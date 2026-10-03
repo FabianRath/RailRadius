@@ -215,9 +215,12 @@ public class TransitGraph {
             String[] ends = oldKey.split(EDGE_SEPARATOR);
             String newFrom = aliasToCanonical.getOrDefault(ends[0], ends[0]);
             String newTo = aliasToCanonical.getOrDefault(ends[1], ends[1]);
-            if (!newFrom.equals(newTo)) {
-                connections.computeIfAbsent(edgeKey(newFrom, newTo), k -> new ArrayList<>()).addAll(edgeConnections);
+            if (newFrom.equals(newTo)) continue;
+            for (Connection c : edgeConnections) {
+                c.setFromStopId(newFrom);
+                c.setToStopId(newTo);
             }
+            connections.computeIfAbsent(edgeKey(newFrom, newTo), k -> new ArrayList<>()).addAll(edgeConnections);
         }
     }
 
