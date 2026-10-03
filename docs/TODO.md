@@ -2,10 +2,11 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B17 · F7 · S9
+**Next free IDs:** B18 · F7 · S9
 
 ## Bugs (data loading)
 - [ ] **B1** UTF-8 BOM breaks header parsing, so Austria is silently dropped. `gtfs_austria.zip` files start with `EF BB BF`. `indexOf(headers, "route_id")` then returns -1, and the feed loads 0 routes, 0 stops and 0 trips (log: "Routes: 273 total, 259 rail routes selected" then "Loaded 0 rail routes, 0 stops"). It's the only affected feed today. Fix: strip a leading `﻿` from the header line in the CSV loaders, add a BOM fixture test, then rebuild the caches. Also make a feed that loads 0 stops a loud warning.
+- [ ] **B17** Trips can be split across stop_times batches. `GtfsFeedLoader.loadStopTimes` turns buffered trips into edges every 100k trips. If a feed's `stop_times.txt` is not grouped by trip, one trip's rows can land in two batches: the second batch overwrites the trip's stop list with only its part (`TransitGraph.addTrip`), and the connection between the last stop of the first part and the first stop of the second is lost. Only affects feeds with >100k rail trips and unsorted rows. Fix direction: flush only trips that cannot get more rows (e.g. require grouped input and detect violations), or merge partial trips by stop_sequence; add a fixture test with interleaved rows and a small batch size.
 
 ## Bugs (algorithm)
 - [ ] **B2** BFS pruning ignores arrival time. `ReachabilitySearch` keeps one best path per station, ranked by (transfers, duration). An earlier-arriving but longer trip is pruned even when it enables a much better onward transfer. Repro: the disabled test `ReachabilityServiceTest.pruningShouldNotDiscardEarlierArrivalsThatEnableBetterTransfers` gets 250 min where 120 is possible. Probably the root cause of B3 and B4. Fix direction: keep a Pareto set per station (arrival time × transfers), or switch to a time-dependent algorithm (e.g. RAPTOR / CSA profile).
