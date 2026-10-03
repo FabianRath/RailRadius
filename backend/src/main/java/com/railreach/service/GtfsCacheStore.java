@@ -1,6 +1,5 @@
 package com.railreach.service;
 
-import com.railreach.model.Connection;
 import com.railreach.model.Station;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,10 +7,9 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.File;
-import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 
 /** Reads and writes the parsed {@link TransitGraph} as one JSON file, so restarts skip parsing the zips. */
 @Component
@@ -25,16 +23,14 @@ public class GtfsCacheStore {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /** Field names are the on-disk format; renaming one invalidates existing cache files. */
-    public record GtfsCacheData(
-            Map<String, Station> stations,
-            Map<String, Set<String>> graph,
-            Map<String, List<Connection>> connectionInfo,
-            Map<String, List<String>> tripStops,
-            Map<String, Set<String>> stopTrips,
-            long timestamp,
-            int stationCount,
-            int graphNodeCount) {}
+    /** Bump on every format change: a cache file with another version is ignored and the zips are re-parsed. */
+    static final int FORMAT_VERSION = 2;
+
+    /**
+     * Field names are the on-disk format. Only stations and trips are stored, see {@link CachedTrip}.
+     * {@code formatVersion} is boxed so a file from before versioning (no such field) reads as null, not an error.
+     */
+    public record GtfsCacheData(Integer formatVersion, Map<String, Station> stations, Map<String, CachedTrip> trips) {}
 
     Optional<GtfsCacheData> load() {
         File file = file();
@@ -46,7 +42,13 @@ public class GtfsCacheStore {
         try {
             log.info("✓ Cache file exists ({} MB)", sizeMb(file));
             log.info("  Loading GTFS cache...");
-            return Optional.of(objectMapper.readValue(file, GtfsCacheData.class));
+            GtfsCacheData data = objectMapper.readValue(file, GtfsCacheData.class);
+            if (!Objects.equals(data.formatVersion(), FORMAT_VERSION)) {
+                log.warn("GTFS cache has format version {}, expected {}; ignoring it", data.formatVersion(),
+                        FORMAT_VERSION);
+                return Optional.empty();
+            }
+            return Optional.of(data);
         } catch (Exception e) {
             log.error("❌ FAILED to load GTFS cache!", e);
             return Optional.empty();
@@ -60,8 +62,8 @@ public class GtfsCacheStore {
             if (file.getParentFile() != null) {
                 file.getParentFile().mkdirs();
             }
-            log.info("  Serializing {} stations, {} connections...", data.stationCount(), data.connectionInfo().size());
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, data);
+            log.info("  Serializing {} stations, {} trips...", data.stations().size(), data.trips().size());
+            objectMapper.writeValue(file, data);
             log.info("✓ GTFS cache saved ({} MB)", sizeMb(file));
         } catch (Exception e) {
             log.error("❌ FAILED to save GTFS cache to {}", file.getAbsolutePath(), e);

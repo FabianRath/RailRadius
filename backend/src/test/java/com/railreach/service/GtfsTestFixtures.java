@@ -29,12 +29,18 @@ final class GtfsTestFixtures {
         }
 
         TransitGraph graph = new TransitGraph();
-        GtfsCacheStore cacheStore = new GtfsCacheStore();
-        ReflectionTestUtils.setField(cacheStore, "cacheFile", tempDir.resolve("gtfs-cache.json").toString());
-        GtfsDataService service = new GtfsDataService(graph, new GtfsFeedLoader(), new StationDeduplicator(), cacheStore);
+        GtfsDataService service = new GtfsDataService(graph, new GtfsFeedLoader(), new StationDeduplicator(),
+                cacheStore(tempDir));
         ReflectionTestUtils.setField(service, "gtfsDirectory", gtfsDir.toString());
         service.loadFromFiles();
         return graph;
+    }
+
+    /** The cache store that {@link #load} writes to. */
+    static GtfsCacheStore cacheStore(Path tempDir) {
+        GtfsCacheStore cacheStore = new GtfsCacheStore();
+        ReflectionTestUtils.setField(cacheStore, "cacheFile", tempDir.resolve("gtfs-cache.json").toString());
+        return cacheStore;
     }
 
     /** A ReachabilityService wired like in the app, without hubs, warming or a Caffeine cache. */

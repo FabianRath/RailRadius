@@ -13,7 +13,6 @@ import lombok.NoArgsConstructor;
 @Builder
 public class Connection {
     private String tripId;
-    private String routeId;
     private String routeName;
     private String fromStopId;
     private String toStopId;
@@ -21,8 +20,6 @@ public class Connection {
     // Seconds since midnight, so the BFS never parses time strings
     private int departureTimeSeconds;
     private int arrivalTimeSeconds;
-    
-    private Integer stopsApart;
     
     // Convenience methods for display (and backwards-compatible deserialization)
     @JsonProperty("departureTime")

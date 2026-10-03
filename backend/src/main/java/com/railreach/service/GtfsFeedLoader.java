@@ -329,13 +329,11 @@ public class GtfsFeedLoader {
                 }
                 graph.addConnection(Connection.builder()
                         .tripId(tripId)
-                        .routeId(StopIds.of(tables.source(), routeId))
                         .routeName(tables.routeNames().get(routeId))
                         .fromStopId(fromCanonical)
                         .toStopId(toCanonical)
                         .departureTimeSeconds(from.departureSeconds())
                         .arrivalTimeSeconds(to.arrivalSeconds())
-                        .stopsApart(1)
                         .build());
                 edgesAdded++;
             }

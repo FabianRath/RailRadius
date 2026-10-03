@@ -1,6 +1,7 @@
 # RailReach — Architecture
 
 _Read this only when you need detail beyond CLAUDE.md. Last reviewed: 2026-10-03._
+_Describes the code as it is now. Update it in the same commit as any change it covers (see CLAUDE.md → Workflow). After a full check against the code, bump the date._
 
 ## Purpose
 
@@ -22,7 +23,7 @@ It loads GTFS timetable feeds for ~25 European countries, keeps only **rail** ro
 Run from `backend/`; the cache paths are relative to the working directory. The commands below are for Git Bash; in PowerShell use `.\mvnw.cmd` instead of `./mvnw`.
 
 - **Full data:** `./mvnw package -DskipTests && java -Xmx12g -jar target/railreach-backend-0.0.1-SNAPSHOT.jar`
-  - `data/gtfs-cache.json` is ~4.2 GB and `data/hub-cache.json` ~840 MB.
+  - `data/hub-cache.json` is ~840 MB. `data/gtfs-cache.json` is ~360 MB (3.6 GB before the trip-based format, S9); it loads in ~17 s.
 - **Dev data:** `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev`
   - Austria + Hungary + Slovakia from `data/gtfs-dev/`, cache in `data/gtfs-dev-cache.json`.
 
@@ -44,12 +45,12 @@ RailReach/
     ├── pom.xml
     ├── src/main/java/com/railreach/{controller,service,dto,model,config}/
     ├── src/main/resources/application.yml (+ application-dev.yml)
-    ├── src/test/java/com/railreach/service/   # GtfsDataServiceTest, ReachabilityServiceTest, GtfsTestFixtures
+    ├── src/test/java/com/railreach/           # service/ (GtfsDataService, Reachability*, GtfsTestFixtures), util/ tests
     ├── src/test/resources/gtfs-mini/          # hand-written fixture feeds (see its README)
     └── data/                                  # GITIGNORED
         ├── gtfs/            # gtfs_<country>.zip, broken/, list.txt (download sources; versioned copy: docs/gtfs-sources.txt), maps
         ├── gtfs-dev/        # 3 small feeds for the dev profile
-        ├── gtfs-cache.json  # processed graph (~4.2 GB, generated)
+        ├── gtfs-cache.json  # processed graph: stations + trips (generated)
         └── hub-cache.json   # precomputed hub reachability (~840 MB, generated)
 ```
 
@@ -67,7 +68,8 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `GtfsFeedLoader` | service | Parses the rail part of each zip into the graph, with per-feed stop dedup |
 | `GtfsCsvReader` | service | Row-by-row reader for one CSV file inside a GTFS zip |
 | `StationDeduplicator` | service | Within-country and cross-border station merging after all feeds are loaded |
-| `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`) |
+| `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`: format version, stations, trips); a file with another version is ignored |
+| `CachedTrip` | service | One trip in the cache file: route name, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
 | `ReachabilityService` | service | Thin orchestrator: request defaults, POST response (`@Cacheable`), SSE streaming, triggers warming |
 | `ReachabilitySearch` | service | Full and incremental trip BFS |
 | `ReachabilityCache` | service | Raw BFS results per `SearchKey`; get-or-compute (incremental / hub / full); Caffeine eviction and stats |
@@ -75,8 +77,8 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `JourneyLegBuilder` | service | BFS path → `ReachableStation` with TRAIN/TRANSFER legs |
 | `HubRoutingService` | service | Top-N hub precompute and hub-based query shortcut |
 | `CacheConfig` | config | Caffeine `CacheManager` ("reachability" cache), `@EnableAsync` |
-| `Station` | model | id, name, lat, lon, parentStation |
-| `Connection` | model | One edge of one trip: tripId, routeId/name, from/to, dep/arr times as **int seconds since midnight** (string getters/setters for JSON) |
+| `Station` | model | id, name, latitude, longitude, parentStation |
+| `Connection` | model | One edge of one trip: tripId, routeName, from/to, dep/arr times as **int seconds since midnight** (string getters/setters for JSON) |
 | `JourneyPath` | model | Internal BFS result: stationIds, connections, transfers, totalDurationMinutes |
 | `ReachabilityRequest` | dto | startStationId, maxTransfers, maxJourneyTimeHours, min/maxTransferTimeMinutes |
 | `ReachabilityResponse` | dto | Start info, count, calcTime, list of `ReachableStation` |
@@ -93,14 +95,14 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 2. **stops.txt / trips.txt**: load stops and the trip→route map.
 3. **Per-feed stop dedup**: stops with the same name within ~0.0015° are merged. IDs are canonicalised to `<source>:<id>`, with `_ARR`/`_DEP`/`ARRIVAL_` style suffixes and prefixes stripped.
 4. **stop_times.txt**: streamed and buffered per trip in batches of 100k trips, rail trips only. Each trip's consecutive stop pairs produce:
-   - `graph`: stopId → neighbour stopIds
-   - `connectionInfo`: `"from->to"` → list of `Connection`
+   - `neighbors`: stopId → neighbour stopIds
+   - `connections`: `"from->to"` → list of `Connection`
    - `tripStops`: tripId → ordered stop list; `stopTrips`: stopId → tripIds
 
 After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStations`):
 5. **Within-country dedup**: same exact name, same source, within ~200 m.
 6. **Cross-border dedup**: ~1 km spatial grid, different sources, within ~500 m, token Jaccard similarity ≥ 0.4. The station with more connections becomes canonical, and every map is remapped.
-7. `GtfsCacheStore` saves the result to the GTFS cache file.
+7. `GtfsCacheStore` saves stations and trips (`CachedTrip`) to the GTFS cache file. On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops` and `stopTrips` from the trips.
 
 `TransitGraph` builds lazy indexes on first access: `tripStopIndex` (trip → stop → position) and `connectionByTrip` (edge → tripId → Connection).
 
@@ -121,12 +123,12 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 - Caffeine `"reachability"` cache holds full `ReachabilityResponse`s from `POST /api/reachability` (max 10k entries, 60 min TTL).
 - **Predictive warming**: after a streaming request, `ReachabilityWarmer` precomputes N+1 … `predictive-max-transfers` (5) on a background thread, into the raw cache only (the stream never reads Caffeine).
 
-**Streaming** (`calculateReachabilityStreaming`): stations are sent as SSE `stations` events in batches (30 stations or 400 ms), then a `done` event (`{total, calculationTimeMs}`), or an `error` event on failure.
+**Streaming** (`calculateReachabilityStreaming`): the BFS runs to completion first (paths improve during the search, so nothing is sent early). The result is then sent as SSE `stations` events in batches of 30, followed by a `done` event (`{total, calculationTimeMs}`), or an `error` event on failure.
 
 ## Hub routing (`HubRoutingService`)
 
 - Hubs are the top `num-hubs` (50) stations by out-degree.
-- For each hub, a BFS with `precompute-transfers` (1) runs on a 4-thread pool with a per-hub timeout. Results are saved to the hub cache file.
+- For each hub, a BFS with `precompute-transfers` (1) runs on a pool of up to 4 threads with a per-hub timeout. Results are saved to the hub cache file.
 - `queryViaHubs`: BFS from the start with `min(N−1, 2)` transfers, then combine with each reachable hub's precomputed paths.
 
 ## REST API
@@ -161,6 +163,8 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 - `algorithm.max-transfer-time-minutes` (180), `algorithm.cache-size` (10000), `algorithm.cache-ttl-minutes` (60)
 - `cache.predictive-enabled` (true), `cache.predictive-max-transfers` (5)
 - `hub.auto-initialize` (false), `hub.cache-file`, `hub.num-hubs` (50), `hub.precompute-transfers` (1), `hub.timeout-seconds` (600)
+
+`application-dev.yml` overrides the GTFS directory and cache file, sets `auto-load-from-files: true`, turns predictive warming off and uses `data/hub-dev-cache.json`.
 
 ## Known issues and TODOs
 
