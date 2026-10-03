@@ -10,3 +10,4 @@ Short log of notable choices, newest first. Format: date — decision — why.
 - **2026-10-03 — Tests use a hand-written `gtfs-mini` fixture** (`src/test/resources/gtfs-mini/`), zipped on the fly by `GtfsTestFixtures`. Tests run in milliseconds and every expected value can be checked by hand. The Spring context test runs with profile `test`, which loads no data.
 - **2026-10-03 — Known bugs are captured as `@Disabled` tests** with the reason in the annotation. Re-enable the test when fixing the bug.
 - **2026-10-03 — Source files moved into folders matching their declared packages** (`controller`, `service`, `dto`, `model`, `config`). Before this, the files sat in one flat folder.
+- **2026-10-03 — Base map uses the standard OpenStreetMap tiles** (`tile.openstreetmap.org`). CARTO `dark_all` started requiring an API key. OSM needs no key, at the cost of a light map under the dark UI. Its tile usage policy allows light use like this, but not heavy or bulk traffic.

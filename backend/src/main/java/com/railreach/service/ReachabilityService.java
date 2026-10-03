@@ -606,6 +606,7 @@ public class ReachabilityService {
         final long FLUSH_MS  = 400;
         List<ReachableStation> batch = new ArrayList<>();
         long[] lastFlush = {System.currentTimeMillis()};
+        int[] streamedCount = {0};
 
         Consumer<Map.Entry<String, JourneyPath>> consumer = entry -> {
             String stopId    = entry.getKey();
@@ -622,6 +623,7 @@ public class ReachabilityService {
             ReachableStation rs = toReachableStation(stopId, path, station);
             if (rs == null) return;
             batch.add(rs);
+            streamedCount[0]++;
 
             long now = System.currentTimeMillis();
             if (batch.size() >= BATCH_SIZE || (now - lastFlush[0]) >= FLUSH_MS) {
@@ -632,7 +634,7 @@ public class ReachabilityService {
         };
 
         try {
-            Map<String, JourneyPath> reachable = resolveReachability(
+            resolveReachability(
                     request.getStartStationId(), maxTransfers, minTransferMins, maxTransferMins, consumer);
 
             // Flush remaining
@@ -652,7 +654,7 @@ public class ReachabilityService {
             emitter.send(SseEmitter.event()
                     .name("done")
                     .data(Map.of(
-                        "total", reachable.size(),
+                        "total", streamedCount[0],
                         "calculationTimeMs", duration
                     )));
             emitter.complete();

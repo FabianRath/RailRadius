@@ -284,8 +284,8 @@ public class GtfsDataService {
                                      s1.getName().toLowerCase().contains("köln") ||
                                      s2.getName().toLowerCase().contains("köln")) &&
                                     sim > 0.3) {
-                                    log.info("  Cross-border candidate: '{}' <-> '{}' (sim={:.2f})",
-                                            s1.getName(), s2.getName(), sim);
+                                    log.info("  Cross-border candidate: '{}' <-> '{}' (sim={})",
+                                            s1.getName(), s2.getName(), String.format("%.2f", sim));
                                 }
                                 
                                 // Accept if similarity >= 0.4 (was 0.5)
@@ -300,10 +300,10 @@ public class GtfsDataService {
                                     aliasToCanonical.put(alias, canonical);
                                     crossBorderMerges++;
                                     
-                                    log.info("  MERGED: '{}' ({}) -> '{}' ({}) [sim={:.2f}]",
+                                    log.info("  MERGED: '{}' ({}) -> '{}' ({}) [sim={}]",
                                             alias, s1.getName().equals(alias) ? s1.getName() : s2.getName(),
                                             canonical, s1.getName().equals(canonical) ? s1.getName() : s2.getName(),
-                                            sim);
+                                            String.format("%.2f", sim));
                                 }
                             }
                         }

@@ -10,8 +10,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -93,6 +97,42 @@ class ReachabilityServiceTest {
         ReachableStation b2 = find(query(withFastTrain, "alpha:A1", 1, 0, 180), "beta:B2").orElseThrow();
 
         assertThat(b2.getTotalDurationMinutes()).isEqualTo(120); // currently 250 via T6 -> U3
+    }
+
+    @Test
+    void doneEventCountsOnlyStationsWithinMaxJourneyTime() {
+        // A2 (30 min) and A3/B1 (60 min) fit into 1 h, B2 (120 min) does not
+        RecordingEmitter emitter = new RecordingEmitter();
+        ReachabilityService service = new ReachabilityService(gtfs, new ConcurrentMapCacheManager());
+        service.calculateReachabilityStreaming(ReachabilityRequest.builder()
+                .startStationId("alpha:A1")
+                .maxTransfers(1)
+                .minTransferTimeMinutes(0)
+                .maxTransferTimeMinutes(180)
+                .maxJourneyTimeHours(1.0)
+                .build(), emitter);
+
+        long streamedCount = emitter.payloads.stream()
+                .filter(List.class::isInstance)
+                .mapToLong(batch -> ((List<?>) batch).size())
+                .sum();
+        Map<?, ?> done = emitter.payloads.stream()
+                .filter(Map.class::isInstance).map(Map.class::cast)
+                .findFirst().orElseThrow();
+        assertThat(streamedCount).isEqualTo(2);
+        assertThat(done.get("total")).isEqualTo(2);
+    }
+
+    /** Captures the data objects of every sent SSE event instead of writing them to a response. */
+    private static class RecordingEmitter extends SseEmitter {
+        final List<Object> payloads = new ArrayList<>();
+
+        @Override
+        public void send(SseEventBuilder event) {
+            event.build().stream().map(DataWithMediaType::getData)
+                    .filter(data -> !(data instanceof String))
+                    .forEach(payloads::add);
+        }
     }
 
     private static ReachabilityResponse query(GtfsDataService data, String start, int maxTransfers,
