@@ -34,7 +34,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Structure
 - [ ] **S1** Split `GtfsDataService` (~1100 lines) into `GtfsFeedLoader`, `StationDeduplicator`, `TransitGraph` and `GtfsCacheStore`.
 - [ ] **S2** Split `ReachabilityService` (~870 lines) into `ReachabilitySearch`, `JourneyLegBuilder`, `ReachabilityCache` and a thin orchestrator. This also fixes B7.
-- [ ] **S4** Consolidate duplicated GTFS time logic into `util/GtfsTime`: `Connection.formatTime/parseTime`, `GtfsDataService.formatTime/parseGtfsTime`, `ReachabilityService.parseTime/formatDuration/timeDiff/totalDuration` (see CODING_GUIDELINES §2).
 - [ ] **S5** Extract stop-ID source parsing (`id.split(":")[0]`, 3×) into `util/StopIds`.
 - [ ] **S6** Style cleanup when touching files: wildcard imports (7), inline fully-qualified names (`CacheConfig`, `ReachabilityService`), `QueueItem` → record, `double CELL_SIZE` local → constant, Paris/Köln debug-log special case in `deduplicateCrossBorder`, `@Value` without default for `max-transfer-time-minutes`.
 - [ ] **S8** Feeds that failed to load: `data/gtfs/broken/` (finland, lithuania).

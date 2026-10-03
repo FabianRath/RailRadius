@@ -4,6 +4,7 @@ import com.railreach.dto.*;
 import com.railreach.model.Connection;
 import com.railreach.model.JourneyPath;
 import com.railreach.model.Station;
+import com.railreach.util.GtfsTime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
@@ -208,8 +209,7 @@ public class ReachabilityService {
                             cur.stationId, newTripStops.get(curIdx + 1), tripId);
                     if (firstConn == null) continue;
 
-                    int waitMins = (firstConn.getDepartureTimeSeconds() - arrivalSec) / 60;
-                    if (waitMins < -60) waitMins += 24 * 60;
+                    int waitMins = GtfsTime.diffMinutes(arrivalSec, firstConn.getDepartureTimeSeconds());
                     if (waitMins < minTransferMins || waitMins > maxTransferMins) continue;
                 }
 
@@ -240,13 +240,9 @@ public class ReachabilityService {
                     int depSec = conn.getDepartureTimeSeconds();
                     int arrSec = conn.getArrivalTimeSeconds();
                     if (prevArrSec >= 0) {
-                        int waitMins = (depSec - prevArrSec) / 60;
-                        if (waitMins < -60) waitMins += 24 * 60;
-                        runningDur += Math.max(0, waitMins);
+                        runningDur += Math.max(0, GtfsTime.diffMinutes(prevArrSec, depSec));
                     }
-                    int segMins = (arrSec - depSec) / 60;
-                    if (segMins < -60) segMins += 24 * 60;
-                    runningDur += Math.max(0, segMins);
+                    runningDur += Math.max(0, GtfsTime.diffMinutes(depSec, arrSec));
                     prevArrSec = arrSec;
 
                     runningConns.add(conn);
@@ -369,8 +365,7 @@ public class ReachabilityService {
                                 cur.stationId, nextStop, tripId);
                         if (newConn == null) continue;
 
-                        int waitTimeMins = (newConn.getDepartureTimeSeconds() - arrivalTimeSeconds) / 60;
-                        if (waitTimeMins < -60) waitTimeMins += 24 * 60;
+                        int waitTimeMins = GtfsTime.diffMinutes(arrivalTimeSeconds, newConn.getDepartureTimeSeconds());
                         if (waitTimeMins < minTransferMins || waitTimeMins > maxTransferMins) continue;
                     }
                 } else if (isNewTrip) {
@@ -415,13 +410,9 @@ public class ReachabilityService {
                     int arrSec = conn.getArrivalTimeSeconds();
                     if (prevArrivalSeconds >= 0) {
                         // Transfer wait (0 if continuing same trip)
-                        int waitMins = (depSec - prevArrivalSeconds) / 60;
-                        if (waitMins < -60) waitMins += 24 * 60;
-                        runningDurMinutes += Math.max(0, waitMins);
+                        runningDurMinutes += Math.max(0, GtfsTime.diffMinutes(prevArrivalSeconds, depSec));
                     }
-                    int segMins = (arrSec - depSec) / 60;
-                    if (segMins < -60) segMins += 24 * 60;
-                    runningDurMinutes += Math.max(0, segMins);
+                    runningDurMinutes += Math.max(0, GtfsTime.diffMinutes(depSec, arrSec));
                     prevArrivalSeconds = arrSec;
 
                     runningConns.add(conn);
@@ -654,7 +645,7 @@ public class ReachabilityService {
                 .latitude(station.getLatitude())
                 .longitude(station.getLongitude())
                 .transfers(path.getTransfers())
-                .totalDuration(formatDuration(path.getTotalDurationMinutes()))
+                .totalDuration(GtfsTime.formatDuration(path.getTotalDurationMinutes()))
                 .totalDurationMinutes(path.getTotalDurationMinutes())
                 .path(path.getStationIds())
                 .pathNames(pathNames)
@@ -684,7 +675,7 @@ public class ReachabilityService {
                             .latitude(station.getLatitude())
                             .longitude(station.getLongitude())
                             .transfers(path.getTransfers())
-                            .totalDuration(formatDuration(path.getTotalDurationMinutes()))
+                            .totalDuration(GtfsTime.formatDuration(path.getTotalDurationMinutes()))
                             .totalDurationMinutes(path.getTotalDurationMinutes())
                             .path(path.getStationIds())
                             .pathNames(pathNames)
@@ -720,7 +711,7 @@ public class ReachabilityService {
                         && prev.getRouteName().equals(next.getRouteName());
                 // "Continuous" means the train arrives at the same time as the next departs
                 // (or within 1 minute - allow for rounding)
-                boolean continuous = timeDiff(prev.getArrivalTimeSeconds(), next.getDepartureTimeSeconds()) <= 1;
+                boolean continuous = GtfsTime.diffMinutes(prev.getArrivalTimeSeconds(), next.getDepartureTimeSeconds()) <= 1;
 
                 if (sameTrip || (sameName && continuous)) {
                     j++;
@@ -731,7 +722,7 @@ public class ReachabilityService {
 
             // connections[i..j-1] are all the same train ride
             Connection segEnd = connections.get(j - 1);
-            int dur = timeDiff(depTimeSeconds, segEnd.getArrivalTimeSeconds());
+            int dur = GtfsTime.diffMinutes(depTimeSeconds, segEnd.getArrivalTimeSeconds());
 
             legs.add(JourneyLeg.builder()
                     .type("TRAIN")
@@ -740,7 +731,7 @@ public class ReachabilityService {
                     .toStation(stationName(segEnd.getToStopId()))
                     .departureTime(segStart.getDepartureTime())  // Getter formats the int as string
                     .arrivalTime(segEnd.getArrivalTime())         // Getter formats the int as string
-                    .duration(formatDuration(dur))
+                    .duration(GtfsTime.formatDuration(dur))
                     .durationMinutes(dur)
                     .build());
 
@@ -749,16 +740,15 @@ public class ReachabilityService {
                 Connection nextSeg = connections.get(j);
                 // nextSeg is the first connection of the next train leg,
                 // departing FROM the transfer station — correct departure time
-                int transferTimeSeconds = nextSeg.getDepartureTimeSeconds() - segEnd.getArrivalTimeSeconds();
-                int transferTimeMins = transferTimeSeconds / 60;
-                if (transferTimeMins < -60) transferTimeMins += 24 * 60; // overnight wrap
+                int transferTimeMins = GtfsTime.diffMinutes(
+                        segEnd.getArrivalTimeSeconds(), nextSeg.getDepartureTimeSeconds());
                 String transferStation = stationName(segEnd.getToStopId());
 
                 legs.add(JourneyLeg.builder()
                         .type("TRANSFER")
                         .fromStation(transferStation)
                         .toStation(transferStation)
-                        .duration(formatDuration(Math.max(0, transferTimeMins)))
+                        .duration(GtfsTime.formatDuration(Math.max(0, transferTimeMins)))
                         .durationMinutes(Math.max(0, transferTimeMins))
                         .build());
             }
@@ -772,21 +762,6 @@ public class ReachabilityService {
     private String stationName(String stopId) {
         Station s = gtfsDataService.getStation(stopId);
         return s != null ? s.getName() : stopId;
-    }
-
-    private int timeDiff(int fromSeconds, int toSeconds) {
-        int diffSeconds = toSeconds - fromSeconds;
-        int diffMins = diffSeconds / 60;
-        // Allow wraparound only for small values (overnight trains, max 4h wrap)
-        // For transfer time validation we want the raw difference
-        if (diffMins < -60) diffMins += 24 * 60; // only wrap if more than 1h negative (genuine overnight)
-        return diffMins;
-    }
-
-    private String formatDuration(int minutes) {
-        if (minutes < 0) minutes = 0;
-        int h = minutes / 60, m = minutes % 60;
-        return h > 0 ? h + "h " + m + "m" : m + "m";
     }
 
     private static class QueueItem {
