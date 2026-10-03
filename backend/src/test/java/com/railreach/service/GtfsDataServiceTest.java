@@ -35,6 +35,14 @@ class GtfsDataServiceTest {
     }
 
     @Test
+    void onlyStopsServedByRailTripsBecomeStations() {
+        assertThat(gtfs.getStation("alpha:A1")).isNotNull();
+        assertThat(gtfs.getStation("alpha:A9")).as("bus-only stop").isNull();
+        assertThat(gtfs.getStation("alpha:AP")).as("unserved parent station").isNull();
+        assertThat(gtfs.getStation("alpha:AE")).as("entrance").isNull();
+    }
+
+    @Test
     void sameNameNearbyStopsWithinFeedAreMerged() {
         // T1 serves A2b, which is merged into A2 (same name, ~50 m apart)
         assertThat(gtfs.getNeighbors("alpha:A1")).contains("alpha:A2");
