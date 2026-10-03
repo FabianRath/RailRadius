@@ -1,0 +1,50 @@
+import { searchStations } from './api.js';
+import { escapeHtml } from './util.js';
+
+const SEARCH_DEBOUNCE_MS = 300;
+const MIN_QUERY_LENGTH = 2;
+
+const searchInput = document.getElementById('searchInput');
+const stationResults = document.getElementById('stationResults');
+
+/** onSelect receives { id, name } of the clicked station. */
+export function initSearch(onSelect) {
+    let debounceTimer;
+    searchInput.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => runSearch(searchInput.value), SEARCH_DEBOUNCE_MS);
+    });
+    stationResults.addEventListener('click', e => {
+        const item = e.target.closest('.station-item');
+        if (!item) return;
+        searchInput.value = item.dataset.name;
+        stationResults.innerHTML = '';
+        onSelect({ id: item.dataset.id, name: item.dataset.name });
+    });
+}
+
+async function runSearch(query) {
+    if (!query || query.length < MIN_QUERY_LENGTH) {
+        stationResults.innerHTML = '';
+        return;
+    }
+    try {
+        const stations = await searchStations(query);
+        stationResults.innerHTML = stations.length === 0
+            ? '<div class="no-results">No stations found</div>'
+            : `<div class="station-list">${stations.map(stationItemHtml).join('')}</div>`;
+    } catch (error) {
+        console.error('Search error:', error);
+        stationResults.innerHTML = '<div class="no-results">⚠️ Backend connection failed</div>';
+    }
+}
+
+function stationItemHtml(station) {
+    const detail = station.connections != null
+        ? `${station.connections} connection${station.connections !== 1 ? 's' : ''}`
+        : station.id;
+    return `<div class="station-item" data-id="${escapeHtml(station.id)}" data-name="${escapeHtml(station.name)}">`
+        + `<div class="station-name">${escapeHtml(station.name)}</div>`
+        + `<div class="station-id">${escapeHtml(detail)}</div>`
+        + '</div>';
+}

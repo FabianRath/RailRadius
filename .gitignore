@@ -41,3 +41,6 @@ Thumbs.db
 
 # Playwright MCP screenshots and logs
 .playwright-mcp/
+
+# Personal manual test notes
+MANUAL_TEST.md

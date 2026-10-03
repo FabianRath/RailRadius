@@ -12,7 +12,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.function.Consumer;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import java.util.*;
@@ -21,6 +20,8 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class ReachabilityService {
+
+    private static final int STREAM_BATCH_SIZE = 30;
 
     private final GtfsDataService gtfsDataService;
     private final CacheManager cacheManager;
@@ -69,7 +70,7 @@ public class ReachabilityService {
                 request.getStartStationId(), maxTransfers, minTransferMins, maxTransferMins);
 
         Map<String, JourneyPath> reachable = resolveReachability(
-                request.getStartStationId(), maxTransfers, minTransferMins, maxTransferMins, null);
+                request.getStartStationId(), maxTransfers, minTransferMins, maxTransferMins);
 
         if (request.getMaxJourneyTimeHours() != null) {
             int maxMins = (int) (request.getMaxJourneyTimeHours() * 60);
@@ -100,8 +101,7 @@ public class ReachabilityService {
      * Also writes results into rawPathCache for future incremental use.
      */
     private Map<String, JourneyPath> resolveReachability(
-            String startId, int maxTransfers, int minTransferMins, int maxTransferMins,
-            Consumer<Map.Entry<String, JourneyPath>> consumer) {
+            String startId, int maxTransfers, int minTransferMins, int maxTransferMins) {
 
         String rawKey  = startId + "-" + maxTransfers + "-" + minTransferMins + "-" + maxTransferMins;
         String prevKey = startId + "-" + (maxTransfers - 1) + "-" + minTransferMins + "-" + maxTransferMins;
@@ -111,9 +111,6 @@ public class ReachabilityService {
         if (cached != null) {
             log.info("  Raw cache HIT: {} x{} ({} stations) — skipping BFS",
                     startId, maxTransfers, cached.size());
-            if (consumer != null) {
-                cached.forEach((id, jp) -> consumer.accept(Map.entry(id, jp)));
-            }
             return cached;
         }
 
@@ -125,25 +122,16 @@ public class ReachabilityService {
         if (prevResult != null && !prevResult.isEmpty()) {
             log.info("  Incremental BFS: seeding from {} x{} ({} stations), adding 1 more transfer",
                     startId, maxTransfers - 1, prevResult.size());
-            // Re-emit all previously known stations so the frontend map is complete.
-            // The incremental BFS consumer only fires for genuinely new discoveries,
-            // so without this the SSE stream would be missing every N-1 station.
-            if (consumer != null) {
-                prevResult.forEach((id, jp) -> consumer.accept(Map.entry(id, jp)));
-            }
-            result = runIncrementalBFS(startId, prevResult, maxTransfers, minTransferMins, maxTransferMins, consumer);
+            result = runIncrementalBFS(startId, prevResult, maxTransfers, minTransferMins, maxTransferMins);
 
         } else if (maxTransfers >= 1 && hubRoutingService != null
                 && hubRoutingService.isHubRoutingAvailable()) {
             log.info("  Hub routing: {} x{}", startId, maxTransfers);
             result = hubRoutingService.queryViaHubs(startId, maxTransfers, minTransferMins, maxTransferMins);
-            if (consumer != null) {
-                result.forEach((id, jp) -> consumer.accept(Map.entry(id, jp)));
-            }
 
         } else {
             log.info("  Full BFS: {} x{}", startId, maxTransfers);
-            result = runBFSInternal(startId, maxTransfers, minTransferMins, maxTransferMins, consumer);
+            result = runBFSInternal(startId, maxTransfers, minTransferMins, maxTransferMins);
         }
 
         // Store raw result for future incremental use
@@ -166,8 +154,7 @@ public class ReachabilityService {
             Map<String, JourneyPath> prevResult,
             int maxTransfers,
             int minTransferMins,
-            int maxTransferMins,
-            Consumer<Map.Entry<String, JourneyPath>> consumer) {
+            int maxTransferMins) {
 
         // Start with a copy of all known stations from the N-1 result
         Map<String, JourneyPath> reachable = new HashMap<>(prevResult);
@@ -287,12 +274,6 @@ public class ReachabilityService {
                                 .build();
                         reachable.put(nextStopId, jp);
 
-                        // Only emit to consumer if this is genuinely new or improved
-                        if (consumer != null && (existingPath == null
-                                || nextTransfers < existingPath.getTransfers())) {
-                            consumer.accept(Map.entry(nextStopId, jp));
-                        }
-
                         // Only push to queue if we haven't yet hit maxTransfers
                         if (nextTransfers < maxTransfers) {
                             queue.offer(new QueueItem(nextStopId, nextTransfers,
@@ -317,12 +298,11 @@ public class ReachabilityService {
      * Package-private to allow hub routing to use it.
      */
     Map<String, JourneyPath> runBFSInternal(String startId, int maxTransfers, int maxTransferMins) {
-        return runBFSInternal(startId, maxTransfers, 0, maxTransferMins, null);
+        return runBFSInternal(startId, maxTransfers, 0, maxTransferMins);
     }
 
     Map<String, JourneyPath> runBFSInternal(String startId, int maxTransfers,
-                                             int minTransferMins, int maxTransferMins,
-                                             Consumer<Map.Entry<String, JourneyPath>> stationConsumer) {
+                                             int minTransferMins, int maxTransferMins) {
         Map<String, JourneyPath> reachable = new HashMap<>();
         Queue<QueueItem> queue = new LinkedList<>();
         int lastLoggedCount = 0;
@@ -471,10 +451,6 @@ public class ReachabilityService {
                                 .build();
                         reachable.put(nextStopId, jp);
 
-                        if (stationConsumer != null) {
-                            stationConsumer.accept(Map.entry(nextStopId, jp));
-                        }
-
                         queue.offer(new QueueItem(nextStopId, nextTransfers,
                                 storedPath, storedConns, tripId, runningDurMinutes));
                     }
@@ -584,7 +560,7 @@ public class ReachabilityService {
     }
 
     /**
-     * Streaming version: runs BFS and feeds discovered stations into the
+     * Streaming version: resolves reachability, then sends the result to the
      * provided SseEmitter in batches. Designed to be called from a dedicated
      * thread so the HTTP response stays open until BFS completes.
      */
@@ -598,48 +574,16 @@ public class ReachabilityService {
 
         // NOTE: Cache lookup is handled entirely by resolveReachability() via rawPathCache.
         // We intentionally do NOT check the Caffeine response cache here — it can hold
-        // stale results (e.g. from predictive warming before incremental BFS ran) that
-        // would bypass pre-emission of N-1 stations and show an incorrect count.
-
-        // Batch buffer — flush to SSE every BATCH_SIZE stations or FLUSH_MS milliseconds
-        final int BATCH_SIZE = 30;
-        final long FLUSH_MS  = 400;
-        List<ReachableStation> batch = new ArrayList<>();
-        long[] lastFlush = {System.currentTimeMillis()};
-        int[] streamedCount = {0};
-
-        Consumer<Map.Entry<String, JourneyPath>> consumer = entry -> {
-            String stopId    = entry.getKey();
-            JourneyPath path = entry.getValue();
-            Station station  = gtfsDataService.getStation(stopId);
-            if (station == null) return;
-
-            // Apply journey time filter early if set
-            if (request.getMaxJourneyTimeHours() != null) {
-                int maxMins = (int)(request.getMaxJourneyTimeHours() * 60);
-                if (path.getTotalDurationMinutes() > maxMins) return;
-            }
-
-            ReachableStation rs = toReachableStation(stopId, path, station);
-            if (rs == null) return;
-            batch.add(rs);
-            streamedCount[0]++;
-
-            long now = System.currentTimeMillis();
-            if (batch.size() >= BATCH_SIZE || (now - lastFlush[0]) >= FLUSH_MS) {
-                flushBatch(emitter, new ArrayList<>(batch));
-                batch.clear();
-                lastFlush[0] = now;
-            }
-        };
+        // stale results (e.g. from predictive warming before incremental BFS ran).
 
         try {
-            resolveReachability(
-                    request.getStartStationId(), maxTransfers, minTransferMins, maxTransferMins, consumer);
-
-            // Flush remaining
-            if (!batch.isEmpty()) {
-                flushBatch(emitter, batch);
+            // Stream only the finished result: the BFS improves paths as it goes, so emitting
+            // during the search would send stations more than once and with non-final paths.
+            Map<String, JourneyPath> reachable = resolveReachability(
+                    request.getStartStationId(), maxTransfers, minTransferMins, maxTransferMins);
+            List<ReachableStation> stations = toStreamedStations(request, reachable);
+            for (int i = 0; i < stations.size(); i += STREAM_BATCH_SIZE) {
+                flushBatch(emitter, stations.subList(i, Math.min(i + STREAM_BATCH_SIZE, stations.size())));
             }
 
             // Evict any stale Caffeine entry so calculateReachability() re-populates it
@@ -654,7 +598,7 @@ public class ReachabilityService {
             emitter.send(SseEmitter.event()
                     .name("done")
                     .data(Map.of(
-                        "total", streamedCount[0],
+                        "total", stations.size(),
                         "calculationTimeMs", duration
                     )));
             emitter.complete();
@@ -671,6 +615,22 @@ public class ReachabilityService {
             } catch (Exception ignored) {}
             emitter.completeWithError(e);
         }
+    }
+
+    /** The start station itself is not a destination, so it is never streamed. */
+    private List<ReachableStation> toStreamedStations(ReachabilityRequest request,
+                                                      Map<String, JourneyPath> reachable) {
+        Integer maxJourneyMins = request.getMaxJourneyTimeHours() != null
+                ? (int) (request.getMaxJourneyTimeHours() * 60) : null;
+        List<ReachableStation> stations = new ArrayList<>();
+        reachable.forEach((stopId, path) -> {
+            if (stopId.equals(request.getStartStationId())) return;
+            if (maxJourneyMins != null && path.getTotalDurationMinutes() > maxJourneyMins) return;
+            Station station = gtfsDataService.getStation(stopId);
+            if (station == null) return;
+            stations.add(toReachableStation(stopId, path, station));
+        });
+        return stations;
     }
 
     private void flushBatch(SseEmitter emitter, List<ReachableStation> stations) {

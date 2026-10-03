@@ -6,7 +6,7 @@ _Read this only when you need detail beyond CLAUDE.md. Last reviewed: 2026-10-03
 
 RailReach answers the question **"Where can I get by train from station X with at most N transfers?"** across Europe.
 
-It loads GTFS timetable feeds for ~25 European countries, keeps only **rail** routes, and builds one merged station/connection graph (with cross-border station deduplication). It then runs a transfer-bounded BFS from a start station. The result is every reachable station with transfer count, total duration, path, and a leg-by-leg itinerary (train legs and transfer waits). The browser frontend (`frontend/index.html`) draws the results on a map and receives stations live via Server-Sent Events.
+It loads GTFS timetable feeds for ~25 European countries, keeps only **rail** routes, and builds one merged station/connection graph (with cross-border station deduplication). It then runs a transfer-bounded BFS from a start station. The result is every reachable station with transfer count, total duration, path, and a leg-by-leg itinerary (train legs and transfer waits). The browser frontend (`frontend/`, served by the backend at `http://localhost:8080/`) draws the results on a MapLibre map with OpenFreeMap's dark style and receives stations live via Server-Sent Events.
 
 ## Tech stack
 
@@ -35,7 +35,10 @@ Run from `backend/`; the cache paths are relative to the working directory.
 ```
 RailReach/
 ├── CLAUDE.md, docs/ (ARCHITECTURE, TODO, decisions), scripts/api.sh
-├── frontend/index.html               # single-file map UI (Leaflet), talks to localhost:8080
+├── frontend/index.html               # markup; served at / by Spring (static-locations: file:../frontend/)
+├── frontend/css/app.css              # all styles and the map palette (CSS variables)
+├── frontend/js/                      # ES modules: main (entry), api, map (only MapLibre user), search, query-form,
+│                                     #   reachability (SSE), coverage (Turf), popup, debug, util, config
 ├── frontend/backend_test.html        # small manual API test page
 └── backend/
     ├── pom.xml

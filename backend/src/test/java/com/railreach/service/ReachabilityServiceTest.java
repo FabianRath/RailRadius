@@ -123,6 +123,27 @@ class ReachabilityServiceTest {
         assertThat(done.get("total")).isEqualTo(2);
     }
 
+    @Test
+    void uncachedStreamSendsEachStationOnceAndMatchesTheCachedRepeat() {
+        ReachabilityService service = new ReachabilityService(gtfs, new ConcurrentMapCacheManager());
+        ReachabilityRequest request = ReachabilityRequest.builder()
+                .startStationId("alpha:A1")
+                .maxTransfers(1)
+                .minTransferTimeMinutes(0)
+                .maxTransferTimeMinutes(180)
+                .build();
+
+        RecordingEmitter first = new RecordingEmitter();
+        service.calculateReachabilityStreaming(request, first);
+        RecordingEmitter repeat = new RecordingEmitter();
+        service.calculateReachabilityStreaming(request, repeat);
+
+        assertThat(first.streamedStopIds()).doesNotHaveDuplicates().doesNotContain("alpha:A1");
+        assertThat(first.streamedStopIds()).containsExactlyInAnyOrderElementsOf(repeat.streamedStopIds());
+        assertThat(first.done().get("total")).isEqualTo(first.streamedStopIds().size());
+        assertThat(repeat.done().get("total")).isEqualTo(repeat.streamedStopIds().size());
+    }
+
     /** Captures the data objects of every sent SSE event instead of writing them to a response. */
     private static class RecordingEmitter extends SseEmitter {
         final List<Object> payloads = new ArrayList<>();
@@ -132,6 +153,20 @@ class ReachabilityServiceTest {
             event.build().stream().map(DataWithMediaType::getData)
                     .filter(data -> !(data instanceof String))
                     .forEach(payloads::add);
+        }
+
+        List<String> streamedStopIds() {
+            return payloads.stream()
+                    .filter(List.class::isInstance)
+                    .flatMap(batch -> ((List<?>) batch).stream())
+                    .map(station -> ((ReachableStation) station).getStopId())
+                    .toList();
+        }
+
+        Map<?, ?> done() {
+            return payloads.stream()
+                    .filter(Map.class::isInstance).map(Map.class::cast)
+                    .findFirst().orElseThrow();
         }
     }
 

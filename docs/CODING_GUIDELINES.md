@@ -7,7 +7,7 @@ Binding for every change. Existing code does not always follow them yet. New and
 |---|---|---|
 | Backend | Java 25, Spring Boot (webmvc, actuator, cache), Lombok, Caffeine, Jackson, SLF4J via `@Slf4j` | Guava, Apache Commons, Gson, a second cache/JSON/logging lib |
 | Tests | JUnit 5, AssertJ, `gtfs-mini` fixture | Mockito (unless there is truly no real object), Hamcrest, Spring context in unit tests |
-| Frontend | Vanilla JS, Leaflet 1.9.4, Turf 6, from CDN | Frameworks, jQuery, npm/build step |
+| Frontend | Vanilla JS (native ES modules), MapLibre GL JS 6, Turf 6, from CDN; OpenFreeMap tiles | Frameworks, jQuery, Leaflet, npm/build step, map tiles that need a key or forbid commercial use |
 
 - Adding a dependency: **ask first**, then add a line in `decisions.md`. Try the JDK, Spring, and the existing deps first.
 - `gtfs-lib` is only used for its `Stop`/`StopTime` POJOs and will be removed. Don't add new usages.
@@ -18,7 +18,7 @@ Binding for every change. Existing code does not always follow them yet. New and
 - Single homes for shared concerns (create them when you first need them, then migrate callers you touch):
   - GTFS time and durations (parse `HH:MM:SS`, format, minutes↔seconds, overnight wrap) → `com.railreach.util.GtfsTime`
   - Stop ID handling (canonical ID, extract source) → `com.railreach.util.StopIds`
-  - Frontend backend URL → one `const API_BASE`; all calls go through it
+  - Frontend backend URL → `API_BASE` in `js/config.js`; all calls go through `js/api.js`
 - New logic goes into a new focused class. Don't grow `GtfsDataService` or `ReachabilityService`.
 
 ## 3. No bloat
@@ -59,10 +59,13 @@ Binding for every change. Existing code does not always follow them yet. New and
 - Plain objects on `GtfsTestFixtures.load(tempDir, ...)`, with AssertJ assertions. Test names are behaviour sentences: `oneTransferReachesStationBehindTheBorder`.
 - Need new data? Extend `gtfs-mini` and document it in its README. Don't create a parallel fixture.
 
-## 8. Frontend (`frontend/index.html`)
-- Stays one file and vanilla. Use `const` by default, `let` only when reassigned, never `var`. Use `async`/`await` with `fetch`. Declare functions with `function name() {}`.
-- Reuse existing helpers (`fmtMins`, `showStatus`, `setLoadingState`, …) before writing new ones.
-- Styling: add classes in the `<style>` block and use the existing `--` CSS variables. No new inline `style="…"` and no hardcoded colours.
+## 8. Frontend (`frontend/`)
+- Vanilla, no build step. `index.html` holds markup only, `css/app.css` all styles, `js/` one ES module per concern (`api`, `map`, `search`, `query-form`, `reachability`, `coverage`, `popup`, `debug`, `util`; `main.js` wires them up). New logic goes into the module it belongs to, or a new one.
+- Only `js/map.js` talks to MapLibre. Other modules call its functions and never touch the map object.
+- Use `const` by default, `let` only when reassigned, never `var`. Use `async`/`await` with `fetch`. Declare functions with `function name() {}`.
+- Reuse existing helpers (`fmtMins`, `escapeHtml`, `showStatus`, `cssVar`, …) before writing new ones.
+- Styling: add classes to `css/app.css` and use the `--` CSS variables. No inline `style="…"` and no hardcoded colours, also not in JS: map colours are CSS variables read with `cssVar()`.
+- The page only works over HTTP (ES modules): open it via the backend at `http://localhost:8080/`, not as a file.
 - Escape GTFS/user text before inserting it via `innerHTML`, or use `textContent`.
 
 ## 9. Bugs and `TODO.md`

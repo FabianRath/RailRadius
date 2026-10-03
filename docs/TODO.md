@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B16 · F7 · S9
+**Next free IDs:** B17 · F7 · S9
 
 ## Bugs (data loading)
 - [ ] **B1** UTF-8 BOM breaks header parsing, so Austria is silently dropped. `gtfs_austria.zip` files start with `EF BB BF`. `indexOf(headers, "route_id")` then returns -1, and the feed loads 0 routes, 0 stops and 0 trips (log: "Routes: 273 total, 259 rail routes selected" then "Loaded 0 rail routes, 0 stops"). It's the only affected feed today. Fix: strip a leading `﻿` from the header line in the CSV loaders, add a BOM fixture test, then rebuild the caches. Also make a feed that loads 0 stops a loud warning.
@@ -38,5 +38,4 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 - [ ] **S4** Consolidate duplicated GTFS time logic into `util/GtfsTime`: `Connection.formatTime/parseTime`, `GtfsDataService.formatTime/parseGtfsTime`, `ReachabilityService.parseTime/formatDuration/timeDiff/totalDuration` (see CODING_GUIDELINES §2).
 - [ ] **S5** Extract stop-ID source parsing (`id.split(":")[0]`, 3×) into `util/StopIds`.
 - [ ] **S6** Style cleanup when touching files: wildcard imports (7), inline fully-qualified names (`CacheConfig`, `ReachabilityService`), `QueueItem` → record, `double CELL_SIZE` local → constant, Paris/Köln debug-log special case in `deduplicateCrossBorder`, `@Value` without default for `max-transfer-time-minutes`.
-- [ ] **S7** Frontend: replace the 7 hardcoded `http://localhost:8080` with one `API_BASE`; remove the unused JSZip script tag; escape station names inserted via `innerHTML`.
 - [ ] **S8** Feeds that failed to load: `data/gtfs/broken/` (finland, lithuania).
