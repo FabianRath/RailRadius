@@ -1,6 +1,6 @@
 # RailReach
 
-Spring Boot backend + single-file Leaflet frontend. Given a start station and a max number of transfers, it shows every European rail station you can reach.
+Spring Boot backend + vanilla MapLibre frontend (served by the backend at `http://localhost:8080/`). Given a start station and a max number of transfers, it shows every European rail station you can reach.
 GTFS feeds → merged rail graph (cross-border station dedup) → transfer-bounded trip BFS → results streamed to the map via SSE.
 Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this file.
 
@@ -10,7 +10,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
   - `service/`: `GtfsDataService` (load, dedup, graph), `ReachabilityService` (BFS, caching, SSE), `HubRoutingService`
   - `dto/`, `model/`, `config/`
 - `backend/src/test/`: unit tests on the `gtfs-mini` fixture (see `src/test/resources/gtfs-mini/README.md`)
-- `frontend/index.html`: the whole UI in one file (~1600 lines). Grep for the function you need instead of reading all of it.
+- `frontend/`: `index.html` (markup), `css/app.css`, `js/*.js` (one ES module per concern, entry `main.js`). See guidelines §8.
 - `docs/TODO.md` (backlog + known bugs), `docs/decisions.md` (why things are the way they are)
 - `scripts/api.sh`: curl shortcuts (`scripts/api.sh help`)
 

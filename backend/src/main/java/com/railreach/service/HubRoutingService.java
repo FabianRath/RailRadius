@@ -254,12 +254,12 @@ public class HubRoutingService {
     public Map<String, JourneyPath> queryViaHubs(String startId, int maxTransfers, int minTransferMins, int maxTransferMins) {
         if (hubReachability.isEmpty()) {
             log.warn("Hub data not available, falling back to regular BFS");
-            return reachabilityService.runBFSInternal(startId, maxTransfers, minTransferMins, maxTransferMins, null);
+            return reachabilityService.runBFSInternal(startId, maxTransfers, minTransferMins, maxTransferMins);
         }
         
         int transfersToHub = Math.min(maxTransfers - 1, 2);
         Map<String, JourneyPath> reachableFromStart = reachabilityService.runBFSInternal(
-                startId, transfersToHub, minTransferMins, maxTransferMins, null);
+                startId, transfersToHub, minTransferMins, maxTransferMins);
         
         Map<String, JourneyPath> hubsFound = reachableFromStart.entrySet().stream()
             .filter(e -> hubStationIds.contains(e.getKey()))

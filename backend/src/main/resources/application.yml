@@ -8,6 +8,15 @@ spring:
     # Tomcat requests and Spring's task executor (used for SSE streams) run on virtual threads
     virtual:
       enabled: true
+  web:
+    resources:
+      # The UI is served at http://localhost:8080/ straight from the repo's frontend/ folder (relative to backend/,
+      # where the app is started), so edits show on reload without a rebuild. Override with RAILREACH_FRONTEND_DIR.
+      static-locations: ${RAILREACH_FRONTEND_DIR:file:../frontend/}
+      cache:
+        cachecontrol:
+          # Browsers revalidate on every load, so they never run a stale copy of an edited file
+          no-cache: true
 
 railreach:
   gtfs:
