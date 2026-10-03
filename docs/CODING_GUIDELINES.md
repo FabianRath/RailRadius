@@ -65,9 +65,18 @@ Binding for every change. Existing code does not always follow them yet. New and
 - Styling: add classes in the `<style>` block and use the existing `--` CSS variables. No new inline `style="…"` and no hardcoded colours.
 - Escape GTFS/user text before inserting it via `innerHTML`, or use `textContent`.
 
-## 9. Before you call a change done
+## 9. Bugs and `TODO.md`
+- **Found a possible bug? Ask first.** Stop and describe it to the user: what you saw, where (`file:line`), how to reproduce it, and why you think it's a bug. Write it into `TODO.md` only after the user agrees, in the form and with the priority they confirm. Don't fix it on the side either.
+- **Every item has a permanent ID**: a category prefix plus a number.
+  - `B` = bug, `F` = feature/UX, `S` = structure/cleanup/refactor. Example: `- [ ] **B12** Short title. Details…`
+  - Take the number from the "Next free IDs" line at the top of `TODO.md`, then increase that counter in the same edit.
+  - IDs are never renumbered or reused, not even after an item is deleted.
+  - Refer to other items by ID ("caused by B2"), never by position ("the issue above").
+- **Finishing an item:** delete its line and name the ID in the commit message (e.g. `Fix BOM header parsing (B1)`). Reference the ID in the related test's `@Disabled` reason too, if there is one.
+
+## 10. Before you call a change done
 1. `compile` and `test` pass (CLAUDE.md commands).
 2. The diff has no unused code, commented-out code, stray logs, debug leftovers or unrelated reformatting.
 3. Nothing you added duplicates existing logic (grep for it).
 4. No new dependency without approval.
-5. `TODO.md` / `decisions.md` updated if relevant.
+5. `TODO.md` updated (finished IDs removed, user-approved new items added) and `decisions.md` updated if relevant.
