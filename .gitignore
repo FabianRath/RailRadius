@@ -38,3 +38,6 @@ build/
 # OS
 Thumbs.db
 .DS_Store
+
+# Playwright MCP screenshots and logs
+.playwright-mcp/
