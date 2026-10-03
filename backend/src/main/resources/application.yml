@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: railreach-backend
+  threads:
+    # Tomcat requests and Spring's task executor (used for SSE streams) run on virtual threads
+    virtual:
+      enabled: true
 
 railreach:
   gtfs:

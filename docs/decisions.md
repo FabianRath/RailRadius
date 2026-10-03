@@ -2,6 +2,7 @@
 
 Short log of notable choices, newest first. Format: date — decision — why.
 
+- **2026-10-03 — Target Java 25 (LTS) and enable virtual threads.** With the full dataset (12 GB heap, millions of small objects) we can use compact object headers and generational ZGC. SSE streams now run on Spring's task executor (virtual threads) instead of a hand-made cached thread pool. Lombok 1.18.42 prints a harmless `sun.misc.Unsafe` deprecation warning on JDK 25.
 - **2026-10-03 — Coding guidelines in `docs/CODING_GUIDELINES.md`, imported into CLAUDE.md via `@`.** The import loads them into every Claude session automatically. The dependency list is closed and shared logic has one named home, to stop style drift and copy-paste duplication (time helpers already exist 4×). Existing code is migrated as it is touched, not in one big rewrite.
 - **2026-10-03 — Monorepo at `RailReach/`** with `backend/` and `frontend/`. Claude (and you) can see both sides of the API in one session.
 - **2026-10-03 — All large data lives in `backend/data/` and is gitignored.** This covers GTFS zips, `gtfs-cache.json` (~4 GB) and `hub-cache.json` (~0.8 GB). It keeps the repo small and keeps tools from scanning multi-GB files. Download sources are versioned in `docs/gtfs-sources.txt`.
