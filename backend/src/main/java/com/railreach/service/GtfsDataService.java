@@ -3,6 +3,7 @@ package com.railreach.service;
 import com.railreach.model.Connection;
 import com.railreach.model.Station;
 import com.railreach.util.GtfsTime;
+import com.railreach.util.StopIds;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -183,7 +184,7 @@ public class GtfsDataService {
             // Group by source country
             Map<String, List<Station>> bySource = new HashMap<>();
             for (Station s : group) {
-                String source = s.getId().split(":")[0];
+                String source = StopIds.source(s.getId());
                 bySource.computeIfAbsent(source, k -> new ArrayList<>()).add(s);
             }
             
@@ -265,9 +266,7 @@ public class GtfsDataService {
                                 aliasToCanonical.containsKey(s2.getId())) continue;
                             
                             // Only merge DIFFERENT countries
-                            String source1 = s1.getId().split(":")[0];
-                            String source2 = s2.getId().split(":")[0];
-                            if (source1.equals(source2)) continue;
+                            if (StopIds.source(s1.getId()).equals(StopIds.source(s2.getId()))) continue;
                             
                             // Geographic proximity (~500m)
                             if (isNearby(s1.getLatitude(), s1.getLongitude(),
@@ -833,7 +832,7 @@ public class GtfsDataService {
             }
         }
 
-        return source + ":" + id;
+        return StopIds.of(source, id);
     }
 
     // -------------------------------------------------------------------------
