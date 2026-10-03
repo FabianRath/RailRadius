@@ -2,7 +2,7 @@
 
 Two tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the name is the folder name up to the first `-`.
 
-- **alpha**: A1 Alpha Central, A2/A2b Alpha North (duplicate stop, merged per feed), A3 Border Town, A4 Alpha West, A9 bus stop (bus route, filtered out)
+- **alpha**: A1 Alpha Central, A2/A2b Alpha North (duplicate stop, merged per feed), A3 Border Town, A4 Alpha West, A9 bus stop (bus route, filtered out), AP parent station of A1 and AE its entrance (no rail trip uses either, so neither becomes a station)
   - T1 RE1: A1 08:00 → A2b 08:30 → A3 09:00
   - T4 NJ: A4 22:50 → A3 23:30
   - T2 bus: A1 → A9 (not rail, ignored)

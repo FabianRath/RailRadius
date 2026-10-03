@@ -56,9 +56,12 @@ public class GtfsFeedLoader {
 
     private record GtfsStopTime(String stopId, int sequence, int arrivalSeconds, int departureSeconds) {}
 
-    /** The per-feed lookup tables that stop_times rows are resolved against. Route names hold rail routes only. */
+    /**
+     * The per-feed lookup tables that stop_times rows are resolved against. Route names hold rail routes only.
+     * Stations are keyed by canonical ID and only enter the graph once a rail trip uses them.
+     */
     private record FeedTables(String source, Map<String, String> routeNames, Map<String, String> tripToRoute,
-                              Map<String, String> rawToCanonicalStop) {}
+                              Map<String, String> rawToCanonicalStop, Map<String, Station> stations) {}
 
     void loadDirectory(String directory, TransitGraph graph) {
         File dir = new File(directory);
@@ -102,14 +105,15 @@ public class GtfsFeedLoader {
                 return;
             }
 
-            Map<String, String> rawToCanonical = registerStations(stops, source, graph);
+            Map<String, Station> stations = new HashMap<>();
+            Map<String, String> rawToCanonical = buildStations(stops, source, stations);
             log.info("  Stop ID mapping: {} raw IDs -> {} canonical IDs",
                     rawToCanonical.size(), rawToCanonical.values().stream().distinct().count());
             if (rawToCanonical.isEmpty()) {
                 log.error("  No stop ID mappings created! Cannot build graph");
                 return;
             }
-            loadStopTimes(zipFile, new FeedTables(source, routeNames, tripToRoute, rawToCanonical), graph);
+            loadStopTimes(zipFile, new FeedTables(source, routeNames, tripToRoute, rawToCanonical, stations), graph);
         }
     }
 
@@ -181,10 +185,11 @@ public class GtfsFeedLoader {
     }
 
     /**
-     * Merges same-name stops close to each other, adds one station per merged group to the graph
+     * Merges same-name stops close to each other, puts one station per merged group into {@code stations}
      * and returns raw stop ID -> canonical stop ID. Stops without coordinates are skipped.
      */
-    private Map<String, String> registerStations(Map<String, GtfsStop> stops, String source, TransitGraph graph) {
+    private Map<String, String> buildStations(Map<String, GtfsStop> stops, String source,
+                                              Map<String, Station> stations) {
         Map<String, GtfsStop> validStops = new LinkedHashMap<>();
         for (GtfsStop stop : stops.values()) {
             if (stop.lat() == 0.0 && stop.lon() == 0.0) continue;
@@ -198,9 +203,9 @@ public class GtfsFeedLoader {
             String canonical = canonicaliseStopId(representativeId, source);
             rawToCanonical.put(stop.stopId(), canonical);
             GtfsStop representative = validStops.getOrDefault(representativeId, stop);
-            graph.addStationIfAbsent(Station.builder()
-                    .id(canonical)
-                    .name(representative.name() != null ? representative.name() : canonical)
+            stations.computeIfAbsent(canonical, id -> Station.builder()
+                    .id(id)
+                    .name(representative.name() != null ? representative.name() : id)
                     .latitude(representative.lat())
                     .longitude(representative.lon())
                     .parentStation(representative.parentStation() != null
@@ -305,7 +310,9 @@ public class GtfsFeedLoader {
                 String canonical = tables.rawToCanonicalStop().get(st.stopId());
                 if (canonical != null) stopSequence.add(canonical);
             }
-            if (stopSequence.size() >= 2) graph.addTrip(tripId, stopSequence);
+            if (stopSequence.size() < 2) continue;
+            stopSequence.forEach(id -> graph.addStationIfAbsent(tables.stations().get(id)));
+            graph.addTrip(tripId, stopSequence);
 
             for (int i = 0; i < stopTimes.size() - 1; i++) {
                 GtfsStopTime from = stopTimes.get(i);
