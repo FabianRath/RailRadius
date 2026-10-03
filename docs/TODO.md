@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B19 · F7 · S9
+**Next free IDs:** B19 · F7 · S10
 
 ## Bugs (data loading)
 - [ ] **B1** UTF-8 BOM breaks header parsing, so Austria is silently dropped. `gtfs_austria.zip` files start with `EF BB BF`. `indexOf(headers, "route_id")` then returns -1, and the feed loads 0 routes, 0 stops and 0 trips (log: "Routes: 273 total, 259 rail routes selected" then "Loaded 0 rail routes, 0 stops"). It's the only affected feed today. Fix: strip a leading `﻿` from the header line in the CSV loaders, add a BOM fixture test, then rebuild the caches. Also make a feed that loads 0 stops a loud warning.
@@ -33,3 +33,4 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 - [ ] **F5** `/api/admin/debug/stations?includeIsolated=true` is referenced in old notes but not implemented.
 
 ## Structure
+- [ ] **S9** Find out what fills the GTFS cache. After B18 the full-data `gtfs-cache.json` is still 3.6 GB (was ~4.2 GB) for 26,428 stations and 74,640 edges, so stations were never the bulk. Suspects: the per-trip `Connection` lists (trip ID, route ID and route name repeated on every connection), plus the trip→stops and stop→trips maps. Measure first (e.g. size per top-level field of `GtfsCacheData`, live heap after a full GC), then decide on a fix such as a more compact format or not storing derived maps.
