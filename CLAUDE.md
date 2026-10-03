@@ -28,14 +28,10 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 - Fixing a known bug: enable its `@Disabled` test first (or write a failing test), then fix.
 - Ask before changing the public API (`/api/**` request/response shapes). The frontend depends on it.
 
-## Code conventions
-- Lombok: DTOs/models use `@Data @Builder @NoArgsConstructor @AllArgsConstructor`. Services use constructor injection and `@Slf4j`.
-- Log with `{}` placeholders only (not `{:.2f}`).
-- Times are **int seconds since midnight** (may exceed 24h per GTFS). Overnight wrap: a diff below −60 min gets +24 h.
-- Stop IDs are canonical `<source>:<rawId>`, e.g. `germany:8011160`. The source comes from the zip name `gtfs_<source>.zip`.
-- Config lives under `railreach.*` in `application.yml`. Inject with `@Value` and a default.
-- Tests: JUnit 5 + AssertJ, plain objects (no Spring context) via `GtfsTestFixtures.load(tempDir, "alpha", "beta")`.
-- Keep new classes focused. The two big services are slated for splitting (see TODO.md), so don't grow them further.
+## Coding guidelines
+All code changes must follow these. They cover allowed libraries, style, reuse and anti-bloat rules, and the pre-done checklist.
+
+@docs/CODING_GUIDELINES.md
 
 ## Workflow
 - Small, focused changes. Plan first when a change spans several files.

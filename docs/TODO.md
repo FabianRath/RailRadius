@@ -30,4 +30,8 @@ Keep this list current: add issues when found, and remove or tick items when don
 - [ ] Split `GtfsDataService` (~1100 lines) into `GtfsFeedLoader`, `StationDeduplicator`, `TransitGraph` and `GtfsCacheStore`.
 - [ ] Split `ReachabilityService` (~870 lines) into `ReachabilitySearch`, `JourneyLegBuilder`, `ReachabilityCache` and a thin orchestrator. This also fixes the self-invocation issue above.
 - [ ] Remove dead code: `StopSequence`, `ReachabilityService.totalDuration/parseTime`, unused gtfs-lib dependency (only `Stop`/`StopTime` POJOs used).
+- [ ] Consolidate duplicated GTFS time logic into `util/GtfsTime`: `Connection.formatTime/parseTime`, `GtfsDataService.formatTime/parseGtfsTime`, `ReachabilityService.parseTime/formatDuration/timeDiff/totalDuration` (see CODING_GUIDELINES §2).
+- [ ] Extract stop-ID source parsing (`id.split(":")[0]`, 3×) into `util/StopIds`.
+- [ ] Style cleanup when touching files: wildcard imports (7), inline fully-qualified names (`CacheConfig`, `ReachabilityService`), `QueueItem` → record, `double CELL_SIZE` local → constant, Paris/Köln debug-log special case in `deduplicateCrossBorder`, `@Value` without default for `max-transfer-time-minutes`.
+- [ ] Frontend: replace the 7 hardcoded `http://localhost:8080` with one `API_BASE`; remove the unused JSZip script tag; escape station names inserted via `innerHTML`.
 - [ ] Feeds that failed to load: `data/gtfs/broken/` (finland, lithuania).
