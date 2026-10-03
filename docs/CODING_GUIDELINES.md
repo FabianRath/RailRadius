@@ -10,7 +10,6 @@ Binding for every change. Existing code does not always follow them yet. New and
 | Frontend | Vanilla JS (native ES modules), MapLibre GL JS 6, Turf 6, from CDN; OpenFreeMap tiles | Frameworks, jQuery, Leaflet, npm/build step, map tiles that need a key or forbid commercial use |
 
 - Adding a dependency: **ask first**, then add a line in `decisions.md`. Try the JDK, Spring, and the existing deps first.
-- `gtfs-lib` is only used for its `Stop`/`StopTime` POJOs and will be removed. Don't add new usages.
 
 ## 2. Reuse before you write
 - **Search first.** Before adding a helper, grep for an existing one (`formatTime`, `parse`, `split(":")`, `fetch(` …).

@@ -12,8 +12,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -161,7 +159,6 @@ public class ReachabilityService {
 
         Queue<QueueItem> queue = new LinkedList<>();
         Set<String> exploredBoardings = new HashSet<>();
-        int lastLoggedCount = reachable.size();
         int queueItemsProcessed = 0;
         int queueItemsSkipped = 0;
 
@@ -784,24 +781,6 @@ public class ReachabilityService {
         // For transfer time validation we want the raw difference
         if (diffMins < -60) diffMins += 24 * 60; // only wrap if more than 1h negative (genuine overnight)
         return diffMins;
-    }
-
-    private int totalDuration(List<Connection> connections) {
-        int total = 0;
-        for (int i = 0; i < connections.size(); i++) {
-            Connection c = connections.get(i);
-            total += timeDiff(c.getDepartureTimeSeconds(), c.getArrivalTimeSeconds());
-            if (i < connections.size() - 1) {
-                total += timeDiff(c.getArrivalTimeSeconds(), connections.get(i + 1).getDepartureTimeSeconds());
-            }
-        }
-        return total;
-    }
-
-    private int parseTime(String t) {
-        if (t == null || t.length() < 5) return 0;
-        String[] p = t.split(":");
-        return Integer.parseInt(p[0]) * 60 + Integer.parseInt(p[1]);
     }
 
     private String formatDuration(int minutes) {

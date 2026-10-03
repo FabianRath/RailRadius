@@ -1,17 +1,14 @@
 package com.railreach.service;
 
-import com.conveyal.gtfs.model.Stop;
-import com.conveyal.gtfs.model.StopTime;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.railreach.model.Connection;
 import com.railreach.model.Station;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 
 import jakarta.annotation.PostConstruct;
 import java.io.File;
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -158,7 +155,7 @@ public class GtfsDataService {
         Map<String, String> aliasToCanonical = deduplicateWithinCountry();
         
         // Phase 2: Cross-border fuzzy matching
-        int crossBorderMerges = deduplicateCrossBorder(aliasToCanonical);
+        deduplicateCrossBorder(aliasToCanonical);
         
         // Apply all remappings
         applyDeduplication(aliasToCanonical);
@@ -415,7 +412,7 @@ public class GtfsDataService {
         // Step 1: Load reference tables (routes, stops, trips)
         Map<String, String> routeNames = new HashMap<>();
         Set<String> railRouteIds = new HashSet<>(); // Track which routes are rail
-        Map<String, Stop> stops = new HashMap<>();
+        Map<String, GtfsStop> stops = new HashMap<>();
         Map<String, String> tripToRoute = new HashMap<>();
         
         try (java.util.zip.ZipFile zipFile = new java.util.zip.ZipFile(path)) {
@@ -447,80 +444,79 @@ public class GtfsDataService {
         }
     }
 
-    private Map<String, String> deduplicateStops(Map<String, Stop> stops, String source) {
+    private Map<String, String> deduplicateStops(Map<String, GtfsStop> stops, String source) {
         Map<String, String> rawToCanonical = new HashMap<>();
         int stopsSkipped = 0;
 
         // Filter valid stops (with coordinates)
-        Map<String, Stop> validStops = new LinkedHashMap<>();
-        for (Stop stop : stops.values()) {
-            if (stop.stop_lat == 0.0 && stop.stop_lon == 0.0) {
+        Map<String, GtfsStop> validStops = new LinkedHashMap<>();
+        for (GtfsStop stop : stops.values()) {
+            if (stop.lat() == 0.0 && stop.lon() == 0.0) {
                 stopsSkipped++;
                 continue;
             }
-            validStops.put(stop.stop_id, stop);
+            validStops.put(stop.stopId(), stop);
         }
 
         // Group by name for deduplication
-        Map<String, List<Stop>> byName = new HashMap<>();
-        for (Stop stop : validStops.values()) {
-            if (stop.stop_name != null) {
-                byName.computeIfAbsent(stop.stop_name.trim(), k -> new ArrayList<>()).add(stop);
+        Map<String, List<GtfsStop>> byName = new HashMap<>();
+        for (GtfsStop stop : validStops.values()) {
+            if (stop.name() != null) {
+                byName.computeIfAbsent(stop.name().trim(), k -> new ArrayList<>()).add(stop);
             }
         }
 
         // Deduplicate within each name group (same name + nearby location)
         Map<String, String> rawToRawCanonical = new HashMap<>();
-        for (List<Stop> group : byName.values()) {
+        for (List<GtfsStop> group : byName.values()) {
             if (group.size() == 1) {
-                rawToRawCanonical.put(group.get(0).stop_id, group.get(0).stop_id);
+                rawToRawCanonical.put(group.get(0).stopId(), group.get(0).stopId());
                 continue;
             }
             
-            group.sort(Comparator.comparing(s -> s.stop_id));
+            group.sort(Comparator.comparing(GtfsStop::stopId));
             for (int i = 0; i < group.size(); i++) {
-                Stop candidate = group.get(i);
-                if (rawToRawCanonical.containsKey(candidate.stop_id)) continue;
+                GtfsStop candidate = group.get(i);
+                if (rawToRawCanonical.containsKey(candidate.stopId())) continue;
 
                 boolean mapped = false;
                 for (int j = 0; j < i; j++) {
-                    Stop existing = group.get(j);
-                    if (isNearby(candidate.stop_lat, candidate.stop_lon,
-                                 existing.stop_lat, existing.stop_lon, 0.0015)) {
+                    GtfsStop existing = group.get(j);
+                    if (isNearby(candidate.lat(), candidate.lon(),
+                                 existing.lat(), existing.lon(), 0.0015)) {
                         String existingCanonical = rawToRawCanonical.getOrDefault(
-                                existing.stop_id, existing.stop_id);
-                        rawToRawCanonical.put(candidate.stop_id, existingCanonical);
+                                existing.stopId(), existing.stopId());
+                        rawToRawCanonical.put(candidate.stopId(), existingCanonical);
                         mapped = true;
                         break;
                     }
                 }
                 if (!mapped) {
-                    rawToRawCanonical.put(candidate.stop_id, candidate.stop_id);
+                    rawToRawCanonical.put(candidate.stopId(), candidate.stopId());
                 }
             }
         }
 
         // Build final mapping and register stations
-        for (Stop stop : validStops.values()) {
-            String rawCanonical = rawToRawCanonical.getOrDefault(stop.stop_id, stop.stop_id);
+        for (GtfsStop stop : validStops.values()) {
+            String rawCanonical = rawToRawCanonical.getOrDefault(stop.stopId(), stop.stopId());
             String canonical = canonicaliseStopId(rawCanonical, source);
-            rawToCanonical.put(stop.stop_id, canonical);
+            rawToCanonical.put(stop.stopId(), canonical);
 
             stations.computeIfAbsent(canonical, id -> {
-                Stop rep = validStops.get(rawCanonical);
+                GtfsStop rep = validStops.get(rawCanonical);
                 if (rep == null) rep = stop;
                 return Station.builder()
                         .id(canonical)
-                        .name(rep.stop_name != null ? rep.stop_name : canonical)
-                        .latitude(rep.stop_lat)
-                        .longitude(rep.stop_lon)
-                        .parentStation(rep.parent_station != null
-                                ? canonicaliseStopId(rep.parent_station, source) : null)
+                        .name(rep.name() != null ? rep.name() : canonical)
+                        .latitude(rep.lat())
+                        .longitude(rep.lon())
+                        .parentStation(rep.parentStation() != null
+                                ? canonicaliseStopId(rep.parentStation(), source) : null)
                         .build();
             });
         }
 
-        int dedupCount = (int) (validStops.size() - rawToRawCanonical.values().stream().distinct().count());
         log.info("  Stops: {} valid, {} unique after dedup, {} skipped (no coords)",
                 validStops.size(), rawToRawCanonical.values().stream().distinct().count(), stopsSkipped);
         
@@ -539,7 +535,7 @@ public class GtfsDataService {
         }
 
         final int BATCH_SIZE = 100000; // Process every 100k trips to avoid OOM
-        Map<String, List<StopTime>> stopTimesByTrip = new HashMap<>();
+        Map<String, List<GtfsStopTime>> stopTimesByTrip = new HashMap<>();
         int totalTripsProcessed = 0;
         int totalEdgesAdded = 0;
         
@@ -571,13 +567,10 @@ public class GtfsDataService {
                     continue;
                 }
 
-                StopTime st = new StopTime();
-                st.trip_id = tripId;
-                st.stop_id = stopId;
-                st.stop_sequence = parseInt(getField(fields, seqIdx));
-                st.arrival_time = parseGtfsTime(getField(fields, arrIdx));
-                st.departure_time = parseGtfsTime(getField(fields, depIdx));
-
+                GtfsStopTime st = new GtfsStopTime(stopId,
+                        parseInt(getField(fields, seqIdx)),
+                        parseGtfsTime(getField(fields, arrIdx)),
+                        parseGtfsTime(getField(fields, depIdx)));
                 stopTimesByTrip.computeIfAbsent(tripId, k -> new ArrayList<>()).add(st);
                 
                 linesRead++;
@@ -611,19 +604,19 @@ public class GtfsDataService {
         log.info("  Trips: {}, edges: {}", totalTripsProcessed, totalEdgesAdded);
     }
 
-    private int processTripBatch(Map<String, List<StopTime>> stopTimesByTrip, String source,
+    private int processTripBatch(Map<String, List<GtfsStopTime>> stopTimesByTrip, String source,
                                   Map<String, String> rawToCanonical,
                                   Map<String, String> tripToRoute,
                                   Map<String, String> routeNames) {
         // Sort each trip's stop times
         stopTimesByTrip.values().forEach(list ->
-                list.sort(Comparator.comparingInt(st -> st.stop_sequence)));
+                list.sort(Comparator.comparingInt(GtfsStopTime::sequence)));
 
         int edgesAdded = 0;
         int edgesSkippedNoMapping = 0;
         int edgesSkippedSelfLoop = 0;
 
-        for (Map.Entry<String, List<StopTime>> tripEntry : stopTimesByTrip.entrySet()) {
+        for (Map.Entry<String, List<GtfsStopTime>> tripEntry : stopTimesByTrip.entrySet()) {
             String rawTripId = tripEntry.getKey();
             String tripId = source + ":" + rawTripId;
             String routeId = tripToRoute.get(rawTripId);
@@ -633,13 +626,13 @@ public class GtfsDataService {
             
             String routeName = routeNames.get(routeId);
 
-            List<StopTime> tripStopTimes = tripEntry.getValue();
+            List<GtfsStopTime> tripStopTimes = tripEntry.getValue();
             if (tripStopTimes.size() < 2) continue;
 
             // Build trip stop sequence
             List<String> tripStopSeq = new ArrayList<>();
-            for (StopTime st : tripStopTimes) {
-                String canonical = rawToCanonical.get(st.stop_id);
+            for (GtfsStopTime st : tripStopTimes) {
+                String canonical = rawToCanonical.get(st.stopId());
                 if (canonical != null) tripStopSeq.add(canonical);
             }
             
@@ -652,11 +645,11 @@ public class GtfsDataService {
 
             // Build edges
             for (int i = 0; i < tripStopTimes.size() - 1; i++) {
-                StopTime from = tripStopTimes.get(i);
-                StopTime to = tripStopTimes.get(i + 1);
+                GtfsStopTime from = tripStopTimes.get(i);
+                GtfsStopTime to = tripStopTimes.get(i + 1);
 
-                String fromCanonical = rawToCanonical.get(from.stop_id);
-                String toCanonical = rawToCanonical.get(to.stop_id);
+                String fromCanonical = rawToCanonical.get(from.stopId());
+                String toCanonical = rawToCanonical.get(to.stopId());
 
                 if (fromCanonical == null || toCanonical == null) {
                     edgesSkippedNoMapping++;
@@ -676,8 +669,8 @@ public class GtfsDataService {
                         .routeName(routeName)
                         .fromStopId(fromCanonical)
                         .toStopId(toCanonical)
-                        .departureTimeSeconds(from.departure_time)  // Store as int, no conversion!
-                        .arrivalTimeSeconds(to.arrival_time)        // Store as int, no conversion!
+                        .departureTimeSeconds(from.departureSeconds())  // Store as int, no conversion!
+                        .arrivalTimeSeconds(to.arrivalSeconds())        // Store as int, no conversion!
                         .stopsApart(1)
                         .build();
 
@@ -760,7 +753,7 @@ public class GtfsDataService {
         }
     }
     
-    private void loadStops(java.util.zip.ZipFile zipFile, Map<String, Stop> stops) throws Exception {
+    private void loadStops(java.util.zip.ZipFile zipFile, Map<String, GtfsStop> stops) throws Exception {
         java.util.zip.ZipEntry entry = zipFile.getEntry("stops.txt");
         if (entry == null) return;
         
@@ -779,13 +772,13 @@ public class GtfsDataService {
             String line;
             while ((line = reader.readLine()) != null) {
                 String[] fields = parseCsvLine(line);
-                Stop s = new Stop();
-                s.stop_id = getField(fields, idIdx);
-                s.stop_name = getField(fields, nameIdx);
-                s.stop_lat = parseDouble(getField(fields, latIdx));
-                s.stop_lon = parseDouble(getField(fields, lonIdx));
-                s.parent_station = getField(fields, parentIdx);
-                if (s.stop_id != null) stops.put(s.stop_id, s);
+                String stopId = getField(fields, idIdx);
+                if (stopId == null) continue;
+                stops.put(stopId, new GtfsStop(stopId,
+                        getField(fields, nameIdx),
+                        parseDouble(getField(fields, latIdx)),
+                        parseDouble(getField(fields, lonIdx)),
+                        getField(fields, parentIdx)));
             }
         }
     }
@@ -840,14 +833,6 @@ public class GtfsDataService {
         }
 
         return source + ":" + id;
-    }
-
-    private String formatTime(int seconds) {
-        if (seconds < 0) return "00:00:00";
-        int hours   = seconds / 3600;
-        int minutes = (seconds % 3600) / 60;
-        int secs    = seconds % 60;
-        return String.format("%02d:%02d:%02d", hours, minutes, secs);
     }
 
     // -------------------------------------------------------------------------
@@ -1095,6 +1080,10 @@ public class GtfsDataService {
         );
     }
     
+    private record GtfsStop(String stopId, String name, double lat, double lon, String parentStation) {}
+
+    private record GtfsStopTime(String stopId, int sequence, int arrivalSeconds, int departureSeconds) {}
+
     // Cache data structure
     public static class GtfsCacheData {
         public Map<String, Station> stations;

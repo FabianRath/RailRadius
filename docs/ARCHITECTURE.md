@@ -13,8 +13,8 @@ It loads GTFS timetable feeds for ~25 European countries, keeps only **rail** ro
 - Java 25 (JDK 25 required to build), Spring Boot 4.0.2 (`spring-boot-starter-webmvc`, actuator, cache). Virtual threads are on (`spring.threads.virtual.enabled`): SSE streams run on Spring's task executor.
 - Lombok (`@Data`, `@Builder`, `@Slf4j`, `@RequiredArgsConstructor`)
 - Caffeine for the in-memory response cache
-- `com.conveyal:gtfs-lib` 6.1.0. Only its `Stop` / `StopTime` POJOs are used; GTFS CSV parsing is hand-written.
-- Jackson for the on-disk JSON caches
+- GTFS CSV parsing is hand-written (no GTFS library).
+- Jackson 3 (`tools.jackson`, from Spring Boot) for the on-disk JSON caches
 - Maven (wrapper `mvnw` / `mvnw.cmd`). Tests use JUnit 5 + AssertJ.
 
 ## Running
@@ -70,7 +70,6 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `Station` | model | id, name, lat, lon, parentStation |
 | `Connection` | model | One edge of one trip: tripId, routeId/name, from/to, dep/arr times as **int seconds since midnight** (string getters/setters for JSON) |
 | `JourneyPath` | model | Internal BFS result: stationIds, connections, transfers, totalDurationMinutes |
-| `StopSequence` | model | Intermediate stop (mostly unused) |
 | `ReachabilityRequest` | dto | startStationId, maxTransfers, maxJourneyTimeHours, min/maxTransferTimeMinutes |
 | `ReachabilityResponse` | dto | Start info, count, calcTime, list of `ReachableStation` |
 | `ReachableStation` | dto | Station + transfers, duration, path ids/names, `legs` |
