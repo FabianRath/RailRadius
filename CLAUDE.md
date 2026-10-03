@@ -14,6 +14,13 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 - `docs/TODO.md` (backlog + known bugs), `docs/decisions.md` (why things are the way they are)
 - `scripts/api.sh`: curl shortcuts (`scripts/api.sh help`)
 
+## Environment: Windows, not Linux
+- Dev machine is Windows 10. Claude's Bash tool is Git Bash; the user's own terminal is PowerShell 5.1.
+- Every shell command in docs, skills and scripts must work in Git Bash on Windows. No Linux-only tools or paths (`lsof`, `pkill`, `ps aux`, `nohup`, `xdg-open`, `/tmp`, `/proc`). Use instead:
+  - ports/processes: `netstat -ano | grep :8080`, then `taskkill //PID <pid> //F` (double slashes in Git Bash)
+  - temp files: the session scratchpad
+- Commands the user should type themselves: give PowerShell syntax (`.\mvnw.cmd`, `$env:X = "…"`, `;` instead of `&&`).
+
 ## Commands (run from repo root)
 - Compile: `mvn -q -f backend/pom.xml compile`
 - Test: `mvn -q -f backend/pom.xml test` (~10 s; prints nothing on success)
