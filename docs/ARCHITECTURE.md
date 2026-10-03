@@ -19,7 +19,7 @@ It loads GTFS timetable feeds for ~25 European countries, keeps only **rail** ro
 
 ## Running
 
-Run from `backend/`; the cache paths are relative to the working directory.
+Run from `backend/`; the cache paths are relative to the working directory. The commands below are for Git Bash; in PowerShell use `.\mvnw.cmd` instead of `./mvnw`.
 
 - **Full data:** `./mvnw package -DskipTests && java -Xmx12g -jar target/railreach-backend-0.0.1-SNAPSHOT.jar`
   - `data/gtfs-cache.json` is ~4.2 GB and `data/hub-cache.json` ~840 MB.
