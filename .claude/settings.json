@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(mvn -q -f backend/pom.xml *)",
+      "Bash(mvn -f backend/pom.xml *)",
+      "Bash(scripts/api.sh health)",
+      "Bash(scripts/api.sh stats)",
+      "Bash(scripts/api.sh search *)",
+      "Bash(scripts/api.sh station *)",
+      "Bash(scripts/api.sh reach *)",
+      "Bash(scripts/api.sh cache-stats)",
+      "Bash(scripts/api.sh gtfs-stats)",
+      "Bash(scripts/api.sh hub-stats)",
+      "Bash(scripts/api.sh debug-status)",
+      "Bash(curl -s localhost:8080/api/*)",
+      "Bash(curl -s http://localhost:8080/api/*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(ls *)",
+      "Bash(tail *)"
+    ],
+    "deny": [
+      "Read(**/backend/data/**)",
+      "Read(**/target/**)",
+      "Bash(git push --force*)"
+    ]
+  }
+}

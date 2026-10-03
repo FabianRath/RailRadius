@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RailReach Backend Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 40px; background: #1a1a1a; color: #fff; }
+        .box { background: #2a2a2a; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        button { padding: 10px 20px; margin: 10px 10px 10px 0; background: #00ff9f; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #00d97f; }
+        input { padding: 8px; width: 300px; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; }
+        pre { background: #000; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .status { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background: #00ff9f20; border-left: 3px solid #00ff9f; }
+        .error { background: #ff006e20; border-left: 3px solid #ff006e; }
+    </style>
+</head>
+<body>
+    <h1>🚆 RailReach Backend Test</h1>
+    
+    <div class="box">
+        <h2>1. Health Check</h2>
+        <button onclick="testHealth()">Check Backend Health</button>
+        <div id="healthResult"></div>
+    </div>
+    
+    <div class="box">
+        <h2>2. Search Stations</h2>
+        <input id="searchInput" placeholder="Search for station (e.g., Berlin)" />
+        <button onclick="testSearch()">Search</button>
+        <div id="searchResult"></div>
+    </div>
+    
+    <div class="box">
+        <h2>3. Calculate Reachability</h2>
+        <p>Station ID: <input id="stationId" placeholder="e.g., 8011160" style="width: 200px" /></p>
+        <p>Max Transfers: <input id="maxTransfers" value="3" type="number" style="width: 100px" /></p>
+        <button onclick="testReachability()">Calculate</button>
+        <div id="reachabilityResult"></div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8080/api';
+
+        async function testHealth() {
+            const result = document.getElementById('healthResult');
+            result.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                
+                result.innerHTML = `
+                    <div class="status success">
+                        <strong>✓ Backend is running!</strong>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                result.innerHTML = `
+                    <div class="status error">
+                        <strong>✗ Connection failed</strong>
+                        <p>${error.message}</p>
+                        <p>Make sure backend is running on port 8080</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function testSearch() {
+            const query = document.getElementById('searchInput').value;
+            const result = document.getElementById('searchResult');
+            
+            if (!query) {
+                result.innerHTML = '<div class="status error">Please enter a search term</div>';
+                return;
+            }
+            
+            result.innerHTML = '<p>Searching...</p>';
+            
+            try {
+                const response = await fetch(`${API_URL}/stations/search?q=${encodeURIComponent(query)}&limit=10`);
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    result.innerHTML = '<div class="status">No stations found</div>';
+                    return;
+                }
+                
+                result.innerHTML = `
+                    <div class="status success">
+                        <strong>Found ${data.length} stations:</strong>
+                        <ul>
+                            ${data.map(s => `<li><strong>${s.name}</strong> (ID: ${s.id})</li>`).join('')}
+                        </ul>
+                        <p style="font-size: 12px; opacity: 0.7;">Copy an ID to use in the reachability test below</p>
+                    </div>
+                `;
+            } catch (error) {
+                result.innerHTML = `
+                    <div class="status error">
+                        <strong>Search failed</strong>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function testReachability() {
+            const stationId = document.getElementById('stationId').value;
+            const maxTransfers = parseInt(document.getElementById('maxTransfers').value);
+            const result = document.getElementById('reachabilityResult');
+            
+            if (!stationId) {
+                result.innerHTML = '<div class="status error">Please enter a station ID</div>';
+                return;
+            }
+            
+            result.innerHTML = '<p>Calculating...</p>';
+            
+            try {
+                const response = await fetch(`${API_URL}/reachability`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        startStationId: stationId,
+                        maxTransfers: maxTransfers,
+                        maxJourneyTimeHours: null,
+                        maxTransferTimeMinutes: 180
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                result.innerHTML = `
+                    <div class="status success">
+                        <strong>✓ Calculation successful!</strong>
+                        <p>From: <strong>${data.startStationName}</strong></p>
+                        <p>Found: <strong>${data.totalReachableStations}</strong> reachable stations</p>
+                        <p>Calculation time: <strong>${data.calculationTimeMs}ms</strong></p>
+                        <details>
+                            <summary>View first 5 reachable stations</summary>
+                            <pre>${JSON.stringify(data.reachableStations.slice(0, 5), null, 2)}</pre>
+                        </details>
+                    </div>
+                `;
+            } catch (error) {
+                result.innerHTML = `
+                    <div class="status error">
+                        <strong>Calculation failed</strong>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Auto-test health on load
+        window.addEventListener('load', testHealth);
+    </script>
+</body>
+</html>

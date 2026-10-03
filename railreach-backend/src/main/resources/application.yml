@@ -1,0 +1,50 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: railreach-backend
+
+railreach:
+  gtfs:
+    directory: ${GTFS_DIRECTORY:./data/gtfs}
+    # Set to false to load from cache instead of parsing ZIP files on startup
+    auto-load-from-files: false
+    # Where to store processed GTFS data (stations, graph, connections)
+    cache-file: data/gtfs-cache.json
+  
+  algorithm:
+    max-transfer-time-minutes: 180
+    cache-size: 10000
+    cache-ttl-minutes: 60
+
+  cache:
+    # When a user queries station X with N transfers, pre-warm N+1 up to this max in the background
+    predictive-enabled: true
+    predictive-max-transfers: 5
+  
+  # Hub routing configuration
+  hub:
+    # Set to false to skip auto-computation on startup (recommended for development)
+    auto-initialize: false
+    
+    # Where to store pre-computed hub data
+    cache-file: data/hub-cache.json
+    
+    # Number of hub stations to identify (top N by connectivity)
+    # More hubs = faster queries but slower startup and larger cache
+    num-hubs: 50
+    
+    # How many transfers to pre-compute from each hub
+    # 1 = direct connections only (fast, good for 2-transfer queries)
+    # 2 = covers 3-transfer queries but 10x slower to compute
+    precompute-transfers: 1
+    
+    # Timeout per hub computation (seconds)
+    # Increase if hubs are timing out during computation
+    timeout-seconds: 600
+
+logging:
+  level:
+    root: INFO
+    com.railreach: INFO
