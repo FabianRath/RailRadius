@@ -1,20 +1,38 @@
 package com.railreach.service;
 
-import com.railreach.dto.*;
+import com.github.benmanes.caffeine.cache.stats.CacheStats;
+import com.railreach.dto.JourneyLeg;
+import com.railreach.dto.ReachabilityRequest;
+import com.railreach.dto.ReachabilityResponse;
+import com.railreach.dto.ReachableStation;
 import com.railreach.model.Connection;
 import com.railreach.model.JourneyPath;
 import com.railreach.model.Station;
 import com.railreach.util.GtfsTime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+
 
 @Service
 @Slf4j
@@ -26,7 +44,7 @@ public class ReachabilityService {
     private final CacheManager cacheManager;
     private HubRoutingService hubRoutingService; // Injected later to avoid circular dependency
 
-    @Value("${railreach.algorithm.max-transfer-time-minutes}")
+    @Value("${railreach.algorithm.max-transfer-time-minutes:180}")
     private int maxTransferTimeMinutes;
 
     @Value("${railreach.cache.predictive-max-transfers:5}")
@@ -37,13 +55,13 @@ public class ReachabilityService {
 
     // Track in-flight warming jobs to avoid duplicates
     private final Set<String> warmingInProgress = Collections.newSetFromMap(
-            new java.util.concurrent.ConcurrentHashMap<>());
+            new ConcurrentHashMap<>());
 
     // Raw BFS result cache: "stationId-transfers" -> Map<stopId, JourneyPath>
     // Stored separately from the Caffeine response cache so the BFS can seed
     // from N-1 results when computing N transfers (incremental BFS).
     private final Map<String, Map<String, JourneyPath>> rawPathCache =
-            new java.util.concurrent.ConcurrentHashMap<>();
+            new ConcurrentHashMap<>();
 
     public ReachabilityService(GtfsDataService gtfsDataService, CacheManager cacheManager) {
         this.gtfsDataService = gtfsDataService;
@@ -184,29 +202,29 @@ public class ReachabilityService {
         while (!queue.isEmpty()) {
             QueueItem cur = queue.poll();
             // Only allow one more transfer from frontier stations
-            if (cur.transfers >= maxTransfers) continue;
+            if (cur.transfers() >= maxTransfers) continue;
 
             queueItemsProcessed++;
 
-            Set<String> trips = gtfsDataService.getTripsAtStop(cur.stationId);
+            Set<String> trips = gtfsDataService.getTripsAtStop(cur.stationId());
 
             for (String tripId : trips) {
                 // Every trip from a frontier station is a transfer (or continuation)
-                boolean isContinuation = tripId.equals(cur.currentTripId);
-                int nextTransfers = isContinuation ? cur.transfers : cur.transfers + 1;
+                boolean isContinuation = tripId.equals(cur.currentTripId());
+                int nextTransfers = isContinuation ? cur.transfers() : cur.transfers() + 1;
                 if (nextTransfers > maxTransfers) continue;
 
                 // Validate transfer timing if this is a real transfer
-                if (!isContinuation && !cur.connections.isEmpty()) {
-                    int arrivalSec = cur.connections.get(cur.connections.size() - 1)
+                if (!isContinuation && !cur.connections().isEmpty()) {
+                    int arrivalSec = cur.connections().get(cur.connections().size() - 1)
                             .getArrivalTimeSeconds();
-                    int curIdx = gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId);
+                    int curIdx = gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId());
                     if (curIdx < 0) continue;
                     List<String> newTripStops = gtfsDataService.getStopsOnTrip(tripId);
                     if (curIdx >= newTripStops.size() - 1) continue;
 
                     Connection firstConn = gtfsDataService.getConnectionByTrip(
-                            cur.stationId, newTripStops.get(curIdx + 1), tripId);
+                            cur.stationId(), newTripStops.get(curIdx + 1), tripId);
                     if (firstConn == null) continue;
 
                     int waitMins = GtfsTime.diffMinutes(arrivalSec, firstConn.getDepartureTimeSeconds());
@@ -214,20 +232,20 @@ public class ReachabilityService {
                 }
 
                 // Boarding deduplication
-                String boardingKey = cur.stationId + "|" + tripId + "|" + nextTransfers;
+                String boardingKey = cur.stationId() + "|" + tripId + "|" + nextTransfers;
                 if (!exploredBoardings.add(boardingKey)) {
                     queueItemsSkipped++;
                     continue;
                 }
 
-                int startIdx = gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId);
+                int startIdx = gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId());
                 if (startIdx < 0) continue;
                 List<String> stopSequence = gtfsDataService.getStopsOnTrip(tripId);
                 if (startIdx >= stopSequence.size() - 1) continue;
 
-                List<Connection> runningConns = new ArrayList<>(cur.connections);
-                List<String>     runningPath  = new ArrayList<>(cur.path);
-                int runningDur = cur.durationMinutes;
+                List<Connection> runningConns = new ArrayList<>(cur.connections());
+                List<String>     runningPath  = new ArrayList<>(cur.path());
+                int runningDur = cur.durationMinutes();
                 int prevArrSec = runningConns.isEmpty() ? -1
                         : runningConns.get(runningConns.size() - 1).getArrivalTimeSeconds();
 
@@ -318,14 +336,14 @@ public class ReachabilityService {
 
         while (!queue.isEmpty()) {
             QueueItem cur = queue.poll();
-            if (cur.transfers > maxTransfers) continue;
+            if (cur.transfers() > maxTransfers) continue;
 
             // Prune: skip if we already have a strictly better path to this station
-            JourneyPath existing = reachable.get(cur.stationId);
+            JourneyPath existing = reachable.get(cur.stationId());
             if (existing != null) {
-                if (existing.getTransfers() < cur.transfers ||
-                    (existing.getTransfers() == cur.transfers
-                            && existing.getTotalDurationMinutes() < cur.durationMinutes)) {
+                if (existing.getTransfers() < cur.transfers() ||
+                    (existing.getTransfers() == cur.transfers()
+                            && existing.getTotalDurationMinutes() < cur.durationMinutes())) {
                     queueItemsSkipped++;
                     continue;
                 }
@@ -333,7 +351,7 @@ public class ReachabilityService {
 
             queueItemsProcessed++;
 
-            Set<String> trips = gtfsDataService.getTripsAtStop(cur.stationId);
+            Set<String> trips = gtfsDataService.getTripsAtStop(cur.stationId());
 
             if (reachable.size() - lastLoggedCount >= 50) {
                 log.info("  ... {} stations reachable (queue={})", reachable.size(), queue.size());
@@ -341,28 +359,28 @@ public class ReachabilityService {
             }
 
             for (String tripId : trips) {
-                boolean isNewTrip = !tripId.equals(cur.currentTripId);
-                int nextTransfers = cur.transfers;
+                boolean isNewTrip = !tripId.equals(cur.currentTripId());
+                int nextTransfers = cur.transfers();
 
-                if (isNewTrip && cur.currentTripId != null) {
-                    nextTransfers = cur.transfers + 1;
+                if (isNewTrip && cur.currentTripId() != null) {
+                    nextTransfers = cur.transfers() + 1;
                     if (nextTransfers > maxTransfers) continue;
 
                     // FIX 2: O(1) stop-index lookup instead of List.indexOf()
-                    int curStopIdx = gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId);
+                    int curStopIdx = gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId());
                     if (curStopIdx < 0) continue;
 
                     List<String> newTripStops = gtfsDataService.getStopsOnTrip(tripId);
                     if (curStopIdx >= newTripStops.size() - 1) continue;
 
-                    if (!cur.connections.isEmpty()) {
-                        int arrivalTimeSeconds = cur.connections.get(cur.connections.size() - 1)
+                    if (!cur.connections().isEmpty()) {
+                        int arrivalTimeSeconds = cur.connections().get(cur.connections().size() - 1)
                                 .getArrivalTimeSeconds();
 
                         // FIX 3: O(1) connection-by-trip lookup instead of stream filter
                         String nextStop = newTripStops.get(curStopIdx + 1);
                         Connection newConn = gtfsDataService.getConnectionByTrip(
-                                cur.stationId, nextStop, tripId);
+                                cur.stationId(), nextStop, tripId);
                         if (newConn == null) continue;
 
                         int waitTimeMins = GtfsTime.diffMinutes(arrivalTimeSeconds, newConn.getDepartureTimeSeconds());
@@ -374,7 +392,7 @@ public class ReachabilityService {
                 if (nextTransfers > maxTransfers) continue;
 
                 // FIX 1 cont: skip this (station, trip) boarding if already explored
-                String boardingKey = cur.stationId + "|" + tripId + "|" + nextTransfers;
+                String boardingKey = cur.stationId() + "|" + tripId + "|" + nextTransfers;
                 if (!exploredBoardings.add(boardingKey)) {
                     queueItemsSkipped++;
                     continue;
@@ -382,18 +400,18 @@ public class ReachabilityService {
 
                 // FIX 2: O(1) position lookup
                 int startIdx = isNewTrip
-                        ? gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId)
-                        : gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId);
+                        ? gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId())
+                        : gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId());
                 if (startIdx < 0) continue;
 
                 List<String> stopSequence = gtfsDataService.getStopsOnTrip(tripId);
                 if (startIdx >= stopSequence.size() - 1) continue;
 
-                List<Connection> runningConns = new ArrayList<>(cur.connections);
-                List<String>     runningPath  = new ArrayList<>(cur.path);
+                List<Connection> runningConns = new ArrayList<>(cur.connections());
+                List<String>     runningPath  = new ArrayList<>(cur.path());
 
                 // FIX 4: track duration incrementally — no totalDuration() re-scan per step
-                int runningDurMinutes = cur.durationMinutes;
+                int runningDurMinutes = cur.durationMinutes();
                 int prevArrivalSeconds = runningConns.isEmpty() ? -1
                         : runningConns.get(runningConns.size() - 1).getArrivalTimeSeconds();
 
@@ -523,12 +541,12 @@ public class ReachabilityService {
      * Returns stats about what is currently warm in the cache.
      */
     public Map<String, Object> getCacheStats() {
-        org.springframework.cache.Cache cache = cacheManager.getCache("reachability");
+        Cache cache = cacheManager.getCache("reachability");
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("warmingInProgress", new ArrayList<>(warmingInProgress));
         stats.put("warmingCount", warmingInProgress.size());
-        if (cache instanceof org.springframework.cache.caffeine.CaffeineCache caffeineCache) {
-            com.github.benmanes.caffeine.cache.stats.CacheStats caffeStats =
+        if (cache instanceof CaffeineCache caffeineCache) {
+            CacheStats caffeStats =
                     caffeineCache.getNativeCache().stats();
             stats.put("hitCount",      caffeStats.hitCount());
             stats.put("missCount",     caffeStats.missCount());
@@ -576,7 +594,7 @@ public class ReachabilityService {
 
             // Evict any stale Caffeine entry so calculateReachability() re-populates it
             // with the correct incremental result next time it's called (e.g. from warmer).
-            org.springframework.cache.Cache caffeineCache = cacheManager.getCache("reachability");
+            Cache caffeineCache = cacheManager.getCache("reachability");
             if (caffeineCache != null) {
                 caffeineCache.evict(request.getStartStationId() + "-" + maxTransfers + "-" + minTransferMins + "-" + maxTransferMins);
             }
@@ -764,22 +782,7 @@ public class ReachabilityService {
         return s != null ? s.getName() : stopId;
     }
 
-    private static class QueueItem {
-        final String stationId;
-        final int transfers;
-        final List<String> path;
-        final List<Connection> connections;
-        final String currentTripId;
-        final int durationMinutes; // carried to avoid recomputing totalDuration()
-
-        QueueItem(String stationId, int transfers, List<String> path,
-                  List<Connection> connections, String currentTripId, int durationMinutes) {
-            this.stationId = stationId;
-            this.transfers = transfers;
-            this.path = path;
-            this.connections = connections;
-            this.currentTripId = currentTripId;
-            this.durationMinutes = durationMinutes;
-        }
-    }
+    /** durationMinutes is carried along so it never has to be recomputed from the connections. */
+    private record QueueItem(String stationId, int transfers, List<String> path,
+                             List<Connection> connections, String currentTripId, int durationMinutes) {}
 }

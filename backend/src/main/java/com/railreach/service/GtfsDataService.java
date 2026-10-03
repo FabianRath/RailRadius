@@ -10,11 +10,25 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
 import jakarta.annotation.PostConstruct;
+import java.io.BufferedReader;
 import java.io.File;
-import java.util.*;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+
 
 @Service
 @Slf4j
@@ -46,6 +60,9 @@ public class GtfsDataService {
     private final Map<String, Map<String, Integer>> tripStopIndex = new ConcurrentHashMap<>();
     // Lazy per-edge trip index: "fromId->toId" -> (tripId -> Connection). Built on first access.
     private final Map<String, Map<String, Connection>> connectionByTrip = new ConcurrentHashMap<>();
+
+    // Cross-border candidates are bucketed into ~1 km cells; only neighbouring cells are compared
+    private static final double CROSS_BORDER_CELL_SIZE_DEG = 0.01;
 
     // Patterns that indicate arrival/departure split stops
     private static final List<Pattern> ARRIVAL_DEPARTURE_PATTERNS = List.of(
@@ -225,14 +242,13 @@ public class GtfsDataService {
     private int deduplicateCrossBorder(Map<String, String> aliasToCanonical) {
         // Spatial bucketing for cross-border stations
         Map<String, List<Station>> byCell = new HashMap<>();
-        double CELL_SIZE = 0.01; // ~1km cells
         
         for (Station station : stations.values()) {
             // Skip if already aliased
             if (aliasToCanonical.containsKey(station.getId())) continue;
             
-            int cellX = (int) Math.floor(station.getLatitude() / CELL_SIZE);
-            int cellY = (int) Math.floor(station.getLongitude() / CELL_SIZE);
+            int cellX = (int) Math.floor(station.getLatitude() / CROSS_BORDER_CELL_SIZE_DEG);
+            int cellY = (int) Math.floor(station.getLongitude() / CROSS_BORDER_CELL_SIZE_DEG);
             String cellKey = cellX + ":" + cellY;
             byCell.computeIfAbsent(cellKey, k -> new ArrayList<>()).add(station);
         }
@@ -275,18 +291,7 @@ public class GtfsDataService {
                                 // Fuzzy name matching with lower threshold
                                 double sim = tokenSimilarity(s1.getName(), s2.getName());
                                 
-                                // Debug logging for Paris and other major stations
-                                if ((s1.getName().toLowerCase().contains("paris") || 
-                                     s2.getName().toLowerCase().contains("paris") ||
-                                     s1.getName().toLowerCase().contains("köln") ||
-                                     s2.getName().toLowerCase().contains("köln")) &&
-                                    sim > 0.3) {
-                                    log.info("  Cross-border candidate: '{}' <-> '{}' (sim={})",
-                                            s1.getName(), s2.getName(), String.format("%.2f", sim));
-                                }
-                                
-                                // Accept if similarity >= 0.4 (was 0.5)
-                                // This catches "Paris Gare du Nord" + "Paris Nord (FR)" = 0.4
+                                // 0.4 still accepts "Paris Gare du Nord" vs "Paris Nord (FR)"
                                 if (sim >= 0.4) {
                                     int s1Connections = graph.getOrDefault(s1.getId(), Set.of()).size();
                                     int s2Connections = graph.getOrDefault(s2.getId(), Set.of()).size();
@@ -415,7 +420,7 @@ public class GtfsDataService {
         Map<String, GtfsStop> stops = new HashMap<>();
         Map<String, String> tripToRoute = new HashMap<>();
         
-        try (java.util.zip.ZipFile zipFile = new java.util.zip.ZipFile(path)) {
+        try (ZipFile zipFile = new ZipFile(path)) {
             loadRoutes(zipFile, routeNames, railRouteIds);
             loadStops(zipFile, stops);
             loadTrips(zipFile, tripToRoute);
@@ -523,12 +528,12 @@ public class GtfsDataService {
         return rawToCanonical;
     }
 
-    private void processStopTimes(java.util.zip.ZipFile zipFile, String source,
+    private void processStopTimes(ZipFile zipFile, String source,
                                    Map<String, String> rawToCanonical,
                                    Map<String, String> tripToRoute,
                                    Map<String, String> routeNames,
                                    Set<String> railRouteIds) throws Exception {
-        java.util.zip.ZipEntry entry = zipFile.getEntry("stop_times.txt");
+        ZipEntry entry = zipFile.getEntry("stop_times.txt");
         if (entry == null) {
             log.warn("  No stop_times.txt found");
             return;
@@ -539,8 +544,8 @@ public class GtfsDataService {
         int totalTripsProcessed = 0;
         int totalEdgesAdded = 0;
         
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                new java.io.InputStreamReader(zipFile.getInputStream(entry), "UTF-8"))) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(zipFile.getInputStream(entry), "UTF-8"))) {
             String headerLine = reader.readLine();
             if (headerLine == null) return;
             
@@ -691,12 +696,12 @@ public class GtfsDataService {
     // CSV loaders
     // -------------------------------------------------------------------------
     
-    private void loadRoutes(java.util.zip.ZipFile zipFile, Map<String, String> routeNames, Set<String> railRouteIds) throws Exception {
-        java.util.zip.ZipEntry entry = zipFile.getEntry("routes.txt");
+    private void loadRoutes(ZipFile zipFile, Map<String, String> routeNames, Set<String> railRouteIds) throws Exception {
+        ZipEntry entry = zipFile.getEntry("routes.txt");
         if (entry == null) return;
         
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                new java.io.InputStreamReader(zipFile.getInputStream(entry), "UTF-8"))) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(zipFile.getInputStream(entry), "UTF-8"))) {
             String headerLine = reader.readLine();
             if (headerLine == null) return;
             
@@ -709,7 +714,7 @@ public class GtfsDataService {
             String line;
             int totalRoutes = 0;
             int railRoutes = 0;
-            Map<Integer, Integer> routeTypeCounts = new java.util.HashMap<>();
+            Map<Integer, Integer> routeTypeCounts = new HashMap<>();
             
             while ((line = reader.readLine()) != null) {
                 String[] fields = parseCsvLine(line);
@@ -753,12 +758,12 @@ public class GtfsDataService {
         }
     }
     
-    private void loadStops(java.util.zip.ZipFile zipFile, Map<String, GtfsStop> stops) throws Exception {
-        java.util.zip.ZipEntry entry = zipFile.getEntry("stops.txt");
+    private void loadStops(ZipFile zipFile, Map<String, GtfsStop> stops) throws Exception {
+        ZipEntry entry = zipFile.getEntry("stops.txt");
         if (entry == null) return;
         
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                new java.io.InputStreamReader(zipFile.getInputStream(entry), "UTF-8"))) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(zipFile.getInputStream(entry), "UTF-8"))) {
             String headerLine = reader.readLine();
             if (headerLine == null) return;
             
@@ -783,12 +788,12 @@ public class GtfsDataService {
         }
     }
     
-    private void loadTrips(java.util.zip.ZipFile zipFile, Map<String, String> tripToRoute) throws Exception {
-        java.util.zip.ZipEntry entry = zipFile.getEntry("trips.txt");
+    private void loadTrips(ZipFile zipFile, Map<String, String> tripToRoute) throws Exception {
+        ZipEntry entry = zipFile.getEntry("trips.txt");
         if (entry == null) return;
         
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                new java.io.InputStreamReader(zipFile.getInputStream(entry), "UTF-8"))) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(zipFile.getInputStream(entry), "UTF-8"))) {
             String headerLine = reader.readLine();
             if (headerLine == null) return;
             
@@ -923,7 +928,7 @@ public class GtfsDataService {
     public int getStopIndexOnTrip(String tripId, String stopId) {
         Map<String, Integer> idx = tripStopIndex.computeIfAbsent(tripId, tid -> {
             List<String> stops = tripStops.getOrDefault(tid, Collections.emptyList());
-            Map<String, Integer> m = new java.util.HashMap<>(stops.size() * 2);
+            Map<String, Integer> m = new HashMap<>(stops.size() * 2);
             for (int i = 0; i < stops.size(); i++) {
                 m.put(stops.get(i), i);
             }
@@ -939,7 +944,7 @@ public class GtfsDataService {
     public Connection getConnectionByTrip(String fromId, String toId, String tripId) {
         return connectionByTrip.computeIfAbsent(fromId + "->" + toId, key -> {
             List<Connection> conns = connectionInfo.getOrDefault(key, Collections.emptyList());
-            Map<String, Connection> m = new java.util.HashMap<>(conns.size() * 2);
+            Map<String, Connection> m = new HashMap<>(conns.size() * 2);
             for (Connection c : conns) {
                 m.put(c.getTripId(), c);
             }
