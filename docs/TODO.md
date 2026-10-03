@@ -27,10 +27,11 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 
 ## Features / UX
 - [ ] **F1** Rework station naming: map lat/long to OpenStreetMap station names and use that name for grouping as well.
-- [ ] **F2** Weird station names in transfers, e.g. `germany:000008700014` or `belgien:gs:nmbssncb:8101073`. A raw ID is shown when the name lookup fails.
 - [ ] **F3** Max journey time has to be entered repeatedly (frontend).
 - [ ] **F4** Zoom level after calculation (frontend).
 - [ ] **F5** `/api/admin/debug/stations?includeIsolated=true` is referenced in old notes but not implemented.
+- [ ] **F6** Add authentification to acces the site with something like https://clerk.com (Seperate dev accounts and user accounts with different acces)
+
 
 ## Structure
 - [ ] **S9** Find out what fills the GTFS cache. After B18 the full-data `gtfs-cache.json` is still 3.6 GB (was ~4.2 GB) for 26,428 stations and 74,640 edges, so stations were never the bulk. Suspects: the per-trip `Connection` lists (trip ID, route ID and route name repeated on every connection), plus the trip→stops and stop→trips maps. Measure first (e.g. size per top-level field of `GtfsCacheData`, live heap after a full GC), then decide on a fix such as a more compact format or not storing derived maps.

@@ -65,6 +65,15 @@ class ReachabilityServiceTest {
     }
 
     @Test
+    void legsShowTheNameOfAStationMergedAcrossFeeds() {
+        // T1 ends at alpha:A3, which was merged into beta:B1 "Border Town Station"
+        ReachableStation b2 = find(query(gtfs, "alpha:A1", 1, 0, 180), "beta:B2").orElseThrow();
+
+        assertThat(b2.getLegs().get(0).getToStation()).isEqualTo("Border Town Station");
+        assertThat(b2.getLegs().get(1).getFromStation()).isEqualTo("Border Town Station");
+    }
+
+    @Test
     void transferShorterThanMinimumIsRejected() {
         // Only feasible transfer at the border is 20 min
         assertThat(find(query(gtfs, "alpha:A1", 1, 30, 180), "beta:B2")).isEmpty();
