@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B12 · F6 · S9
+**Next free IDs:** B15 · F7 · S9
 
 ## Bugs (data loading)
 - [ ] **B1** UTF-8 BOM breaks header parsing, so Austria is silently dropped. `gtfs_austria.zip` files start with `EF BB BF`. `indexOf(headers, "route_id")` then returns -1, and the feed loads 0 routes, 0 stops and 0 trips (log: "Routes: 273 total, 259 rail routes selected" then "Loaded 0 rail routes, 0 stops"). It's the only affected feed today. Fix: strip a leading `﻿` from the header line in the CSV loaders, add a BOM fixture test, then rebuild the caches. Also make a feed that loads 0 stops a loud warning.
@@ -20,6 +20,11 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 - [ ] **B9** `rawPathCache` is unbounded and not cleared on `reload-gtfs` (`clearRawCache()` is never called).
 - [ ] **B10** The cross-border dedup log uses `{:.2f}`, which isn't valid SLF4J. Use `{}` with `String.format`.
 - [ ] **B11** `searchStations` is a linear scan per request.
+- [ ] **B13** The SSE `done` event reports `reachable.size()`, which ignores the max-journey-time filter (applied only to streamed stations in the consumer). Repro: Wien Meidling (`slovakia:8100514`), 1 transfer, `maxJourneyHours=1` streams 23 stations but sends `total: 100`. The UI briefly shows "Found 100", then corrects to 23.
+
+## Bugs (frontend)
+- [ ] **B12** The local result cache key is `station|transfers|minWait|maxWait` and leaves out max journey time, so changing only the journey limit returns the cached result. Repro: Wien Hbf, 1 transfer, no limit (237), then 1 h limit: still 237. It also works in reverse: whichever query runs first fills the cache for both.
+- [ ] **B14** No status or error ever reaches the user: `showStatus` only logs to the console. Repro: stop the backend and click Calculate. The map clears, the counter stays at "…", and nothing says the stream failed.
 
 ## Features / UX
 - [ ] **F1** Rework station naming: map lat/long to OpenStreetMap station names and use that name for grouping as well.
@@ -27,6 +32,7 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 - [ ] **F3** Max journey time has to be entered repeatedly (frontend).
 - [ ] **F4** Zoom level after calculation (frontend).
 - [ ] **F5** `/api/admin/debug/stations?includeIsolated=true` is referenced in old notes but not implemented.
+- [ ] **F6** No base map: the CARTO `dark_all` tiles now return an "API KEY REQUIRED" placeholder, so markers float on a blank map. Switch to a keyless tile provider or configure a key.
 
 ## Structure
 - [ ] **S1** Split `GtfsDataService` (~1100 lines) into `GtfsFeedLoader`, `StationDeduplicator`, `TransitGraph` and `GtfsCacheStore`.
