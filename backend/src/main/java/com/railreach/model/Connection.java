@@ -1,13 +1,10 @@
 package com.railreach.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -26,7 +23,6 @@ public class Connection {
     private int arrivalTimeSeconds;
     
     private Integer stopsApart;
-    private List<StopSequence> intermediateStops;
     
     // Convenience methods for display (and backwards-compatible deserialization)
     @JsonProperty("departureTime")
