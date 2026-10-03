@@ -1,5 +1,6 @@
 package com.railreach.service;
 
+import com.railreach.model.Connection;
 import com.railreach.model.JourneyPath;
 import com.railreach.model.Station;
 import com.railreach.util.GtfsTime;
@@ -10,9 +11,21 @@ import tools.jackson.databind.ObjectMapper;
 
 import jakarta.annotation.PostConstruct;
 import java.io.File;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+
 
 @Service
 @Slf4j
@@ -286,9 +299,9 @@ public class HubRoutingService {
                 
                 // Validate transfer time at hub
                 if (!pathToHub.getConnections().isEmpty() && !hubToDest.getConnections().isEmpty()) {
-                    com.railreach.model.Connection arrivalAtHub = pathToHub.getConnections()
+                    Connection arrivalAtHub = pathToHub.getConnections()
                         .get(pathToHub.getConnections().size() - 1);
-                    com.railreach.model.Connection departureFromHub = hubToDest.getConnections().get(0);
+                    Connection departureFromHub = hubToDest.getConnections().get(0);
                     
                     int transferWaitMins = GtfsTime.diffMinutes(
                             arrivalAtHub.getArrivalTimeSeconds(), departureFromHub.getDepartureTimeSeconds());
@@ -312,14 +325,14 @@ public class HubRoutingService {
                     List<String> combinedStations = new ArrayList<>(pathToHub.getStationIds());
                     combinedStations.addAll(hubToDest.getStationIds().subList(1, hubToDest.getStationIds().size()));
                     
-                    List<com.railreach.model.Connection> combinedConns = new ArrayList<>(pathToHub.getConnections());
+                    List<Connection> combinedConns = new ArrayList<>(pathToHub.getConnections());
                     combinedConns.addAll(hubToDest.getConnections());
                     
                     int recalcDuration = totalDuration;
                     if (!pathToHub.getConnections().isEmpty() && !hubToDest.getConnections().isEmpty()) {
-                        com.railreach.model.Connection arrivalAtHub = pathToHub.getConnections()
+                        Connection arrivalAtHub = pathToHub.getConnections()
                             .get(pathToHub.getConnections().size() - 1);
-                        com.railreach.model.Connection departureFromHub = hubToDest.getConnections().get(0);
+                        Connection departureFromHub = hubToDest.getConnections().get(0);
                         int transferWaitMins = GtfsTime.diffMinutes(
                                 arrivalAtHub.getArrivalTimeSeconds(), departureFromHub.getDepartureTimeSeconds());
                         recalcDuration = pathToHub.getTotalDurationMinutes() + transferWaitMins + hubToDest.getTotalDurationMinutes();
