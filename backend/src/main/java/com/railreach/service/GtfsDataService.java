@@ -2,6 +2,7 @@ package com.railreach.service;
 
 import com.railreach.model.Connection;
 import com.railreach.model.Station;
+import com.railreach.util.GtfsTime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -569,8 +570,8 @@ public class GtfsDataService {
 
                 GtfsStopTime st = new GtfsStopTime(stopId,
                         parseInt(getField(fields, seqIdx)),
-                        parseGtfsTime(getField(fields, arrIdx)),
-                        parseGtfsTime(getField(fields, depIdx)));
+                        GtfsTime.parseSeconds(getField(fields, arrIdx)),
+                        GtfsTime.parseSeconds(getField(fields, depIdx)));
                 stopTimesByTrip.computeIfAbsent(tripId, k -> new ArrayList<>()).add(st);
                 
                 linesRead++;
@@ -887,19 +888,6 @@ public class GtfsDataService {
         catch (NumberFormatException e) { return 0; }
     }
     
-    private int parseGtfsTime(String s) {
-        if (s == null || s.isEmpty()) return 0;
-        String[] parts = s.split(":");
-        if (parts.length < 2) return 0;
-        try {
-            int hours = Integer.parseInt(parts[0]);
-            int mins = Integer.parseInt(parts[1]);
-            int secs = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
-            return hours * 3600 + mins * 60 + secs;
-        } catch (NumberFormatException e) {
-            return 0;
-        }
-    }
 
     // -------------------------------------------------------------------------
     // Public API

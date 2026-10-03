@@ -2,6 +2,7 @@ package com.railreach.service;
 
 import com.railreach.model.JourneyPath;
 import com.railreach.model.Station;
+import com.railreach.util.GtfsTime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -289,13 +290,8 @@ public class HubRoutingService {
                         .get(pathToHub.getConnections().size() - 1);
                     com.railreach.model.Connection departureFromHub = hubToDest.getConnections().get(0);
                     
-                    int arrivalTimeSeconds = arrivalAtHub.getArrivalTimeSeconds();
-                    int departureTimeSeconds = departureFromHub.getDepartureTimeSeconds();
-                    int transferWaitSeconds = departureTimeSeconds - arrivalTimeSeconds;
-                    int transferWaitMins = transferWaitSeconds / 60;
-                    
-                    if (transferWaitMins < -60) transferWaitMins += 24 * 60;
-                    
+                    int transferWaitMins = GtfsTime.diffMinutes(
+                            arrivalAtHub.getArrivalTimeSeconds(), departureFromHub.getDepartureTimeSeconds());
                     if (transferWaitMins < 0 || transferWaitMins > maxTransferMins) {
                         continue;
                     }
@@ -324,9 +320,8 @@ public class HubRoutingService {
                         com.railreach.model.Connection arrivalAtHub = pathToHub.getConnections()
                             .get(pathToHub.getConnections().size() - 1);
                         com.railreach.model.Connection departureFromHub = hubToDest.getConnections().get(0);
-                        int transferWaitSeconds = departureFromHub.getDepartureTimeSeconds() - arrivalAtHub.getArrivalTimeSeconds();
-                        int transferWaitMins = transferWaitSeconds / 60;
-                        if (transferWaitMins < -60) transferWaitMins += 24 * 60;
+                        int transferWaitMins = GtfsTime.diffMinutes(
+                                arrivalAtHub.getArrivalTimeSeconds(), departureFromHub.getDepartureTimeSeconds());
                         recalcDuration = pathToHub.getTotalDurationMinutes() + transferWaitMins + hubToDest.getTotalDurationMinutes();
                     }
                     
