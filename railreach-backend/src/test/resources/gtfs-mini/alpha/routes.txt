@@ -1,0 +1,4 @@
+route_id,route_short_name,route_long_name,route_type
+R1,RE1,Alpha Regional,2
+RN,NJ,Alpha Night Train,102
+RB,B9,Alpha Bus,3

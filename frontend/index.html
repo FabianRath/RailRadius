@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rail Reachability Explorer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+          crossorigin=""/>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Martian+Mono:wght@400;600;800&family=Outfit:wght@300;500;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --bg-primary: #0f0f23;
+            --bg-secondary: #1a1a2e;
+            --bg-tertiary: #16213e;
+            --accent-rail: #00ff9f;
+            --accent-warm: #ff6b35;
+            --text-primary: #e4e4e7;
+            --text-secondary: #a1a1aa;
+            --border: #27272a;
+        }
+        
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            height: 100vh;
+            position: relative;
+        }
+        
+        .sidebar {
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .header {
+            padding: 32px 28px 24px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        h1 {
+            font-family: 'Martian Mono', monospace;
+            font-weight: 800;
+            font-size: 28px;
+            letter-spacing: -1px;
+            background: linear-gradient(135deg, var(--accent-rail), var(--accent-warm));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+        
+        .tagline {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 300;
+        }
+        
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 28px;
+        }
+        
+        .section {
+            margin-bottom: 32px;
+        }
+        
+        .section-title {
+            font-family: 'Martian Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent-rail);
+            margin-bottom: 16px;
+        }
+        
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 32px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(0, 255, 159, 0.02);
+            /* Hidden by default for auto-load */
+            display: none; 
+        }
+        
+        .upload-zone:hover {
+            border-color: var(--accent-rail);
+            background: rgba(0, 255, 159, 0.05);
+        }
+        
+        .upload-zone.active {
+            border-color: var(--accent-rail);
+            background: rgba(0, 255, 159, 0.08);
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+            opacity: 0.6;
+        }
+        
+        .upload-text {
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .upload-hint {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .search-box {
+            position: relative;
+            margin-bottom: 16px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-rail);
+            box-shadow: 0 0 0 3px rgba(0, 255, 159, 0.1);
+        }
+        
+        .search-input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        .station-list {
+            max-height: 280px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-primary);
+        }
+        
+        .station-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .station-item:last-child {
+            border-bottom: none;
+        }
+        
+        .station-item:hover {
+            background: rgba(0, 255, 159, 0.05);
+        }
+        
+        .station-item.selected {
+            background: rgba(0, 255, 159, 0.1);
+            border-left: 3px solid var(--accent-rail);
+        }
+        
+        .station-name {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+        
+        .station-id {
+            font-family: 'Martian Mono', monospace;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        
+        .no-results {
+            padding: 32px 16px;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+        
+        .slider-container {
+            margin-bottom: 24px;
+        }
+        
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+        
+        .slider-value {
+            font-family: 'Martian Mono', monospace;
+            color: var(--accent-rail);
+            font-weight: 600;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--bg-primary);
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--accent-rail);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 255, 159, 0.4);
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: var(--accent-rail);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 8px rgba(0, 255, 159, 0.4);
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--accent-rail), #00d98f);
+            border: none;
+            border-radius: 8px;
+            color: var(--bg-primary);
+            font-family: 'Martian Mono', monospace;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 255, 159, 0.3);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            font-family: 'Martian Mono', monospace;
+        }
+        
+        .status.info {
+            background: rgba(0, 255, 159, 0.1);
+            border: 1px solid rgba(0, 255, 159, 0.3);
+            color: var(--accent-rail);
+        }
+        
+        .status.loading {
+            background: rgba(255, 107, 53, 0.1);
+            border: 1px solid rgba(255, 107, 53, 0.3);
+            color: var(--accent-warm);
+        }
+        
+        .status.warning {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            color: #ffc107;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card {
+            background: var(--bg-primary);
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+        
+        .stat-value {
+            font-family: 'Martian Mono', monospace;
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--accent-rail);
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-secondary) !important;
+            color: var(--text-primary) !important;
+            font-family: 'Outfit', sans-serif !important;
+            border-radius: 8px !important;
+            border: 1px solid var(--border) !important;
+        }
+        
+        .leaflet-popup-tip {
+            background: var(--bg-secondary) !important;
+        }
+        
+        .popup-station {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        
+        .popup-transfers {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .progress-container {
+            margin-top: 12px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: var(--bg-primary);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-rail), var(--accent-warm));
+            transition: width 0.3s;
+            width: 0%;
+        }
+        
+        .progress-text {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 6px;
+        }
+        
+        .popup-path {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        /* ── Loading spinner ── */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        @keyframes pulse-ring {
+            0%   { transform: scale(0.8); opacity: 1; }
+            100% { transform: scale(2.2); opacity: 0; }
+        }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(0,255,159,0.25);
+            border-top-color: var(--accent-rail);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+
+        #loadingOverlay {
+            position: absolute;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15,15,35,0.92);
+            border: 1px solid rgba(0,255,159,0.35);
+            border-radius: 12px;
+            padding: 14px 22px;
+            display: none;
+            align-items: center;
+            gap: 14px;
+            z-index: 900;
+            backdrop-filter: blur(6px);
+            box-shadow: 0 4px 24px rgba(0,255,159,0.15);
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        #loadingOverlay.visible {
+            display: flex;
+        }
+
+        .loading-pulse {
+            position: relative;
+            width: 10px;
+            height: 10px;
+        }
+        .loading-pulse::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: var(--accent-rail);
+        }
+        .loading-pulse::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px solid var(--accent-rail);
+            animation: pulse-ring 1.2s ease-out infinite;
+        }
+
+        .loading-text {
+            font-family: 'Martian Mono', monospace;
+            font-size: 12px;
+            color: var(--accent-rail);
+        }
+
+        .loading-count {
+            font-family: 'Martian Mono', monospace;
+            font-size: 12px;
+            color: var(--text-secondary);
+            min-width: 80px;
+        }
+
+        .btn-loading {
+            background: linear-gradient(135deg, #1a1a2e, #16213e) !important;
+            border: 1px solid var(--accent-rail) !important;
+            color: var(--accent-rail) !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            cursor: pointer !important;
+            transition: background 0.2s, border-color 0.2s !important;
+        }
+
+        .btn-loading:hover {
+            background: linear-gradient(135deg, #2a0a0a, #1a0505) !important;
+            border-color: #ff4455 !important;
+            color: #ff4455 !important;
+        }
+
+        .btn-loading:hover .spinner {
+            border-top-color: #ff4455 !important;
+        }
+
+        .btn-cancel-hint {
+            font-size: 10px;
+            opacity: 0;
+            position: absolute;
+            bottom: -18px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            color: #ff4455;
+            font-family: 'Martian Mono', monospace;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+
+        #calculateBtn {
+            position: relative;
+        }
+
+        #calculateBtn.btn-loading:hover .btn-cancel-hint {
+            opacity: 1;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-rail);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="header">
+                <h1>RailReach</h1>
+                <div class="tagline">Explore train networks by transfer limits</div>
+            </div>
+            
+            <div class="content">
+                <div class="section" id="searchSection">
+                    <div class="section-title">Step 1: Find Starting Station</div>
+                    <div class="search-box">
+                        <input type="text" class="search-input" id="searchInput" 
+                               placeholder="Search for a station...">
+                    </div>
+                    <div id="stationResults"></div>
+                </div>
+                
+                <div class="section" id="calculateSection" style="display: none;">
+                    <div class="section-title">Step 2: Calculate Reachability</div>
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>Maximum Transfers</span>
+                            <span class="slider-value" id="transferValue">0</span>
+                        </div>
+                        <input type="range" id="transferSlider" min="0" max="5" value="0" step="1">
+                    </div>
+                    
+                    <!-- Max Journey Time Input -->
+                    <div style="margin-top: 16px; margin-bottom: 16px;">
+                        <label style="display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+                            Max Journey Time (hours)
+                            <span style="font-size: 11px; opacity: 0.7;"> — optional</span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="maxJourneyTime" 
+                            class="search-input"
+                            placeholder="e.g., 8"
+                            min="0.5"
+                            max="24"
+                            step="0.5"
+                            style="width: 100%;"
+                        >
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 6px;">
+                            Leave empty for no time limit
+                        </div>
+                    </div>
+                    
+                    <!-- Max Transfer Wait Time Toggle + Input -->
+                    <div style="margin-bottom: 16px; padding: 12px; background: rgba(0, 255, 159, 0.05); border-radius: 8px;">
+                        <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-size: 13px; margin-bottom: 0;" id="transferTimeToggleLabel">
+                            <span style="font-weight: 500;">Limit Transfer Wait Time</span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span id="transferTimeToggleHint" style="font-size: 11px; color: var(--accent-rail); font-family: 'Martian Mono', monospace;">3h</span>
+                                <!-- Toggle switch -->
+                                <div id="transferTimeToggleTrack" style="
+                                    width: 36px; height: 20px; border-radius: 10px;
+                                    background: var(--accent-rail); position: relative;
+                                    transition: background 0.2s; cursor: pointer; flex-shrink: 0;">
+                                    <div id="transferTimeToggleThumb" style="
+                                        width: 14px; height: 14px; border-radius: 50%;
+                                        background: var(--bg-primary); position: absolute;
+                                        top: 3px; left: 19px; transition: left 0.2s;">
+                                    </div>
+                                </div>
+                            </div>
+                        </label>
+                        <div id="transferTimeInputWrap" style="margin-top: 12px;">
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <div style="flex: 1;">
+                                    <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 4px; font-family: 'Martian Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px;">Min</div>
+                                    <input 
+                                        type="number" 
+                                        id="minTransferTime" 
+                                        class="search-input"
+                                        value="5"
+                                        min="0"
+                                        max="9999"
+                                        step="1"
+                                        style="width: 100%; text-align: center;"
+                                    >
+                                </div>
+                                <div style="color: var(--text-secondary); font-size: 18px; margin-top: 16px;">—</div>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 4px; font-family: 'Martian Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px;">Max</div>
+                                    <input 
+                                        type="number" 
+                                        id="maxTransferTime" 
+                                        class="search-input"
+                                        value="180"
+                                        min="1"
+                                        max="9999"
+                                        step="1"
+                                        style="width: 100%; text-align: center;"
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 16px; padding: 12px; background: rgba(0, 255, 159, 0.05); border-radius: 8px;">
+                        <label style="display: flex; align-items: center; cursor: pointer; font-size: 13px;">
+                            <input type="checkbox" id="showMergedZones" style="margin-right: 8px; width: 16px; height: 16px; cursor: pointer;">
+                            <span>Show merged coverage areas (slower)</span>
+                        </label>
+                    </div>
+                    
+                    <button class="btn" id="calculateBtn" disabled>Calculate Reachability<span class="btn-cancel-hint">click to cancel</span></button>
+                </div>
+                
+                <div class="section" id="resultsSection" style="display: none;">
+                    <div class="section-title">Results</div>
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-label">Reachable</div>
+                            <div class="stat-value" id="reachableCount">—</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Max Transfers</div>
+                            <div class="stat-value" id="maxTransfersUsed">—</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="map"></div>
+
+        <!-- Calculation loading overlay -->
+        <div id="loadingOverlay">
+            <div class="loading-pulse"></div>
+            <div class="loading-text">Calculating…</div>
+            <div class="loading-count" id="loadingCount">0 stations found</div>
+            <div class="spinner"></div>
+        </div>
+
+        <!-- Debug overlay banner (shown when triggered via curl) -->
+        <div id="debugBanner" style="
+            position: absolute;
+            top: 16px; left: 50%; transform: translateX(-50%);
+            background: rgba(15,15,35,0.92);
+            border: 1px solid #ff6b35;
+            color: #ff6b35;
+            font-family: 'Martian Mono', monospace;
+            font-size: 12px;
+            padding: 10px 18px;
+            border-radius: 8px;
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 4px 20px rgba(255,107,53,0.3);
+            white-space: nowrap;
+        ">
+            <span>🐛 DEBUG MODE</span>
+            <span id="debugBannerText">Loading stations…</span>
+            <span style="opacity:0.4;">|</span>
+            <span style="cursor:pointer; opacity:0.8; text-decoration:underline;" onclick="clearDebugOverlay()">
+                clear
+            </span>
+            <span style="opacity:0.4; font-size:10px;">
+                curl -X DELETE localhost:8080/api/admin/debug/trigger
+            </span>
+        </div>
+    </div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <script>
+        // ==========================================
+        // CONFIGURATION
+        // ==========================================
+        // ==========================================
+        // GLOBAL STATE
+        // ==========================================
+
+        // Global state
+        // Local results cache: key = "stationId|maxTransfers|maxTransferMinutes" -> Map of reachable stations
+        const localResultsCache = new Map();
+
+        let gtfsData = {
+            stops: new Map(),
+            graph: new Map(),
+            trips: new Map(), // tripId -> {routeId, serviceId}
+            routes: new Map(), // routeId -> {routeName, routeType}
+            connectionInfo: new Map(), // "fromId->toId" -> [{tripId, ...}]
+            calendar: new Map(), // serviceId -> {days, start_date, end_date}
+            calendarDates: new Map() // serviceId -> [{date, exception_type}]
+        };
+        let selectedStation = null;
+        let map = null;
+        let markers = [];
+        let routeLines = []; // Store route lines separately
+        
+        const transferColors = ['#00ff9f', '#00d9ff', '#8b5cf6', '#ff006e', '#ff7b00', '#ffd700'];
+        
+        // Initialize map and start auto-load
+        window.addEventListener('load', () => {
+            map = L.map('map', {
+                preferCanvas: true
+            }).setView([51.1657, 10.4515], 6);
+            
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+                maxZoom: 20
+            }).addTo(map);
+
+            // Check backend health on load
+            checkBackendHealth();
+            
+            // Recalculate and redraw when zoom changes (debounced)
+            let zoomTimeout;
+            map.on('zoomend', () => {
+                clearTimeout(zoomTimeout);
+                zoomTimeout = setTimeout(() => {
+                    if (window.currentReachabilityData) {
+                        visualizeResults(window.currentReachabilityData, false);
+                    }
+                }, 300);
+            });
+        });
+
+        // Check backend connection
+        async function checkBackendHealth() {
+            try {
+                const response = await fetch('http://localhost:8080/api/health');
+                const data = await response.json();
+                console.log('Backend health:', data);
+                if (data.status === 'UP') {
+                    console.log('✓ Backend connected and ready!');
+                }
+            } catch (error) {
+                console.error('⚠️ Backend connection failed:', error);
+            }
+        }
+        // Function to automatically load the default GTFS file
+        const searchInput = document.getElementById('searchInput');
+        const stationResults = document.getElementById('stationResults');
+        
+        let searchTimeout;
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => searchStations(e.target.value), 300);
+        });
+        
+        async function searchStations(query) {
+            console.log('Search called with query:', query);
+            
+            if (!query || query.length < 2) {
+                stationResults.innerHTML = '';
+                return;
+            }
+            
+            try {
+                console.log('Fetching from API...');
+                const response = await fetch(`http://localhost:8080/api/stations/search?q=${encodeURIComponent(query)}&limit=50`);
+                console.log('Response status:', response.status);
+                const stations = await response.json();
+                console.log('Found stations:', stations.length);
+                
+                if (stations.length === 0) {
+                    stationResults.innerHTML = '<div class="no-results">No stations found</div>';
+                    return;
+                }
+                
+                stationResults.innerHTML = '<div class="station-list">' +
+                    stations.map(station => `
+                        <div class="station-item" data-id="${station.id}" data-name="${station.name}">
+                            <div class="station-name">${station.name}</div>
+                            <div class="station-id">${station.connections != null ? station.connections + ' connection' + (station.connections !== 1 ? 's' : '') : station.id}</div>
+                        </div>
+                    `).join('') +
+                '</div>';
+                
+                stationResults.querySelectorAll('.station-item').forEach(item => {
+                    item.addEventListener('click', () => selectStation(item.dataset.id, item.dataset.name));
+                });
+            } catch (error) {
+                console.error('Search error:', error);
+                stationResults.innerHTML = '<div class="no-results">⚠️ Backend connection failed</div>';
+            }
+        }
+        
+        function selectStation(stopId, stopName) {
+            selectedStation = { id: stopId, name: stopName };
+            
+            console.log('Selected station:', stopName, 'ID:', stopId);
+            
+            stationResults.querySelectorAll('.station-item').forEach(item => {
+                item.classList.toggle('selected', item.dataset.id == stopId);
+            });
+            
+            // Clear the search input and hide results
+            searchInput.value = selectedStation.name;
+            stationResults.innerHTML = '';
+            
+            document.getElementById('calculateSection').style.display = 'block';
+            document.getElementById('calculateBtn').disabled = false;
+            
+            showStatus('info', `Selected: ${selectedStation.name}`);
+        }
+        
+        // Transfer slider
+        const transferSlider = document.getElementById('transferSlider');
+        const transferValue = document.getElementById('transferValue');
+        transferSlider.addEventListener('input', (e) => {
+            transferValue.textContent = e.target.value;
+        });
+        
+        // Transfer wait time toggle
+        let transferTimeLimitEnabled = true;
+        const transferTimeTrack = document.getElementById('transferTimeToggleTrack');
+        const transferTimeThumb = document.getElementById('transferTimeToggleThumb');
+        const transferTimeHint  = document.getElementById('transferTimeToggleHint');
+        const transferTimeWrap  = document.getElementById('transferTimeInputWrap');
+        const minTransferTimeInput = document.getElementById('minTransferTime');
+        const maxTransferTimeInput = document.getElementById('maxTransferTime');
+
+        function fmtMins(mins) {
+            const h = Math.floor(mins / 60), m = mins % 60;
+            return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+        }
+
+        function updateTransferTimeHint() {
+            if (!transferTimeLimitEnabled) {
+                transferTimeHint.textContent = 'off';
+                transferTimeHint.style.color = 'var(--text-secondary)';
+            } else {
+                const minMins = parseInt(minTransferTimeInput.value) || 5;
+                const maxMins = parseInt(maxTransferTimeInput.value) || 180;
+                transferTimeHint.textContent = `${fmtMins(minMins)} – ${fmtMins(maxMins)}`;
+                transferTimeHint.style.color = 'var(--accent-rail)';
+            }
+        }
+
+        transferTimeTrack.addEventListener('click', () => {
+            transferTimeLimitEnabled = !transferTimeLimitEnabled;
+            // Animate toggle
+            if (transferTimeLimitEnabled) {
+                transferTimeTrack.style.background = 'var(--accent-rail)';
+                transferTimeThumb.style.left = '19px';
+                transferTimeWrap.style.display = 'block';
+            } else {
+                transferTimeTrack.style.background = 'var(--border)';
+                transferTimeThumb.style.left = '3px';
+                transferTimeWrap.style.display = 'none';
+            }
+            updateTransferTimeHint();
+        });
+
+        minTransferTimeInput.addEventListener('input', updateTransferTimeHint);
+        maxTransferTimeInput.addEventListener('input', updateTransferTimeHint);
+        // Initialise hint
+        updateTransferTimeHint();
+
+        // Merged zones toggle - redraw when changed
+        const mergedZonesToggle = document.getElementById('showMergedZones');
+        if (mergedZonesToggle) {
+            mergedZonesToggle.addEventListener('change', () => {
+                if (window.currentReachabilityData) {
+                    visualizeResults(window.currentReachabilityData, false);
+                }
+            });
+        }
+        
+        // ── Loading state helpers ──────────────────────────────────────────
+        function setLoadingState(active) {
+            const btn     = document.getElementById('calculateBtn');
+            const overlay = document.getElementById('loadingOverlay');
+            const count   = document.getElementById('loadingCount');
+            if (active) {
+                btn.classList.add('btn-loading');
+                btn.innerHTML =
+                    '<div class="spinner" style="width:14px;height:14px;border-width:2px;border-top-color:inherit;"></div>' +
+                    '<span>Calculating…</span>' +
+                    '<span class="btn-cancel-hint">click to cancel</span>';
+                overlay.classList.add('visible');
+                count.textContent = '0 stations found';
+                // One-time cancel click listener — removed automatically when state clears
+                btn._cancelHandler = () => cancelQuery();
+                btn.addEventListener('click', btn._cancelHandler);
+            } else {
+                // Remove cancel listener
+                if (btn._cancelHandler) {
+                    btn.removeEventListener('click', btn._cancelHandler);
+                    btn._cancelHandler = null;
+                }
+                btn.classList.remove('btn-loading');
+                btn.innerHTML = 'Calculate Reachability<span class="btn-cancel-hint">click to cancel</span>';
+                overlay.classList.remove('visible');
+            }
+        }
+
+        function cancelQuery() {
+            if (window._activeStream) {
+                window._activeStream.close();
+                window._activeStream = null;
+            }
+            setLoadingState(false);
+
+            // Show whatever we've collected so far in the counter
+            const found = window.currentReachabilityData
+                ? window.currentReachabilityData.size : 0;
+            document.getElementById('reachableCount').textContent =
+                found > 0 ? found.toLocaleString() : '—';
+            showStatus('info', found > 0
+                ? 'Cancelled — showing ' + found.toLocaleString() + ' partial results'
+                : 'Cancelled');
+            console.log('Query cancelled by user after', found, 'stations');
+        }
+
+        // Calculate reachability
+        const calculateBtn = document.getElementById('calculateBtn');
+        calculateBtn.addEventListener('click', async () => {
+            console.log('Calculate button clicked!');
+            if (!selectedStation) {
+                console.error('No station selected!');
+                return;
+            }
+            
+            const maxTransfers = parseInt(transferSlider.value);
+            const maxJourneyTimeInput = document.getElementById('maxJourneyTime');
+            const maxJourneyTimeHours = maxJourneyTimeInput ? (maxJourneyTimeInput.value ? parseFloat(maxJourneyTimeInput.value) : null) : null;
+            // If toggle is off, send values that effectively remove the constraint
+            const minTransferTimeMinutes = transferTimeLimitEnabled
+                ? (parseInt(document.getElementById('minTransferTime').value) || 0)
+                : 0;
+            const maxTransferTimeMinutes = transferTimeLimitEnabled
+                ? (parseInt(document.getElementById('maxTransferTime').value) || 180)
+                : 99999;
+            
+            console.log('Sending API request:', {
+                startStationId: selectedStation.id,
+                maxTransfers: maxTransfers,
+                maxJourneyTimeHours: maxJourneyTimeHours,
+                maxTransferTimeMinutes: maxTransferTimeMinutes
+            });
+            
+            // ── Check local cache first ──────────────────────────────────────
+            const cacheKey = selectedStation.id + '|' + maxTransfers + '|' + minTransferTimeMinutes + '|' + maxTransferTimeMinutes;
+            if (localResultsCache.has(cacheKey)) {
+                console.log('Local cache HIT for', cacheKey);
+                const cachedData = localResultsCache.get(cacheKey);
+
+                // Clear map and re-render from cache instantly
+                markers.forEach(m => map.removeLayer(m));
+                markers = [];
+                routeLines.forEach(l => map.removeLayer(l));
+                routeLines = [];
+                window.currentReachabilityData = new Map(cachedData);
+                visualizeResults(window.currentReachabilityData);
+                document.getElementById('resultsSection').style.display = 'block';
+                document.getElementById('reachableCount').textContent =
+                    cachedData.size.toLocaleString();
+                document.getElementById('maxTransfersUsed').textContent = maxTransfers;
+                showStatus('info', 'Loaded ' + cachedData.size.toLocaleString() +
+                    ' stations from cache (instant)');
+                return; // Skip the SSE stream entirely
+            }
+
+            setLoadingState(true);
+
+            // Clear previous results and start fresh
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+            routeLines.forEach(l => map.removeLayer(l));
+            routeLines = [];
+            window.currentReachabilityData = new Map();
+            document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('reachableCount').textContent = '…';
+            document.getElementById('maxTransfersUsed').textContent = maxTransfers;
+
+            // Close any previous stream
+            if (window._activeStream) {
+                window._activeStream.close();
+                window._activeStream = null;
+            }
+
+            const params = new URLSearchParams({
+                stationId: selectedStation.id,
+                maxTransfers: maxTransfers,
+                minTransferMinutes: minTransferTimeMinutes,
+                maxTransferMinutes: maxTransferTimeMinutes
+            });
+            if (maxJourneyTimeHours != null) params.set('maxJourneyHours', maxJourneyTimeHours);
+
+            const es = new EventSource(
+                'http://localhost:8080/api/reachability/stream?' + params.toString()
+            );
+            window._activeStream = es;
+            let boundsSet = false;
+            const allBounds = [];
+
+            es.addEventListener('stations', e => {
+                const batch = JSON.parse(e.data);
+                batch.forEach(station => {
+                    window.currentReachabilityData.set(station.stopId, {
+                        transfers: station.transfers,
+                        path: station.path,
+                        pathNames: station.pathNames,
+                        totalDuration: station.totalDuration,
+                        totalDurationMinutes: station.totalDurationMinutes,
+                        legs: station.legs,
+                        stopInfo: {
+                            id: station.stopId,
+                            name: station.stopName,
+                            lat: station.latitude,
+                            lon: station.longitude
+                        }
+                    });
+                });
+
+                // Render this batch immediately
+                renderBatch(batch, allBounds);
+                const n = window.currentReachabilityData.size;
+                document.getElementById('reachableCount').textContent = n.toLocaleString();
+                document.getElementById('loadingCount').textContent = n.toLocaleString() + ' stations found';
+
+                // Fit bounds once after the first batch arrives
+                if (!boundsSet && allBounds.length > 0) {
+                    map.fitBounds(allBounds, { padding: [50, 50] });
+                    boundsSet = true;
+                }
+            });
+
+            es.addEventListener('done', e => {
+                const info = JSON.parse(e.data);
+                const fromCache = info.fromCache || false;
+                console.log('Stream done:', info.total, 'stations in', info.calculationTimeMs + 'ms',
+                    fromCache ? '(from server cache)' : '');
+                document.getElementById('reachableCount').textContent =
+                    info.total.toLocaleString();
+                es.close();
+                window._activeStream = null;
+                setLoadingState(false);
+
+                // Save completed results to local cache
+                localResultsCache.set(cacheKey, new Map(window.currentReachabilityData));
+                console.log('Cached result locally for key:', cacheKey,
+                    '— cache now has', localResultsCache.size, 'entries');
+
+                const label = fromCache ? ' (instant — server cache)' : '';
+                showStatus('info', 'Found ' + info.total.toLocaleString() +
+                    ' reachable stations' + label);
+            });
+
+            es.addEventListener('error', e => {
+                console.error('SSE error:', e);
+                es.close();
+                window._activeStream = null;
+                setLoadingState(false);
+                showStatus('error', 'Stream failed — check backend logs');
+            });
+        });
+        
+        // BFS reachability - tracks path, trains, and ALL connection details
+        function calculateDuration(departureTime, arrivalTime) {
+            if (!departureTime || !arrivalTime) return null;
+            
+            // Parse HH:MM:SS format
+            const parseTime = (timeStr) => {
+                const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+                return hours * 60 + minutes; // Return total minutes
+            };
+            
+            const depMinutes = parseTime(departureTime);
+            const arrMinutes = parseTime(arrivalTime);
+            
+            let duration = arrMinutes - depMinutes;
+            
+            // Handle next-day arrivals (times > 24:00:00 in GTFS)
+            if (duration < 0) {
+                duration += 24 * 60;
+            }
+            
+            const hours = Math.floor(duration / 60);
+            const minutes = duration % 60;
+            
+            if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            } else {
+                return `${minutes}m`;
+            }
+        }
+        
+        // Helper function to calculate buffer radius based on zoom level
+        function getBufferRadiusKm(zoom) {
+            // Smaller, more reasonable radii
+            // At zoom 6: ~2km, At zoom 10: ~0.5km, At zoom 14: ~0.1km
+            return Math.pow(2, 12 - zoom) * 0.5;
+        }
+        
+        // Render a batch of newly-arrived stations onto the map without clearing existing markers.
+        // Called incrementally as SSE batches arrive.
+        function renderBatch(stations, allBounds) {
+            stations.forEach(station => {
+                const lat = station.latitude;
+                const lon = station.longitude;
+                if (!lat || !lon) return;
+
+                const transfers = station.transfers;
+                const color = transferColors[Math.min(transfers, 5)];
+
+                const marker = L.circleMarker([lat, lon], {
+                    radius: transfers === 0 ? 5 : 3,
+                    fillColor: color,
+                    color: '#ffffff',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 1
+                }).addTo(map);
+
+                let pathHtml = '';
+                if (station.legs && station.legs.length > 0) {
+                    pathHtml = '<div class="popup-path" style="max-height:300px;overflow-y:auto;">';
+                    pathHtml += '<div style="font-size:13px;font-weight:700;color:var(--accent-rail);margin-bottom:8px;">⏱️ ' + (station.totalDuration || 'N/A') + '</div>';
+                    station.legs.forEach(leg => {
+                        if (leg.type === 'TRAIN') {
+                            pathHtml += '<div style="background:rgba(0,217,255,0.05);padding:6px;border-radius:4px;margin-bottom:6px;border-left:3px solid var(--accent-rail);">';
+                            pathHtml += '<div style="font-size:11px;font-weight:600;color:var(--accent-rail);">🚂 ' + (leg.trainName || 'Train');
+                            if (leg.duration) pathHtml += ' <span style="font-weight:normal;color:var(--text-secondary);">(' + leg.duration + ')</span>';
+                            pathHtml += '</div></div>';
+                        } else if (leg.type === 'TRANSFER') {
+                            pathHtml += '<div style="font-size:12px;padding:6px;background:rgba(255,107,53,0.1);border-radius:4px;margin-bottom:6px;">';
+                            pathHtml += '🔄 Transfer at ' + (leg.fromStation || '');
+                            if (leg.duration) pathHtml += ' <span style="color:var(--text-secondary);">(' + leg.duration + ')</span>';
+                            pathHtml += '</div>';
+                        }
+                    });
+                    pathHtml += '<div style="font-size:12px;padding:6px;background:rgba(0,255,159,0.1);border-radius:4px;">🎯 ' + station.stopName + '</div>';
+                    pathHtml += '</div>';
+                }
+
+                marker.bindPopup(
+                    '<div class="popup-station">' + station.stopName + '</div>' +
+                    '<div class="popup-transfers">Transfers: ' + transfers + '</div>' +
+                    pathHtml
+                );
+
+                markers.push(marker);
+                allBounds.push([lat, lon]);
+            });
+        }
+
+        // Visualize on map with merged polygons (proper Chronotrains style)
+        function visualizeResults(reachable, shouldFitBounds = true) {
+            // Clear existing markers
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+            routeLines.forEach(l => map.removeLayer(l));
+            routeLines = [];
+            
+            const bounds = [];
+            let maxTransfers = 0;
+            
+            // Check if merged zones should be shown
+            const showMergedZones = document.getElementById('showMergedZones')?.checked || false;
+            
+            // Group stations by transfer level
+            const stationsByTransfer = new Map();
+            
+            reachable.forEach((data, stopId) => {
+                // Use stopInfo from API response
+                const stop = data.stopInfo;
+                if (!stop || !stop.lat || !stop.lon) return;
+                
+                const transfers = data.transfers;
+                maxTransfers = Math.max(maxTransfers, transfers);
+                
+                if (!stationsByTransfer.has(transfers)) {
+                    stationsByTransfer.set(transfers, []);
+                }
+                
+                stationsByTransfer.get(transfers).push({
+                    stop: stop,
+                    data: data
+                });
+                
+                bounds.push([stop.lat, stop.lon]);
+            });
+            
+            // Only create merged polygons if toggle is enabled
+            if (showMergedZones) {
+                // For each transfer level, create merged polygons
+                const currentZoom = map.getZoom();
+                const bufferRadius = getBufferRadiusKm(currentZoom);
+            
+            stationsByTransfer.forEach((stations, transferLevel) => {
+                const color = transferColors[Math.min(transferLevel, 5)];
+                
+                // Create buffered circles for each station
+                const circles = stations.map(({stop}) => {
+                    return turf.circle([stop.lon, stop.lat], bufferRadius, {
+                        steps: 16, // Lower steps for performance
+                        units: 'kilometers'
+                    });
+                });
+                
+                if (circles.length === 0) return;
+                
+                // Merge all circles into a single polygon
+                let merged = circles[0];
+                for (let i = 1; i < circles.length; i++) {
+                    try {
+                        merged = turf.union(merged, circles[i]);
+                    } catch (e) {
+                        // If union fails, skip this circle
+                        console.warn('Union failed:', e);
+                    }
+                }
+                
+                // Convert to Leaflet GeoJSON and add to map
+                const layer = L.geoJSON(merged, {
+                    style: {
+                        fillColor: color,
+                        color: color,
+                        weight: 1,
+                        opacity: 0.8,
+                        fillOpacity: 0.6
+                    }
+                }).addTo(map);
+                
+                routeLines.push(layer);
+            }); // Close stationsByTransfer.forEach for merged zones
+        } // Close if (showMergedZones)
+        
+        // Always show station markers (regardless of merged zones toggle)
+        stationsByTransfer.forEach((stations, transferLevel) => {
+            const color = transferColors[Math.min(transferLevel, 5)];
+            
+            stations.forEach(({stop, data}) => {
+                const marker = L.circleMarker([stop.lat, stop.lon], {
+                    radius: transferLevel === 0 ? 5 : 3,
+                    fillColor: color,
+                    color: '#ffffff',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 1
+                }).addTo(map);
+                
+                // Build popup
+                let pathHtml = '';
+                if (data.legs && data.legs.length > 0) {
+                    pathHtml = '<div class="popup-path" style="max-height: 400px; overflow-y: auto;">';
+                    
+                    // Total journey time header
+                    pathHtml += '<div style="font-size: 13px; font-weight: 700; color: var(--accent-rail); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">';
+                    pathHtml += `⏱️ Total Journey Time: ${data.totalDuration || 'N/A'}`;
+                    pathHtml += '</div>';
+                    
+                    pathHtml += '<div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; font-weight: 600;">JOURNEY DETAILS:</div>';
+                    
+                    // Starting station
+                    const startName = data.pathNames?.[0] || 'Start';
+                    pathHtml += `<div style="font-size: 12px; padding: 4px 0; font-weight: 600; background: rgba(0,255,159,0.1); padding: 8px; border-radius: 4px; margin-bottom: 8px;">`;
+                    pathHtml += `🚉 START: ${startName}`;
+                    pathHtml += `</div>`;
+                    
+                    // Show all legs
+                    data.legs.forEach(leg => {
+                        if (leg.type === 'TRAIN') {
+                            pathHtml += `<div style="background: rgba(0,217,255,0.05); padding: 8px; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid var(--accent-rail);">`;
+                            pathHtml += `<div style="font-size: 11px; font-weight: 600; color: var(--accent-rail);">`;
+                            pathHtml += `🚂 ${leg.trainName || 'Train'}`;
+                            if (leg.duration) {
+                                pathHtml += ` <span style="font-weight: normal; color: var(--text-secondary);">(${leg.duration})</span>`;
+                            }
+                            pathHtml += `</div>`;
+                            // Removed the fromStation → toStation line
+                            pathHtml += `</div>`;
+                        } else if (leg.type === 'TRANSFER') {
+                            pathHtml += `<div style="font-size: 12px; padding: 8px; font-weight: 600; background: rgba(255,107,53,0.1); border-radius: 4px; margin-bottom: 8px;">`;
+                            pathHtml += `🔄 Transfer at ${leg.fromStation || ''}`;
+                            if (leg.duration) {
+                                pathHtml += ` <span style="font-weight: normal; color: var(--text-secondary);">(${leg.duration})</span>`;
+                            }
+                            pathHtml += `</div>`;
+                        }
+                    });
+                    
+                    // Destination
+                    pathHtml += `<div style="font-size: 12px; padding: 8px; font-weight: 600; background: rgba(0,255,159,0.1); border-radius: 4px; margin-bottom: 8px;">`;
+                    pathHtml += `🎯 DESTINATION: ${stop.name}`;
+                    pathHtml += `</div>`;
+                    
+                    pathHtml += '</div>';
+                } else if (data.path && data.path.length > 1) {
+                    pathHtml = '<div class="popup-path" style="max-height: 400px; overflow-y: auto;">';
+                    pathHtml += '<div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px; margin-bottom: 6px; font-weight: 600;">FULL CONNECTION DATA:</div>';
+                    
+                    for (let i = 0; i < data.path.length; i++) {
+                        const stationId = data.path[i];
+                        const stationName = data.pathNames?.[i] || stationId;
+                        
+                        if (i === 0) {
+                            // Starting station - no stop ID
+                            pathHtml += `<div style="font-size: 12px; padding: 4px 0; font-weight: 600; background: rgba(0,255,159,0.1); padding: 8px; border-radius: 4px; margin-bottom: 8px;">`;
+                            pathHtml += `🚉 START: ${stationName}`;
+                            pathHtml += `</div>`;
+                        } else {
+                            pathHtml += `<div style="font-size: 12px; padding: 4px 0; font-weight: 600;">`;
+                            pathHtml += `→ ${stationName}`;
+                            pathHtml += `</div>`;
+                            pathHtml += `</div>`;
+
+                            
+                            // Show all intermediate stops
+                            /*if (detail.allStops && detail.allStops.length > 0) {
+                                pathHtml += `<div style="margin-top: 6px; font-size: 9px; color: var(--text-secondary);">`;
+                                pathHtml += `<strong>All stops on this segment:</strong><br>`;
+                                detail.allStops.forEach((stopInfo, idx) => {
+                                    const s = gtfsData.stops.get(stopInfo.stop);
+                                    const sName = s ? s.name : stopInfo.stop;
+                                    pathHtml += `${idx + 1}. ${sName}`;
+                                    if (stopInfo.arrivalTime) pathHtml += ` (${stopInfo.arrivalTime})`;
+                                    pathHtml += `<br>`;
+                                });
+                                pathHtml += `</div>`;
+                            }
+                            
+                            pathHtml += `</div>`;
+                            */
+
+                            // Show arrival station
+                            const isTransfer = i < data.path.length - 1;
+                            const icon = isTransfer ? '🔄' : '🎯';
+                            const bgColor = isTransfer ? 'rgba(255,107,53,0.1)' : 'rgba(0,255,159,0.1)';
+                            
+                            pathHtml += `<div style="font-size: 12px; padding: 8px; font-weight: 600; background: ${bgColor}; border-radius: 4px; margin-bottom: 8px;">`;
+                            pathHtml += `${icon} ${isTransfer ? 'TRANSFER' : 'DESTINATION'}: ${stationName}<br>`;
+                            pathHtml += `</div>`;
+                        }
+                    }
+                    
+                    pathHtml += '</div>';
+                }
+                
+                marker.bindPopup(`
+                    <div class="popup-station">${stop.name}</div>
+                    <div class="popup-transfers">Transfers: ${transferLevel}</div>
+                    ${pathHtml}
+                `);
+                
+                markers.push(marker);
+                bounds.push([stop.lat, stop.lon]);
+                }); // Close stations.forEach
+            }); // Close transferLevels.forEach
+            
+            // Only fit bounds on initial calculation, not when recalculating due to zoom
+            if (shouldFitBounds && bounds.length > 0) {
+                map.fitBounds(bounds, {padding: [50, 50]});
+            }
+            
+            document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('reachableCount').textContent = reachable.size.toLocaleString();
+            document.getElementById('maxTransfersUsed').textContent = maxTransfers;
+            
+            showStatus('info', `Found ${reachable.size.toLocaleString()} reachable stations`);
+        }
+        
+        function showStatus(type, message, showProgress = false) {
+            // Since we removed the fileStatus element, just log to console
+            const cleanMessage = message.replace(/<[^>]*>/g, ''); // Strip HTML tags
+            if (type === 'error') {
+                console.error('Status:', cleanMessage);
+            } else if (type === 'warning') {
+                console.warn('Status:', cleanMessage);
+            } else {
+                console.log('Status:', cleanMessage);
+            }
+        }
+        
+        function updateProgress(percent, text) {
+            console.log(`Progress: ${percent}% - ${text}`);
+        }
+
+        // =====================================================================
+        // DEBUG OVERLAY — polls backend every 2s for a curl-triggered flag
+        // =====================================================================
+        let debugMarkers = [];
+        let debugPollingInterval = null;
+        let debugActive = false;
+
+        function startDebugPolling() {
+            if (debugPollingInterval) return; // already running
+            debugPollingInterval = setInterval(pollDebugStatus, 2000);
+            pollDebugStatus(); // immediate first check
+            console.log('🐛 Debug polling started (every 2s)');
+        }
+
+        async function pollDebugStatus() {
+            try {
+                const res = await fetch('http://localhost:8080/api/admin/debug/status');
+                if (!res.ok) return;
+                const status = await res.json();
+
+                if (status.showAllStations && !debugActive) {
+                    // Newly triggered — load and render all stations
+                    debugActive = true;
+                    await renderDebugStations(status.stationCount);
+                } else if (!status.showAllStations && debugActive) {
+                    // Cleared remotely
+                    clearDebugOverlay();
+                }
+            } catch (e) {
+                // Backend may not be up yet — fail silently
+            }
+        }
+
+        // Shared canvas renderer for debug markers — much faster than SVG for large counts
+        const debugRenderer = L.canvas({ padding: 0.5 });
+
+        async function renderDebugStations(expectedCount) {
+            const banner = document.getElementById('debugBanner');
+            const bannerText = document.getElementById('debugBannerText');
+            banner.style.display = 'flex';
+            bannerText.textContent = 'Fetching stations from backend…';
+
+            try {
+                const res = await fetch('http://localhost:8080/api/admin/debug/stations');
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                const stations = data.stations;
+
+                // Clear any previous debug markers
+                debugMarkers.forEach(m => map.removeLayer(m));
+                debugMarkers = [];
+
+                const maxEdges = stations[0]?.edges || 1;
+                const bounds = [];
+
+                // Add markers in chunks of 500, yielding between each chunk so
+                // the browser stays responsive and can handle input/scroll/zoom.
+                const CHUNK = 500;
+                for (let i = 0; i < stations.length; i += CHUNK) {
+                    // Bail out if debug was cleared mid-render
+                    if (!debugActive) return;
+
+                    const chunk = stations.slice(i, i + CHUNK);
+                    chunk.forEach(s => {
+                        if (!s.lat || !s.lon) return;
+                        const ratio = Math.min(s.edges / maxEdges, 1);
+                        const color = ratio > 0.5
+                            ? lerpColor('#0099ff', '#ff2244', (ratio - 0.5) * 2)
+                            : lerpColor('#00ff9f', '#0099ff', ratio * 2);
+
+                        const m = L.circleMarker([s.lat, s.lon], {
+                            renderer: debugRenderer,
+                            radius: Math.max(2, Math.min(5, 2 + Math.round(ratio * 3))),
+                            fillColor: color,
+                            color: 'transparent',
+                            weight: 0,
+                            fillOpacity: 0.75
+                        }).addTo(map);
+
+                        // Bind popup lazily — only create DOM when clicked, not upfront
+                        m.bindPopup(() =>
+                            `<div class="popup-station">${s.name}</div>` +
+                            `<div class="popup-transfers" style="font-family:'Martian Mono',monospace;font-size:11px;">` +
+                            `ID: ${s.id}<br>Edges: ${s.edges}</div>`
+                        );
+
+                        debugMarkers.push(m);
+                        bounds.push([s.lat, s.lon]);
+                    });
+
+                    // Update progress in banner
+                    bannerText.textContent =
+                        `Rendering… ${Math.min(i + CHUNK, stations.length).toLocaleString()} / ${stations.length.toLocaleString()}`;
+
+                    // Yield to browser event loop between chunks
+                    await new Promise(r => setTimeout(r, 0));
+                }
+
+                if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40] });
+
+                bannerText.textContent =
+                    `${stations.length.toLocaleString()} stations in memory` +
+                    ` · colour = connectivity (green→blue→red)`;
+
+                console.log("🐛 Debug overlay: rendered " + stations.length + " stations");
+
+            } catch (e) {
+                bannerText.textContent = '⚠ Failed to fetch stations: ' + e.message;
+                console.error('Debug overlay error:', e);
+            }
+        }
+
+        function clearDebugOverlay() {
+            debugActive = false;
+            debugMarkers.forEach(m => map.removeLayer(m));
+            debugMarkers = [];
+            const banner = document.getElementById('debugBanner');
+            banner.style.display = 'none';
+            console.log('🐛 Debug overlay cleared');
+            // Tell the backend to reset the flag too (fire-and-forget)
+            fetch('http://localhost:8080/api/admin/debug/trigger', { method: 'DELETE' }).catch(() => {});
+        }
+
+        // Linear colour interpolation between two hex colours
+        function lerpColor(hexA, hexB, t) {
+            const parse = h => [
+                parseInt(h.slice(1,3),16),
+                parseInt(h.slice(3,5),16),
+                parseInt(h.slice(5,7),16)
+            ];
+            const [r1,g1,b1] = parse(hexA);
+            const [r2,g2,b2] = parse(hexB);
+            const r = Math.round(r1 + (r2-r1)*t);
+            const g = Math.round(g1 + (g2-g1)*t);
+            const b = Math.round(b1 + (b2-b1)*t);
+            return `rgb(${r},${g},${b})`;
+        }
+
+        // Kick off polling once the map is ready (map init is in the load handler above)
+        window.addEventListener('load', () => {
+            // Small delay so the map is fully initialised first
+            setTimeout(startDebugPolling, 1500);
+        });
+    </script>
+</body>
+</html>

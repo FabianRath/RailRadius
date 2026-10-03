@@ -1,0 +1,11 @@
+# Keeps the Spring context test from loading the real multi-GB caches.
+railreach:
+  gtfs:
+    directory: ./target/test-gtfs-none
+    auto-load-from-files: false
+    cache-file: target/test-gtfs-cache-none.json
+  cache:
+    predictive-enabled: false
+  hub:
+    auto-initialize: false
+    cache-file: target/test-hub-cache-none.json

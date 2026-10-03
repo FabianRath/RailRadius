@@ -1,0 +1,15 @@
+# Small-dataset profile for fast local runs (Austria + Hungary + Slovakia, ~8 MB of feeds).
+# Run: ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+# The first start parses the zips (~1 min) and writes data/gtfs-dev-cache.json; later starts load that cache.
+railreach:
+  gtfs:
+    directory: ./data/gtfs-dev
+    auto-load-from-files: true
+    cache-file: data/gtfs-dev-cache.json
+
+  cache:
+    predictive-enabled: false
+
+  hub:
+    auto-initialize: false
+    cache-file: data/hub-dev-cache.json
