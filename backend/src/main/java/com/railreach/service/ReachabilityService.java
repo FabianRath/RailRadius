@@ -40,7 +40,7 @@ public class ReachabilityService {
 
     private static final int STREAM_BATCH_SIZE = 30;
 
-    private final GtfsDataService gtfsDataService;
+    private final TransitGraph transitGraph;
     private final CacheManager cacheManager;
     private HubRoutingService hubRoutingService; // Injected later to avoid circular dependency
 
@@ -63,8 +63,8 @@ public class ReachabilityService {
     private final Map<String, Map<String, JourneyPath>> rawPathCache =
             new ConcurrentHashMap<>();
 
-    public ReachabilityService(GtfsDataService gtfsDataService, CacheManager cacheManager) {
-        this.gtfsDataService = gtfsDataService;
+    public ReachabilityService(TransitGraph transitGraph, CacheManager cacheManager) {
+        this.transitGraph = transitGraph;
         this.cacheManager = cacheManager;
     }
 
@@ -97,7 +97,7 @@ public class ReachabilityService {
         }
 
         List<ReachableStation> stationList = convertToDTO(reachable);
-        Station startStation = gtfsDataService.getStation(request.getStartStationId());
+        Station startStation = transitGraph.getStation(request.getStartStationId());
         long duration = System.currentTimeMillis() - startTime;
 
         log.info("Found {} reachable stations in {}ms", stationList.size(), duration);
@@ -206,7 +206,7 @@ public class ReachabilityService {
 
             queueItemsProcessed++;
 
-            Set<String> trips = gtfsDataService.getTripsAtStop(cur.stationId());
+            Set<String> trips = transitGraph.getTripsAtStop(cur.stationId());
 
             for (String tripId : trips) {
                 // Every trip from a frontier station is a transfer (or continuation)
@@ -218,12 +218,12 @@ public class ReachabilityService {
                 if (!isContinuation && !cur.connections().isEmpty()) {
                     int arrivalSec = cur.connections().get(cur.connections().size() - 1)
                             .getArrivalTimeSeconds();
-                    int curIdx = gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId());
+                    int curIdx = transitGraph.getStopIndexOnTrip(tripId, cur.stationId());
                     if (curIdx < 0) continue;
-                    List<String> newTripStops = gtfsDataService.getStopsOnTrip(tripId);
+                    List<String> newTripStops = transitGraph.getStopsOnTrip(tripId);
                     if (curIdx >= newTripStops.size() - 1) continue;
 
-                    Connection firstConn = gtfsDataService.getConnectionByTrip(
+                    Connection firstConn = transitGraph.getConnectionByTrip(
                             cur.stationId(), newTripStops.get(curIdx + 1), tripId);
                     if (firstConn == null) continue;
 
@@ -238,9 +238,9 @@ public class ReachabilityService {
                     continue;
                 }
 
-                int startIdx = gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId());
+                int startIdx = transitGraph.getStopIndexOnTrip(tripId, cur.stationId());
                 if (startIdx < 0) continue;
-                List<String> stopSequence = gtfsDataService.getStopsOnTrip(tripId);
+                List<String> stopSequence = transitGraph.getStopsOnTrip(tripId);
                 if (startIdx >= stopSequence.size() - 1) continue;
 
                 List<Connection> runningConns = new ArrayList<>(cur.connections());
@@ -252,7 +252,7 @@ public class ReachabilityService {
                 for (int si = startIdx + 1; si < stopSequence.size(); si++) {
                     String segFrom = stopSequence.get(si - 1);
                     String segTo   = stopSequence.get(si);
-                    Connection conn = gtfsDataService.getConnectionByTrip(segFrom, segTo, tripId);
+                    Connection conn = transitGraph.getConnectionByTrip(segFrom, segTo, tripId);
                     if (conn == null) break;
 
                     int depSec = conn.getDepartureTimeSeconds();
@@ -351,7 +351,7 @@ public class ReachabilityService {
 
             queueItemsProcessed++;
 
-            Set<String> trips = gtfsDataService.getTripsAtStop(cur.stationId());
+            Set<String> trips = transitGraph.getTripsAtStop(cur.stationId());
 
             if (reachable.size() - lastLoggedCount >= 50) {
                 log.info("  ... {} stations reachable (queue={})", reachable.size(), queue.size());
@@ -367,10 +367,10 @@ public class ReachabilityService {
                     if (nextTransfers > maxTransfers) continue;
 
                     // FIX 2: O(1) stop-index lookup instead of List.indexOf()
-                    int curStopIdx = gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId());
+                    int curStopIdx = transitGraph.getStopIndexOnTrip(tripId, cur.stationId());
                     if (curStopIdx < 0) continue;
 
-                    List<String> newTripStops = gtfsDataService.getStopsOnTrip(tripId);
+                    List<String> newTripStops = transitGraph.getStopsOnTrip(tripId);
                     if (curStopIdx >= newTripStops.size() - 1) continue;
 
                     if (!cur.connections().isEmpty()) {
@@ -379,7 +379,7 @@ public class ReachabilityService {
 
                         // FIX 3: O(1) connection-by-trip lookup instead of stream filter
                         String nextStop = newTripStops.get(curStopIdx + 1);
-                        Connection newConn = gtfsDataService.getConnectionByTrip(
+                        Connection newConn = transitGraph.getConnectionByTrip(
                                 cur.stationId(), nextStop, tripId);
                         if (newConn == null) continue;
 
@@ -400,11 +400,11 @@ public class ReachabilityService {
 
                 // FIX 2: O(1) position lookup
                 int startIdx = isNewTrip
-                        ? gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId())
-                        : gtfsDataService.getStopIndexOnTrip(tripId, cur.stationId());
+                        ? transitGraph.getStopIndexOnTrip(tripId, cur.stationId())
+                        : transitGraph.getStopIndexOnTrip(tripId, cur.stationId());
                 if (startIdx < 0) continue;
 
-                List<String> stopSequence = gtfsDataService.getStopsOnTrip(tripId);
+                List<String> stopSequence = transitGraph.getStopsOnTrip(tripId);
                 if (startIdx >= stopSequence.size() - 1) continue;
 
                 List<Connection> runningConns = new ArrayList<>(cur.connections());
@@ -420,7 +420,7 @@ public class ReachabilityService {
                     String segTo   = stopSequence.get(si);
 
                     // FIX 3: O(1) connection lookup
-                    Connection conn = gtfsDataService.getConnectionByTrip(segFrom, segTo, tripId);
+                    Connection conn = transitGraph.getConnectionByTrip(segFrom, segTo, tripId);
                     if (conn == null) break; // gap in data
 
                     // FIX 4: incremental duration
@@ -632,7 +632,7 @@ public class ReachabilityService {
         reachable.forEach((stopId, path) -> {
             if (stopId.equals(request.getStartStationId())) return;
             if (maxJourneyMins != null && path.getTotalDurationMinutes() > maxJourneyMins) return;
-            Station station = gtfsDataService.getStation(stopId);
+            Station station = transitGraph.getStation(stopId);
             if (station == null) return;
             stations.add(toReachableStation(stopId, path, station));
         });
@@ -653,7 +653,7 @@ public class ReachabilityService {
         List<JourneyLeg> legs = buildLegs(path.getConnections());
         List<String> pathNames = path.getStationIds().stream()
                 .map(id -> {
-                    Station s = gtfsDataService.getStation(id);
+                    Station s = transitGraph.getStation(id);
                     return s != null ? s.getName() : id;
                 })
                 .collect(Collectors.toList());
@@ -676,13 +676,13 @@ public class ReachabilityService {
                 .map(e -> {
                     String stopId = e.getKey();
                     JourneyPath path = e.getValue();
-                    Station station = gtfsDataService.getStation(stopId);
+                    Station station = transitGraph.getStation(stopId);
                     if (station == null) return null;
 
                     List<JourneyLeg> legs = buildLegs(path.getConnections());
                     List<String> pathNames = path.getStationIds().stream()
                             .map(id -> {
-                                Station s = gtfsDataService.getStation(id);
+                                Station s = transitGraph.getStation(id);
                                 return s != null ? s.getName() : id;
                             })
                             .collect(Collectors.toList());
@@ -778,7 +778,7 @@ public class ReachabilityService {
     }
 
     private String stationName(String stopId) {
-        Station s = gtfsDataService.getStation(stopId);
+        Station s = transitGraph.getStation(stopId);
         return s != null ? s.getName() : stopId;
     }
 

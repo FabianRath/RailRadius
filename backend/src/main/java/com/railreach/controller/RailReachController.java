@@ -3,8 +3,8 @@ package com.railreach.controller;
 import com.railreach.dto.ReachabilityRequest;
 import com.railreach.dto.ReachabilityResponse;
 import com.railreach.model.Station;
-import com.railreach.service.GtfsDataService;
 import com.railreach.service.ReachabilityService;
+import com.railreach.service.TransitGraph;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.task.AsyncTaskExecutor;
@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 public class RailReachController {
     
     private final ReachabilityService reachabilityService;
-    private final GtfsDataService gtfsDataService;
+    private final TransitGraph transitGraph;
     private final AsyncTaskExecutor taskExecutor;
     
     /**
@@ -83,7 +83,7 @@ public class RailReachController {
             return ResponseEntity.badRequest().build();
         }
         
-        if (gtfsDataService.getStation(request.getStartStationId()) == null) {
+        if (transitGraph.getStation(request.getStartStationId()) == null) {
             log.warn("Station not found: {}", request.getStartStationId());
             return ResponseEntity.notFound().build();
         }
@@ -97,8 +97,7 @@ public class RailReachController {
             @RequestParam("q") String query,
             @RequestParam(value = "limit", defaultValue = "50") int limit) {
         
-        // Use the GtfsDataService.searchStations() method which filters isolated stations
-        List<Station> stations = gtfsDataService.searchStations(query, limit);
+        List<Station> stations = transitGraph.searchStations(query, limit);
         
         List<StationSearchResult> results = stations.stream()
                 .map(station -> new StationSearchResult(
@@ -114,7 +113,7 @@ public class RailReachController {
     
     @GetMapping("/stations/{id}")
     public ResponseEntity<Station> getStation(@PathVariable String id) {
-        Station station = gtfsDataService.getStation(id);
+        Station station = transitGraph.getStation(id);
         if (station == null) {
             return ResponseEntity.notFound().build();
         }
@@ -123,14 +122,14 @@ public class RailReachController {
     
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getStats() {
-        return ResponseEntity.ok(gtfsDataService.getStats());
+        return ResponseEntity.ok(transitGraph.getStats());
     }
     
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> health() {
         return ResponseEntity.ok(Map.of(
-                "status", gtfsDataService.isDataLoaded() ? "UP" : "DOWN",
-                "dataLoaded", gtfsDataService.isDataLoaded()
+                "status", transitGraph.isDataLoaded() ? "UP" : "DOWN",
+                "dataLoaded", transitGraph.isDataLoaded()
         ));
     }
     

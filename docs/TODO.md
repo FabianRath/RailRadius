@@ -18,7 +18,7 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 - [ ] **B7** `@Async warmHigherTransferCounts` and `@Cacheable calculateReachability` are called from inside the same class, so Spring's proxy is bypassed. Warming runs synchronously on the SSE thread, and warmed results never reach Caffeine.
 - [ ] **B8** The warming cache key hardcodes min-transfer `0`, so warming never matches requests with a min transfer time.
 - [ ] **B9** `rawPathCache` is unbounded and not cleared on `reload-gtfs` (`clearRawCache()` is never called).
-- [ ] **B15** The cross-border dedup `MERGED` log compares station names with stop IDs (`s1.getName().equals(alias)` in `deduplicateCrossBorder`). That is always false, so both the alias and the canonical stop are logged with s2's name. Log only; the merge itself is unaffected.
+- [ ] **B15** The cross-border dedup `MERGED` log compares station names with stop IDs (`s1.getName().equals(alias)` in `StationDeduplicator.tryCrossBorderMerge`). That is always false, so both the alias and the canonical stop are logged with s2's name. Log only; the merge itself is unaffected.
 - [ ] **B11** `searchStations` is a linear scan per request.
 
 ## Bugs (frontend)
@@ -32,6 +32,5 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 - [ ] **F5** `/api/admin/debug/stations?includeIsolated=true` is referenced in old notes but not implemented.
 
 ## Structure
-- [ ] **S1** Split `GtfsDataService` (~1100 lines) into `GtfsFeedLoader`, `StationDeduplicator`, `TransitGraph` and `GtfsCacheStore`.
 - [ ] **S2** Split `ReachabilityService` (~870 lines) into `ReachabilitySearch`, `JourneyLegBuilder`, `ReachabilityCache` and a thin orchestrator. This also fixes B7.
 - [ ] **S8** Feeds that failed to load: `data/gtfs/broken/` (finland, lithuania).

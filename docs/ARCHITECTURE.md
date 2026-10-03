@@ -62,7 +62,12 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `RailReachBackendApplication` | root | Spring Boot entry point |
 | `RailReachController` | controller | Public API under `/api` |
 | `AdminController` | controller | Admin/debug API under `/api/admin` |
-| `GtfsDataService` | service | GTFS loading, dedup, graph + indexes, JSON cache (~1100 lines) |
+| `GtfsDataService` | service | Fills the `TransitGraph` at startup (cache file, else zips) and on `reload-gtfs` |
+| `TransitGraph` | service | The merged network: stations, edges, connections, trip indexes, station search. Everything that reads GTFS data injects this |
+| `GtfsFeedLoader` | service | Parses the rail part of each zip into the graph, with per-feed stop dedup |
+| `GtfsCsvReader` | service | Row-by-row reader for one CSV file inside a GTFS zip |
+| `StationDeduplicator` | service | Within-country and cross-border station merging after all feeds are loaded |
+| `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`) |
 | `ReachabilityService` | service | BFS algorithms, caching, SSE streaming, leg building (~870 lines) |
 | `HubRoutingService` | service | Top-N hub precompute and hub-based query shortcut |
 | `CacheConfig` | config | Caffeine `CacheManager` ("reachability" cache), `@EnableAsync` |
@@ -74,10 +79,13 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `ReachabilityResponse` | dto | Start info, count, calcTime, list of `ReachableStation` |
 | `ReachableStation` | dto | Station + transfers, duration, path ids/names, `legs` |
 | `JourneyLeg` | dto | `TRAIN` or `TRANSFER` leg with times and duration |
+| `GtfsTime` | util | Parse/format GTFS times, minute diffs with overnight wrap, duration text |
+| `StopIds` | util | Canonical `<source>:<rawId>` stop IDs |
+| `Coordinates` | util | Degree-box proximity check |
 
 ## Data pipeline (`GtfsDataService.loadFromFiles`)
 
-For each `data/gtfs/*.zip` (sorted). The source name comes from the filename, e.g. `gtfs_germany.zip` → `germany`:
+`GtfsFeedLoader`, for each `data/gtfs/*.zip` (sorted). The source name comes from the filename, e.g. `gtfs_germany.zip` → `germany`:
 1. **routes.txt**: keep only rail route types `2` and `100–106`.
 2. **stops.txt / trips.txt**: load stops and the trip→route map.
 3. **Per-feed stop dedup**: stops with the same name within ~0.0015° are merged. IDs are canonicalised to `<source>:<id>`, with `_ARR`/`_DEP`/`ARRIVAL_` style suffixes and prefixes stripped.
@@ -86,12 +94,12 @@ For each `data/gtfs/*.zip` (sorted). The source name comes from the filename, e.
    - `connectionInfo`: `"from->to"` → list of `Connection`
    - `tripStops`: tripId → ordered stop list; `stopTrips`: stopId → tripIds
 
-After all feeds are loaded:
+After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStations`):
 5. **Within-country dedup**: same exact name, same source, within ~200 m.
 6. **Cross-border dedup**: ~1 km spatial grid, different sources, within ~500 m, token Jaccard similarity ≥ 0.4. The station with more connections becomes canonical, and every map is remapped.
-7. The result is saved to the GTFS cache file.
+7. `GtfsCacheStore` saves the result to the GTFS cache file.
 
-Lazy indexes are built on first access: `tripStopIndex` (trip → stop → position) and `connectionByTrip` (edge → tripId → Connection).
+`TransitGraph` builds lazy indexes on first access: `tripStopIndex` (trip → stop → position) and `connectionByTrip` (edge → tripId → Connection).
 
 ## Reachability algorithm (`ReachabilityService`)
 

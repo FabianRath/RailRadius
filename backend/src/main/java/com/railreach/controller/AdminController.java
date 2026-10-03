@@ -4,6 +4,7 @@ import com.railreach.model.Station;
 import com.railreach.service.GtfsDataService;
 import com.railreach.service.HubRoutingService;
 import com.railreach.service.ReachabilityService;
+import com.railreach.service.TransitGraph;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +32,7 @@ public class AdminController {
 
     private final HubRoutingService hubRoutingService;
     private final GtfsDataService gtfsDataService;
+    private final TransitGraph transitGraph;
 
     /** Debug flag — toggled by POST/DELETE /api/admin/debug/trigger */
     private final AtomicBoolean debugShowAllStations = new AtomicBoolean(false);
@@ -155,7 +157,7 @@ public class AdminController {
         return ResponseEntity.ok(Map.of(
             "message", "Debug overlay activated. The browser will pick this up within 2 seconds.",
             "showAllStations", true,
-            "stationCount", gtfsDataService.getAllStations().size()
+            "stationCount", transitGraph.getAllStations().size()
         ));
     }
 
@@ -180,7 +182,7 @@ public class AdminController {
     public ResponseEntity<Map<String, Object>> debugStatus() {
         return ResponseEntity.ok(Map.of(
             "showAllStations", debugShowAllStations.get(),
-            "stationCount", gtfsDataService.getAllStations().size()
+            "stationCount", transitGraph.getAllStations().size()
         ));
     }
 
@@ -192,15 +194,15 @@ public class AdminController {
      */
     @GetMapping("/debug/stations")
     public ResponseEntity<Map<String, Object>> debugStations() {
-        List<Map<String, Object>> stations = gtfsDataService.getAllStations().values().stream()
+        List<Map<String, Object>> stations = transitGraph.getAllStations().values().stream()
             // Same criteria as searchStations(): must have coordinates and at least one outgoing edge
             .filter(s -> s.getLatitude() != null && s.getLongitude() != null)
             .filter(s -> {
-                Set<String> neighbors = gtfsDataService.getNeighbors(s.getId());
+                Set<String> neighbors = transitGraph.getNeighbors(s.getId());
                 return neighbors != null && !neighbors.isEmpty();
             })
             .map(s -> {
-                int edges = gtfsDataService.getNeighbors(s.getId()).size();
+                int edges = transitGraph.getNeighbors(s.getId()).size();
                 return Map.<String, Object>of(
                     "id",    s.getId(),
                     "name",  s.getName() != null ? s.getName() : s.getId(),

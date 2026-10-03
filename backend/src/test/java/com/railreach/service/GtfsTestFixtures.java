@@ -12,7 +12,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 /**
- * Builds a GtfsDataService from the hand-written feeds in src/test/resources/gtfs-mini.
+ * Builds a TransitGraph from the hand-written feeds in src/test/resources/gtfs-mini.
  * Each feed folder is zipped to gtfs_<source>.zip, where source is the folder name up to
  * the first '-' (so "alpha-fast-train" still loads as source "alpha").
  */
@@ -20,18 +20,20 @@ final class GtfsTestFixtures {
 
     private GtfsTestFixtures() {}
 
-    static GtfsDataService load(Path tempDir, String... feedFolders) throws IOException {
+    static TransitGraph load(Path tempDir, String... feedFolders) throws IOException {
         Path gtfsDir = Files.createDirectories(tempDir.resolve("gtfs"));
         for (String folder : feedFolders) {
             String source = folder.split("-")[0];
             zipFolder(resource("gtfs-mini/" + folder), gtfsDir.resolve("gtfs_" + source + ".zip"));
         }
 
-        GtfsDataService service = new GtfsDataService();
+        TransitGraph graph = new TransitGraph();
+        GtfsCacheStore cacheStore = new GtfsCacheStore();
+        ReflectionTestUtils.setField(cacheStore, "cacheFile", tempDir.resolve("gtfs-cache.json").toString());
+        GtfsDataService service = new GtfsDataService(graph, new GtfsFeedLoader(), new StationDeduplicator(), cacheStore);
         ReflectionTestUtils.setField(service, "gtfsDirectory", gtfsDir.toString());
-        ReflectionTestUtils.setField(service, "gtfsCacheFile", tempDir.resolve("gtfs-cache.json").toString());
         service.loadFromFiles();
-        return service;
+        return graph;
     }
 
     private static Path resource(String name) {
