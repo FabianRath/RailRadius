@@ -10,7 +10,7 @@ It loads GTFS timetable feeds for ~25 European countries, keeps only **rail** ro
 
 ## Tech stack
 
-- Java 17+ (built with JDK 21), Spring Boot 4.0.2 (`spring-boot-starter-webmvc`, actuator, cache)
+- Java 25 (JDK 25 required to build), Spring Boot 4.0.2 (`spring-boot-starter-webmvc`, actuator, cache). Virtual threads are on (`spring.threads.virtual.enabled`): SSE streams run on Spring's task executor.
 - Lombok (`@Data`, `@Builder`, `@Slf4j`, `@RequiredArgsConstructor`)
 - Caffeine for the in-memory response cache
 - `com.conveyal:gtfs-lib` 6.1.0. Only its `Stop` / `StopTime` POJOs are used; GTFS CSV parsing is hand-written.

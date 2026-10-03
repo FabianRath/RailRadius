@@ -5,7 +5,7 @@ Binding for every change. Existing code does not always follow them yet. New and
 ## 1. Dependencies: closed list
 | Area | Use | Not this |
 |---|---|---|
-| Backend | Java 17, Spring Boot (webmvc, actuator, cache), Lombok, Caffeine, Jackson, SLF4J via `@Slf4j` | Guava, Apache Commons, Gson, a second cache/JSON/logging lib |
+| Backend | Java 25, Spring Boot (webmvc, actuator, cache), Lombok, Caffeine, Jackson, SLF4J via `@Slf4j` | Guava, Apache Commons, Gson, a second cache/JSON/logging lib |
 | Tests | JUnit 5, AssertJ, `gtfs-mini` fixture | Mockito (unless there is truly no real object), Hamcrest, Spring context in unit tests |
 | Frontend | Vanilla JS, Leaflet 1.9.4, Turf 6, from CDN | Frameworks, jQuery, npm/build step |
 

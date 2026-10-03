@@ -7,12 +7,10 @@ import com.railreach.service.GtfsDataService;
 import com.railreach.service.ReachabilityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import java.util.List;
 import java.util.Map;
@@ -27,9 +25,7 @@ public class RailReachController {
     
     private final ReachabilityService reachabilityService;
     private final GtfsDataService gtfsDataService;
-
-    // Thread pool for SSE streaming — one thread per concurrent stream
-    private final ExecutorService streamExecutor = Executors.newCachedThreadPool();
+    private final AsyncTaskExecutor taskExecutor;
     
     /**
      * Streaming reachability via Server-Sent Events.
@@ -62,7 +58,7 @@ public class RailReachController {
                 .maxJourneyTimeHours(maxJourneyHours)
                 .build();
 
-        streamExecutor.submit(() ->
+        taskExecutor.execute(() ->
                 reachabilityService.calculateReachabilityStreaming(req, emitter));
 
         return emitter;
