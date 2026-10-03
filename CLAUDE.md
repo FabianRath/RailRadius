@@ -35,5 +35,5 @@ All code changes must follow these. They cover allowed libraries, style, reuse a
 
 ## Workflow
 - Small, focused changes. Plan first when a change spans several files.
-- Update `docs/TODO.md` when you finish an item or discover an issue. Add a line to `docs/decisions.md` for non-obvious choices.
+- Update `docs/TODO.md` when you finish an item. Ask the user before adding a newly found bug (guidelines §9). Add a line to `docs/decisions.md` for non-obvious choices.
 - Commit after each completed task. Use short imperative messages, and don't commit `backend/data/`.
