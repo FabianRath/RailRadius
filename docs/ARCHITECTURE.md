@@ -72,10 +72,10 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `CachedTrip` | service | One trip in the cache file: route name, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
 | `ReachabilityService` | service | Thin orchestrator: request defaults, POST response (`@Cacheable`), SSE streaming, triggers warming |
 | `ReachabilitySearch` | service | Full and incremental trip BFS |
-| `ReachabilityCache` | service | Raw BFS results per `SearchKey`; get-or-compute (incremental / hub / full); Caffeine eviction and stats |
+| `ReachabilityCache` | service | Raw BFS results per `SearchKey`; get-or-compute (incremental / full); Caffeine eviction and stats |
 | `ReachabilityWarmer` | service | `@Async` predictive warming of N+1 … transfers (own bean so the proxy applies) |
 | `JourneyLegBuilder` | service | BFS path → `ReachableStation` with TRAIN/TRANSFER legs |
-| `HubRoutingService` | service | Top-N hub precompute and hub-based query shortcut |
+| `HubRoutingService` | service | Top-N hub precompute and its cache file; not used by queries (B20) |
 | `CacheConfig` | config | Caffeine `CacheManager` ("reachability" cache), `@EnableAsync` |
 | `Station` | model | id, name, latitude, longitude, parentStation |
 | `Connection` | model | One edge of one trip: tripId, routeName, from/to, dep/arr times as **int seconds since midnight** (string getters/setters for JSON) |
@@ -111,8 +111,7 @@ After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStati
 `ReachabilityCache.getOrCompute` is the central dispatcher. It is keyed by `SearchKey(start, maxTransfers, minTransfer, maxTransfer)`:
 1. **Raw cache hit** → return the stored result immediately.
 2. **Incremental BFS**: if the result for N−1 transfers is cached, seed the queue only from stations reached with exactly N−1 transfers and explore one more transfer layer.
-3. **Hub routing**: if hubs are loaded and N ≥ 1, run BFS from the start to hubs, then splice in the precomputed hub→destination paths after checking the transfer wait at the hub.
-4. **Full BFS** (`ReachabilitySearch.fullSearch`): a trip-based BFS. From a station, ride each trip forward stop by stop. Boarding a different trip counts as +1 transfer and must satisfy the min/max wait window. Paths are ranked by (transfers, then duration). `exploredBoardings` (`station|trip|transfers`) prevents re-walking the same trip.
+3. **Full BFS** (`ReachabilitySearch.fullSearch`): a trip-based BFS. From a station, ride each trip forward stop by stop. Boarding a different trip counts as +1 transfer and must satisfy the min/max wait window. Paths are ranked by (transfers, then duration). `exploredBoardings` (`station|trip|transfers`) prevents re-walking the same trip.
 
 Overnight wrap: a time difference below −60 min gets +24 h added.
 
@@ -129,7 +128,7 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 
 - Hubs are the top `num-hubs` (50) stations by out-degree.
 - For each hub, a BFS with `precompute-transfers` (1) runs on a pool of up to 4 threads with a per-hub timeout. Results are saved to the hub cache file.
-- `queryViaHubs`: BFS from the start with `min(N−1, 2)` transfers, then combine with each reachable hub's precomputed paths.
+- Queries do not use the hubs (B20): transferring only at hubs missed most stations (Hatvan, 1 transfer: 140 instead of 782). The precompute, cache file and admin endpoints remain.
 
 ## REST API
 

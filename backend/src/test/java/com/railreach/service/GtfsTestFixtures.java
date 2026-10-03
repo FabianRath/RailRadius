@@ -43,7 +43,7 @@ final class GtfsTestFixtures {
         return cacheStore;
     }
 
-    /** A ReachabilityService wired like in the app, without hubs, warming or a Caffeine cache. */
+    /** A ReachabilityService wired like in the app, without warming or a Caffeine cache. */
     static ReachabilityService reachabilityService(TransitGraph graph) {
         ReachabilityCache cache = reachabilityCache(graph);
         ReachabilityService service = new ReachabilityService(graph, cache, new ReachabilityWarmer(cache),
@@ -54,7 +54,7 @@ final class GtfsTestFixtures {
 
     static ReachabilityCache reachabilityCache(TransitGraph graph) {
         ReachabilitySearch search = new ReachabilitySearch(graph);
-        return new ReachabilityCache(search, new HubRoutingService(graph, search), new ConcurrentMapCacheManager());
+        return new ReachabilityCache(search, new ConcurrentMapCacheManager());
     }
 
     private static Path resource(String name) {

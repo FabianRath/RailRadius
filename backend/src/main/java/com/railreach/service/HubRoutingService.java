@@ -1,9 +1,7 @@
 package com.railreach.service;
 
-import com.railreach.model.Connection;
 import com.railreach.model.JourneyPath;
 import com.railreach.model.Station;
-import com.railreach.util.GtfsTime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
@@ -267,113 +265,6 @@ public class HubRoutingService {
         } catch (InterruptedException e) {
             log.warn("Executor shutdown interrupted");
         }
-    }
-    
-    public Map<String, JourneyPath> queryViaHubs(String startId, int maxTransfers, int minTransferMins, int maxTransferMins) {
-        if (hubReachability.isEmpty()) {
-            log.warn("Hub data not available, falling back to regular BFS");
-            return search.fullSearch(startId, maxTransfers, minTransferMins, maxTransferMins);
-        }
-        
-        int transfersToHub = Math.min(maxTransfers - 1, 2);
-        Map<String, JourneyPath> reachableFromStart = search.fullSearch(
-                startId, transfersToHub, minTransferMins, maxTransferMins);
-        
-        Map<String, JourneyPath> hubsFound = reachableFromStart.entrySet().stream()
-            .filter(e -> hubStationIds.contains(e.getKey()))
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        
-        log.info("  Hub routing: found {} reachable hubs from start (within {} transfers)", 
-                hubsFound.size(), transfersToHub);
-        
-        Map<String, JourneyPath> allReachable = new HashMap<>(reachableFromStart);
-        int pathsViaHubs = 0;
-        
-        for (Map.Entry<String, JourneyPath> hubEntry : hubsFound.entrySet()) {
-            String hubId = hubEntry.getKey();
-            JourneyPath pathToHub = hubEntry.getValue();
-            
-            Map<String, JourneyPath> fromHub = hubReachability.get(hubId);
-            if (fromHub == null) continue;
-            
-            for (Map.Entry<String, JourneyPath> destEntry : fromHub.entrySet()) {
-                String destId = destEntry.getKey();
-                JourneyPath hubToDest = destEntry.getValue();
-                
-                if (destId.equals(startId)) continue;
-                
-                // Validate transfer time at hub
-                if (!pathToHub.getConnections().isEmpty() && !hubToDest.getConnections().isEmpty()) {
-                    Connection arrivalAtHub = pathToHub.getConnections()
-                        .get(pathToHub.getConnections().size() - 1);
-                    Connection departureFromHub = hubToDest.getConnections().get(0);
-                    
-                    int transferWaitMins = GtfsTime.diffMinutes(
-                            arrivalAtHub.getArrivalTimeSeconds(), departureFromHub.getDepartureTimeSeconds());
-                    if (transferWaitMins < 0 || transferWaitMins > maxTransferMins) {
-                        continue;
-                    }
-                }
-                
-                int transferAtHub = pathToHub.getConnections().isEmpty() ? 0 : 1;
-                int totalTransfers = pathToHub.getTransfers() + transferAtHub + hubToDest.getTransfers();
-                if (totalTransfers > maxTransfers) continue;
-                
-                int totalDuration = pathToHub.getTotalDurationMinutes() + hubToDest.getTotalDurationMinutes();
-                
-                JourneyPath existing = allReachable.get(destId);
-                boolean better = existing == null
-                    || totalTransfers < existing.getTransfers()
-                    || (totalTransfers == existing.getTransfers() && totalDuration < existing.getTotalDurationMinutes());
-                
-                if (better) {
-                    List<String> combinedStations = new ArrayList<>(pathToHub.getStationIds());
-                    combinedStations.addAll(hubToDest.getStationIds().subList(1, hubToDest.getStationIds().size()));
-                    
-                    List<Connection> combinedConns = new ArrayList<>(pathToHub.getConnections());
-                    combinedConns.addAll(hubToDest.getConnections());
-                    
-                    int recalcDuration = totalDuration;
-                    if (!pathToHub.getConnections().isEmpty() && !hubToDest.getConnections().isEmpty()) {
-                        Connection arrivalAtHub = pathToHub.getConnections()
-                            .get(pathToHub.getConnections().size() - 1);
-                        Connection departureFromHub = hubToDest.getConnections().get(0);
-                        int transferWaitMins = GtfsTime.diffMinutes(
-                                arrivalAtHub.getArrivalTimeSeconds(), departureFromHub.getDepartureTimeSeconds());
-                        recalcDuration = pathToHub.getTotalDurationMinutes() + transferWaitMins + hubToDest.getTotalDurationMinutes();
-                    }
-                    
-                    JourneyPath mergedPath = JourneyPath.builder()
-                        .stationIds(combinedStations)
-                        .connections(combinedConns)
-                        .transfers(totalTransfers)
-                        .totalDurationMinutes(recalcDuration)
-                        .build();
-                    
-                    allReachable.put(destId, mergedPath);
-                    pathsViaHubs++;
-                    
-                    if (pathsViaHubs <= 5) {
-                        Station dest = transitGraph.getStation(destId);
-                        Station hubStation = transitGraph.getStation(hubId);
-                        log.info("  Hub path example #{}: {} transfers total (start→{}={}, @hub=+{}, {}→dest={}) to {}",
-                                pathsViaHubs,
-                                totalTransfers,
-                                hubStation != null ? hubStation.getName() : hubId,
-                                pathToHub.getTransfers(),
-                                transferAtHub,
-                                hubStation != null ? hubStation.getName() : hubId,
-                                hubToDest.getTransfers(),
-                                dest != null ? dest.getName() : destId);
-                    }
-                }
-            }
-        }
-        
-        log.info("  Hub routing result: {} total stations ({} via hubs)", 
-                allReachable.size(), pathsViaHubs);
-        
-        return allReachable;
     }
     
     public boolean isHubRoutingAvailable() {
