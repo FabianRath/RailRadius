@@ -8,8 +8,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.nio.file.Path;
@@ -103,7 +101,7 @@ class ReachabilityServiceTest {
     void doneEventCountsOnlyStationsWithinMaxJourneyTime() {
         // A2 (30 min) and A3/B1 (60 min) fit into 1 h, B2 (120 min) does not
         RecordingEmitter emitter = new RecordingEmitter();
-        ReachabilityService service = new ReachabilityService(gtfs, new ConcurrentMapCacheManager());
+        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs);
         service.calculateReachabilityStreaming(ReachabilityRequest.builder()
                 .startStationId("alpha:A1")
                 .maxTransfers(1)
@@ -125,7 +123,7 @@ class ReachabilityServiceTest {
 
     @Test
     void uncachedStreamSendsEachStationOnceAndMatchesTheCachedRepeat() {
-        ReachabilityService service = new ReachabilityService(gtfs, new ConcurrentMapCacheManager());
+        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs);
         ReachabilityRequest request = ReachabilityRequest.builder()
                 .startStationId("alpha:A1")
                 .maxTransfers(1)
@@ -172,9 +170,7 @@ class ReachabilityServiceTest {
 
     private static ReachabilityResponse query(TransitGraph data, String start, int maxTransfers,
                                               int minTransferMins, int maxTransferMins) {
-        ReachabilityService service = new ReachabilityService(data, new ConcurrentMapCacheManager());
-        ReflectionTestUtils.setField(service, "maxTransferTimeMinutes", 180);
-        return service.calculateReachability(ReachabilityRequest.builder()
+        return GtfsTestFixtures.reachabilityService(data).calculateReachability(ReachabilityRequest.builder()
                 .startStationId(start)
                 .maxTransfers(maxTransfers)
                 .minTransferTimeMinutes(minTransferMins)

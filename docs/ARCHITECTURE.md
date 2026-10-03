@@ -68,10 +68,13 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `GtfsCsvReader` | service | Row-by-row reader for one CSV file inside a GTFS zip |
 | `StationDeduplicator` | service | Within-country and cross-border station merging after all feeds are loaded |
 | `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`) |
-| `ReachabilityService` | service | BFS algorithms, caching, SSE streaming, leg building (~870 lines) |
+| `ReachabilityService` | service | Thin orchestrator: request defaults, POST response (`@Cacheable`), SSE streaming, triggers warming |
+| `ReachabilitySearch` | service | Full and incremental trip BFS |
+| `ReachabilityCache` | service | Raw BFS results per `SearchKey`; get-or-compute (incremental / hub / full); Caffeine eviction and stats |
+| `ReachabilityWarmer` | service | `@Async` predictive warming of N+1 … transfers (own bean so the proxy applies) |
+| `JourneyLegBuilder` | service | BFS path → `ReachableStation` with TRAIN/TRANSFER legs |
 | `HubRoutingService` | service | Top-N hub precompute and hub-based query shortcut |
 | `CacheConfig` | config | Caffeine `CacheManager` ("reachability" cache), `@EnableAsync` |
-| `ServiceConfig` | config | Wires `HubRoutingService` into `ReachabilityService` (breaks the circular dependency with `@Lazy`) |
 | `Station` | model | id, name, lat, lon, parentStation |
 | `Connection` | model | One edge of one trip: tripId, routeId/name, from/to, dep/arr times as **int seconds since midnight** (string getters/setters for JSON) |
 | `JourneyPath` | model | Internal BFS result: stationIds, connections, transfers, totalDurationMinutes |
@@ -101,22 +104,22 @@ After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStati
 
 `TransitGraph` builds lazy indexes on first access: `tripStopIndex` (trip → stop → position) and `connectionByTrip` (edge → tripId → Connection).
 
-## Reachability algorithm (`ReachabilityService`)
+## Reachability algorithm (`ReachabilityCache`, `ReachabilitySearch`)
 
-`resolveReachability` is the central dispatcher. It is keyed by `start-maxTransfers-minTransfer-maxTransfer`:
-1. **rawPathCache hit** → return the stored result immediately.
+`ReachabilityCache.getOrCompute` is the central dispatcher. It is keyed by `SearchKey(start, maxTransfers, minTransfer, maxTransfer)`:
+1. **Raw cache hit** → return the stored result immediately.
 2. **Incremental BFS**: if the result for N−1 transfers is cached, seed the queue only from stations reached with exactly N−1 transfers and explore one more transfer layer.
 3. **Hub routing**: if hubs are loaded and N ≥ 1, run BFS from the start to hubs, then splice in the precomputed hub→destination paths after checking the transfer wait at the hub.
-4. **Full BFS** (`runBFSInternal`): a trip-based BFS. From a station, ride each trip forward stop by stop. Boarding a different trip counts as +1 transfer and must satisfy the min/max wait window. Paths are ranked by (transfers, then duration). `exploredBoardings` (`station|trip|transfers`) prevents re-walking the same trip.
+4. **Full BFS** (`ReachabilitySearch.fullSearch`): a trip-based BFS. From a station, ride each trip forward stop by stop. Boarding a different trip counts as +1 transfer and must satisfy the min/max wait window. Paths are ranked by (transfers, then duration). `exploredBoardings` (`station|trip|transfers`) prevents re-walking the same trip.
 
 Overnight wrap: a time difference below −60 min gets +24 h added.
 
-`buildLegs` merges consecutive connections into one TRAIN leg (same tripId, or same route name and continuous in time) and inserts TRANSFER legs between them.
+`JourneyLegBuilder` merges consecutive connections into one TRAIN leg (same tripId, or same route name and continuous in time) and inserts TRANSFER legs between them.
 
 **Caching layers:**
-- `rawPathCache` (unbounded `ConcurrentHashMap`) holds raw `JourneyPath` maps and enables the incremental BFS.
+- `ReachabilityCache` (unbounded `ConcurrentHashMap`) holds raw `JourneyPath` maps and enables the incremental BFS.
 - Caffeine `"reachability"` cache holds full `ReachabilityResponse`s from `POST /api/reachability` (max 10k entries, 60 min TTL).
-- **Predictive warming**: after a streaming request, `warmHigherTransferCounts` precomputes N+1 … `predictive-max-transfers` (5).
+- **Predictive warming**: after a streaming request, `ReachabilityWarmer` precomputes N+1 … `predictive-max-transfers` (5) on a background thread, into the raw cache only (the stream never reads Caffeine).
 
 **Streaming** (`calculateReachabilityStreaming`): stations are sent as SSE `stations` events in batches (30 stations or 400 ms), then a `done` event (`{total, calculationTimeMs}`), or an `error` event on failure.
 
