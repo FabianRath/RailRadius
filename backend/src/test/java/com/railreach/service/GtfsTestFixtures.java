@@ -1,5 +1,6 @@
 package com.railreach.service;
 
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.IOException;
@@ -34,6 +35,20 @@ final class GtfsTestFixtures {
         ReflectionTestUtils.setField(service, "gtfsDirectory", gtfsDir.toString());
         service.loadFromFiles();
         return graph;
+    }
+
+    /** A ReachabilityService wired like in the app, without hubs, warming or a Caffeine cache. */
+    static ReachabilityService reachabilityService(TransitGraph graph) {
+        ReachabilityCache cache = reachabilityCache(graph);
+        ReachabilityService service = new ReachabilityService(graph, cache, new ReachabilityWarmer(cache),
+                new JourneyLegBuilder(graph));
+        ReflectionTestUtils.setField(service, "maxTransferTimeMinutes", 180);
+        return service;
+    }
+
+    static ReachabilityCache reachabilityCache(TransitGraph graph) {
+        ReachabilitySearch search = new ReachabilitySearch(graph);
+        return new ReachabilityCache(search, new HubRoutingService(graph, search), new ConcurrentMapCacheManager());
     }
 
     private static Path resource(String name) {

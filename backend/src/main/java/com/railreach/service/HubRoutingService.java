@@ -27,15 +27,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
-
 // The hub cache is only loaded once GtfsDataService has filled the transit graph
 @DependsOn("gtfsDataService")
 @Service
 @Slf4j
 public class HubRoutingService {
 
+    // B5: hubs are precomputed with this fixed transfer window, whatever a request asks for
+    private static final int PRECOMPUTE_MAX_TRANSFER_MINUTES = 180;
+
     private final TransitGraph transitGraph;
-    private final ReachabilityService reachabilityService;
+    private final ReachabilitySearch search;
     private final ObjectMapper objectMapper;
     
     @Value("${railreach.hub.cache-file:./hub-cache.json}")
@@ -58,9 +60,9 @@ public class HubRoutingService {
     private Map<String, Map<String, JourneyPath>> hubReachability = new ConcurrentHashMap<>();
     
     public HubRoutingService(TransitGraph transitGraph,
-                            ReachabilityService reachabilityService) {
+                            ReachabilitySearch search) {
         this.transitGraph = transitGraph;
-        this.reachabilityService = reachabilityService;
+        this.search = search;
         this.objectMapper = new ObjectMapper();
     }
     
@@ -228,8 +230,8 @@ public class HubRoutingService {
                 try {
                     long hubStart = System.currentTimeMillis();
                     
-                    Map<String, JourneyPath> reachable = reachabilityService.runBFSInternal(
-                            hubIdFinal, precomputeTransfers, 180);
+                    Map<String, JourneyPath> reachable = search.fullSearch(
+                            hubIdFinal, precomputeTransfers, 0, PRECOMPUTE_MAX_TRANSFER_MINUTES);
                     
                     long hubDuration = System.currentTimeMillis() - hubStart;
                     
@@ -270,11 +272,11 @@ public class HubRoutingService {
     public Map<String, JourneyPath> queryViaHubs(String startId, int maxTransfers, int minTransferMins, int maxTransferMins) {
         if (hubReachability.isEmpty()) {
             log.warn("Hub data not available, falling back to regular BFS");
-            return reachabilityService.runBFSInternal(startId, maxTransfers, minTransferMins, maxTransferMins);
+            return search.fullSearch(startId, maxTransfers, minTransferMins, maxTransferMins);
         }
         
         int transfersToHub = Math.min(maxTransfers - 1, 2);
-        Map<String, JourneyPath> reachableFromStart = reachabilityService.runBFSInternal(
+        Map<String, JourneyPath> reachableFromStart = search.fullSearch(
                 startId, transfersToHub, minTransferMins, maxTransferMins);
         
         Map<String, JourneyPath> hubsFound = reachableFromStart.entrySet().stream()
