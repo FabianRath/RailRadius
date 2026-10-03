@@ -162,18 +162,29 @@ public class TransitGraph {
     }
 
     GtfsCacheStore.GtfsCacheData snapshot() {
-        return new GtfsCacheStore.GtfsCacheData(new HashMap<>(stations), new HashMap<>(neighbors),
-                new HashMap<>(connections), new HashMap<>(tripStops), new HashMap<>(stopTrips),
-                System.currentTimeMillis(), stations.size(), neighbors.size());
+        Map<String, List<Connection>> connectionsByTrip = new HashMap<>(tripStops.size() * 2);
+        for (List<Connection> edgeConnections : connections.values()) {
+            for (Connection c : edgeConnections) {
+                connectionsByTrip.computeIfAbsent(c.getTripId(), k -> new ArrayList<>()).add(c);
+            }
+        }
+        Map<String, CachedTrip> trips = new HashMap<>(tripStops.size() * 2);
+        tripStops.forEach((tripId, stops) ->
+                trips.put(tripId, CachedTrip.of(stops, connectionsByTrip.getOrDefault(tripId, List.of()))));
+        long droppedCount = connections.values().stream().mapToLong(List::size).sum()
+                - trips.values().stream().mapToLong(CachedTrip::connectionCount).sum();
+        if (droppedCount > 0) {
+            log.warn("{} connections match no leg of their trip's stop list and are left out of the cache (B19)",
+                    droppedCount);
+        }
+        return new GtfsCacheStore.GtfsCacheData(GtfsCacheStore.FORMAT_VERSION, new HashMap<>(stations), trips);
     }
 
+    /** Edges, connections and the stop→trips index are not stored; they are rebuilt from the trips. */
     void restore(GtfsCacheStore.GtfsCacheData data) {
         clear();
         stations.putAll(data.stations());
-        neighbors.putAll(data.graph());
-        connections.putAll(data.connectionInfo());
-        tripStops.putAll(data.tripStops());
-        stopTrips.putAll(data.stopTrips());
+        data.trips().forEach((tripId, trip) -> trip.addTo(tripId, this));
     }
 
     /** Folds every alias stop into its canonical stop: edges, connections, trips; then drops the alias. */

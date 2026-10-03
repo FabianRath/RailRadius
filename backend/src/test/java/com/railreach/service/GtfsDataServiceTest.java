@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -73,5 +74,31 @@ class GtfsDataServiceTest {
         assertThat(results).extracting(Station::getId)
                 .contains("alpha:A1", "alpha:A2", "alpha:A4")
                 .doesNotContain("alpha:A9");
+    }
+
+    @Test
+    void graphRestoredFromCacheEqualsTheParsedGraph() {
+        TransitGraph restored = new TransitGraph();
+        restored.restore(GtfsTestFixtures.cacheStore(tempDir).load().orElseThrow());
+
+        assertThat(restored.getAllStations()).isEqualTo(gtfs.getAllStations());
+        assertThat(restored.connectionCount()).isEqualTo(gtfs.connectionCount());
+        for (String stopId : gtfs.getAllStations().keySet()) {
+            assertThat(restored.getNeighbors(stopId)).isEqualTo(gtfs.getNeighbors(stopId));
+            for (String neighbor : gtfs.getNeighbors(stopId)) {
+                assertThat(restored.getConnections(stopId, neighbor))
+                        .containsExactlyInAnyOrderElementsOf(gtfs.getConnections(stopId, neighbor));
+            }
+            assertThat(restored.getTripsAtStop(stopId)).isEqualTo(gtfs.getTripsAtStop(stopId));
+            for (String tripId : gtfs.getTripsAtStop(stopId)) {
+                assertThat(restored.getStopsOnTrip(tripId)).isEqualTo(gtfs.getStopsOnTrip(tripId));
+            }
+        }
+    }
+
+    @Test
+    void cacheFileInAnOldFormatIsIgnored(@TempDir Path oldCacheDir) throws Exception {
+        Files.writeString(oldCacheDir.resolve("gtfs-cache.json"), "{\"stations\":{},\"graph\":{},\"timestamp\":1}");
+        assertThat(GtfsTestFixtures.cacheStore(oldCacheDir).load()).isEmpty();
     }
 }
