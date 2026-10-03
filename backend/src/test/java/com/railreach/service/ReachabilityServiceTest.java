@@ -25,7 +25,7 @@ class ReachabilityServiceTest {
     @TempDir
     static Path tempDir;
 
-    static GtfsDataService gtfs;
+    static TransitGraph gtfs;
 
     @BeforeAll
     static void loadFixture() throws Exception {
@@ -92,7 +92,7 @@ class ReachabilityServiceTest {
     @Disabled("Known issue (docs/TODO.md): BFS keeps only the shortest-duration path per station, "
             + "ignoring arrival time, so the faster T6 evening train hides the T1 -> U1 connection")
     void pruningShouldNotDiscardEarlierArrivalsThatEnableBetterTransfers(@TempDir Path dir) throws Exception {
-        GtfsDataService withFastTrain = GtfsTestFixtures.load(dir, "alpha-fast-train", "beta");
+        TransitGraph withFastTrain = GtfsTestFixtures.load(dir, "alpha-fast-train", "beta");
 
         ReachableStation b2 = find(query(withFastTrain, "alpha:A1", 1, 0, 180), "beta:B2").orElseThrow();
 
@@ -170,7 +170,7 @@ class ReachabilityServiceTest {
         }
     }
 
-    private static ReachabilityResponse query(GtfsDataService data, String start, int maxTransfers,
+    private static ReachabilityResponse query(TransitGraph data, String start, int maxTransfers,
                                               int minTransferMins, int maxTransferMins) {
         ReachabilityService service = new ReachabilityService(data, new ConcurrentMapCacheManager());
         ReflectionTestUtils.setField(service, "maxTransferTimeMinutes", 180);

@@ -15,7 +15,7 @@ class GtfsDataServiceTest {
     @TempDir
     static Path tempDir;
 
-    static GtfsDataService gtfs;
+    static TransitGraph gtfs;
 
     @BeforeAll
     static void loadFixture() throws Exception {

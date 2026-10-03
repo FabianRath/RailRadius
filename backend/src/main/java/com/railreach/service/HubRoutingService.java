@@ -6,6 +6,7 @@ import com.railreach.model.Station;
 import com.railreach.util.GtfsTime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
@@ -27,11 +28,13 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 
+// The hub cache is only loaded once GtfsDataService has filled the transit graph
+@DependsOn("gtfsDataService")
 @Service
 @Slf4j
 public class HubRoutingService {
 
-    private final GtfsDataService gtfsDataService;
+    private final TransitGraph transitGraph;
     private final ReachabilityService reachabilityService;
     private final ObjectMapper objectMapper;
     
@@ -54,16 +57,16 @@ public class HubRoutingService {
     private Set<String> hubStationIds = new HashSet<>();
     private Map<String, Map<String, JourneyPath>> hubReachability = new ConcurrentHashMap<>();
     
-    public HubRoutingService(GtfsDataService gtfsDataService,
+    public HubRoutingService(TransitGraph transitGraph,
                             ReachabilityService reachabilityService) {
-        this.gtfsDataService = gtfsDataService;
+        this.transitGraph = transitGraph;
         this.reachabilityService = reachabilityService;
         this.objectMapper = new ObjectMapper();
     }
     
     @PostConstruct
     public void initializeHubs() {
-        if (!gtfsDataService.isDataLoaded()) {
+        if (!transitGraph.isDataLoaded()) {
             log.warn("GTFS data not loaded, skipping hub initialization");
             return;
         }
@@ -183,11 +186,11 @@ public class HubRoutingService {
     // Rest of the methods remain the same...
     
     private void identifyHubs() {
-        Map<String, Station> allStations = gtfsDataService.getAllStations();
+        Map<String, Station> allStations = transitGraph.getAllStations();
         
         List<Map.Entry<String, Integer>> stationsByDegree = allStations.keySet().stream()
             .map(stationId -> {
-                Set<String> neighbors = gtfsDataService.getNeighbors(stationId);
+                Set<String> neighbors = transitGraph.getNeighbors(stationId);
                 return Map.entry(stationId, neighbors != null ? neighbors.size() : 0);
             })
             .filter(e -> e.getValue() > 0)
@@ -201,7 +204,7 @@ public class HubRoutingService {
         
         log.info("  Top hubs identified:");
         stationsByDegree.stream().limit(10).forEach(e -> {
-            Station s = gtfsDataService.getStation(e.getKey());
+            Station s = transitGraph.getStation(e.getKey());
             log.info("    {} - {} connections", 
                     s != null ? s.getName() : e.getKey(), e.getValue());
         });
@@ -232,7 +235,7 @@ public class HubRoutingService {
                     
                     hubReachability.put(hubIdFinal, reachable);
                     
-                    Station hub = gtfsDataService.getStation(hubIdFinal);
+                    Station hub = transitGraph.getStation(hubIdFinal);
                     String hubName = hub != null ? hub.getName() : hubIdFinal;
                     
                     if ((hubIndex + 1) % 10 == 0 || hubDuration > 10000) {
@@ -349,8 +352,8 @@ public class HubRoutingService {
                     pathsViaHubs++;
                     
                     if (pathsViaHubs <= 5) {
-                        Station dest = gtfsDataService.getStation(destId);
-                        Station hubStation = gtfsDataService.getStation(hubId);
+                        Station dest = transitGraph.getStation(destId);
+                        Station hubStation = transitGraph.getStation(hubId);
                         log.info("  Hub path example #{}: {} transfers total (start→{}={}, @hub=+{}, {}→dest={}) to {}",
                                 pathsViaHubs,
                                 totalTransfers,

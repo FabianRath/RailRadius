@@ -18,7 +18,7 @@ Binding for every change. Existing code does not always follow them yet. New and
   - GTFS time and durations (parse `HH:MM:SS`, format, minutes↔seconds, overnight wrap) → `com.railreach.util.GtfsTime`
   - Stop ID handling (canonical ID, extract source) → `com.railreach.util.StopIds`
   - Frontend backend URL → `API_BASE` in `js/config.js`; all calls go through `js/api.js`
-- New logic goes into a new focused class. Don't grow `GtfsDataService` or `ReachabilityService`.
+- New logic goes into a new focused class. Don't grow `TransitGraph` or `ReachabilityService` into catch-alls.
 
 ## 3. No bloat
 - Build what the task asks for, nothing more. No speculative parameters, flags, config keys, single-implementation interfaces, abstract bases, factories, or "for later" code.

@@ -7,7 +7,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 ## Layout
 - `backend/src/main/java/com/railreach/`
   - `controller/`: `/api` public API and `/api/admin` endpoints
-  - `service/`: `GtfsDataService` (load, dedup, graph), `ReachabilityService` (BFS, caching, SSE), `HubRoutingService`
+  - `service/`: `GtfsDataService` (startup/reload) → `GtfsFeedLoader`, `StationDeduplicator`, `GtfsCacheStore`; `TransitGraph` (the data + queries), `ReachabilityService` (BFS, caching, SSE), `HubRoutingService`
   - `dto/`, `model/`, `config/`
 - `backend/src/test/`: unit tests on the `gtfs-mini` fixture (see `src/test/resources/gtfs-mini/README.md`)
 - `frontend/`: `index.html` (markup), `css/app.css`, `js/*.js` (one ES module per concern, entry `main.js`). See guidelines §8.
