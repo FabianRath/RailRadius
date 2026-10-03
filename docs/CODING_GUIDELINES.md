@@ -82,3 +82,4 @@ Binding for every change. Existing code does not always follow them yet. New and
 3. Nothing you added duplicates existing logic (grep for it).
 4. No new dependency without approval.
 5. `TODO.md` updated (finished IDs removed, user-approved new items added) and `decisions.md` updated if relevant.
+6. `ARCHITECTURE.md` still matches the code for everything the diff touches (triggers listed in CLAUDE.md → Workflow). Grep it for every class, field, endpoint, config key and constant you renamed, removed or changed.

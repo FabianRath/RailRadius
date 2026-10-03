@@ -42,5 +42,6 @@ All code changes must follow these. They cover allowed libraries, style, reuse a
 
 ## Workflow
 - Small, focused changes. Plan first when a change spans several files.
+- Keep `docs/ARCHITECTURE.md` in sync **in the same commit** as the code change. Update it when you add, remove, rename or re-scope a class or frontend module; change an endpoint, SSE event, DTO/model field, config key or default; change the data pipeline, cache file format, BFS/caching/hub behaviour, or a documented constant (radii, batch sizes, thresholds); or change the directory layout or run commands. Before editing a section, check its claims against the code: the doc must describe the code as it is, not as planned. Pure internal refactors that touch none of these need no update.
 - Update `docs/TODO.md` when you finish an item. Ask the user before adding a newly found bug (guidelines §9). Add a line to `docs/decisions.md` for non-obvious choices.
 - Commit after each completed task. Use short imperative messages, and don't commit `backend/data/`.
