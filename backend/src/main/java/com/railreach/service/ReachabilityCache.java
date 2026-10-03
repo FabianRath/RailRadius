@@ -25,7 +25,6 @@ public class ReachabilityCache {
     static final String RESPONSE_CACHE_NAME = "reachability";
 
     private final ReachabilitySearch search;
-    private final HubRoutingService hubRoutingService;
     private final CacheManager cacheManager;
 
     private final Map<SearchKey, Map<String, JourneyPath>> rawPaths = new ConcurrentHashMap<>();
@@ -43,8 +42,8 @@ public class ReachabilityCache {
     }
 
     /**
-     * The stored result, else an incremental BFS from the stored N-1 result, else a hub-routed
-     * query, else a full BFS. The computed result is stored.
+     * The stored result, else an incremental BFS from the stored N-1 result, else a full BFS.
+     * The computed result is stored.
      */
     public Map<String, JourneyPath> getOrCompute(SearchKey key) {
         Map<String, JourneyPath> cached = rawPaths.get(key);
@@ -61,10 +60,6 @@ public class ReachabilityCache {
             log.info("  Incremental BFS: seeding from {} x{} ({} stations), adding 1 more transfer",
                     key.startId(), key.maxTransfers() - 1, previous.size());
             result = search.incrementalSearch(key.startId(), previous, key.maxTransfers(),
-                    key.minTransferMins(), key.maxTransferMins());
-        } else if (key.maxTransfers() >= 1 && hubRoutingService.isHubRoutingAvailable()) {
-            log.info("  Hub routing: {} x{}", key.startId(), key.maxTransfers());
-            result = hubRoutingService.queryViaHubs(key.startId(), key.maxTransfers(),
                     key.minTransferMins(), key.maxTransferMins());
         } else {
             log.info("  Full BFS: {} x{}", key.startId(), key.maxTransfers());
