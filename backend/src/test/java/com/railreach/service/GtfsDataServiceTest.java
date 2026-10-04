@@ -93,6 +93,20 @@ class GtfsDataServiceTest {
     }
 
     @Test
+    void chainedMergesEndAtTheLastStation(@TempDir Path dir) throws Exception {
+        // G2 merges into GX within gamma, then GX merges into delta's D1 across the border
+        TransitGraph graph = GtfsTestFixtures.load(dir, "gamma", "delta");
+
+        assertThat(graph.getStation("gamma:GX")).isNull();
+        assertThat(graph.getStation("gamma:G2")).isNull();
+        assertThat(graph.getTripsAtStop("gamma:GX")).isEmpty();
+        assertThat(graph.getStopsOnTrip("gamma:V1")).containsExactly("gamma:G3", "delta:D1", "gamma:G4");
+        assertThat(graph.getStopsOnTrip("gamma:V2")).containsExactly("gamma:G3", "delta:D1");
+        assertThat(graph.getConnectionByTrip("gamma:G3", "delta:D1", "gamma:V2")).isNotNull();
+        assertThat(graph.getNeighbors("gamma:G3")).containsExactly("delta:D1");
+    }
+
+    @Test
     void connectionsStoreTimesAsSecondsSinceMidnight() {
         var conn = gtfs.getConnectionByTrip("alpha:A1", "alpha:A2", "alpha:T1");
         assertThat(conn.getDepartureTimeSeconds()).isEqualTo(8 * 3600);

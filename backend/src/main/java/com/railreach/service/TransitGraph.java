@@ -175,8 +175,12 @@ public class TransitGraph {
         data.trips().forEach((tripId, trip) -> trip.addTo(tripId, this));
     }
 
-    /** Folds every alias stop into its canonical stop: edges, connections, trips; then drops the alias. */
-    void mergeStations(Map<String, String> aliasToCanonical) {
+    /**
+     * Folds every alias stop into its canonical stop: edges, connections, trips; then drops the alias. A canonical
+     * stop may itself be an alias (A→B, B→C); A then ends up at C.
+     */
+    void mergeStations(Map<String, String> aliasToCanonicalOrAlias) {
+        Map<String, String> aliasToCanonical = resolveChains(aliasToCanonicalOrAlias);
         int merged = 0;
         for (Map.Entry<String, String> mapping : aliasToCanonical.entrySet()) {
             if (++merged % MERGE_PROGRESS_LOG_INTERVAL == 0) {
@@ -189,6 +193,21 @@ public class TransitGraph {
             mergeTrips(alias, canonical);
             stations.remove(alias);
         }
+    }
+
+    // Each merge step below remaps one hop only, so every alias must point straight at the end of its chain.
+    // Otherwise, depending on the merge order, trips and connections are left on removed or different stations (B19).
+    private static Map<String, String> resolveChains(Map<String, String> aliasToCanonical) {
+        Map<String, String> resolved = new HashMap<>(aliasToCanonical.size() * 2);
+        for (String alias : aliasToCanonical.keySet()) {
+            String target = aliasToCanonical.get(alias);
+            for (int hops = 0; aliasToCanonical.containsKey(target); hops++) {
+                if (hops > aliasToCanonical.size()) throw new IllegalStateException("Station merge cycle at " + alias);
+                target = aliasToCanonical.get(target);
+            }
+            resolved.put(alias, target);
+        }
+        return resolved;
     }
 
     private void mergeEdges(String alias, String canonical, Map<String, String> aliasToCanonical) {

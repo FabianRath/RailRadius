@@ -5,7 +5,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 **Next free IDs:** B22 · F7 · S12
 
 ## Bugs (data loading)
-- [ ] **B19** Some connections match no leg of their trip's stop list. Full-data reload: `belgien:gt:nmbssncb:88____:L72::8015345:8841004:15:852:20251212` has a connection `netherlands:2993355->netherlands:2993124`, but its stop list goes `netherlands:2993355` → `germany:000008400307`, and `2993124` is not in it. The BFS walks stop lists via `getConnectionByTrip`, so it can never use such a connection (only `neighbors`/stats see it), and the trip may be cut short there. The GTFS cache (S9) drops these and logs a WARN with the count. Suspects: B17 (a split trip's stop list overwritten by its second part), or a chain of station merges (A→B, then B→C; `mergeConnections` resolves one hop). Diagnose by logging the trip's raw stop_times and the alias map entries for the involved stops.
 - [ ] **S8** Feeds that failed to load: `data/gtfs/broken/` (finland, lithuania).
 
 ## Bugs (algorithm)
