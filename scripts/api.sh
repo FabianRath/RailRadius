@@ -13,12 +13,9 @@ case "${1:-help}" in
   reach)         curl -sN "$BASE/api/reachability/stream?stationId=${2:?stationId}&maxTransfers=${3:?maxTransfers}&minTransferMinutes=${4:-0}&maxTransferMinutes=${5:-180}" | grep -A1 '^event:done' ;;
   cache-stats)   curl -s "$BASE/api/admin/cache-stats" ;;
   gtfs-stats)    curl -s "$BASE/api/admin/gtfs-stats" ;;
-  hub-stats)     curl -s "$BASE/api/admin/hub-stats" ;;
-  # Slow / destructive: full GTFS reparse (minutes), hub recompute (5-10 min), cache deletion
+  # Slow / destructive: full GTFS reparse (minutes), cache deletion
   reload-gtfs)   curl -s -X POST "$BASE/api/admin/reload-gtfs" ;;
-  compute-hubs)  curl -s -X POST "$BASE/api/admin/compute-hubs" ;;
   clear-gtfs)    curl -s -X DELETE "$BASE/api/admin/gtfs-cache" ;;
-  clear-hubs)    curl -s -X DELETE "$BASE/api/admin/hub-cache" ;;
   # Frontend debug overlay (shows all stations, picked up within ~2 s)
   debug-on)      curl -s -X POST "$BASE/api/admin/debug/trigger" ;;
   debug-off)     curl -s -X DELETE "$BASE/api/admin/debug/trigger" ;;

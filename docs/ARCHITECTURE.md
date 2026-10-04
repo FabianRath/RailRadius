@@ -23,13 +23,12 @@ It loads GTFS timetable feeds for ~25 European countries, keeps only **rail** ro
 Run from `backend/`; the cache paths are relative to the working directory. The commands below are for Git Bash; in PowerShell use `.\mvnw.cmd` instead of `./mvnw`.
 
 - **Full data:** `./mvnw package -DskipTests && java -Xmx12g -jar target/railreach-backend-0.0.1-SNAPSHOT.jar`
-  - `data/hub-cache.json` is ~840 MB. `data/gtfs-cache.json` is ~360 MB (3.6 GB before the trip-based format, S9); it loads in ~17 s.
+  - `data/gtfs-cache.json` is ~360 MB (3.6 GB before the trip-based format, S9); it loads in ~17 s.
 - **Dev data:** `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev`
   - Austria + Hungary + Slovakia from `data/gtfs-dev/`, cache in `data/gtfs-dev-cache.json`.
 
 **Startup flow:**
 1. `GtfsDataService` loads the GTFS cache file if present. Otherwise it parses the zips only if `auto-load-from-files` is true (true for dev, false for default). With no data, use `POST /api/admin/reload-gtfs`.
-2. `HubRoutingService` loads the hub cache if present. If it's missing and `auto-initialize` is false, there are no hubs; use `POST /api/admin/compute-hubs`.
 
 ## Directory layout
 
@@ -50,8 +49,7 @@ RailReach/
     └── data/                                  # GITIGNORED
         ├── gtfs/            # gtfs_<country>.zip, broken/, list.txt (download sources; versioned copy: docs/gtfs-sources.txt), maps
         ├── gtfs-dev/        # 3 small feeds for the dev profile
-        ├── gtfs-cache.json  # processed graph: stations + trips (generated)
-        └── hub-cache.json   # precomputed hub reachability (~840 MB, generated)
+        └── gtfs-cache.json  # processed graph: stations + trips (generated)
 ```
 
 ## Source files
@@ -77,7 +75,6 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `ReachabilityCache` | service | Raw BFS results per `SearchKey`; get-or-compute (incremental / full); Caffeine eviction and stats |
 | `ReachabilityWarmer` | service | `@Async` predictive warming of N+1 … transfers (own bean so the proxy applies) |
 | `JourneyLegBuilder` | service | BFS path → `ReachableStation` with TRAIN/TRANSFER legs |
-| `HubRoutingService` | service | Top-N hub precompute and its cache file; not used by queries (B20) |
 | `CacheConfig` | config | Caffeine `CacheManager` ("reachability" cache), `@EnableAsync` |
 | `Station` | model | id, name, latitude, longitude, parentStation |
 | `Connection` | model | One edge of one trip: tripId, routeName, from/to, dep/arr times as **int seconds since midnight** (string getters/setters for JSON) |
@@ -128,12 +125,6 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 
 **Streaming** (`calculateReachabilityStreaming`): the BFS runs to completion first (paths improve during the search, so nothing is sent early). The result is then sent as SSE `stations` events in batches of 30, followed by a `done` event (`{total, calculationTimeMs}`), or an `error` event on failure.
 
-## Hub routing (`HubRoutingService`)
-
-- Hubs are the top `num-hubs` (50) stations by out-degree.
-- For each hub, a BFS with `precompute-transfers` (1) runs on a pool of up to 4 threads with a per-hub timeout. Results are saved to the hub cache file.
-- Queries do not use the hubs (B20): transferring only at hubs missed most stations (Hatvan, 1 transfer: 140 instead of 782). The precompute, cache file and admin endpoints remain.
-
 ## REST API
 
 **Public (`/api`)**, CORS `*`:
@@ -153,9 +144,6 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 | POST | `/reload-gtfs` | Full reparse of the zips (minutes), rewrite of the cache, clears the raw and response reachability caches |
 | DELETE | `/gtfs-cache` | Deletes the cache file |
 | GET | `/gtfs-stats` | Cache file and data counts |
-| POST | `/compute-hubs` | Recompute hubs (5–10 min) |
-| DELETE | `/hub-cache` | Delete the hub cache and clear hubs from memory |
-| GET | `/hub-stats` | Hub count and paths |
 | POST / DELETE | `/debug/trigger` | Toggle the frontend overlay that shows all stations |
 | GET | `/debug/status` | Polled by the frontend every 2 s |
 | GET | `/debug/stations` | All connected stations with edge counts |
@@ -165,9 +153,8 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 - `gtfs.directory` (`./data/gtfs`, env `GTFS_DIRECTORY`), `gtfs.auto-load-from-files` (false), `gtfs.cache-file`
 - `algorithm.max-transfer-time-minutes` (180), `algorithm.cache-size` (10000), `algorithm.cache-ttl-minutes` (60)
 - `cache.predictive-enabled` (true), `cache.predictive-max-transfers` (5), `cache.raw-max-entries` (30)
-- `hub.auto-initialize` (false), `hub.cache-file`, `hub.num-hubs` (50), `hub.precompute-transfers` (1), `hub.timeout-seconds` (600)
 
-`application-dev.yml` overrides the GTFS directory and cache file, sets `auto-load-from-files: true`, turns predictive warming off and uses `data/hub-dev-cache.json`.
+`application-dev.yml` overrides the GTFS directory and cache file, sets `auto-load-from-files: true` and turns predictive warming off.
 
 ## Known issues and TODOs
 
