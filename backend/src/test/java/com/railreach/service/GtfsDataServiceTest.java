@@ -115,25 +115,6 @@ class GtfsDataServiceTest {
         assertThat(graph.getNeighbors("gamma:G3")).containsExactly("delta:D1");
     }
 
-    // B22
-    @Test
-    void crossFeedStationsVeryCloseTogetherAreMergedWhateverTheirNames(@TempDir Path dir) throws Exception {
-        // "Gamma Border" and "Delta Grens" share no word but are ~40 m apart
-        TransitGraph graph = GtfsTestFixtures.load(dir, "gamma", "delta");
-
-        assertThat(graph.getStation("gamma:G5")).isNull();
-        assertThat(graph.getStopsOnTrip("gamma:V3")).containsExactly("gamma:G4", "delta:D4", "gamma:G6");
-    }
-
-    @Test
-    void crossFeedStationsFurtherApartStaySeparateWithoutSimilarNames(@TempDir Path dir) throws Exception {
-        // "Gamma Sidings" and "Delta Yard" are ~330 m apart
-        TransitGraph graph = GtfsTestFixtures.load(dir, "gamma", "delta");
-
-        assertThat(graph.getStation("gamma:G6")).isNotNull();
-        assertThat(graph.getStation("delta:D5")).isNotNull();
-    }
-
     @Test
     void connectionsStoreTimesAsSecondsSinceMidnight() {
         var conn = gtfs.getConnectionByTrip("alpha:A1", "alpha:A2", "alpha:T1");

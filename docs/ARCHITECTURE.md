@@ -104,7 +104,7 @@ A feed that adds no connections at all (e.g. unreadable headers) is logged as a 
 
 After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStations`):
 5. **Within-country dedup**: same exact name, same source, within ~200 m.
-6. **Cross-border dedup**: ~1 km spatial grid, different sources, within ~500 m with token Jaccard similarity ≥ 0.4, or within ~100 m whatever the names (feeds often translate them, e.g. "Aachen, West Bf" / "Aix-la-Chapelle Ouest"). The station with more connections becomes canonical, and every map is remapped. A canonical station can itself be merged later (A→B, then B→C); `mergeStations` first resolves such chains so every alias maps straight to the last station.
+6. **Cross-border dedup**: ~1 km spatial grid, different sources, within ~500 m, token Jaccard similarity ≥ 0.4. The station with more connections becomes canonical, and every map is remapped. A canonical station can itself be merged later (A→B, then B→C); `mergeStations` first resolves such chains so every alias maps straight to the last station.
 7. `GtfsCacheStore` saves stations and trips (`CachedTrip`) to the GTFS cache file. On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops` and `stopTrips` from the trips.
 
 `StationSearchIndex.rebuild` then indexes the station names. `TransitGraph` builds lazy indexes on first access: `timetables` (trip → `TripTimetable`), `departuresByStop` (stop → departures by time) and `connectionByTrip` (edge → tripId → Connection).

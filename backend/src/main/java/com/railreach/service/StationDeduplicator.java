@@ -17,8 +17,7 @@ import java.util.stream.Collectors;
 
 /**
  * Merges stations that are the same place after all feeds are loaded: exact-name duplicates within
- * one feed, and stations of different feeds at a border that have similar names or stand within ~100 m.
- * The better connected one survives.
+ * one feed, and similar-name stations of different feeds at a border. The better connected one survives.
  */
 @Component
 @Slf4j
@@ -32,9 +31,6 @@ public class StationDeduplicator {
     private static final double CROSS_BORDER_CELL_SIZE_DEG = 0.01;
     // 0.4 still accepts "Paris Gare du Nord" vs "Paris Nord (FR)"
     private static final double CROSS_BORDER_MIN_NAME_SIMILARITY = 0.4;
-    // ~100 m: closer than this, feeds name the same station differently ("Aachen, West Bf" vs
-    // "Aix-la-Chapelle Ouest") far more often than two different stations stand side by side
-    private static final double CROSS_BORDER_ANY_NAME_RADIUS_DEG = 0.001;
 
     void deduplicate(TransitGraph graph) {
         log.info("=== Station deduplication (within + cross-border) ===");
@@ -127,8 +123,7 @@ public class StationDeduplicator {
         if (StopIds.source(s1.getId()).equals(StopIds.source(s2.getId()))) return false;
         if (!areNear(s1, s2, CROSS_BORDER_RADIUS_DEG)) return false;
         double similarity = tokenSimilarity(s1.getName(), s2.getName());
-        if (similarity < CROSS_BORDER_MIN_NAME_SIMILARITY
-                && !areNear(s1, s2, CROSS_BORDER_ANY_NAME_RADIUS_DEG)) return false;
+        if (similarity < CROSS_BORDER_MIN_NAME_SIMILARITY) return false;
 
         Station canonical = betterConnected(graph, s1, s2);
         Station alias = canonical == s1 ? s2 : s1;
