@@ -92,7 +92,7 @@ public class ReachabilityService {
             emitter.complete();
 
             if (predictiveEnabled) {
-                warmer.warmHigherTransferCounts(key.startId(), key.maxTransfers(), key.maxTransferMins());
+                warmer.warmHigherTransferCounts(key);
             }
         } catch (Exception e) {
             log.error("Streaming BFS error", e);

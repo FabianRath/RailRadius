@@ -63,10 +63,11 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `RailReachBackendApplication` | root | Spring Boot entry point |
 | `RailReachController` | controller | Public API under `/api` |
 | `AdminController` | controller | Admin/debug API under `/api/admin` |
-| `GtfsDataService` | service | Fills the `TransitGraph` at startup (cache file, else zips) and on `reload-gtfs` |
-| `TransitGraph` | service | The merged network: stations, edges, connections, trip indexes, station search. Everything that reads GTFS data injects this |
+| `GtfsDataService` | service | Fills the `TransitGraph` at startup (cache file, else zips) and on `reload-gtfs`, then rebuilds the station search index and (on reload) clears the reachability caches |
+| `TransitGraph` | service | The merged network: stations, edges, connections, trip indexes. Everything that reads GTFS data injects this |
 | `GtfsFeedLoader` | service | Parses the rail part of each zip into the graph, with per-feed stop dedup |
 | `GtfsCsvReader` | service | Row-by-row reader for one CSV file inside a GTFS zip |
+| `StationSearchIndex` | service | Station name search: trigram → station positions, in degree order; rebuilt after each load |
 | `StationDeduplicator` | service | Within-country and cross-border station merging after all feeds are loaded |
 | `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`: format version, stations, trips); a file with another version is ignored |
 | `CachedTrip` | service | One trip in the cache file: route name, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
@@ -104,7 +105,7 @@ After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStati
 6. **Cross-border dedup**: ~1 km spatial grid, different sources, within ~500 m, token Jaccard similarity ≥ 0.4. The station with more connections becomes canonical, and every map is remapped.
 7. `GtfsCacheStore` saves stations and trips (`CachedTrip`) to the GTFS cache file. On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops` and `stopTrips` from the trips.
 
-`TransitGraph` builds lazy indexes on first access: `tripStopIndex` (trip → stop → position) and `connectionByTrip` (edge → tripId → Connection).
+`StationSearchIndex.rebuild` then indexes the station names. `TransitGraph` builds lazy indexes on first access: `tripStopIndex` (trip → stop → position) and `connectionByTrip` (edge → tripId → Connection).
 
 ## Reachability algorithm (`ReachabilityCache`, `ReachabilitySearch`)
 
@@ -118,9 +119,9 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 `JourneyLegBuilder` merges consecutive connections into one TRAIN leg (same tripId, or same route name and continuous in time) and inserts TRANSFER legs between them.
 
 **Caching layers:**
-- `ReachabilityCache` (unbounded `ConcurrentHashMap`) holds raw `JourneyPath` maps and enables the incremental BFS.
+- `ReachabilityCache` (Caffeine, max `cache.raw-max-entries` (30) results) holds raw `JourneyPath` maps and enables the incremental BFS. If the N−1 result was evicted, N falls back to a full BFS.
 - Caffeine `"reachability"` cache holds full `ReachabilityResponse`s from `POST /api/reachability` (max 10k entries, 60 min TTL).
-- **Predictive warming**: after a streaming request, `ReachabilityWarmer` precomputes N+1 … `predictive-max-transfers` (5) on a background thread, into the raw cache only (the stream never reads Caffeine).
+- **Predictive warming**: after a streaming request, `ReachabilityWarmer` precomputes N+1 … `predictive-max-transfers` (5) with the same transfer window on a background thread, into the raw cache only (the stream never reads Caffeine).
 
 **Streaming** (`calculateReachabilityStreaming`): the BFS runs to completion first (paths improve during the search, so nothing is sent early). The result is then sent as SSE `stations` events in batches of 30, followed by a `done` event (`{total, calculationTimeMs}`), or an `error` event on failure.
 
@@ -137,7 +138,7 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 |---|---|---|
 | GET | `/reachability/stream?stationId=&maxTransfers=&minTransferMinutes=0&maxTransferMinutes=180&maxJourneyHours=` | SSE; used by the frontend |
 | POST | `/reachability` | JSON `ReachabilityRequest` → `ReachabilityResponse` (Caffeine-cached) |
-| GET | `/stations/search?q=&limit=50` | Substring match; only stations with edges, sorted by degree |
+| GET | `/stations/search?q=&limit=50` | Case-insensitive substring match; only stations with edges, sorted by degree. Candidates come from the rarest trigram of the query (`StationSearchIndex`); queries under 3 characters scan in degree order and stop at `limit` |
 | GET | `/stations/{id}` | Single station |
 | GET | `/stats` | stations / graphNodes / totalEdges |
 | GET | `/health` | UP/DOWN depending on whether data is loaded |
@@ -146,7 +147,7 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/cache-stats` | Caffeine stats, warming jobs, rawPathCache keys |
-| POST | `/reload-gtfs` | Full reparse of the zips (minutes) and rewrite of the cache |
+| POST | `/reload-gtfs` | Full reparse of the zips (minutes), rewrite of the cache, clears the raw and response reachability caches |
 | DELETE | `/gtfs-cache` | Deletes the cache file |
 | GET | `/gtfs-stats` | Cache file and data counts |
 | POST | `/compute-hubs` | Recompute hubs (5–10 min) |
@@ -160,7 +161,7 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 
 - `gtfs.directory` (`./data/gtfs`, env `GTFS_DIRECTORY`), `gtfs.auto-load-from-files` (false), `gtfs.cache-file`
 - `algorithm.max-transfer-time-minutes` (180), `algorithm.cache-size` (10000), `algorithm.cache-ttl-minutes` (60)
-- `cache.predictive-enabled` (true), `cache.predictive-max-transfers` (5)
+- `cache.predictive-enabled` (true), `cache.predictive-max-transfers` (5), `cache.raw-max-entries` (30)
 - `hub.auto-initialize` (false), `hub.cache-file`, `hub.num-hubs` (50), `hub.precompute-transfers` (1), `hub.timeout-seconds` (600)
 
 `application-dev.yml` overrides the GTFS directory and cache file, sets `auto-load-from-files: true`, turns predictive warming off and uses `data/hub-dev-cache.json`.

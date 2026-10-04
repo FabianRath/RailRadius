@@ -68,8 +68,8 @@ public class StationDeduplicator {
                 Station s2 = group.get(j);
                 if (aliasToCanonical.containsKey(s1.getId()) || aliasToCanonical.containsKey(s2.getId())) continue;
                 if (!areNear(s1, s2, WITHIN_FEED_RADIUS_DEG)) continue;
-                String canonical = betterConnected(graph, s1, s2);
-                aliasToCanonical.put(canonical.equals(s1.getId()) ? s2.getId() : s1.getId(), canonical);
+                Station canonical = betterConnected(graph, s1, s2);
+                aliasToCanonical.put((canonical == s1 ? s2 : s1).getId(), canonical.getId());
             }
         }
     }
@@ -125,20 +125,18 @@ public class StationDeduplicator {
         double similarity = tokenSimilarity(s1.getName(), s2.getName());
         if (similarity < CROSS_BORDER_MIN_NAME_SIMILARITY) return false;
 
-        String canonical = betterConnected(graph, s1, s2);
-        String alias = canonical.equals(s1.getId()) ? s2.getId() : s1.getId();
-        aliasToCanonical.put(alias, canonical);
+        Station canonical = betterConnected(graph, s1, s2);
+        Station alias = canonical == s1 ? s2 : s1;
+        aliasToCanonical.put(alias.getId(), canonical.getId());
         log.info("  MERGED: '{}' ({}) -> '{}' ({}) [sim={}]",
-                alias, s1.getName().equals(alias) ? s1.getName() : s2.getName(),
-                canonical, s1.getName().equals(canonical) ? s1.getName() : s2.getName(),
+                alias.getId(), alias.getName(), canonical.getId(), canonical.getName(),
                 String.format("%.2f", similarity));
         return true;
     }
 
-    /** ID of the station with more outgoing edges; s1 on a tie. */
-    private static String betterConnected(TransitGraph graph, Station s1, Station s2) {
-        return graph.getNeighbors(s1.getId()).size() >= graph.getNeighbors(s2.getId()).size()
-                ? s1.getId() : s2.getId();
+    /** The station with more outgoing edges; s1 on a tie. */
+    private static Station betterConnected(TransitGraph graph, Station s1, Station s2) {
+        return graph.getNeighbors(s1.getId()).size() >= graph.getNeighbors(s2.getId()).size() ? s1 : s2;
     }
 
     private static boolean areNear(Station s1, Station s2, double radiusDeg) {

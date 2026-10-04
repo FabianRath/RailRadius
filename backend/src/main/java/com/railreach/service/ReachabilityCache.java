@@ -1,17 +1,17 @@
 package com.railreach.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import com.railreach.model.JourneyPath;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.Cache;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Raw BFS results per search, computed on demand. Kept apart from the Caffeine response cache
@@ -19,15 +19,21 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Component
 @Slf4j
-@RequiredArgsConstructor
 public class ReachabilityCache {
 
     static final String RESPONSE_CACHE_NAME = "reachability";
 
     private final ReachabilitySearch search;
     private final CacheManager cacheManager;
+    // One full-data result holds a path to every reachable station, so the count must stay small
+    private final Cache<SearchKey, Map<String, JourneyPath>> rawPaths;
 
-    private final Map<SearchKey, Map<String, JourneyPath>> rawPaths = new ConcurrentHashMap<>();
+    public ReachabilityCache(ReachabilitySearch search, CacheManager cacheManager,
+                             @Value("${railreach.cache.raw-max-entries:30}") int rawMaxEntries) {
+        this.search = search;
+        this.cacheManager = cacheManager;
+        this.rawPaths = Caffeine.newBuilder().maximumSize(rawMaxEntries).build();
+    }
 
     public record SearchKey(String startId, int maxTransfers, int minTransferMins, int maxTransferMins) {
 
@@ -46,7 +52,7 @@ public class ReachabilityCache {
      * The computed result is stored.
      */
     public Map<String, JourneyPath> getOrCompute(SearchKey key) {
-        Map<String, JourneyPath> cached = rawPaths.get(key);
+        Map<String, JourneyPath> cached = rawPaths.getIfPresent(key);
         if (cached != null) {
             log.info("  Raw cache HIT: {} x{} ({} stations) — skipping BFS",
                     key.startId(), key.maxTransfers(), cached.size());
@@ -54,7 +60,7 @@ public class ReachabilityCache {
         }
 
         Map<String, JourneyPath> previous = key.maxTransfers() > 0
-                ? rawPaths.get(key.withMaxTransfers(key.maxTransfers() - 1)) : null;
+                ? rawPaths.getIfPresent(key.withMaxTransfers(key.maxTransfers() - 1)) : null;
         Map<String, JourneyPath> result;
         if (previous != null && !previous.isEmpty()) {
             log.info("  Incremental BFS: seeding from {} x{} ({} stations), adding 1 more transfer",
@@ -73,12 +79,20 @@ public class ReachabilityCache {
     }
 
     public boolean contains(SearchKey key) {
-        return rawPaths.containsKey(key);
+        return rawPaths.getIfPresent(key) != null;
+    }
+
+    /** Drops every stored result and response; they describe a graph that no longer exists. */
+    public void clear() {
+        rawPaths.invalidateAll();
+        var responseCache = cacheManager.getCache(RESPONSE_CACHE_NAME);
+        if (responseCache != null) responseCache.clear();
+        log.info("Reachability caches cleared");
     }
 
     /** Drops the Caffeine response for this search, which may predate the stored raw result. */
     public void evictResponse(SearchKey key) {
-        Cache responseCache = cacheManager.getCache(RESPONSE_CACHE_NAME);
+        var responseCache = cacheManager.getCache(RESPONSE_CACHE_NAME);
         if (responseCache != null) responseCache.evict(key.label());
     }
 
@@ -92,8 +106,10 @@ public class ReachabilityCache {
             stats.put("evictionCount", caffeineStats.evictionCount());
             stats.put("estimatedSize", caffeineCache.getNativeCache().estimatedSize());
         }
-        stats.put("rawPathCacheEntries", rawPaths.size());
-        stats.put("rawPathCacheKeys", rawPaths.keySet().stream().map(SearchKey::label).toList());
+        // Applies pending evictions, so the count is exact
+        rawPaths.cleanUp();
+        stats.put("rawPathCacheEntries", rawPaths.estimatedSize());
+        stats.put("rawPathCacheKeys", rawPaths.asMap().keySet().stream().map(SearchKey::label).toList());
         return stats;
     }
 }

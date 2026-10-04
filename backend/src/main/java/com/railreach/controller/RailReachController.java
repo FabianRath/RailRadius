@@ -4,6 +4,7 @@ import com.railreach.dto.ReachabilityRequest;
 import com.railreach.dto.ReachabilityResponse;
 import com.railreach.model.Station;
 import com.railreach.service.ReachabilityService;
+import com.railreach.service.StationSearchIndex;
 import com.railreach.service.TransitGraph;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class RailReachController {
     
     private final ReachabilityService reachabilityService;
     private final TransitGraph transitGraph;
+    private final StationSearchIndex stationSearchIndex;
     private final AsyncTaskExecutor taskExecutor;
     
     /**
@@ -97,7 +99,7 @@ public class RailReachController {
             @RequestParam("q") String query,
             @RequestParam(value = "limit", defaultValue = "50") int limit) {
         
-        List<Station> stations = transitGraph.searchStations(query, limit);
+        List<Station> stations = stationSearchIndex.search(query, limit);
         
         List<StationSearchResult> results = stations.stream()
                 .map(station -> new StationSearchResult(

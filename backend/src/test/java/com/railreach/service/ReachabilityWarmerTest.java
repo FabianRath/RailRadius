@@ -19,7 +19,7 @@ class ReachabilityWarmerTest {
         SearchKey queried = new SearchKey("alpha:A1", 0, 0, 180);
         cache.getOrCompute(queried);
 
-        warmer.warmHigherTransferCounts("alpha:A1", 0, 180);
+        warmer.warmHigherTransferCounts(queried);
 
         assertThat(cache.contains(queried.withMaxTransfers(1))).isTrue();
         assertThat(cache.contains(queried.withMaxTransfers(2))).isTrue();
@@ -33,8 +33,22 @@ class ReachabilityWarmerTest {
         ReachabilityWarmer warmer = new ReachabilityWarmer(cache);
         ReflectionTestUtils.setField(warmer, "predictiveMaxTransfers", 2);
 
-        warmer.warmHigherTransferCounts("alpha:A1", 1, 180);
+        warmer.warmHigherTransferCounts(new SearchKey("alpha:A1", 1, 0, 180));
 
         assertThat(cache.contains(new SearchKey("alpha:A1", 2, 0, 180))).isFalse();
+    }
+
+    // B8
+    @Test
+    void warmingKeepsTheQueriedMinimumTransferTime(@TempDir Path dir) throws Exception {
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(GtfsTestFixtures.load(dir, "alpha", "beta"));
+        ReachabilityWarmer warmer = new ReachabilityWarmer(cache);
+        ReflectionTestUtils.setField(warmer, "predictiveMaxTransfers", 1);
+        SearchKey queried = new SearchKey("alpha:A1", 0, 5, 180);
+        cache.getOrCompute(queried);
+
+        warmer.warmHigherTransferCounts(queried);
+
+        assertThat(cache.contains(queried.withMaxTransfers(1))).isTrue();
     }
 }

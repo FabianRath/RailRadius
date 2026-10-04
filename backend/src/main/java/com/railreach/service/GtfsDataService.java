@@ -18,6 +18,8 @@ public class GtfsDataService {
     private final GtfsFeedLoader feedLoader;
     private final StationDeduplicator deduplicator;
     private final GtfsCacheStore cacheStore;
+    private final ReachabilityCache reachabilityCache;
+    private final StationSearchIndex stationSearchIndex;
 
     @Value("${railreach.gtfs.directory:./gtfs}")
     private String gtfsDirectory;
@@ -33,6 +35,7 @@ public class GtfsDataService {
         var cached = cacheStore.load();
         if (cached.isPresent()) {
             graph.restore(cached.get());
+            stationSearchIndex.rebuild();
             log.info("✓ GTFS data loaded from cache: {} stations, {} graph nodes, {} connections",
                     graph.stationCount(), graph.nodeCount(), graph.connectionCount());
             dataLoaded = true;
@@ -64,6 +67,8 @@ public class GtfsDataService {
         log.info("Total edges     : {}", graph.edgeCount());
 
         cacheStore.save(graph.snapshot());
+        stationSearchIndex.rebuild();
+        reachabilityCache.clear();
         dataLoaded = true;
     }
 

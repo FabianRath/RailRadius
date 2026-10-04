@@ -20,9 +20,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class ReachabilityWarmer {
 
-    // B8: warming always uses no minimum transfer time, whatever the request asked for
-    private static final int WARM_MIN_TRANSFER_MINS = 0;
-
     private final ReachabilityCache cache;
 
     @Value("${railreach.cache.predictive-max-transfers:5}")
@@ -31,9 +28,10 @@ public class ReachabilityWarmer {
     private final Set<SearchKey> warmingInProgress = ConcurrentHashMap.newKeySet();
 
     @Async
-    public void warmHigherTransferCounts(String stationId, int currentMaxTransfers, int maxTransferMins) {
-        for (int t = currentMaxTransfers + 1; t <= predictiveMaxTransfers; t++) {
-            SearchKey key = new SearchKey(stationId, t, WARM_MIN_TRANSFER_MINS, maxTransferMins);
+    public void warmHigherTransferCounts(SearchKey queried) {
+        String stationId = queried.startId();
+        for (int t = queried.maxTransfers() + 1; t <= predictiveMaxTransfers; t++) {
+            SearchKey key = queried.withMaxTransfers(t);
             if (cache.contains(key)) {
                 log.debug("  Predictive cache: {} x{} already cached", stationId, t);
                 continue;

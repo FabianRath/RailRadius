@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B21 · F7 · S12
+**Next free IDs:** B22 · F7 · S12
 
 ## Bugs (data loading)
 - [ ] **B1** UTF-8 BOM breaks header parsing, so Austria is silently dropped. `gtfs_austria.zip` files start with `EF BB BF`. `indexOf(headers, "route_id")` then returns -1, and the feed loads 0 routes, 0 stops and 0 trips (log: "Routes: 273 total, 259 rail routes selected" then "Loaded 0 rail routes, 0 stops"). It's the only affected feed today. Fix: strip a leading `﻿` from the header line in the CSV loaders, add a BOM fixture test, then rebuild the caches. Also make a feed that loads 0 stops a loud warning.
@@ -11,17 +11,14 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 - [ ] **S8** Feeds that failed to load: `data/gtfs/broken/` (finland, lithuania).
 
 ## Bugs (algorithm)
-- [ ] **B2** BFS pruning ignores arrival time. `ReachabilitySearch` keeps one best path per station, ranked by (transfers, duration). An earlier-arriving but longer trip is pruned even when it enables a much better onward transfer. Repro: the disabled test `ReachabilityServiceTest.pruningShouldNotDiscardEarlierArrivalsThatEnableBetterTransfers` gets 250 min where 120 is possible. Probably the root cause of B3 and B4. Fix direction: keep a Pareto set per station (arrival time × transfers), or switch to a time-dependent algorithm (e.g. RAPTOR / CSA profile).
+- [ ] **B2** BFS pruning ignores arrival time. `ReachabilitySearch` keeps one best path per station, ranked by (transfers, duration). An earlier-arriving but longer trip is pruned even when it enables a much better onward transfer. Repro: the disabled test `ReachabilityServiceTest.pruningShouldNotDiscardEarlierArrivalsThatEnableBetterTransfers` gets 250 min where 120 is possible. Probably the root cause of B3, B4 and B21. Fix direction: keep a Pareto set per station (arrival time × transfers), or switch to a time-dependent algorithm (e.g. RAPTOR / CSA profile).
+- [ ] **B21** The incremental search (N seeded from the stored N−1 result) loses stations compared with a search from scratch. Full data, Bruxelles-Midi (`belgien:gs:nmbssncb:8814001`), 0–179 min wait: from scratch 6,181 / 11,767 / 15,233 / 17,165 stations for 2 / 3 / 4 / 5 transfers, incremental 6,117 / 11,581 / 15,026 / 16,961 (up to ~1.6 % fewer). Smaller losses for Paris Gare de Lyon (up to 58), Wien Hbf (up to 6) and Hamburg Hbf (up to 1); Hatvan none. It hits users who query N and then N+1, and everything predictive warming fills. Likely caused by B2: the incremental step only continues from stations reached with exactly N−1 transfers, each with its single best path, so arrival times that a search from scratch still explores are missing. `ReachabilityCacheTest` passes on `gtfs-mini`, which is too small to show it. Related: with 5 transfers, a 179 min max wait reached more stations (17,165) than 180 min (17,138).
 - [ ] **B3** Min transfer time filters out connections that should be kept (anything other than 5 min min / 180 max). Likely caused by B2.
 - [ ] **B4** Turning the transfer wait time off makes many connections disappear. Likely caused by B2.
 - [ ] **B5** Hub precompute always uses a 0–180 min transfer window, whatever the request asks for.
 - [ ] **B6** Route-type filter is `2 || 100–106`, but the comment says 107/109 are included. Decide and align. Impact: 109 is suburban railway (S-Bahn), and 3,571 stops are served only by it (Germany 3,260, Finland 238, Denmark 73). S-Bahn trips through stations that are in the graph are dropped too, so a large part of the regional network is missing. Including it adds many short, frequent trips (memory, BFS time); measure after B18.
 
 ## Bugs (caching / infrastructure)
-- [ ] **B8** The warming cache key hardcodes min-transfer `0`, so warming never matches requests with a min transfer time.
-- [ ] **B9** The raw path store in `ReachabilityCache` is unbounded and not cleared on `reload-gtfs`.
-- [ ] **B15** The cross-border dedup `MERGED` log compares station names with stop IDs (`s1.getName().equals(alias)` in `StationDeduplicator.tryCrossBorderMerge`). That is always false, so both the alias and the canonical stop are logged with s2's name. Log only; the merge itself is unaffected.
-- [ ] **B11** `searchStations` is a linear scan per request.
 
 ## Features / UX
 - [ ] **F1** Rework station naming: map lat/long to OpenStreetMap station names and use that name for grouping as well.
