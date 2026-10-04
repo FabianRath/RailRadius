@@ -31,6 +31,11 @@ public final class GtfsTime {
         }
     }
 
+    /** The clock minute (0..1439) of a time, so a trip's 24:21 and another feed's 00:21 compare equal. */
+    public static int minuteOfDay(int seconds) {
+        return (seconds % SECONDS_PER_DAY) / SECONDS_PER_MINUTE;
+    }
+
     /** Formats as {@code HH:MM:SS}; negative input gives {@code 00:00:00}. */
     public static String format(int seconds) {
         if (seconds < 0) return "00:00:00";

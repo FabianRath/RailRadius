@@ -202,14 +202,19 @@ public class TransitGraph {
     private static Map<String, String> resolveChains(Map<String, String> aliasToCanonical) {
         Map<String, String> resolved = new HashMap<>(aliasToCanonical.size() * 2);
         for (String alias : aliasToCanonical.keySet()) {
-            String target = aliasToCanonical.get(alias);
-            for (int hops = 0; aliasToCanonical.containsKey(target); hops++) {
-                if (hops > aliasToCanonical.size()) throw new IllegalStateException("Station merge cycle at " + alias);
-                target = aliasToCanonical.get(target);
-            }
-            resolved.put(alias, target);
+            resolved.put(alias, canonicalOf(alias, aliasToCanonical));
         }
         return resolved;
+    }
+
+    /** The stop at the end of the stop's alias chain; the stop itself if it is no alias. */
+    static String canonicalOf(String stopId, Map<String, String> aliasToCanonical) {
+        String target = stopId;
+        for (int hops = 0; aliasToCanonical.containsKey(target); hops++) {
+            if (hops > aliasToCanonical.size()) throw new IllegalStateException("Station merge cycle at " + stopId);
+            target = aliasToCanonical.get(target);
+        }
+        return target;
     }
 
     private void mergeEdges(String alias, String canonical, Map<String, String> aliasToCanonical) {

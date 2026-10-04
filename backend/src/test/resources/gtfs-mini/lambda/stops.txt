@@ -1,0 +1,3 @@
+stop_id,stop_name,stop_lat,stop_lon,parent_station
+L1,Lambdastadt Ost,50.5000,31.1100,
+L2,Lambdastadt,50.5000,31.5000,
