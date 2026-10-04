@@ -1,0 +1,4 @@
+stop_id,stop_name,stop_lat,stop_lon,parent_station
+D1,Chain Junction Hbf,49.0010,18.0010,
+D2,Delta North,49.3000,18.3000,
+D3,Delta South,48.7000,18.3000,

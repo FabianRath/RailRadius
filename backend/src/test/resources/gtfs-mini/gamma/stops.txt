@@ -1,0 +1,5 @@
+stop_id,stop_name,stop_lat,stop_lon,parent_station
+GX,Chain Junction,49.0000,18.0000,
+G2,Chain Junction,49.0017,18.0000,
+G3,Gamma Start,49.1000,18.1000,
+G4,Gamma End,48.9000,17.9000,
