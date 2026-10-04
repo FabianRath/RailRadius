@@ -24,7 +24,7 @@ public class GtfsCacheStore {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** Bump on every format change: a cache file with another version is ignored and the zips are re-parsed. */
-    static final int FORMAT_VERSION = 2;
+    static final int FORMAT_VERSION = 3;
 
     /**
      * Field names are the on-disk format. Only stations and trips are stored, see {@link CachedTrip}.

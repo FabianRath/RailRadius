@@ -46,14 +46,22 @@ public class StationDeduplicator {
 
     void deduplicate(TransitGraph graph) {
         log.info("=== Station deduplication ===");
+        assignCountries(graph);
         Map<String, String> aliasToCanonical = findWithinFeedDuplicates(graph);
         List<StationPair> candidates = crossBorderCandidates(graph);
         mergeSimilarNames(graph, candidates, aliasToCanonical);
         mergeSharedTrains(graph, candidates, aliasToCanonical);
-        int snapped = ForeignStopSnapper.snap(graph.stations(), countryLocator, aliasToCanonical);
+        int snapped = ForeignStopSnapper.snap(graph.stations(), aliasToCanonical);
         log.info("  Foreign stops merged into the local station: {}", snapped);
         if (!aliasToCanonical.isEmpty()) graph.mergeStations(aliasToCanonical);
         log.info("  Deduplication complete: {} total stations merged", aliasToCanonical.size());
+    }
+
+    /** Merged stations keep the canonical station's country, so this runs once before any merge. */
+    private void assignCountries(TransitGraph graph) {
+        for (Station station : graph.stations()) {
+            station.setCountry(countryLocator.countryAt(station.getLatitude(), station.getLongitude()).orElse(null));
+        }
     }
 
     private Map<String, String> findWithinFeedDuplicates(TransitGraph graph) {

@@ -32,6 +32,7 @@ public class JourneyLegBuilder {
         return Optional.of(ReachableStation.builder()
                 .stopId(stopId)
                 .stopName(station.getName())
+                .country(station.getCountry())
                 .latitude(station.getLatitude())
                 .longitude(station.getLongitude())
                 .transfers(path.getTransfers())
@@ -63,6 +64,8 @@ public class JourneyLegBuilder {
                     .trainName(first.getRouteName())
                     .fromStation(stationName(first.getFromStopId()))
                     .toStation(stationName(last.getToStopId()))
+                    .fromCountry(stationCountry(first.getFromStopId()))
+                    .toCountry(stationCountry(last.getToStopId()))
                     .departureTime(first.getDepartureTime())
                     .arrivalTime(last.getArrivalTime())
                     .duration(GtfsTime.formatDuration(rideMinutes))
@@ -73,10 +76,13 @@ public class JourneyLegBuilder {
                 int transferMinutes = Math.max(0, GtfsTime.diffMinutes(
                         last.getArrivalTimeSeconds(), connections.get(rideEnd).getDepartureTimeSeconds()));
                 String transferStation = stationName(last.getToStopId());
+                String transferCountry = stationCountry(last.getToStopId());
                 legs.add(JourneyLeg.builder()
                         .type(LEG_TRANSFER)
                         .fromStation(transferStation)
                         .toStation(transferStation)
+                        .fromCountry(transferCountry)
+                        .toCountry(transferCountry)
                         .duration(GtfsTime.formatDuration(transferMinutes))
                         .durationMinutes(transferMinutes)
                         .build());
@@ -97,5 +103,10 @@ public class JourneyLegBuilder {
     private String stationName(String stopId) {
         Station s = transitGraph.getStation(stopId);
         return s != null ? s.getName() : stopId;
+    }
+
+    private String stationCountry(String stopId) {
+        Station s = transitGraph.getStation(stopId);
+        return s != null ? s.getCountry() : null;
     }
 }

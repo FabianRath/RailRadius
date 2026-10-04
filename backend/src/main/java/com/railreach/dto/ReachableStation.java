@@ -14,6 +14,7 @@ import java.util.List;
 public class ReachableStation {
     private String stopId;
     private String stopName;
+    private String country;
     private Double latitude;
     private Double longitude;
     private Integer transfers;

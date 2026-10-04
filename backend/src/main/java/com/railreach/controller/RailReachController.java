@@ -106,7 +106,8 @@ public class RailReachController {
                         station.getId(),
                         station.getName(),
                         station.getLatitude(),
-                        station.getLongitude()
+                        station.getLongitude(),
+                        station.getCountry()
                 ))
                 .collect(Collectors.toList());
         
@@ -139,6 +140,7 @@ public class RailReachController {
             String id,
             String name,
             Double latitude,
-            Double longitude
+            Double longitude,
+            String country
     ) {}
 }

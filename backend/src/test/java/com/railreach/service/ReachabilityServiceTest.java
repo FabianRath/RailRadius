@@ -73,6 +73,17 @@ class ReachabilityServiceTest {
     }
 
     @Test
+    void stationAndLegsCarryTheCountries(@TempDir Path dir) throws Exception {
+        // KT1 runs from K1 in KA to L1 in LA (K3 was snapped into it), then LT1 continues to L2
+        TransitGraph graph = GtfsTestFixtures.load(dir, "kappa", "lambda");
+        ReachableStation l2 = find(query(graph, "kappa:K1", 1, 0, 180), "lambda:L2").orElseThrow();
+
+        assertThat(l2.getCountry()).isEqualTo("LA");
+        assertThat(l2.getLegs()).extracting(JourneyLeg::getFromCountry).containsExactly("KA", "LA", "LA");
+        assertThat(l2.getLegs()).extracting(JourneyLeg::getToCountry).containsExactly("LA", "LA", "LA");
+    }
+
+    @Test
     void transferShorterThanMinimumIsRejected() {
         // Only feasible transfer at the border is 20 min
         assertThat(find(query(gtfs, "alpha:A1", 1, 30, 180), "beta:B2")).isEmpty();

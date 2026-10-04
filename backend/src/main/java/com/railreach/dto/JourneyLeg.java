@@ -14,6 +14,8 @@ public class JourneyLeg {
     private String trainName;
     private String fromStation;
     private String toStation;
+    private String fromCountry;
+    private String toCountry;
     private String departureTime;
     private String arrivalTime;
     private String duration;
