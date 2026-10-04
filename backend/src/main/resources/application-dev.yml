@@ -9,3 +9,7 @@ railreach:
 
   cache:
     predictive-enabled: false
+
+  # Fixed token for local runs only (scripts/api.sh sends it by default); never use the dev profile when deployed
+  admin:
+    token: ${RAILREACH_ADMIN_TOKEN:dev}

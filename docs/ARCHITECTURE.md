@@ -38,13 +38,14 @@ RailReach/
 ├── frontend/index.html               # markup; served at / by Spring (static-locations: file:../frontend/)
 ├── frontend/css/app.css              # all styles and the map palette (CSS variables)
 ├── frontend/js/                      # ES modules: main (entry), api, map (only MapLibre user), search, query-form,
-│                                     #   reachability (SSE), coverage (Turf), popup, debug, sidebar (collapse toggle), util, config
+│                                     #   reachability (SSE), coverage (Turf), popup, debug, dev-auth (dev login), sidebar (collapse toggle),
+│                                     #   util, config
 ├── frontend/backend_test.html        # small manual API test page
 └── backend/
     ├── pom.xml
     ├── src/main/java/com/railreach/{controller,service,dto,model,config}/
     ├── src/main/resources/application.yml (+ application-dev.yml), borders/europe.geojson (country borders)
-    ├── src/test/java/com/railreach/           # service/ (GtfsDataService, Reachability*, GtfsTestFixtures), util/ tests
+    ├── src/test/java/com/railreach/           # service/ (GtfsDataService, Reachability*, GtfsTestFixtures), util/, config/ tests
     ├── src/test/resources/gtfs-mini/          # hand-written fixture feeds (see its README)
     └── data/                                  # GITIGNORED
         ├── gtfs/            # gtfs_<country>.zip, broken/, list.txt (download sources; versioned copy: docs/gtfs-sources.txt), maps
@@ -82,6 +83,8 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `ReachabilityWarmer` | service | `@Async` predictive warming of the maximum transfer count (own bean so the proxy applies) |
 | `JourneyLegBuilder` | service | Search path → `ReachableStation` with TRAIN/TRANSFER legs |
 | `CacheConfig` | config | Caffeine `CacheManager` ("reachability" cache), `@EnableAsync` |
+| `AdminTokenInterceptor` | config | Guards `/api/admin/**`: `X-Admin-Token` must equal `railreach.admin.token` (constant-time); 401 if wrong or missing, 403 for every call when no token is configured; CORS preflights pass |
+| `WebConfig` | config | Registers `AdminTokenInterceptor` on `/api/admin/**` (same path matching as the controllers) |
 | `Station` | model | id, name, latitude, longitude, parentStation |
 | `Connection` | model | One edge of one trip: tripId, routeName, from/to, dep/arr times as **int seconds since midnight** (string getters/setters for JSON) |
 | `JourneyPath` | model | Internal search result: stationIds, connections, transfers, totalDurationMinutes |
@@ -155,7 +158,7 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 | GET | `/stats` | stations / graphNodes / totalEdges |
 | GET | `/health` | UP/DOWN depending on whether data is loaded |
 
-**Admin (`/api/admin`)**:
+**Admin (`/api/admin`)**: every call needs the header `X-Admin-Token: <railreach.admin.token>` (see `AdminTokenInterceptor`). `scripts/api.sh` sends `RAILREACH_ADMIN_TOKEN` (default `dev`). In the browser, the "Dev login" at the bottom of the side panel (`js/dev-auth.js`) checks the token against `/debug/status`, keeps it in `localStorage` and only then starts the debug polling.
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/cache-stats` | Caffeine stats, warming jobs, rawPathCache keys |
@@ -163,7 +166,7 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 | DELETE | `/gtfs-cache` | Deletes the cache file |
 | GET | `/gtfs-stats` | Cache file and data counts |
 | POST / DELETE | `/debug/trigger` | Toggle the frontend overlay that shows all stations |
-| GET | `/debug/status` | Polled by the frontend every 2 s |
+| GET | `/debug/status` | Polled every 2 s by a browser logged in as dev; also used to check a dev login |
 | GET | `/debug/stations` | All connected stations with edge counts |
 
 ## Configuration (`application.yml`, prefix `railreach.`)
@@ -171,8 +174,9 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 - `gtfs.directory` (`./data/gtfs`, env `GTFS_DIRECTORY`), `gtfs.auto-load-from-files` (false), `gtfs.cache-file`
 - `algorithm.max-transfer-time-minutes` (180), `algorithm.cache-size` (10000), `algorithm.cache-ttl-minutes` (60)
 - `cache.predictive-enabled` (true), `cache.predictive-max-transfers` (5), `cache.raw-max-entries` (30)
+- `admin.token` (empty, env `RAILREACH_ADMIN_TOKEN`): shared secret for the admin API; empty disables it
 
-`application-dev.yml` overrides the GTFS directory and cache file, sets `auto-load-from-files: true` and turns predictive warming off.
+`application-dev.yml` overrides the GTFS directory and cache file, sets `auto-load-from-files: true`, turns predictive warming off and defaults `admin.token` to `dev`.
 
 ## Known issues and TODOs
 

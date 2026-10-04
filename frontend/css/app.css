@@ -802,6 +802,47 @@ input[type="range"]::-moz-range-thumb {
     font-size: 10px;
 }
 
+/* ── Dev login ── */
+.dev-footer {
+    padding: 12px 28px;
+    border-top: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+.dev-toggle {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font: inherit;
+    cursor: pointer;
+    opacity: 0.6;
+    padding: 0;
+}
+
+.dev-toggle:hover,
+.dev-toggle.is-active {
+    color: var(--accent-warm);
+    opacity: 1;
+}
+
+.dev-login {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.dev-login .search-input {
+    padding: 8px 12px;
+    font-size: 12px;
+}
+
+.dev-error {
+    margin-top: 6px;
+    color: var(--danger);
+}
+
 ::-webkit-scrollbar {
     width: 8px;
 }

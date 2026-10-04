@@ -15,7 +15,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 - [ ] **F1** Rework station naming. I would like to see the coutry code displayed in some way (DE, NL...)
 - [ ] **F4** Zoom level after calculation (frontend) The zoom level should be adjusted so that all rendered stations on the map are visible.
 - [ ] **F5** `/api/admin/debug/stations?includeIsolated=true` is referenced in old notes but not implemented.
-- [ ] **F6** Add authentification to acces the site with something like https://clerk.com (Seperate dev accounts and user accounts with different acces)
 
 
 ## Structure

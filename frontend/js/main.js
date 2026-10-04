@@ -5,7 +5,8 @@ import { initSearch } from './search.js';
 import { initSidebarToggle } from './sidebar.js';
 import { initQueryForm, showQueryForm } from './query-form.js';
 import { getStation, initReachability, refreshCoverage } from './reachability.js';
-import { startDebugPolling } from './debug.js';
+import { initDebugOverlay, startDebugPolling, stopDebugPolling } from './debug.js';
+import { initDevAuth } from './dev-auth.js';
 import { showStatus } from './util.js';
 
 const COVERAGE_REDRAW_DEBOUNCE_MS = 300;
@@ -37,4 +38,5 @@ onZoomEnd(() => {
     zoomTimer = setTimeout(refreshCoverage, COVERAGE_REDRAW_DEBOUNCE_MS);
 });
 
-startDebugPolling();
+initDebugOverlay();
+initDevAuth(startDebugPolling, stopDebugPolling);

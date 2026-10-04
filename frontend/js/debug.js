@@ -1,4 +1,5 @@
-// Debug overlay: `scripts/api.sh debug-on` sets a flag in the backend; this polls it and then shows every station.
+// Debug overlay: `scripts/api.sh debug-on` sets a flag in the backend; a browser logged in as dev polls it and then
+// shows every station.
 import { clearDebugTrigger, fetchDebugStations, fetchDebugStatus } from './api.js';
 import { bindPopup, fitToPoints, hasCoordinates, LAYERS, setDebugStations } from './map.js';
 import { cssVar, escapeHtml, lerpColor } from './util.js';
@@ -11,19 +12,32 @@ const banner = document.getElementById('debugBanner');
 const bannerText = document.getElementById('debugBannerText');
 
 let debugActive = false;
+let pollTimer = null;
 
-export function startDebugPolling() {
+export function initDebugOverlay() {
     document.getElementById('debugClear').addEventListener('click', clearDebugOverlay);
     bindPopup(LAYERS.debug, s =>
         `<div class="popup-station">${escapeHtml(s.name)}</div>`
         + `<div class="popup-meta popup-mono">ID: ${escapeHtml(s.id)}<br>Edges: ${s.edges}</div>`);
-    setInterval(pollDebugStatus, POLL_INTERVAL_MS);
+}
+
+export function startDebugPolling() {
+    if (pollTimer !== null) return;
+    pollTimer = setInterval(pollDebugStatus, POLL_INTERVAL_MS);
     pollDebugStatus();
+}
+
+/** Stops polling and hides the overlay in this browser only; the backend flag stays as it is. */
+export function stopDebugPolling() {
+    clearInterval(pollTimer);
+    pollTimer = null;
+    hideDebugOverlay();
 }
 
 async function pollDebugStatus() {
     try {
         const status = await fetchDebugStatus();
+        if (pollTimer === null) return; // logged out while the request was running
         if (status.showAllStations && !debugActive) {
             debugActive = true;
             await showDebugStations();
@@ -64,9 +78,13 @@ function connectivityStyle(ratio, colors) {
     return { color, radius: MIN_RADIUS_PX + Math.round(ratio * MAX_EXTRA_RADIUS_PX) };
 }
 
-function clearDebugOverlay() {
+function hideDebugOverlay() {
     debugActive = false;
     setDebugStations([]);
     banner.hidden = true;
+}
+
+function clearDebugOverlay() {
+    hideDebugOverlay();
     clearDebugTrigger().catch(() => {});
 }
