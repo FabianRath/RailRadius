@@ -1,0 +1,4 @@
+{"type":"FeatureCollection","features":[
+{"type":"Feature","properties":{"iso":"KA"},"geometry":{"type":"MultiPolygon","coordinates":[[[[30,50],[31,50],[31,51],[30,51],[30,50]]]]}},
+{"type":"Feature","properties":{"iso":"LA"},"geometry":{"type":"MultiPolygon","coordinates":[[[[31,50],[32,50],[32,51],[31,51],[31,50]]]]}}
+]}

@@ -1,0 +1,6 @@
+stop_id,stop_name,stop_lat,stop_lon,parent_station
+K1,Kappa Central,50.5000,30.2000,
+K2,Kappa East,50.5000,30.5000,
+K3,Lambda Gate,50.5000,31.1000,
+K4,Lambda Field,50.5000,31.3000,
+K5,Kappa North,50.8000,30.5000,

@@ -3,6 +3,7 @@ package com.railreach.service;
 import com.railreach.model.Station;
 import com.railreach.util.Coordinates;
 import com.railreach.util.StopIds;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -16,11 +17,20 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Merges stations that are the same place after all feeds are loaded: exact-name duplicates within
- * one feed, and similar-name stations of different feeds at a border. The better connected one survives.
+ * Merges stations that are the same place after all feeds are loaded. The rules run in this order, each on the
+ * stations the earlier ones left:
+ * <ol>
+ *   <li>exact-name duplicates within one feed;</li>
+ *   <li>stations of different feeds near each other with similar names;</li>
+ *   <li>stations of different feeds near each other that share trains ({@link SharedTrainMatcher}): needs rule 2
+ *       first, as it compares neighbouring stations;</li>
+ *   <li>a feed's stops abroad folded into the local feed's station ({@link ForeignStopSnapper}).</li>
+ * </ol>
+ * In rules 1 to 3 the better connected station survives; in rule 4 the local one.
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class StationDeduplicator {
 
     // ~200 m
@@ -32,10 +42,16 @@ public class StationDeduplicator {
     // 0.4 still accepts "Paris Gare du Nord" vs "Paris Nord (FR)"
     private static final double CROSS_BORDER_MIN_NAME_SIMILARITY = 0.4;
 
+    private final CountryLocator countryLocator;
+
     void deduplicate(TransitGraph graph) {
-        log.info("=== Station deduplication (within + cross-border) ===");
+        log.info("=== Station deduplication ===");
         Map<String, String> aliasToCanonical = findWithinFeedDuplicates(graph);
-        findCrossBorderDuplicates(graph, aliasToCanonical);
+        List<StationPair> candidates = crossBorderCandidates(graph);
+        mergeSimilarNames(graph, candidates, aliasToCanonical);
+        mergeSharedTrains(graph, candidates, aliasToCanonical);
+        int snapped = ForeignStopSnapper.snap(graph.stations(), countryLocator, aliasToCanonical);
+        log.info("  Foreign stops merged into the local station: {}", snapped);
         if (!aliasToCanonical.isEmpty()) graph.mergeStations(aliasToCanonical);
         log.info("  Deduplication complete: {} total stations merged", aliasToCanonical.size());
     }
@@ -74,64 +90,60 @@ public class StationDeduplicator {
         }
     }
 
-    private void findCrossBorderDuplicates(TransitGraph graph, Map<String, String> aliasToCanonical) {
-        Map<String, List<Station>> byCell = bucketByCell(graph, aliasToCanonical);
-        Set<String> processedPairs = new HashSet<>();
+    /** Pairs of stations of different feeds within the cross-border radius, each pair once. */
+    private static List<StationPair> crossBorderCandidates(TransitGraph graph) {
+        StationGrid grid = new StationGrid(graph.stations(), CROSS_BORDER_CELL_SIZE_DEG);
+        List<StationPair> pairs = new ArrayList<>();
+        for (Station s1 : graph.stations()) {
+            for (Station s2 : grid.near(s1)) {
+                if (s1.getId().compareTo(s2.getId()) >= 0) continue;
+                if (StopIds.source(s1.getId()).equals(StopIds.source(s2.getId()))) continue;
+                if (areNear(s1, s2, CROSS_BORDER_RADIUS_DEG)) pairs.add(new StationPair(s1, s2));
+            }
+        }
+        return pairs;
+    }
+
+    private void mergeSimilarNames(TransitGraph graph, List<StationPair> candidates,
+                                  Map<String, String> aliasToCanonical) {
         int merges = 0;
-        for (Map.Entry<String, List<Station>> cell : byCell.entrySet()) {
-            for (List<Station> neighbourCell : neighbourCells(byCell, cell.getKey())) {
-                for (Station s1 : cell.getValue()) {
-                    for (Station s2 : neighbourCell) {
-                        if (!processedPairs.add(pairId(s1, s2))) continue;
-                        if (tryCrossBorderMerge(graph, s1, s2, aliasToCanonical)) merges++;
-                    }
+        for (StationPair pair : candidates) {
+            if (pair.eitherMerged(aliasToCanonical)) continue;
+            double similarity = tokenSimilarity(pair.s1().getName(), pair.s2().getName());
+            if (similarity < CROSS_BORDER_MIN_NAME_SIMILARITY) continue;
+            mergeIntoBetterConnected(graph, pair, aliasToCanonical, String.format("sim=%.2f", similarity));
+            merges++;
+        }
+        log.info("  Cross-border stations merged by name: {}", merges);
+    }
+
+    /** Repeats until nothing changes: each merge can make neighbours of a later pair count as one station. */
+    private void mergeSharedTrains(TransitGraph graph, List<StationPair> candidates,
+                                  Map<String, String> aliasToCanonical) {
+        int merges = 0;
+        int roundMerges;
+        do {
+            roundMerges = 0;
+            for (StationPair pair : candidates) {
+                if (pair.eitherMerged(aliasToCanonical)) continue;
+                if (!SharedTrainMatcher.shareTrains(graph, pair.s1().getId(), pair.s2().getId(), aliasToCanonical)) {
+                    continue;
                 }
+                mergeIntoBetterConnected(graph, pair, aliasToCanonical, "shared trains");
+                roundMerges++;
             }
-        }
-        log.info("  Cross-border stations merged: {}", merges);
+            merges += roundMerges;
+        } while (roundMerges > 0);
+        log.info("  Cross-border stations merged by shared trains: {}", merges);
     }
 
-    private Map<String, List<Station>> bucketByCell(TransitGraph graph, Map<String, String> aliasToCanonical) {
-        Map<String, List<Station>> byCell = new HashMap<>();
-        for (Station station : graph.stations()) {
-            if (aliasToCanonical.containsKey(station.getId())) continue;
-            int cellX = (int) Math.floor(station.getLatitude() / CROSS_BORDER_CELL_SIZE_DEG);
-            int cellY = (int) Math.floor(station.getLongitude() / CROSS_BORDER_CELL_SIZE_DEG);
-            byCell.computeIfAbsent(cellKey(cellX, cellY), k -> new ArrayList<>()).add(station);
-        }
-        return byCell;
-    }
-
-    /** The 3×3 block of existing cells around (and including) the given one. */
-    private List<List<Station>> neighbourCells(Map<String, List<Station>> byCell, String cellKey) {
-        String[] parts = cellKey.split(":");
-        int baseX = Integer.parseInt(parts[0]);
-        int baseY = Integer.parseInt(parts[1]);
-        List<List<Station>> cells = new ArrayList<>();
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                List<Station> cell = byCell.get(cellKey(baseX + dx, baseY + dy));
-                if (cell != null) cells.add(cell);
-            }
-        }
-        return cells;
-    }
-
-    private boolean tryCrossBorderMerge(TransitGraph graph, Station s1, Station s2,
-                                        Map<String, String> aliasToCanonical) {
-        if (aliasToCanonical.containsKey(s1.getId()) || aliasToCanonical.containsKey(s2.getId())) return false;
-        if (StopIds.source(s1.getId()).equals(StopIds.source(s2.getId()))) return false;
-        if (!areNear(s1, s2, CROSS_BORDER_RADIUS_DEG)) return false;
-        double similarity = tokenSimilarity(s1.getName(), s2.getName());
-        if (similarity < CROSS_BORDER_MIN_NAME_SIMILARITY) return false;
-
-        Station canonical = betterConnected(graph, s1, s2);
-        Station alias = canonical == s1 ? s2 : s1;
+    private static void mergeIntoBetterConnected(TransitGraph graph, StationPair pair,
+                                                 Map<String, String> aliasToCanonical, String reason) {
+        Station canonical = betterConnected(graph, pair.s1(), pair.s2());
+        Station alias = canonical == pair.s1() ? pair.s2() : pair.s1();
         aliasToCanonical.put(alias.getId(), canonical.getId());
-        log.info("  MERGED: '{}' ({}) -> '{}' ({}) [sim={}]",
-                alias.getId(), alias.getName(), canonical.getId(), canonical.getName(),
-                String.format("%.2f", similarity));
-        return true;
+        log.info("  MERGED: '{}' ({}) -> '{}' ({}) [{}]",
+                alias.getId(), alias.getName(), canonical.getId(), canonical.getName(), reason);
     }
 
     /** The station with more outgoing edges; s1 on a tie. */
@@ -142,16 +154,6 @@ public class StationDeduplicator {
     private static boolean areNear(Station s1, Station s2, double radiusDeg) {
         return Coordinates.areNear(s1.getLatitude(), s1.getLongitude(), s2.getLatitude(), s2.getLongitude(),
                 radiusDeg);
-    }
-
-    private static String cellKey(int cellX, int cellY) {
-        return cellX + ":" + cellY;
-    }
-
-    private static String pairId(Station s1, Station s2) {
-        return s1.getId().compareTo(s2.getId()) < 0
-                ? s1.getId() + "|" + s2.getId()
-                : s2.getId() + "|" + s1.getId();
     }
 
     /** Jaccard similarity of the lower-cased word sets. */
@@ -171,5 +173,12 @@ public class StationDeduplicator {
         return Arrays.stream(name.toLowerCase().split("[\\s\\p{Punct}]+"))
                 .filter(token -> !token.isEmpty())
                 .collect(Collectors.toSet());
+    }
+
+    private record StationPair(Station s1, Station s2) {
+
+        boolean eitherMerged(Map<String, String> aliasToCanonical) {
+            return aliasToCanonical.containsKey(s1.getId()) || aliasToCanonical.containsKey(s2.getId());
+        }
     }
 }

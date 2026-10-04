@@ -23,6 +23,8 @@ final class GtfsTestFixtures {
 
     private static final int RAW_CACHE_MAX_ENTRIES = 100;
     private static final int TRIP_BATCH_SIZE = 100_000;
+    // Made-up countries KA and LA around the kappa and lambda feeds; every other feed lies outside them
+    private static final String BORDERS_FILE = "gtfs-mini/borders.geojson";
 
     static TransitGraph load(Path tempDir, String... feedFolders) throws IOException {
         return load(tempDir, TRIP_BATCH_SIZE, feedFolders);
@@ -54,7 +56,8 @@ final class GtfsTestFixtures {
 
         GtfsFeedLoader feedLoader = new GtfsFeedLoader();
         ReflectionTestUtils.setField(feedLoader, "tripBatchSize", tripBatchSize);
-        GtfsDataService service = new GtfsDataService(graph, feedLoader, new StationDeduplicator(),
+        GtfsDataService service = new GtfsDataService(graph, feedLoader,
+                new StationDeduplicator(new CountryLocator(Files.newInputStream(resource(BORDERS_FILE)))),
                 cacheStore(tempDir), reachabilityCache, stationSearchIndex);
         ReflectionTestUtils.setField(service, "gtfsDirectory", gtfsDir.toString());
         return service;

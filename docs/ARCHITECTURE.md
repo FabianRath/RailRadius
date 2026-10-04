@@ -43,7 +43,7 @@ RailReach/
 └── backend/
     ├── pom.xml
     ├── src/main/java/com/railreach/{controller,service,dto,model,config}/
-    ├── src/main/resources/application.yml (+ application-dev.yml)
+    ├── src/main/resources/application.yml (+ application-dev.yml), borders/europe.geojson (country borders)
     ├── src/test/java/com/railreach/           # service/ (GtfsDataService, Reachability*, GtfsTestFixtures), util/ tests
     ├── src/test/resources/gtfs-mini/          # hand-written fixture feeds (see its README)
     └── data/                                  # GITIGNORED
@@ -67,7 +67,11 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `TripRowBatcher` | service | Buffers stop_times rows per trip and hands whole trips to the loader in batches |
 | `GtfsCsvReader` | service | Row-by-row reader for one CSV file inside a GTFS zip; strips a UTF-8 BOM from the header |
 | `StationSearchIndex` | service | Station name search: trigram → station positions, in degree order; rebuilt after each load |
-| `StationDeduplicator` | service | Within-country and cross-border station merging after all feeds are loaded |
+| `StationDeduplicator` | service | Within-country and cross-border station merging after all feeds are loaded; runs the merge rules in order |
+| `StationGrid` | service | Stations bucketed into square degree cells; `near` = the 3×3 cells around a station |
+| `SharedTrainMatcher` | service | Cross-border rule: two stops are one station if ≥ 3 trains serve both at the same minute with the same neighbour station |
+| `ForeignStopSnapper` | service | Cross-border rule: a feed's stop outside its home country is merged into the nearest station of that country's feed (≤ 1 km) |
+| `CountryLocator` | service | Point → ISO country code, from `borders/europe.geojson` (Natural Earth 1:10m, Europe) |
 | `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`: format version, stations, trips); a file with another version is ignored |
 | `CachedTrip` | service | One trip in the cache file: route name, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
 | `ReachabilityService` | service | Thin orchestrator: request defaults, POST response (`@Cacheable`), SSE streaming, triggers warming |
@@ -85,9 +89,9 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `ReachabilityResponse` | dto | Start info, count, calcTime, list of `ReachableStation` |
 | `ReachableStation` | dto | Station + transfers, duration, path ids/names, `legs` |
 | `JourneyLeg` | dto | `TRAIN` or `TRANSFER` leg with times and duration |
-| `GtfsTime` | util | Parse/format GTFS times, minute diffs with overnight wrap, duration text |
+| `GtfsTime` | util | Parse/format GTFS times, minute diffs with overnight wrap, clock minute of a time, duration text |
 | `StopIds` | util | Canonical `<source>:<rawId>` stop IDs |
-| `Coordinates` | util | Degree-box proximity check |
+| `Coordinates` | util | Degree-box proximity check, distance in metres |
 
 ## Data pipeline (`GtfsDataService.loadFromFiles`)
 
@@ -104,8 +108,13 @@ A feed that adds no connections at all (e.g. unreadable headers) is logged as a 
 
 After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStations`):
 5. **Within-country dedup**: same exact name, same source, within ~200 m.
-6. **Cross-border dedup**: ~1 km spatial grid, different sources, within ~500 m, token Jaccard similarity ≥ 0.4. The station with more connections becomes canonical, and every map is remapped. A canonical station can itself be merged later (A→B, then B→C); `mergeStations` first resolves such chains so every alias maps straight to the last station.
-7. `GtfsCacheStore` saves stations and trips (`CachedTrip`) to the GTFS cache file. On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops` and `stopTrips` from the trips.
+6. **Cross-border dedup**, on pairs of stations of different sources within ~500 m (found via a ~1 km `StationGrid`), in two passes:
+   - **by name**: token Jaccard similarity ≥ 0.4;
+   - **by shared trains** (`SharedTrainMatcher`): at least 3 trains leave both at the same clock minute towards the same next station (or arrive from the same previous one), neighbours compared after the merges so far. Catches translated names ("Aachen, West Bf" / "Aix-la-Chapelle Ouest"). Repeated until a pass merges nothing.
+
+   In both, the station with more connections becomes canonical.
+7. **Foreign stops** (`ForeignStopSnapper`): each station is placed in a country (`CountryLocator`). A source's home country is where more than half of its located stations lie. A stop outside its source's home country is merged into the nearest station within 1 km of a source at home in the stop's country, which stays canonical. Every map is remapped. A canonical station can itself be merged later (A→B, then B→C); `mergeStations` first resolves such chains so every alias maps straight to the last station.
+8. `GtfsCacheStore` saves stations and trips (`CachedTrip`) to the GTFS cache file. On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops` and `stopTrips` from the trips.
 
 `StationSearchIndex.rebuild` then indexes the station names. `TransitGraph` builds lazy indexes on first access: `timetables` (trip → `TripTimetable`), `departuresByStop` (stop → departures by time) and `connectionByTrip` (edge → tripId → Connection).
 

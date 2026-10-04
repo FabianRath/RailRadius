@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -113,6 +114,44 @@ class GtfsDataServiceTest {
         assertThat(graph.getStopsOnTrip("gamma:V2")).containsExactly("gamma:G3", "delta:D1");
         assertThat(graph.getConnectionByTrip("gamma:G3", "delta:D1", "gamma:V2")).isNotNull();
         assertThat(graph.getNeighbors("gamma:G3")).containsExactly("delta:D1");
+    }
+
+    // B22
+    @Test
+    void crossFeedStationsSharingTrainsAreMergedWhateverTheirNames(@TempDir Path dir) throws Exception {
+        // "Gamma Border" and "Delta Grens" are ~330 m apart; three trains leave both at the same minute for Twin Halt
+        TransitGraph graph = GtfsTestFixtures.load(dir, "gamma", "delta");
+
+        assertThat(Stream.of("gamma:G5", "delta:D4").filter(id -> graph.getStation(id) != null)).hasSize(1);
+        assertThat(graph.getStopsOnTrip("gamma:V3").getFirst()).isEqualTo(graph.getStopsOnTrip("delta:W3").getFirst());
+    }
+
+    @Test
+    void crossFeedStationsWithoutSharedTrainsOrSimilarNamesStaySeparate(@TempDir Path dir) throws Exception {
+        // "Gamma Sidings" and "Delta Yard" are ~330 m apart; their trains to Twin Halt leave 5 min apart
+        TransitGraph graph = GtfsTestFixtures.load(dir, "gamma", "delta");
+
+        assertThat(graph.getStation("gamma:G6")).isNotNull();
+        assertThat(graph.getStation("delta:D5")).isNotNull();
+    }
+
+    // B22
+    @Test
+    void stopsAbroadAreMergedIntoTheNearestLocalStation(@TempDir Path dir) throws Exception {
+        // kappa's K3 "Lambda Gate" lies in lambda's country, ~700 m from lambda's L1 "Lambdastadt Ost"
+        TransitGraph graph = GtfsTestFixtures.load(dir, "kappa", "lambda");
+
+        assertThat(graph.getStation("kappa:K3")).isNull();
+        assertThat(graph.getStopsOnTrip("kappa:KT1")).containsExactly("kappa:K1", "kappa:K2", "lambda:L1");
+    }
+
+    @Test
+    void stopsAbroadWithoutALocalStationNearbyStay(@TempDir Path dir) throws Exception {
+        // kappa's K4 "Lambda Field" lies in lambda's country, but ~13 km from any lambda station
+        TransitGraph graph = GtfsTestFixtures.load(dir, "kappa", "lambda");
+
+        assertThat(graph.getStation("kappa:K4")).isNotNull();
+        assertThat(graph.getStation("kappa:K2")).as("stop at home").isNotNull();
     }
 
     @Test
