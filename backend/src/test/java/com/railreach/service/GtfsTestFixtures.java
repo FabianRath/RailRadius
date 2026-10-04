@@ -21,19 +21,29 @@ final class GtfsTestFixtures {
 
     private GtfsTestFixtures() {}
 
+    private static final int RAW_CACHE_MAX_ENTRIES = 100;
+
     static TransitGraph load(Path tempDir, String... feedFolders) throws IOException {
+        TransitGraph graph = new TransitGraph();
+        dataService(tempDir, graph, reachabilityCache(graph), new StationSearchIndex(graph), feedFolders)
+                .loadFromFiles();
+        return graph;
+    }
+
+    /** A GtfsDataService that loads the given feeds into the graph; nothing is loaded yet. */
+    static GtfsDataService dataService(Path tempDir, TransitGraph graph, ReachabilityCache reachabilityCache,
+                                       StationSearchIndex stationSearchIndex, String... feedFolders)
+            throws IOException {
         Path gtfsDir = Files.createDirectories(tempDir.resolve("gtfs"));
         for (String folder : feedFolders) {
             String source = folder.split("-")[0];
             zipFolder(resource("gtfs-mini/" + folder), gtfsDir.resolve("gtfs_" + source + ".zip"));
         }
 
-        TransitGraph graph = new TransitGraph();
         GtfsDataService service = new GtfsDataService(graph, new GtfsFeedLoader(), new StationDeduplicator(),
-                cacheStore(tempDir));
+                cacheStore(tempDir), reachabilityCache, stationSearchIndex);
         ReflectionTestUtils.setField(service, "gtfsDirectory", gtfsDir.toString());
-        service.loadFromFiles();
-        return graph;
+        return service;
     }
 
     /** The cache store that {@link #load} writes to. */
@@ -53,8 +63,11 @@ final class GtfsTestFixtures {
     }
 
     static ReachabilityCache reachabilityCache(TransitGraph graph) {
-        ReachabilitySearch search = new ReachabilitySearch(graph);
-        return new ReachabilityCache(search, new ConcurrentMapCacheManager());
+        return reachabilityCache(graph, RAW_CACHE_MAX_ENTRIES);
+    }
+
+    static ReachabilityCache reachabilityCache(TransitGraph graph, int rawMaxEntries) {
+        return new ReachabilityCache(new ReachabilitySearch(graph), new ConcurrentMapCacheManager(), rawMaxEntries);
     }
 
     private static Path resource(String name) {

@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -97,17 +96,6 @@ public class TransitGraph {
                 "graphNodes", neighbors.size(),
                 "totalEdges", edgeCount()
         );
-    }
-
-    /** Stations whose name contains the query and that have outgoing edges, best connected first. */
-    public List<Station> searchStations(String query, int limit) {
-        String q = query.toLowerCase();
-        return stations.values().stream()
-                .filter(s -> s.getName() != null && s.getName().toLowerCase().contains(q))
-                .filter(s -> !getNeighbors(s.getId()).isEmpty())
-                .sorted(Comparator.comparingInt((Station s) -> getNeighbors(s.getId()).size()).reversed())
-                .limit(limit)
-                .toList();
     }
 
     int stationCount() {

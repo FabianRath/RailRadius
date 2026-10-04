@@ -1,13 +1,11 @@
 package com.railreach.service;
 
-import com.railreach.model.Station;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -66,14 +64,6 @@ class GtfsDataServiceTest {
         assertThat(conn.getDepartureTimeSeconds()).isEqualTo(8 * 3600);
         assertThat(conn.getArrivalTimeSeconds()).isEqualTo(8 * 3600 + 30 * 60);
         assertThat(conn.getRouteName()).isEqualTo("RE1");
-    }
-
-    @Test
-    void searchSkipsStationsWithoutOutgoingEdges() {
-        List<Station> results = gtfs.searchStations("alpha", 10);
-        assertThat(results).extracting(Station::getId)
-                .contains("alpha:A1", "alpha:A2", "alpha:A4")
-                .doesNotContain("alpha:A9");
     }
 
     @Test

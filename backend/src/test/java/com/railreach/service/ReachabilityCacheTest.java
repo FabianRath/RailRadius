@@ -40,6 +40,32 @@ class ReachabilityCacheTest {
         }
     }
 
+    // B9
+    @Test
+    void storedResultsBeyondTheMaximumAreEvicted() {
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs, 1);
+
+        cache.getOrCompute(key(0));
+        cache.getOrCompute(key(1));
+
+        assertThat(cache.getStats()).containsEntry("rawPathCacheEntries", 1L);
+    }
+
+    // B9
+    @Test
+    void reloadingGtfsDropsStoredResults(@TempDir Path dir) throws Exception {
+        TransitGraph graph = new TransitGraph();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(graph);
+        GtfsDataService dataService = GtfsTestFixtures.dataService(dir, graph, cache, new StationSearchIndex(graph),
+                "alpha", "beta");
+        dataService.loadFromFiles();
+        cache.getOrCompute(key(1));
+
+        dataService.loadFromFiles();
+
+        assertThat(cache.contains(key(1))).isFalse();
+    }
+
     private static ReachabilityCache.SearchKey key(int transfers) {
         return new ReachabilityCache.SearchKey(START_ID, transfers, 0, 180);
     }

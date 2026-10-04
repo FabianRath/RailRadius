@@ -195,7 +195,7 @@ public class AdminController {
     @GetMapping("/debug/stations")
     public ResponseEntity<Map<String, Object>> debugStations() {
         List<Map<String, Object>> stations = transitGraph.getAllStations().values().stream()
-            // Same criteria as searchStations(): must have coordinates and at least one outgoing edge
+            // Like StationSearchIndex, only stations with an outgoing edge; the overlay also needs coordinates
             .filter(s -> s.getLatitude() != null && s.getLongitude() != null)
             .filter(s -> {
                 Set<String> neighbors = transitGraph.getNeighbors(s.getId());

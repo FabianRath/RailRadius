@@ -35,6 +35,9 @@ railreach:
     # When a user queries station X with N transfers, pre-warm N+1 up to this max in the background
     predictive-enabled: true
     predictive-max-transfers: 5
+    # Raw BFS results kept for cache hits and incremental searches; Caffeine evicts rarely used ones first.
+    # One full-data result maps every reachable station to its path, so keep this small
+    raw-max-entries: 30
   
   # Hub routing configuration
   hub:
