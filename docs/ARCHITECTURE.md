@@ -48,7 +48,7 @@ RailReach/
     ├── src/test/java/com/railreach/           # service/ (GtfsDataService, Reachability*, GtfsTestFixtures), util/, config/ tests
     ├── src/test/resources/gtfs-mini/          # hand-written fixture feeds (see its README)
     └── data/                                  # GITIGNORED
-        ├── gtfs/            # gtfs_<country>.zip, broken/, list.txt (download sources; versioned copy: docs/gtfs-sources.txt), maps
+        ├── gtfs/            # gtfs_<country>.zip, broken/, list.txt (download sources; versioned copy: docs/gtfs-sources.md), maps
         ├── gtfs-dev/        # 3 small feeds for the dev profile
         └── gtfs-cache.json  # processed graph: stations + trips (generated)
 ```
