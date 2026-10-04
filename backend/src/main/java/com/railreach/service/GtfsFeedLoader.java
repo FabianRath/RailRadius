@@ -38,6 +38,8 @@ public class GtfsFeedLoader {
     // sleeper, regional. Trams (0), subways (1), buses (3, 700+) and urban railways (400) are left out.
     private static final int EXTENDED_RAIL_TYPE_MIN = 100;
     private static final int EXTENDED_RAIL_TYPE_MAX = 106;
+    // S-Bahn: thousands of stations, mostly in Germany, are served by nothing else (B6)
+    private static final int SUBURBAN_RAILWAY_TYPE = 109;
 
     // Some feeds split one platform into separate arrival and departure stops
     private static final List<Pattern> ARRIVAL_DEPARTURE_PATTERNS = List.of(
@@ -155,7 +157,7 @@ public class GtfsFeedLoader {
     }
 
     private static boolean isRail(int routeType) {
-        return routeType == GTFS_ROUTE_TYPE_RAIL
+        return routeType == GTFS_ROUTE_TYPE_RAIL || routeType == SUBURBAN_RAILWAY_TYPE
                 || (routeType >= EXTENDED_RAIL_TYPE_MIN && routeType <= EXTENDED_RAIL_TYPE_MAX);
     }
 

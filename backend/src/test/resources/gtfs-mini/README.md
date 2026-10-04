@@ -15,6 +15,7 @@ Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the 
   - V2 R7: G3 10:00 → G2 10:30
   - W1 IC9: D1 08:00 → D2 08:40; W2 IC9: D1 09:00 → D3 09:40
 - **alpha-fast-train**: alpha plus T6 NJ A1 21:00 → A3 21:30. The faster train reaches the border later and misses U1 (B2 test).
-- **epsilon** (loaded alone): E1 Epsilon Start, E2 Epsilon Fork, E3 Epsilon Junction, E4 Epsilon East, E5 Epsilon Detour, E6 Epsilon End; one route EX
+- **epsilon** (loaded alone): E1 Epsilon Start, E2 Epsilon Fork, E3 Epsilon Junction, E4 Epsilon East, E5 Epsilon Detour, E6 Epsilon End, E7 Epsilon Suburb; route EX (type 2) and S-Bahn route S7 (type 109)
   - Y1: E1 08:00 → E3 08:40; Y2: E1 08:50 → E3 08:58; Y3: E3 09:00 → E4 09:30. The faster Y2 leaves only 2 min to catch Y3, the slower Y1 20 min (B3 test)
   - X1: E1 10:00 → E2 10:30; X2: E2 10:40 → E5 11:00; X3: E5 11:10 → E6 11:30; X4: E2 22:00 → E6 22:30. E6 takes 1 transfer with an 11.5 h wait, or 2 transfers in 90 min (B4 test)
+  - S1 S7: E4 09:40 → E7 09:50. E7 is served only by the S-Bahn (B6 test)
