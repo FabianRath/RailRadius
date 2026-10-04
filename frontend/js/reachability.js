@@ -80,21 +80,21 @@ function streamResults(stationId, query, key) {
     reachableCount.textContent = '…';
     const stream = openReachabilityStream(params);
     activeStream = stream;
-    let boundsSet = false;
 
     stream.addEventListener('stations', e => {
         const batch = JSON.parse(e.data);
         addResults(batch);
         loadingCount.textContent = `${results.size.toLocaleString()} stations found`;
-        // Fit once, to the first batch, so the view doesn't jump around while results stream in
-        if (!boundsSet) boundsSet = fitToResults(batch);
     });
 
     stream.addEventListener('done', e => {
         const info = JSON.parse(e.data);
         finishStream();
         reachableCount.textContent = info.total.toLocaleString();
-        localResultsCache.set(key, [...results.values()]);
+        const all = [...results.values()];
+        localResultsCache.set(key, all);
+        // Fit once at the end: batches only arrive after the search finished, so waiting costs little
+        fitToResults(all);
         refreshCoverage();
         console.log('Stream done:', info.total, 'stations in', `${info.calculationTimeMs}ms`,
             info.fromCache ? '(from server cache)' : '');
@@ -115,13 +115,11 @@ function addResults(stations) {
     reachableCount.textContent = results.size.toLocaleString();
 }
 
-/** Returns whether there was anything to fit to. */
 function fitToResults(stations) {
     const points = stations
         .filter(s => hasCoordinates(s.latitude, s.longitude))
         .map(s => [s.longitude, s.latitude]);
     fitToPoints(points);
-    return points.length > 0;
 }
 
 function finishStream() {
