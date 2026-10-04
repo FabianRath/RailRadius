@@ -60,6 +60,26 @@ class StationSearchIndexTest {
         assertThat(ids(loadedIndex.search("central", 10))).containsExactly("alpha:A1");
     }
 
+    @Test
+    void searchIgnoresAccentsAndFindsGermanSpellingAndTranslatedCityNames(@TempDir Path dir) throws Exception {
+        StationSearchIndex omegaIndex = new StationSearchIndex(GtfsTestFixtures.load(dir, "omega"));
+        omegaIndex.rebuild();
+
+        assertThat(ids(omegaIndex.search("koln", 10))).containsExactly("omega:O1");
+        assertThat(ids(omegaIndex.search("Koeln Hbf", 10))).containsExactly("omega:O1");
+        assertThat(ids(omegaIndex.search("cologne", 10))).containsExactly("omega:O1");
+        assertThat(ids(omegaIndex.search("lodz", 10))).containsExactly("omega:O3");
+        assertThat(omegaIndex.search("vienna", 10)).isEmpty();
+    }
+
+    @Test
+    void queryDoesNotMatchAcrossTwoNameVariants(@TempDir Path dir) throws Exception {
+        StationSearchIndex omegaIndex = new StationSearchIndex(GtfsTestFixtures.load(dir, "omega"));
+        omegaIndex.rebuild();
+
+        assertThat(omegaIndex.search("hbf koeln", 10)).isEmpty();
+    }
+
     private static List<String> ids(List<Station> stations) {
         return stations.stream().map(Station::getId).toList();
     }

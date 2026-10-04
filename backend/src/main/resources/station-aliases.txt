@@ -1,0 +1,49 @@
+# Translated city names for station search (StationNameVariants). Station names stay in the local language;
+# these let "cologne" or "mailand" find "Köln Hbf" or "Milano Centrale".
+# Format: local;translation[;translation...]. The local name must match the word used in GTFS station names.
+# Accents are optional: names are folded before matching, so only list spellings that differ after that.
+köln;cologne
+münchen;munich
+nürnberg;nuremberg
+hannover;hanover
+wien;vienna
+praha;prague;prag
+plzeň;pilsen
+brno;brünn
+bratislava;pressburg
+warszawa;warsaw;warschau
+kraków;cracow;krakau
+wrocław;breslau
+gdańsk;danzig
+poznań;posen
+szczecin;stettin
+ljubljana;laibach
+zagreb;agram
+beograd;belgrade;belgrad
+bucurești;bucharest;bukarest
+milano;milan;mailand
+venezia;venice;venedig
+firenze;florence;florenz
+roma;rome;rom
+napoli;naples;neapel
+torino;turin
+genova;genoa;genua
+padova;padua
+bolzano;bozen
+trento;trient
+genève;geneva;genf
+luzern;lucerne
+nice;nizza
+strasbourg;strassburg
+luxembourg;luxemburg
+bruxelles;brussels;brüssel
+brussel;brussels;brüssel
+antwerpen;antwerp
+gent;ghent
+brugge;bruges;brügge
+liège;lüttich
+den haag;the hague
+københavn;copenhagen;kopenhagen
+göteborg;gothenburg
+lisboa;lisbon;lissabon
+sevilla;seville

@@ -25,3 +25,5 @@ Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the 
   - Y1: E1 08:00 → E3 08:40; Y2: E1 08:50 → E3 08:58; Y3: E3 09:00 → E4 09:30. The faster Y2 leaves only 2 min to catch Y3, the slower Y1 20 min (B3 test)
   - X1: E1 10:00 → E2 10:30; X2: E2 10:40 → E5 11:00; X3: E5 11:10 → E6 11:30; X4: E2 22:00 → E6 22:30. E6 takes 1 transfer with an 11.5 h wait, or 2 transfers in 90 min (B4 test)
   - S1 S7: E4 09:40 → E7 09:50. E7 is served only by the S-Bahn (B6 test)
+- **omega** (loaded alone, by the station search tests): O1 Köln Hbf (umlaut and a city in `station-aliases.txt`), O2 Wiener Neustadt Hbf ("wien" only inside a longer word, so no "vienna" variant), O3 Łódź Fabryczna (letters NFD does not split)
+  - OT1 RE8: O1 08:00 → O2 08:30 → O3 09:00; OT2 RE8: O3 10:00 → O1 11:00 (every station has an outgoing edge, so all are searchable)
