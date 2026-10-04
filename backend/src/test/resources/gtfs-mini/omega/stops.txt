@@ -1,0 +1,4 @@
+stop_id,stop_name,stop_lat,stop_lon,parent_station
+O1,Köln Hbf,60.0000,40.0000,
+O2,Wiener Neustadt Hbf,60.5000,40.5000,
+O3,Łódź Fabryczna,61.0000,41.0000,

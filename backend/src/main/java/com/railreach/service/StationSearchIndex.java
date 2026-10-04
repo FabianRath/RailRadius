@@ -10,14 +10,13 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.IntStream;
 
 /**
- * Substring search over station names. A trigram index finds the candidates, so a search does not scan
- * every station. Must be rebuilt after the graph changes ({@link GtfsDataService} does so after each load).
+ * Substring search over station names and their variants ({@link StationNameVariants}). A trigram index finds the
+ * candidates, so a search does not scan every station. Must be rebuilt after the graph changes ({@link GtfsDataService} does so after each load).
  */
 @Component
 @Slf4j
@@ -25,13 +24,16 @@ import java.util.stream.IntStream;
 public class StationSearchIndex {
 
     private static final int GRAM_LENGTH = 3;
+    // Folded queries contain no newline, so a match never spans two variants.
+    private static final String VARIANT_SEPARATOR = "\n";
 
     private final TransitGraph graph;
+    private final StationNameVariants nameVariants = new StationNameVariants();
 
     private volatile Index index = new Index(List.of(), List.of(), Map.of());
 
     /**
-     * Searchable stations best connected first, their normalized names at the same positions, and per trigram
+     * Searchable stations best connected first, their joined name variants at the same positions, and per trigram
      * the ascending positions of the names that contain it. Ascending positions keep candidates in rank order.
      */
     private record Index(List<Station> ranked, List<String> names, Map<String, int[]> positionsByGram) {}
@@ -42,7 +44,9 @@ public class StationSearchIndex {
                 .sorted(Comparator.comparingInt((Station s) -> graph.getNeighbors(s.getId()).size()).reversed()
                         .thenComparing(Station::getId))
                 .toList();
-        List<String> names = ranked.stream().map(s -> normalize(s.getName())).toList();
+        List<String> names = ranked.stream()
+                .map(s -> String.join(VARIANT_SEPARATOR, nameVariants.variants(s.getName())))
+                .toList();
 
         Map<String, List<Integer>> positions = new HashMap<>();
         for (int i = 0; i < names.size(); i++) {
@@ -58,10 +62,10 @@ public class StationSearchIndex {
         log.info("Station search index built: {} stations, {} trigrams", ranked.size(), positionsByGram.size());
     }
 
-    /** Stations whose name contains the query and that have outgoing edges, best connected first. */
+    /** Stations with a name variant that contains the query and that have outgoing edges, best connected first. */
     public List<Station> search(String query, int limit) {
         Index current = index;
-        String q = normalize(query);
+        String q = StationNameVariants.fold(query);
         return candidates(current, q)
                 .filter(position -> current.names().get(position).contains(q))
                 .limit(limit)
@@ -87,9 +91,5 @@ public class StationSearchIndex {
             grams.add(text.substring(i, i + GRAM_LENGTH));
         }
         return grams;
-    }
-
-    private static String normalize(String text) {
-        return text.toLowerCase(Locale.ROOT);
     }
 }
