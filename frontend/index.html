@@ -101,6 +101,16 @@
                     </div>
                 </div>
             </div>
+
+            <div class="dev-footer">
+                <button type="button" class="dev-toggle" id="devToggle">Dev login</button>
+                <form class="dev-login" id="devLoginForm" hidden>
+                    <input type="password" class="search-input" id="devToken" placeholder="Admin token"
+                           aria-label="Admin token" autocomplete="current-password" required>
+                    <button type="submit" class="dev-toggle">Log in</button>
+                </form>
+                <div class="dev-error" id="devError" role="alert" hidden></div>
+            </div>
         </div>
 
         <div id="map"></div>

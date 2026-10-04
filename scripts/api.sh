@@ -3,6 +3,8 @@
 # Usage: scripts/api.sh <command> [args]     e.g. scripts/api.sh search wien
 set -euo pipefail
 BASE="${RAILREACH_URL:-http://localhost:8080}"
+# Admin calls send RAILREACH_ADMIN_TOKEN; "dev" matches the dev profile's default
+admin() { curl -s -H "X-Admin-Token: ${RAILREACH_ADMIN_TOKEN:-dev}" "$@"; }
 
 case "${1:-help}" in
   health)        curl -s "$BASE/api/health" ;;
@@ -11,15 +13,15 @@ case "${1:-help}" in
   station)       curl -s "$BASE/api/stations/${2:?stationId}" ;;
   # reach <stationId> <maxTransfers> [minTransferMin] [maxTransferMin] -> prints the "done" event only
   reach)         curl -sN "$BASE/api/reachability/stream?stationId=${2:?stationId}&maxTransfers=${3:?maxTransfers}&minTransferMinutes=${4:-0}&maxTransferMinutes=${5:-180}" | grep -A1 '^event:done' ;;
-  cache-stats)   curl -s "$BASE/api/admin/cache-stats" ;;
-  gtfs-stats)    curl -s "$BASE/api/admin/gtfs-stats" ;;
+  cache-stats)   admin "$BASE/api/admin/cache-stats" ;;
+  gtfs-stats)    admin "$BASE/api/admin/gtfs-stats" ;;
   # Slow / destructive: full GTFS reparse (minutes), cache deletion
-  reload-gtfs)   curl -s -X POST "$BASE/api/admin/reload-gtfs" ;;
-  clear-gtfs)    curl -s -X DELETE "$BASE/api/admin/gtfs-cache" ;;
-  # Frontend debug overlay (shows all stations, picked up within ~2 s)
-  debug-on)      curl -s -X POST "$BASE/api/admin/debug/trigger" ;;
-  debug-off)     curl -s -X DELETE "$BASE/api/admin/debug/trigger" ;;
-  debug-status)  curl -s "$BASE/api/admin/debug/status" ;;
+  reload-gtfs)   admin -X POST "$BASE/api/admin/reload-gtfs" ;;
+  clear-gtfs)    admin -X DELETE "$BASE/api/admin/gtfs-cache" ;;
+  # Frontend debug overlay (shows all stations, picked up within ~2 s by a browser logged in as dev)
+  debug-on)      admin -X POST "$BASE/api/admin/debug/trigger" ;;
+  debug-off)     admin -X DELETE "$BASE/api/admin/debug/trigger" ;;
+  debug-status)  admin "$BASE/api/admin/debug/status" ;;
   *) sed -n '2,3p' "$0"; grep -oE '^  [a-z-]+\)' "$0" | tr -d ') ' | paste -sd' ' ;;
 esac
 echo

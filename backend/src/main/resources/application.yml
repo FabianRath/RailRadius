@@ -41,6 +41,11 @@ railreach:
     # One full-data result maps every reachable station to its paths, so keep this small
     raw-max-entries: 30
 
+  admin:
+    # Shared secret for /api/admin/** (sent as X-Admin-Token). Empty = admin API disabled (403), so a deployment
+    # without RAILREACH_ADMIN_TOKEN never exposes it. Use a long random value, e.g. 32+ random bytes in hex
+    token: ${RAILREACH_ADMIN_TOKEN:}
+
 logging:
   level:
     root: INFO
