@@ -207,7 +207,7 @@ public class GtfsFeedLoader {
             if (stop.lat() == 0.0 && stop.lon() == 0.0) continue;
             validStops.put(stop.stopId(), stop);
         }
-        Map<String, String> rawToRepresentative = mergeSameNameStops(validStops);
+        Map<String, String> rawToRepresentative = mergeStops(validStops);
 
         Map<String, String> rawToCanonical = new HashMap<>();
         for (GtfsStop stop : validStops.values()) {
@@ -228,6 +228,29 @@ public class GtfsFeedLoader {
                 validStops.size(), rawToRepresentative.values().stream().distinct().count(),
                 stops.size() - validStops.size());
         return rawToCanonical;
+    }
+
+    /**
+     * raw stop ID -> raw ID of its representative. A stop whose {@code parent_station} has coordinates joins the
+     * parent, however far apart they are (B23); the remaining stops are merged by name and distance.
+     */
+    private Map<String, String> mergeStops(Map<String, GtfsStop> validStops) {
+        Map<String, String> rawToParent = new HashMap<>();
+        Map<String, GtfsStop> topLevelStops = new LinkedHashMap<>();
+        for (GtfsStop stop : validStops.values()) {
+            if (stop.parentStation() != null && validStops.containsKey(stop.parentStation())) {
+                rawToParent.put(stop.stopId(), stop.parentStation());
+            } else {
+                topLevelStops.put(stop.stopId(), stop);
+            }
+        }
+        Map<String, String> topLevelToRepresentative = mergeSameNameStops(topLevelStops);
+        Map<String, String> rawToRepresentative = new HashMap<>();
+        for (String stopId : validStops.keySet()) {
+            String topLevelId = rawToParent.getOrDefault(stopId, stopId);
+            rawToRepresentative.put(stopId, topLevelToRepresentative.getOrDefault(topLevelId, topLevelId));
+        }
+        return rawToRepresentative;
     }
 
     /** raw stop ID -> raw ID of the first (by ID) nearby stop with the same name. */
