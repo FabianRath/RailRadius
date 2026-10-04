@@ -12,6 +12,8 @@ import java.util.zip.ZipFile;
 /** Reads one CSV file of a GTFS zip row by row. A missing file reads as empty. */
 final class GtfsCsvReader implements AutoCloseable {
 
+    private static final char BYTE_ORDER_MARK = '\uFEFF';
+
     private final BufferedReader reader;
     private final String[] headers;
 
@@ -26,7 +28,13 @@ final class GtfsCsvReader implements AutoCloseable {
         BufferedReader reader = new BufferedReader(
                 new InputStreamReader(zipFile.getInputStream(entry), StandardCharsets.UTF_8));
         String headerLine = reader.readLine();
-        return new GtfsCsvReader(reader, headerLine == null ? new String[0] : parseLine(headerLine));
+        if (headerLine == null) return new GtfsCsvReader(reader, new String[0]);
+        return new GtfsCsvReader(reader, parseLine(stripByteOrderMark(headerLine)));
+    }
+
+    // Java's UTF-8 decoder keeps a leading BOM, which would make the first column name unmatchable
+    private static String stripByteOrderMark(String line) {
+        return !line.isEmpty() && line.charAt(0) == BYTE_ORDER_MARK ? line.substring(1) : line;
     }
 
     /** Index of the named column, or -1 if the file has no such column. */

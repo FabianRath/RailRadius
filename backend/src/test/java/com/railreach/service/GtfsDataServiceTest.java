@@ -28,6 +28,13 @@ class GtfsDataServiceTest {
     }
 
     @Test
+    void feedFilesStartingWithAByteOrderMarkAreParsed() {
+        // every beta file starts with a UTF-8 BOM
+        assertThat(gtfs.getNeighbors("beta:B1")).containsExactly("beta:B2");
+        assertThat(gtfs.getStopsOnTrip("beta:U1")).containsExactly("beta:B1", "beta:B2");
+    }
+
+    @Test
     void nonRailRoutesProduceNoEdges() {
         assertThat(gtfs.getNeighbors("alpha:A1")).doesNotContain("alpha:A9");
         assertThat(gtfs.getNeighbors("alpha:A9")).isEmpty();
