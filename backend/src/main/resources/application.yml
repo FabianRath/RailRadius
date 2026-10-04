@@ -25,7 +25,9 @@ railreach:
     auto-load-from-files: false
     # Where to store processed GTFS data (stations, graph, connections)
     cache-file: data/gtfs-cache.json
-  
+    # stop_times.txt is handed to the graph in batches of this many trips, so big feeds don't hold all of it in memory
+    trip-batch-size: 100000
+
   algorithm:
     max-transfer-time-minutes: 180
     cache-size: 10000

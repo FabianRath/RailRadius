@@ -22,11 +22,17 @@ final class GtfsTestFixtures {
     private GtfsTestFixtures() {}
 
     private static final int RAW_CACHE_MAX_ENTRIES = 100;
+    private static final int TRIP_BATCH_SIZE = 100_000;
 
     static TransitGraph load(Path tempDir, String... feedFolders) throws IOException {
+        return load(tempDir, TRIP_BATCH_SIZE, feedFolders);
+    }
+
+    /** Like {@link #load(Path, String...)}, with stop_times handed to the graph in batches of this many trips. */
+    static TransitGraph load(Path tempDir, int tripBatchSize, String... feedFolders) throws IOException {
         TransitGraph graph = new TransitGraph();
-        dataService(tempDir, graph, reachabilityCache(graph), new StationSearchIndex(graph), feedFolders)
-                .loadFromFiles();
+        dataService(tempDir, graph, reachabilityCache(graph), new StationSearchIndex(graph), tripBatchSize,
+                feedFolders).loadFromFiles();
         return graph;
     }
 
@@ -34,13 +40,21 @@ final class GtfsTestFixtures {
     static GtfsDataService dataService(Path tempDir, TransitGraph graph, ReachabilityCache reachabilityCache,
                                        StationSearchIndex stationSearchIndex, String... feedFolders)
             throws IOException {
+        return dataService(tempDir, graph, reachabilityCache, stationSearchIndex, TRIP_BATCH_SIZE, feedFolders);
+    }
+
+    private static GtfsDataService dataService(Path tempDir, TransitGraph graph, ReachabilityCache reachabilityCache,
+                                               StationSearchIndex stationSearchIndex, int tripBatchSize,
+                                               String... feedFolders) throws IOException {
         Path gtfsDir = Files.createDirectories(tempDir.resolve("gtfs"));
         for (String folder : feedFolders) {
             String source = folder.split("-")[0];
             zipFolder(resource("gtfs-mini/" + folder), gtfsDir.resolve("gtfs_" + source + ".zip"));
         }
 
-        GtfsDataService service = new GtfsDataService(graph, new GtfsFeedLoader(), new StationDeduplicator(),
+        GtfsFeedLoader feedLoader = new GtfsFeedLoader();
+        ReflectionTestUtils.setField(feedLoader, "tripBatchSize", tripBatchSize);
+        GtfsDataService service = new GtfsDataService(graph, feedLoader, new StationDeduplicator(),
                 cacheStore(tempDir), reachabilityCache, stationSearchIndex);
         ReflectionTestUtils.setField(service, "gtfsDirectory", gtfsDir.toString());
         return service;

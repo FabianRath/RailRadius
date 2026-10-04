@@ -35,6 +35,33 @@ class GtfsDataServiceTest {
     }
 
     @Test
+    void tripsStayWholeWhenStopTimesAreReadInSmallBatches(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, 1, "alpha");
+
+        assertThat(graph.getStopsOnTrip("alpha:T1")).containsExactly("alpha:A1", "alpha:A2", "alpha:A3");
+        assertThat(graph.getConnectionByTrip("alpha:A2", "alpha:A3", "alpha:T1")).isNotNull();
+    }
+
+    @Test
+    void interleavedStopTimesRowsSwitchOffBatching(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, 2, "beta");
+
+        assertThat(graph.getStopsOnTrip("beta:U1")).containsExactly("beta:B1", "beta:B2");
+        assertThat(graph.getStopsOnTrip("beta:U2")).containsExactly("beta:B1", "beta:B2");
+        assertThat(graph.getConnections("beta:B1", "beta:B2")).hasSize(3);
+    }
+
+    @Test
+    void rowsOfATripAlreadyHandedToTheGraphAreDropped(@TempDir Path dir) throws Exception {
+        // U1 is flushed with one stop before its second row turns up, so it never becomes a trip
+        TransitGraph graph = GtfsTestFixtures.load(dir, 1, "beta");
+
+        assertThat(graph.getStopsOnTrip("beta:U1")).isEmpty();
+        assertThat(graph.getStopsOnTrip("beta:U2")).containsExactly("beta:B1", "beta:B2");
+        assertThat(graph.getConnectionByTrip("beta:B1", "beta:B2", "beta:U1")).isNull();
+    }
+
+    @Test
     void nonRailRoutesProduceNoEdges() {
         assertThat(gtfs.getNeighbors("alpha:A1")).doesNotContain("alpha:A9");
         assertThat(gtfs.getNeighbors("alpha:A9")).isEmpty();
