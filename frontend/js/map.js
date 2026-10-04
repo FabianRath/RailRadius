@@ -131,11 +131,28 @@ export function fitToPoints(points) {
 export function bindPopup(layerId, buildHtml) {
     map.on('click', layerId, e => {
         const feature = e.features[0];
-        new Popup({ maxWidth: POPUP_MAX_WIDTH, className: 'station-popup' })
+        const popup = new Popup({ maxWidth: POPUP_MAX_WIDTH, className: 'station-popup' })
             .setLngLat(feature.geometry.coordinates)
             .setHTML(buildHtml(feature.properties))
             .addTo(map);
+        snapToWholePixels(popup.getElement());
     });
     map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
+}
+
+/**
+ * MapLibre places a popup with translate(-50%, -100%), so a fractional or odd size puts it between pixels and its
+ * text renders soft. Growing the content to an even whole-pixel size keeps every anchor on the pixel grid.
+ */
+function snapToWholePixels(popupElement) {
+    const content = popupElement.querySelector('.maplibregl-popup-content');
+    const outer = popupElement.getBoundingClientRect();
+    const inner = content.getBoundingClientRect();
+    content.style.width = `${inner.width + roundUpToEven(outer.width) - outer.width}px`;
+    content.style.height = `${inner.height + roundUpToEven(outer.height) - outer.height}px`;
+}
+
+function roundUpToEven(px) {
+    return Math.ceil(px / 2) * 2;
 }
