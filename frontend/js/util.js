@@ -26,6 +26,10 @@ export function showStatus(type, message) {
     statusMessage.hidden = false;
 }
 
+export function clearStatus() {
+    document.getElementById('statusMessage').hidden = true;
+}
+
 export function lerpColor(hexA, hexB, t) {
     const parse = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
     const a = parse(hexA);
