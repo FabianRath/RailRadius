@@ -454,6 +454,28 @@ input[type="range"]::-moz-range-thumb {
     opacity: 1;
 }
 
+/* ── Status ── */
+.status {
+    margin-bottom: 24px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.status-warning {
+    border-color: var(--warning);
+    color: var(--warning);
+}
+
+.status-error {
+    border-color: var(--danger);
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
 /* ── Results ── */
 .stats {
     display: grid;

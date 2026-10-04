@@ -23,9 +23,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 - [ ] **B15** The cross-border dedup `MERGED` log compares station names with stop IDs (`s1.getName().equals(alias)` in `StationDeduplicator.tryCrossBorderMerge`). That is always false, so both the alias and the canonical stop are logged with s2's name. Log only; the merge itself is unaffected.
 - [ ] **B11** `searchStations` is a linear scan per request.
 
-## Bugs (frontend)
-- [ ] **B14** No status or error ever reaches the user: `showStatus` only logs to the console. Repro: stop the backend and click Calculate. The map clears, the counter stays at "…", and nothing says the stream failed.
-
 ## Features / UX
 - [ ] **F1** Rework station naming: map lat/long to OpenStreetMap station names and use that name for grouping as well.
 - [ ] **F3** Max journey time has to be entered repeatedly (frontend).

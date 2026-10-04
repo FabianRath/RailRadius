@@ -15,14 +15,15 @@ export function cssVar(name) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+const STATUS_LOGGERS = { error: console.error, warning: console.warn, info: console.log };
+
+/** type is 'info', 'warning' or 'error'; the message replaces the previous one in the sidebar. */
 export function showStatus(type, message) {
-    if (type === 'error') {
-        console.error('Status:', message);
-    } else if (type === 'warning') {
-        console.warn('Status:', message);
-    } else {
-        console.log('Status:', message);
-    }
+    STATUS_LOGGERS[type]('Status:', message);
+    const statusMessage = document.getElementById('statusMessage');
+    statusMessage.textContent = message;
+    statusMessage.className = `status status-${type}`;
+    statusMessage.hidden = false;
 }
 
 export function lerpColor(hexA, hexB, t) {
