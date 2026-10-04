@@ -7,6 +7,7 @@ import { initQueryForm, showQueryForm } from './query-form.js';
 import { getStation, initReachability, refreshCoverage } from './reachability.js';
 import { initDebugOverlay, startDebugPolling, stopDebugPolling } from './debug.js';
 import { initDevAuth } from './dev-auth.js';
+import { hideAdminPanel, initAdminPanel, showAdminEntry } from './admin-panel.js';
 import { showStatus } from './util.js';
 
 const COVERAGE_REDRAW_DEBOUNCE_MS = 300;
@@ -39,4 +40,13 @@ onZoomEnd(() => {
 });
 
 initDebugOverlay();
-initDevAuth(startDebugPolling, stopDebugPolling);
+initAdminPanel();
+initDevAuth(
+    () => {
+        startDebugPolling();
+        showAdminEntry();
+    },
+    () => {
+        stopDebugPolling();
+        hideAdminPanel();
+    });

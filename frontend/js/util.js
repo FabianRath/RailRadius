@@ -3,6 +3,11 @@ export function fmtMins(mins) {
     return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
 }
 
+/** Seconds below a minute, otherwise rounded to fmtMins. */
+export function fmtSeconds(seconds) {
+    return seconds < 60 ? `${seconds}s` : fmtMins(Math.round(seconds / 60));
+}
+
 const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
 /** GTFS names are untrusted text; escape them before they go into innerHTML. */

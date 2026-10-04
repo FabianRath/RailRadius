@@ -1,5 +1,6 @@
 package com.railreach.service;
 
+import com.railreach.dto.GtfsLoadStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +21,7 @@ public class GtfsDataService {
     private final GtfsCacheStore cacheStore;
     private final ReachabilityCache reachabilityCache;
     private final StationSearchIndex stationSearchIndex;
+    private final GtfsLoadProgress loadProgress;
 
     @Value("${railreach.gtfs.directory:./gtfs}")
     private String gtfsDirectory;
@@ -53,10 +55,22 @@ public class GtfsDataService {
         log.info("Scanning directory: {}", gtfsDirectory);
         graph.clear();
         dataLoaded = false;
+        loadProgress.start();
+        try {
+            buildGraphFromFiles();
+        } catch (RuntimeException e) {
+            loadProgress.enter(GtfsLoadProgress.Phase.FAILED);
+            throw e;
+        }
+        loadProgress.enter(GtfsLoadProgress.Phase.DONE);
+        dataLoaded = true;
+    }
 
+    private void buildGraphFromFiles() {
         long startMs = System.currentTimeMillis();
-        feedLoader.loadDirectory(gtfsDirectory, graph);
+        feedLoader.loadDirectory(gtfsDirectory, graph, loadProgress);
         long durationMs = System.currentTimeMillis() - startMs;
+        loadProgress.enter(GtfsLoadProgress.Phase.MERGING);
         deduplicator.deduplicate(graph);
 
         long connected = graph.connectedStationCount();
@@ -66,10 +80,10 @@ public class GtfsDataService {
         log.info("Graph nodes     : {}", graph.nodeCount());
         log.info("Total edges     : {}", graph.edgeCount());
 
+        loadProgress.enter(GtfsLoadProgress.Phase.SAVING);
         cacheStore.save(graph.snapshot());
         stationSearchIndex.rebuild();
         reachabilityCache.clear();
-        dataLoaded = true;
     }
 
     public void clearCache() {
@@ -86,5 +100,9 @@ public class GtfsDataService {
             "graphNodeCount", graph.nodeCount(),
             "connectionCount", graph.connectionCount()
         );
+    }
+
+    public GtfsLoadStatus getLoadStatus() {
+        return loadProgress.status(graph.stationCount(), graph.connectionCount());
     }
 }

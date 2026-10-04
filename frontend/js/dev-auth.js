@@ -1,4 +1,4 @@
-// Dev login: the admin token unlocks dev features (debug overlay, later the admin view). It is checked against the
+// Dev login: the admin token unlocks dev features (debug overlay, admin panel). It is checked against the
 // backend before it is kept, and a stored token that no longer works is dropped on page load.
 import { fetchDebugStatus, hasAdminToken, setAdminToken } from './api.js';
 

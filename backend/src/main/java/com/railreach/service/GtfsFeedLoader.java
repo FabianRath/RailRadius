@@ -67,7 +67,7 @@ public class GtfsFeedLoader {
     private record FeedTables(String source, Map<String, String> routeNames, Map<String, String> tripToRoute,
                               Map<String, String> rawToCanonicalStop, Map<String, Station> stations) {}
 
-    void loadDirectory(String directory, TransitGraph graph) {
+    void loadDirectory(String directory, TransitGraph graph, GtfsLoadProgress progress) {
         File dir = new File(directory);
         if (!dir.isDirectory()) {
             throw new IllegalStateException("GTFS directory not found: " + directory);
@@ -81,6 +81,7 @@ public class GtfsFeedLoader {
         for (File f : zipFiles) {
             log.info("  - {}", f.getName());
         }
+        progress.feedsFound(zipFiles);
 
         for (int i = 0; i < zipFiles.length; i++) {
             File zipFile = zipFiles[i];
@@ -89,6 +90,7 @@ public class GtfsFeedLoader {
                     .replaceFirst("(?i)^gtfs_", "");
             log.info("--------------------------------------------------------------------------------------");
             log.info("[{}/{}] Loading: {} (source={})", i + 1, zipFiles.length, zipFile.getName(), source);
+            progress.feedStarted(zipFile);
             try {
                 if (loadFeed(zipFile, source, graph) == 0) {
                     log.warn("!!! {} added no rail connections to the graph; see the messages above",
@@ -97,6 +99,7 @@ public class GtfsFeedLoader {
             } catch (Exception e) {
                 log.error("Failed to load {}", zipFile.getName(), e);
             }
+            progress.feedFinished(zipFile);
         }
     }
 
