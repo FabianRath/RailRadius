@@ -13,7 +13,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 
 ## Features / UX
 - [ ] **F1** Rework station naming. I would like to see the coutry code displayed in some way (DE, NL...)
-- [ ] **F4** Zoom level after calculation (frontend) The zoom level should be adjusted so that all rendered stations on the map are visible.
 
 
 ## Structure
