@@ -10,9 +10,11 @@
     <script type="module" src="js/main.js"></script>
 </head>
 <body>
-    <div class="container">
-        <div class="sidebar">
+    <div class="container" id="container">
+        <div class="sidebar" id="sidebar">
             <div class="header">
+                <button type="button" class="sidebar-hide" id="sidebarHide"
+                        aria-label="Hide panel" aria-controls="sidebar" aria-expanded="true">‹</button>
                 <h1>RailReach</h1>
                 <div class="tagline">Explore train networks by transfer limits</div>
             </div>
@@ -102,6 +104,9 @@
         </div>
 
         <div id="map"></div>
+
+        <button type="button" class="sidebar-show" id="sidebarShow"
+                aria-label="Show panel" aria-controls="sidebar" aria-expanded="true">☰ RailReach</button>
 
         <div id="loadingOverlay">
             <div class="loading-pulse"></div>

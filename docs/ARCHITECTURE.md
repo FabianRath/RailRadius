@@ -38,7 +38,7 @@ RailReach/
 ├── frontend/index.html               # markup; served at / by Spring (static-locations: file:../frontend/)
 ├── frontend/css/app.css              # all styles and the map palette (CSS variables)
 ├── frontend/js/                      # ES modules: main (entry), api, map (only MapLibre user), search, query-form,
-│                                     #   reachability (SSE), coverage (Turf), popup, debug, util, config
+│                                     #   reachability (SSE), coverage (Turf), popup, debug, sidebar (collapse toggle), util, config
 ├── frontend/backend_test.html        # small manual API test page
 └── backend/
     ├── pom.xml

@@ -2,6 +2,7 @@ import { fetchHealth } from './api.js';
 import { bindPopup, initMap, LAYERS, onZoomEnd } from './map.js';
 import { stationPopupHtml } from './popup.js';
 import { initSearch } from './search.js';
+import { initSidebarToggle } from './sidebar.js';
 import { initQueryForm, showQueryForm } from './query-form.js';
 import { getStation, initReachability, refreshCoverage } from './reachability.js';
 import { startDebugPolling } from './debug.js';
@@ -18,6 +19,7 @@ fetchHealth()
         showStatus('error', 'Backend not reachable');
     });
 
+initSidebarToggle();
 await initMap('map');
 bindPopup(LAYERS.reachable, ({ stopId }) => stationPopupHtml(getStation(stopId)));
 
