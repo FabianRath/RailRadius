@@ -38,8 +38,8 @@ RailReach/
 ├── frontend/index.html               # markup; served at / by Spring (static-locations: file:../frontend/)
 ├── frontend/css/app.css              # all styles and the map palette (CSS variables)
 ├── frontend/js/                      # ES modules: main (entry), api, map (only MapLibre user), search, query-form,
-│                                     #   reachability (SSE), coverage (Turf), popup, debug, dev-auth (dev login), sidebar (collapse toggle),
-│                                     #   util, config
+│                                     #   reachability (SSE), coverage (Turf), popup, debug, dev-auth (dev login), admin-panel (admin
+│                                     #   endpoints as buttons), sidebar (collapse toggle), util, config
 ├── frontend/backend_test.html        # small manual API test page
 └── backend/
     ├── pom.xml
@@ -65,6 +65,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `GtfsDataService` | service | Fills the `TransitGraph` at startup (cache file, else zips) and on `reload-gtfs`, then rebuilds the station search index and (on reload) clears the reachability caches |
 | `TransitGraph` | service | The merged network: stations, edges, connections, trip indexes. Everything that reads GTFS data injects this |
 | `GtfsFeedLoader` | service | Parses the rail part of each zip into the graph, with per-feed stop dedup |
+| `GtfsLoadProgress` | service | Phase (PARSING → MERGING → SAVING → DONE/FAILED), feeds and zip bytes parsed of the running or last load from the zips; read by `/gtfs-load-status` |
 | `TripRowBatcher` | service | Buffers stop_times rows per trip and hands whole trips to the loader in batches |
 | `GtfsCsvReader` | service | Row-by-row reader for one CSV file inside a GTFS zip; strips a UTF-8 BOM from the header |
 | `StationSearchIndex` | service | Station name search: trigram → station positions, in degree order; rebuilt after each load |
@@ -91,6 +92,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `ReachabilityRequest` | dto | startStationId, maxTransfers, maxJourneyTimeHours, min/maxTransferTimeMinutes |
 | `ReachabilityResponse` | dto | Start info, count, calcTime, list of `ReachableStation` |
 | `ReachableStation` | dto | Station + transfers, duration, path ids/names, `legs` |
+| `GtfsLoadStatus` | dto | `GtfsLoadProgress` snapshot plus live station/connection counts; ETA extrapolated from zip bytes parsed |
 | `JourneyLeg` | dto | `TRAIN` or `TRANSFER` leg with times and duration |
 | `GtfsTime` | util | Parse/format GTFS times, minute diffs with overnight wrap, clock minute of a time, duration text |
 | `StopIds` | util | Canonical `<source>:<rawId>` stop IDs |
@@ -158,13 +160,14 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 | GET | `/stats` | stations / graphNodes / totalEdges |
 | GET | `/health` | UP/DOWN depending on whether data is loaded |
 
-**Admin (`/api/admin`)**: every call needs the header `X-Admin-Token: <railreach.admin.token>` (see `AdminTokenInterceptor`). `scripts/api.sh` sends `RAILREACH_ADMIN_TOKEN` (default `dev`). In the browser, the "Dev login" at the bottom of the side panel (`js/dev-auth.js`) checks the token against `/debug/status`, keeps it in `localStorage` and only then starts the debug polling.
+**Admin (`/api/admin`)**: every call needs the header `X-Admin-Token: <railreach.admin.token>` (see `AdminTokenInterceptor`). `scripts/api.sh` sends `RAILREACH_ADMIN_TOKEN` (default `dev`). In the browser, the "Dev login" at the bottom of the side panel (`js/dev-auth.js`) checks the token against `/debug/status`, keeps it in `localStorage` and only then starts the debug polling and shows the "Admin panel" button. That opens a `<dialog>` (`js/admin-panel.js`) with buttons for the stats, debug-trigger, reload and cache-delete endpoints below; it prints the raw JSON response and asks for confirmation before reload and delete. During a reload it shows a progress bar with phase, feeds, % parsed, elapsed time, ETA and graph size.
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/cache-stats` | Caffeine stats, warming jobs, rawPathCache keys |
 | POST | `/reload-gtfs` | Full reparse of the zips (minutes), rewrite of the cache, clears the raw and response reachability caches |
 | DELETE | `/gtfs-cache` | Deletes the cache file |
 | GET | `/gtfs-stats` | Cache file and data counts |
+| GET | `/gtfs-load-status` | `GtfsLoadStatus` of the running or last load from the zips; the admin panel polls it every second during a reload |
 | POST / DELETE | `/debug/trigger` | Toggle the frontend overlay that shows all stations |
 | GET | `/debug/status` | Polled every 2 s by a browser logged in as dev; also used to check a dev login |
 | GET | `/debug/stations` | All connected stations with edge counts |

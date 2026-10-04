@@ -58,7 +58,7 @@ final class GtfsTestFixtures {
         ReflectionTestUtils.setField(feedLoader, "tripBatchSize", tripBatchSize);
         GtfsDataService service = new GtfsDataService(graph, feedLoader,
                 new StationDeduplicator(new CountryLocator(Files.newInputStream(resource(BORDERS_FILE)))),
-                cacheStore(tempDir), reachabilityCache, stationSearchIndex);
+                cacheStore(tempDir), reachabilityCache, stationSearchIndex, new GtfsLoadProgress());
         ReflectionTestUtils.setField(service, "gtfsDirectory", gtfsDir.toString());
         return service;
     }

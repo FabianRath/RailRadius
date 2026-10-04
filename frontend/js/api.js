@@ -5,8 +5,8 @@ const ADMIN_TOKEN_KEY = 'railreach.adminToken';
 
 let adminToken = readStoredAdminToken();
 
-async function getJson(path, headers = {}) {
-    const response = await fetch(API_BASE + path, { headers });
+async function requestJson(path, init = {}) {
+    const response = await fetch(API_BASE + path, init);
     if (!response.ok) throw new Error(`HTTP ${response.status} for ${path}`);
     return response.json();
 }
@@ -19,8 +19,8 @@ function readStoredAdminToken() {
     }
 }
 
-function adminHeaders() {
-    return { 'X-Admin-Token': adminToken ?? '' };
+function adminJson(path, method = 'GET') {
+    return requestJson(path, { method, headers: { 'X-Admin-Token': adminToken ?? '' } });
 }
 
 export function hasAdminToken() {
@@ -39,11 +39,11 @@ export function setAdminToken(token) {
 }
 
 export function fetchHealth() {
-    return getJson('/api/health');
+    return requestJson('/api/health');
 }
 
 export function searchStations(query) {
-    return getJson(`/api/stations/search?q=${encodeURIComponent(query)}&limit=${SEARCH_LIMIT}`);
+    return requestJson(`/api/stations/search?q=${encodeURIComponent(query)}&limit=${SEARCH_LIMIT}`);
 }
 
 /** Opens the SSE stream; the caller attaches the 'stations', 'done' and 'error' listeners. */
@@ -52,13 +52,38 @@ export function openReachabilityStream(params) {
 }
 
 export function fetchDebugStatus() {
-    return getJson('/api/admin/debug/status', adminHeaders());
+    return adminJson('/api/admin/debug/status');
 }
 
 export function fetchDebugStations() {
-    return getJson('/api/admin/debug/stations', adminHeaders());
+    return adminJson('/api/admin/debug/stations');
+}
+
+export function setDebugTrigger() {
+    return adminJson('/api/admin/debug/trigger', 'POST');
 }
 
 export function clearDebugTrigger() {
-    return fetch(`${API_BASE}/api/admin/debug/trigger`, { method: 'DELETE', headers: adminHeaders() });
+    return adminJson('/api/admin/debug/trigger', 'DELETE');
+}
+
+export function fetchGtfsStats() {
+    return adminJson('/api/admin/gtfs-stats');
+}
+
+export function fetchCacheStats() {
+    return adminJson('/api/admin/cache-stats');
+}
+
+/** Reparses every GTFS zip and rewrites the cache; the response only arrives when that is done (minutes). */
+export function reloadGtfs() {
+    return adminJson('/api/admin/reload-gtfs', 'POST');
+}
+
+export function fetchGtfsLoadStatus() {
+    return adminJson('/api/admin/gtfs-load-status');
+}
+
+export function deleteGtfsCache() {
+    return adminJson('/api/admin/gtfs-cache', 'DELETE');
 }

@@ -1,5 +1,6 @@
 package com.railreach.controller;
 
+import com.railreach.dto.GtfsLoadStatus;
 import com.railreach.model.Station;
 import com.railreach.service.GtfsDataService;
 import com.railreach.service.ReachabilityService;
@@ -90,6 +91,12 @@ public class AdminController {
     @GetMapping("/gtfs-stats")
     public ResponseEntity<Map<String, Object>> getGtfsStats() {
         return ResponseEntity.ok(gtfsDataService.getCacheStats());
+    }
+
+    /** Progress of the running (or last) GTFS load, polled by the admin panel during a reload. */
+    @GetMapping("/gtfs-load-status")
+    public GtfsLoadStatus getGtfsLoadStatus() {
+        return gtfsDataService.getLoadStatus();
     }
 
     // =========================================================================

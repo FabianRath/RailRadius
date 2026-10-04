@@ -103,7 +103,10 @@
             </div>
 
             <div class="dev-footer">
-                <button type="button" class="dev-toggle" id="devToggle">Dev login</button>
+                <div class="dev-actions">
+                    <button type="button" class="dev-toggle" id="devToggle">Dev login</button>
+                    <button type="button" class="dev-toggle" id="adminOpen" hidden>Admin panel</button>
+                </div>
                 <form class="dev-login" id="devLoginForm" hidden>
                     <input type="password" class="search-input" id="devToken" placeholder="Admin token"
                            aria-label="Admin token" autocomplete="current-password" required>
@@ -132,6 +135,41 @@
             <button type="button" class="debug-clear" id="debugClear">clear</button>
             <span class="debug-command">scripts/api.sh debug-off</span>
         </div>
+
+        <dialog class="admin-panel" id="adminPanel" aria-labelledby="adminTitle">
+            <div class="admin-header">
+                <h2 class="admin-title" id="adminTitle">Admin panel</h2>
+                <button type="button" class="admin-close" id="adminClose" aria-label="Close">×</button>
+            </div>
+            <div class="admin-group">
+                <div class="section-title">Inspect</div>
+                <div class="admin-buttons">
+                    <button type="button" class="admin-btn" data-action="gtfsStats">GTFS stats</button>
+                    <button type="button" class="admin-btn" data-action="cacheStats">Reachability cache stats</button>
+                </div>
+            </div>
+            <div class="admin-group">
+                <div class="section-title">Debug overlay</div>
+                <div class="admin-buttons">
+                    <button type="button" class="admin-btn" data-action="debugOn">Show all stations</button>
+                    <button type="button" class="admin-btn" data-action="debugOff">Hide all stations</button>
+                </div>
+            </div>
+            <div class="admin-group">
+                <div class="section-title">GTFS cache</div>
+                <div class="admin-buttons">
+                    <button type="button" class="admin-btn admin-btn-danger" data-action="reloadGtfs">
+                        Rebuild from zips</button>
+                    <button type="button" class="admin-btn admin-btn-danger" data-action="deleteGtfsCache">
+                        Delete cache file</button>
+                </div>
+            </div>
+            <div class="admin-progress" id="adminProgress" hidden>
+                <progress class="admin-progress-bar" id="adminProgressBar" max="100" value="0"></progress>
+                <div class="admin-progress-text" id="adminProgressText"></div>
+            </div>
+            <pre class="admin-output" id="adminOutput">Pick an action.</pre>
+        </dialog>
     </div>
 </body>
 </html>
