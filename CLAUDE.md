@@ -29,7 +29,10 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 - Full data (12 GB heap, minutes to start): only when explicitly asked. See ARCHITECTURE.md.
 
 ## Hard rules
-- **Never read, grep or cat anything in `backend/data/`**. It holds multi-GB caches and zips. Use `ls -la` for sizes only.
+- **`backend/data/` holds multi-GB caches and zips. Look, don't read.**
+  - OK (small, bounded output): `ls -la`, `du -sh`, `find -maxdepth`, `unzip -l <zip>` (list GTFS files), peeks capped by `head` (`unzip -p <zip> stops.txt | head -n 20`, `head -c 2000 gtfs-dev-cache.json`), `grep -m 5 …`, `wc -l`. Small text files (e.g. `gtfs/list.txt`) may be read normally.
+  - Never: the Read tool (denied in settings), `cat`, `grep`/`jq`/`unzip -p` without a cap, or anything whose output scales with file size. Cache JSON can be one huge line, so cap by bytes (`head -c`), not lines.
+  - Prefer `gtfs-dev-cache.json` (20 MB) over `gtfs-cache.json` (576 MB) when inspecting the format.
 - Never call `reload-gtfs` or the cache-delete endpoint against the full dataset unless asked.
 - A change is done only when `compile` and `test` pass. Say so explicitly if you could not run them.
 - Fixing a known bug: enable its `@Disabled` test first (or write a failing test), then fix.
