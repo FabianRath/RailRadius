@@ -23,21 +23,19 @@ class ReachabilityCacheTest {
         gtfs = GtfsTestFixtures.load(tempDir, "alpha", "beta");
     }
 
-    // B20: a shortcut such as hub routing must never return fewer stations than the full search
+    // B20, B21: a shortcut must return exactly what the search returns
     @Test
-    void everyTransferCountReachesTheSameStationsAsTheFullSearch() {
+    void lowerTransferCountsCutFromAStoredResultEqualTheirOwnSearch() {
         ReachabilitySearch search = new ReachabilitySearch(gtfs);
-        // Kept across transfer counts, so each count is seeded from the stored result of the one below
-        ReachabilityCache incremental = GtfsTestFixtures.reachabilityCache(gtfs);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
+        cache.getOrCompute(key(MAX_TRANSFERS));
 
-        for (int transfers = 0; transfers <= MAX_TRANSFERS; transfers++) {
-            var expected = search.fullSearch(START_ID, transfers, 0, 180).keySet();
-            ReachabilityCache cold = GtfsTestFixtures.reachabilityCache(gtfs);
-            assertThat(cold.getOrCompute(key(transfers)).keySet()).as("cold, %d transfers", transfers)
-                    .isEqualTo(expected);
-            assertThat(incremental.getOrCompute(key(transfers)).keySet()).as("incremental, %d transfers", transfers)
-                    .isEqualTo(expected);
+        for (int transfers = 0; transfers < MAX_TRANSFERS; transfers++) {
+            assertThat(cache.contains(key(transfers))).isTrue();
+            assertThat(cache.getOrCompute(key(transfers))).as("%d transfers", transfers)
+                    .isEqualTo(search.search(START_ID, transfers, 0, 180));
         }
+        assertThat(cache.getStats()).containsEntry("rawPathCacheEntries", 1L);
     }
 
     // B9

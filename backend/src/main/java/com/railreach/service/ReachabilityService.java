@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Answers reachability requests: resolves defaults, gets the (cached) search result and maps it to DTOs. */
 @Service
@@ -48,10 +49,9 @@ public class ReachabilityService {
 
         int maxJourneyMins = maxJourneyMinutes(request);
         List<ReachableStation> stations = new ArrayList<>();
-        cache.getOrCompute(key).forEach((stopId, path) -> {
-            if (path.getTotalDurationMinutes() > maxJourneyMins) return;
-            legBuilder.toReachableStation(stopId, path).ifPresent(stations::add);
-        });
+        cache.getOrCompute(key).forEach((stopId, paths) -> fewestTransfersWithin(paths, maxJourneyMins)
+                .flatMap(path -> legBuilder.toReachableStation(stopId, path))
+                .ifPresent(stations::add));
 
         Station startStation = transitGraph.getStation(key.startId());
         long durationMs = System.currentTimeMillis() - startMs;
@@ -128,14 +128,23 @@ public class ReachabilityService {
     }
 
     /** The start station itself is not a destination, so it is never streamed. */
-    private List<ReachableStation> toStreamedStations(ReachabilityRequest request, Map<String, JourneyPath> reachable) {
+    private List<ReachableStation> toStreamedStations(ReachabilityRequest request,
+                                                      Map<String, List<JourneyPath>> reachable) {
         int maxJourneyMins = maxJourneyMinutes(request);
         List<ReachableStation> stations = new ArrayList<>();
-        reachable.forEach((stopId, path) -> {
-            if (stopId.equals(request.getStartStationId()) || path.getTotalDurationMinutes() > maxJourneyMins) return;
-            legBuilder.toReachableStation(stopId, path).ifPresent(stations::add);
+        reachable.forEach((stopId, paths) -> {
+            if (stopId.equals(request.getStartStationId())) return;
+            fewestTransfersWithin(paths, maxJourneyMins)
+                    .flatMap(path -> legBuilder.toReachableStation(stopId, path))
+                    .ifPresent(stations::add);
         });
         return stations;
+    }
+
+    // The paths are ordered by ascending transfers, so a station whose fewest-transfer path is too long still shows
+    // up with a faster path that has more transfers (B4)
+    private static Optional<JourneyPath> fewestTransfersWithin(List<JourneyPath> paths, int maxJourneyMins) {
+        return paths.stream().filter(path -> path.getTotalDurationMinutes() <= maxJourneyMins).findFirst();
     }
 
     private void flushBatch(SseEmitter emitter, List<ReachableStation> stations) {
