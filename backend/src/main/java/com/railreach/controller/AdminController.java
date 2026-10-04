@@ -2,7 +2,6 @@ package com.railreach.controller;
 
 import com.railreach.model.Station;
 import com.railreach.service.GtfsDataService;
-import com.railreach.service.HubRoutingService;
 import com.railreach.service.ReachabilityService;
 import com.railreach.service.TransitGraph;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +29,6 @@ import java.util.stream.Collectors;
 @CrossOrigin(origins = "*")
 public class AdminController {
 
-    private final HubRoutingService hubRoutingService;
     private final GtfsDataService gtfsDataService;
     private final TransitGraph transitGraph;
 
@@ -92,52 +90,6 @@ public class AdminController {
     @GetMapping("/gtfs-stats")
     public ResponseEntity<Map<String, Object>> getGtfsStats() {
         return ResponseEntity.ok(gtfsDataService.getCacheStats());
-    }
-
-    /**
-     * Manually trigger hub computation.
-     * This can take 5-10 minutes depending on data size.
-     * 
-     * POST http://localhost:8080/api/admin/compute-hubs
-     */
-    @PostMapping("/compute-hubs")
-    public ResponseEntity<Map<String, Object>> computeHubs() {
-        log.info("Manual hub computation triggered via API");
-        
-        long start = System.currentTimeMillis();
-        hubRoutingService.computeHubs();
-        long duration = System.currentTimeMillis() - start;
-        
-        return ResponseEntity.ok(Map.of(
-            "message", "Hub computation complete",
-            "durationMs", duration,
-            "stats", hubRoutingService.getStats()
-        ));
-    }
-
-    /**
-     * Clear hub cache and force recomputation on next request.
-     * 
-     * DELETE http://localhost:8080/api/admin/hub-cache
-     */
-    @DeleteMapping("/hub-cache")
-    public ResponseEntity<Map<String, String>> clearHubCache() {
-        log.info("Hub cache cleared via API");
-        hubRoutingService.clearCache();
-        
-        return ResponseEntity.ok(Map.of(
-            "message", "Hub cache cleared. Use POST /api/admin/compute-hubs to recompute."
-        ));
-    }
-
-    /**
-     * Get hub routing statistics.
-     * 
-     * GET http://localhost:8080/api/admin/hub-stats
-     */
-    @GetMapping("/hub-stats")
-    public ResponseEntity<Map<String, Object>> getHubStats() {
-        return ResponseEntity.ok(hubRoutingService.getStats());
     }
 
     // =========================================================================

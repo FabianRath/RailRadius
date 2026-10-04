@@ -6,6 +6,3 @@ railreach:
     cache-file: target/test-gtfs-cache-none.json
   cache:
     predictive-enabled: false
-  hub:
-    auto-initialize: false
-    cache-file: target/test-hub-cache-none.json

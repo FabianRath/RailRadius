@@ -11,7 +11,6 @@
       "Bash(scripts/api.sh reach *)",
       "Bash(scripts/api.sh cache-stats)",
       "Bash(scripts/api.sh gtfs-stats)",
-      "Bash(scripts/api.sh hub-stats)",
       "Bash(scripts/api.sh debug-status)",
       "Bash(curl -s localhost:8080/api/*)",
       "Bash(curl -s http://localhost:8080/api/*)",

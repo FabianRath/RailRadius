@@ -40,27 +40,6 @@ railreach:
     # Raw BFS results kept for cache hits and incremental searches; Caffeine evicts rarely used ones first.
     # One full-data result maps every reachable station to its path, so keep this small
     raw-max-entries: 30
-  
-  # Hub routing configuration
-  hub:
-    # Set to false to skip auto-computation on startup (recommended for development)
-    auto-initialize: false
-    
-    # Where to store pre-computed hub data
-    cache-file: data/hub-cache.json
-    
-    # Number of hub stations to identify (top N by connectivity)
-    # More hubs = faster queries but slower startup and larger cache
-    num-hubs: 50
-    
-    # How many transfers to pre-compute from each hub
-    # 1 = direct connections only (fast, good for 2-transfer queries)
-    # 2 = covers 3-transfer queries but 10x slower to compute
-    precompute-transfers: 1
-    
-    # Timeout per hub computation (seconds)
-    # Increase if hubs are timing out during computation
-    timeout-seconds: 600
 
 logging:
   level:

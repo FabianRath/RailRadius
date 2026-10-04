@@ -9,7 +9,3 @@ railreach:
 
   cache:
     predictive-enabled: false
-
-  hub:
-    auto-initialize: false
-    cache-file: data/hub-dev-cache.json

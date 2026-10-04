@@ -7,7 +7,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 ## Layout
 - `backend/src/main/java/com/railreach/`
   - `controller/`: `/api` public API and `/api/admin` endpoints
-  - `service/`: `GtfsDataService` (startup/reload) → `GtfsFeedLoader`, `StationDeduplicator`, `GtfsCacheStore`; `TransitGraph` (the data + queries), `StationSearchIndex`, `ReachabilityService` (orchestrator, SSE) → `ReachabilitySearch` (BFS), `ReachabilityCache`, `ReachabilityWarmer`, `JourneyLegBuilder`, `HubRoutingService`
+  - `service/`: `GtfsDataService` (startup/reload) → `GtfsFeedLoader`, `StationDeduplicator`, `GtfsCacheStore`; `TransitGraph` (the data + queries), `StationSearchIndex`, `ReachabilityService` (orchestrator, SSE) → `ReachabilitySearch` (BFS), `ReachabilityCache`, `ReachabilityWarmer`, `JourneyLegBuilder`
   - `dto/`, `model/`, `config/`
 - `backend/src/test/`: unit tests on the `gtfs-mini` fixture (see `src/test/resources/gtfs-mini/README.md`)
 - `frontend/`: `index.html` (markup), `css/app.css`, `js/*.js` (one ES module per concern, entry `main.js`). See guidelines §8.
@@ -30,7 +30,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 
 ## Hard rules
 - **Never read, grep or cat anything in `backend/data/`**. It holds multi-GB caches and zips. Use `ls -la` for sizes only.
-- Never call `reload-gtfs`, `compute-hubs` or the cache-delete endpoints against the full dataset unless asked.
+- Never call `reload-gtfs` or the cache-delete endpoint against the full dataset unless asked.
 - A change is done only when `compile` and `test` pass. Say so explicitly if you could not run them.
 - Fixing a known bug: enable its `@Disabled` test first (or write a failing test), then fix.
 - Ask before changing the public API (`/api/**` request/response shapes). The frontend depends on it.
@@ -42,6 +42,6 @@ All code changes must follow these. They cover allowed libraries, style, reuse a
 
 ## Workflow
 - Small, focused changes. Plan first when a change spans several files.
-- Keep `docs/ARCHITECTURE.md` in sync **in the same commit** as the code change. Update it when you add, remove, rename or re-scope a class or frontend module; change an endpoint, SSE event, DTO/model field, config key or default; change the data pipeline, cache file format, BFS/caching/hub behaviour, or a documented constant (radii, batch sizes, thresholds); or change the directory layout or run commands. Before editing a section, check its claims against the code: the doc must describe the code as it is, not as planned. Pure internal refactors that touch none of these need no update.
+- Keep `docs/ARCHITECTURE.md` in sync **in the same commit** as the code change. Update it when you add, remove, rename or re-scope a class or frontend module; change an endpoint, SSE event, DTO/model field, config key or default; change the data pipeline, cache file format, BFS/caching behaviour, or a documented constant (radii, batch sizes, thresholds); or change the directory layout or run commands. Before editing a section, check its claims against the code: the doc must describe the code as it is, not as planned. Pure internal refactors that touch none of these need no update.
 - Update `docs/TODO.md` when you finish an item. Ask the user before adding a newly found bug (guidelines §9). Add a line to `docs/decisions.md` for non-obvious choices.
 - Commit after each completed task. Use short imperative messages, and don't commit `backend/data/`.
