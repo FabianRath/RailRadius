@@ -102,10 +102,12 @@ function streamResults(stationId, query, key) {
             + (info.fromCache ? ' (instant — server cache)' : ''));
     });
 
+    // Fires for the backend's own 'error' event (message in e.data) and for a lost connection (no data)
     stream.addEventListener('error', e => {
         console.error('SSE error:', e);
         finishStream();
-        showStatus('error', 'Stream failed — check backend logs');
+        reachableCount.textContent = results.size > 0 ? results.size.toLocaleString() : '—';
+        showStatus('error', e.data ? `Search failed: ${e.data}` : 'Search failed: backend not reachable');
     });
 }
 

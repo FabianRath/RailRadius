@@ -13,7 +13,10 @@ let selectedStation = null;
 
 fetchHealth()
     .then(health => console.log('Backend health:', health))
-    .catch(error => console.error('⚠️ Backend connection failed:', error));
+    .catch(error => {
+        console.error('Backend connection failed:', error);
+        showStatus('error', 'Backend not reachable');
+    });
 
 await initMap('map');
 bindPopup(LAYERS.reachable, ({ stopId }) => stationPopupHtml(getStation(stopId)));
