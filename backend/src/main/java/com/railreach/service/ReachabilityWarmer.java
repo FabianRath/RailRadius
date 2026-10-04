@@ -12,7 +12,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Precomputes N+1, N+2, … transfers after a query, so moving the transfer slider up is instant.
+ * Precomputes the configured maximum transfer count after a query. The cache answers every lower count from it,
+ * so moving the transfer slider up is instant.
  * A separate bean so that {@code @Async} goes through Spring's proxy and runs off the caller's thread.
  */
 @Component
@@ -29,33 +30,22 @@ public class ReachabilityWarmer {
 
     @Async
     public void warmHigherTransferCounts(SearchKey queried) {
-        String stationId = queried.startId();
-        for (int t = queried.maxTransfers() + 1; t <= predictiveMaxTransfers; t++) {
-            SearchKey key = queried.withMaxTransfers(t);
-            if (cache.contains(key)) {
-                log.debug("  Predictive cache: {} x{} already cached", stationId, t);
-                continue;
-            }
-            // Without the N-1 result this would be a full BFS, which is not worth doing speculatively
-            if (t > 1 && !cache.contains(key.withMaxTransfers(t - 1))) {
-                log.debug("  Predictive cache: skipping {} x{} — x{} not cached yet", stationId, t, t - 1);
-                break;
-            }
-            if (!warmingInProgress.add(key)) {
-                log.debug("  Predictive cache: {} x{} already warming", stationId, t);
-                continue;
-            }
-            try {
-                log.info("  Predictive cache warming: {} x{} transfers (incremental from x{})", stationId, t, t - 1);
-                long startMs = System.currentTimeMillis();
-                cache.getOrCompute(key);
-                log.info("  Predictive cache warmed: {} x{} transfers in {}ms",
-                        stationId, t, System.currentTimeMillis() - startMs);
-            } catch (Exception e) {
-                log.warn("  Predictive cache warming failed for {} x{}", stationId, t, e);
-            } finally {
-                warmingInProgress.remove(key);
-            }
+        SearchKey key = queried.withMaxTransfers(predictiveMaxTransfers);
+        if (queried.maxTransfers() >= predictiveMaxTransfers || cache.contains(key)) return;
+        if (!warmingInProgress.add(key)) {
+            log.debug("  Predictive cache: {} x{} already warming", key.startId(), key.maxTransfers());
+            return;
+        }
+        try {
+            log.info("  Predictive cache warming: {} x{} transfers", key.startId(), key.maxTransfers());
+            long startMs = System.currentTimeMillis();
+            cache.getOrCompute(key);
+            log.info("  Predictive cache warmed: {} x{} transfers in {}ms",
+                    key.startId(), key.maxTransfers(), System.currentTimeMillis() - startMs);
+        } catch (Exception e) {
+            log.warn("  Predictive cache warming failed for {} x{}", key.startId(), key.maxTransfers(), e);
+        } finally {
+            warmingInProgress.remove(key);
         }
     }
 

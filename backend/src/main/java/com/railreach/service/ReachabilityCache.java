@@ -10,12 +10,15 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
- * Raw BFS results per search, computed on demand. Kept apart from the Caffeine response cache
- * so an N-transfer search can start from the stored N-1 result (incremental BFS).
+ * Raw search results per search, computed on demand. Kept apart from the Caffeine response cache because a stored
+ * result also answers every lower transfer count: it holds each station's best path per transfer count.
  */
 @Component
 @Slf4j
@@ -25,8 +28,8 @@ public class ReachabilityCache {
 
     private final ReachabilitySearch search;
     private final CacheManager cacheManager;
-    // One full-data result holds a path to every reachable station, so the count must stay small
-    private final Cache<SearchKey, Map<String, JourneyPath>> rawPaths;
+    // One full-data result holds paths to every reachable station, so the count must stay small
+    private final Cache<SearchKey, Map<String, List<JourneyPath>>> rawPaths;
 
     public ReachabilityCache(ReachabilitySearch search, CacheManager cacheManager,
                              @Value("${railreach.cache.raw-max-entries:30}") int rawMaxEntries) {
@@ -48,38 +51,52 @@ public class ReachabilityCache {
     }
 
     /**
-     * The stored result, else an incremental BFS from the stored N-1 result, else a full BFS.
-     * The computed result is stored.
+     * Per station, its paths by ascending transfers (see {@link ReachabilitySearch#search}). Taken from the stored
+     * result, else cut down from a stored result with more transfers, else searched and stored.
      */
-    public Map<String, JourneyPath> getOrCompute(SearchKey key) {
-        Map<String, JourneyPath> cached = rawPaths.getIfPresent(key);
+    public Map<String, List<JourneyPath>> getOrCompute(SearchKey key) {
+        Map<String, List<JourneyPath>> cached = rawPaths.getIfPresent(key);
         if (cached != null) {
-            log.info("  Raw cache HIT: {} x{} ({} stations) — skipping BFS",
-                    key.startId(), key.maxTransfers(), cached.size());
+            log.info("  Raw cache HIT: {} x{} ({} stations)", key.startId(), key.maxTransfers(), cached.size());
             return cached;
         }
-
-        Map<String, JourneyPath> previous = key.maxTransfers() > 0
-                ? rawPaths.getIfPresent(key.withMaxTransfers(key.maxTransfers() - 1)) : null;
-        Map<String, JourneyPath> result;
-        if (previous != null && !previous.isEmpty()) {
-            log.info("  Incremental BFS: seeding from {} x{} ({} stations), adding 1 more transfer",
-                    key.startId(), key.maxTransfers() - 1, previous.size());
-            result = search.incrementalSearch(key.startId(), previous, key.maxTransfers(),
-                    key.minTransferMins(), key.maxTransferMins());
-        } else {
-            log.info("  Full BFS: {} x{}", key.startId(), key.maxTransfers());
-            result = search.fullSearch(key.startId(), key.maxTransfers(),
-                    key.minTransferMins(), key.maxTransferMins());
+        Optional<Map.Entry<SearchKey, Map<String, List<JourneyPath>>>> higher = storedWithMoreTransfers(key);
+        if (higher.isPresent()) {
+            log.info("  Raw cache HIT: {} x{} cut down from x{}",
+                    key.startId(), key.maxTransfers(), higher.get().getKey().maxTransfers());
+            return limitTransfers(higher.get().getValue(), key.maxTransfers());
         }
 
+        log.info("  Search: {} x{}", key.startId(), key.maxTransfers());
+        Map<String, List<JourneyPath>> result = search.search(key.startId(), key.maxTransfers(),
+                key.minTransferMins(), key.maxTransferMins());
         rawPaths.put(key, result);
         log.info("  Cached raw result: {} x{} ({} stations)", key.startId(), key.maxTransfers(), result.size());
         return result;
     }
 
+    /** True if {@link #getOrCompute} would not have to search. */
     public boolean contains(SearchKey key) {
-        return rawPaths.getIfPresent(key) != null;
+        return rawPaths.getIfPresent(key) != null || storedWithMoreTransfers(key).isPresent();
+    }
+
+    private Optional<Map.Entry<SearchKey, Map<String, List<JourneyPath>>>> storedWithMoreTransfers(SearchKey key) {
+        return rawPaths.asMap().entrySet().stream()
+                .filter(entry -> entry.getKey().maxTransfers() > key.maxTransfers()
+                        && entry.getKey().withMaxTransfers(key.maxTransfers()).equals(key))
+                .findAny();
+    }
+
+    // Rounds of the search never depend on later rounds, so the paths with at most N transfers of a search with
+    // more transfers are exactly the result of a search with N
+    private static Map<String, List<JourneyPath>> limitTransfers(Map<String, List<JourneyPath>> result,
+                                                                 int maxTransfers) {
+        Map<String, List<JourneyPath>> limited = new HashMap<>(result.size() * 2);
+        result.forEach((stopId, paths) -> {
+            List<JourneyPath> within = paths.stream().filter(path -> path.getTransfers() <= maxTransfers).toList();
+            if (!within.isEmpty()) limited.put(stopId, within);
+        });
+        return limited;
     }
 
     /** Drops every stored result and response; they describe a graph that no longer exists. */

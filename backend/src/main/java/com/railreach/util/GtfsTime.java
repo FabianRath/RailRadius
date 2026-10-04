@@ -3,12 +3,16 @@ package com.railreach.util;
 /** GTFS times are int seconds since service-day midnight and may exceed 24 h. */
 public final class GtfsTime {
 
-    private static final int SECONDS_PER_MINUTE = 60;
+    public static final int SECONDS_PER_MINUTE = 60;
     private static final int SECONDS_PER_HOUR = 3600;
     private static final int MINUTES_PER_HOUR = 60;
     private static final int MINUTES_PER_DAY = 24 * 60;
+    public static final int SECONDS_PER_DAY = MINUTES_PER_DAY * SECONDS_PER_MINUTE;
     /** A diff more negative than this is an overnight wrap, not a slightly earlier time in the data. */
     private static final int OVERNIGHT_WRAP_THRESHOLD_MINUTES = -60;
+    /** Longest time {@link #diffMinutes} can return across midnight, i.e. from a clock time 61 min later. */
+    public static final int MAX_OVERNIGHT_GAP_SECONDS =
+            SECONDS_PER_DAY + (OVERNIGHT_WRAP_THRESHOLD_MINUTES - 1) * SECONDS_PER_MINUTE;
 
     private GtfsTime() {}
 

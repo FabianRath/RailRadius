@@ -71,14 +71,16 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`: format version, stations, trips); a file with another version is ignored |
 | `CachedTrip` | service | One trip in the cache file: route name, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
 | `ReachabilityService` | service | Thin orchestrator: request defaults, POST response (`@Cacheable`), SSE streaming, triggers warming |
-| `ReachabilitySearch` | service | Full and incremental trip BFS |
-| `ReachabilityCache` | service | Raw BFS results per `SearchKey`; get-or-compute (incremental / full); Caffeine eviction and stats |
-| `ReachabilityWarmer` | service | `@Async` predictive warming of N+1 … transfers (own bean so the proxy applies) |
-| `JourneyLegBuilder` | service | BFS path → `ReachableStation` with TRAIN/TRANSFER legs |
+| `ReachabilitySearch` | service | Round-based search, one round per transfer; best path per station and transfer count |
+| `TripTimetable` | service | One trip as arrays for the search: stops, leg times, minute offsets; `Departure` = trip leaving a stop |
+| `TransferWindow` | service | Sliding window over a station's arrivals: the arrival that boards a departure with the shortest journey |
+| `ReachabilityCache` | service | Raw search results per `SearchKey`; get-or-compute (stored, cut down from a stored higher transfer count, or searched); Caffeine eviction and stats |
+| `ReachabilityWarmer` | service | `@Async` predictive warming of the maximum transfer count (own bean so the proxy applies) |
+| `JourneyLegBuilder` | service | Search path → `ReachableStation` with TRAIN/TRANSFER legs |
 | `CacheConfig` | config | Caffeine `CacheManager` ("reachability" cache), `@EnableAsync` |
 | `Station` | model | id, name, latitude, longitude, parentStation |
 | `Connection` | model | One edge of one trip: tripId, routeName, from/to, dep/arr times as **int seconds since midnight** (string getters/setters for JSON) |
-| `JourneyPath` | model | Internal BFS result: stationIds, connections, transfers, totalDurationMinutes |
+| `JourneyPath` | model | Internal search result: stationIds, connections, transfers, totalDurationMinutes |
 | `ReachabilityRequest` | dto | startStationId, maxTransfers, maxJourneyTimeHours, min/maxTransferTimeMinutes |
 | `ReachabilityResponse` | dto | Start info, count, calcTime, list of `ReachableStation` |
 | `ReachableStation` | dto | Station + transfers, duration, path ids/names, `legs` |
@@ -105,25 +107,32 @@ After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStati
 6. **Cross-border dedup**: ~1 km spatial grid, different sources, within ~500 m, token Jaccard similarity ≥ 0.4. The station with more connections becomes canonical, and every map is remapped. A canonical station can itself be merged later (A→B, then B→C); `mergeStations` first resolves such chains so every alias maps straight to the last station.
 7. `GtfsCacheStore` saves stations and trips (`CachedTrip`) to the GTFS cache file. On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops` and `stopTrips` from the trips.
 
-`StationSearchIndex.rebuild` then indexes the station names. `TransitGraph` builds lazy indexes on first access: `tripStopIndex` (trip → stop → position) and `connectionByTrip` (edge → tripId → Connection).
+`StationSearchIndex.rebuild` then indexes the station names. `TransitGraph` builds lazy indexes on first access: `timetables` (trip → `TripTimetable`), `departuresByStop` (stop → departures by time) and `connectionByTrip` (edge → tripId → Connection).
 
 ## Reachability algorithm (`ReachabilityCache`, `ReachabilitySearch`)
 
 `ReachabilityCache.getOrCompute` is the central dispatcher. It is keyed by `SearchKey(start, maxTransfers, minTransfer, maxTransfer)`:
 1. **Raw cache hit** → return the stored result immediately.
-2. **Incremental BFS**: if the result for N−1 transfers is cached, seed the queue only from stations reached with exactly N−1 transfers and explore one more transfer layer.
-3. **Full BFS** (`ReachabilitySearch.fullSearch`): a trip-based BFS. From a station, ride each trip forward stop by stop. Boarding a different trip counts as +1 transfer and must satisfy the min/max wait window. Paths are ranked by (transfers, then duration). `exploredBoardings` (`station|trip|transfers`) prevents re-walking the same trip.
+2. **Cut down**: if a result with more transfers (same start and window) is stored, keep only its paths with ≤ N transfers. A round never depends on later rounds, so this equals a search with N.
+3. **Search** (`ReachabilitySearch.search`), stored afterwards.
+
+The search has no start time: every trip leaving the start station can begin a journey, and duration counts from its departure. It runs one round per transfer count (like RAPTOR):
+- Round 0 rides every trip from the start station. Round k boards trips from the arrivals of round k−1. Riding a trip forward records each stop as an arrival.
+- **Pruning is per trip**: each trip keeps the shortest duration per stop (`bestDurationsByTrip`). A ride stops as soon as it cannot beat that value, because an earlier ride got there at the same time with no more transfers and stays ahead for the rest of the trip. Arrival time is part of the state, so a slower but earlier arrival that catches a better train is kept (B2).
+- **Transfers**: per station and round, departures are swept in time order against the arrivals sorted by time (`TransferWindow`). Each departure is boarded only from the arrival that catches it within the min/max wait window with the shortest journey so far. Waits past midnight use a second window with the arrivals moved a day back.
+- **Result**: per station, a list of paths by ascending transfers. Each path is the fastest for its transfer count and faster than every path with fewer transfers. Paths are kept as `previous` pointers during the search and turned into `JourneyPath`s at the end.
+- The response picks per station the path with the fewest transfers that fits `maxJourneyTimeHours` (B4). Without a limit, that is the first path.
 
 Overnight wrap: a time difference below −60 min gets +24 h added.
 
 `JourneyLegBuilder` merges consecutive connections into one TRAIN leg (same tripId, or same route name and continuous in time) and inserts TRANSFER legs between them.
 
 **Caching layers:**
-- `ReachabilityCache` (Caffeine, max `cache.raw-max-entries` (30) results) holds raw `JourneyPath` maps and enables the incremental BFS. If the N−1 result was evicted, N falls back to a full BFS.
+- `ReachabilityCache` (Caffeine, max `cache.raw-max-entries` (30) results) holds raw results (station → paths). A stored result also answers every lower transfer count.
 - Caffeine `"reachability"` cache holds full `ReachabilityResponse`s from `POST /api/reachability` (max 10k entries, 60 min TTL).
-- **Predictive warming**: after a streaming request, `ReachabilityWarmer` precomputes N+1 … `predictive-max-transfers` (5) with the same transfer window on a background thread, into the raw cache only (the stream never reads Caffeine).
+- **Predictive warming**: after a streaming request with N < `predictive-max-transfers` (5), `ReachabilityWarmer` searches that maximum with the same transfer window on a background thread, into the raw cache only (the stream never reads Caffeine). Every count from N+1 up is then cut down from it.
 
-**Streaming** (`calculateReachabilityStreaming`): the BFS runs to completion first (paths improve during the search, so nothing is sent early). The result is then sent as SSE `stations` events in batches of 30, followed by a `done` event (`{total, calculationTimeMs}`), or an `error` event on failure.
+**Streaming** (`calculateReachabilityStreaming`): the search runs to completion first (paths improve during the search, so nothing is sent early). The result is then sent as SSE `stations` events in batches of 30, followed by a `done` event (`{total, calculationTimeMs}`), or an `error` event on failure.
 
 ## REST API
 

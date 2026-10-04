@@ -1,0 +1,7 @@
+stop_id,stop_name,stop_lat,stop_lon,parent_station
+E1,Epsilon Start,50.0000,20.0000,
+E2,Epsilon Fork,50.1000,20.1000,
+E3,Epsilon Junction,50.0000,20.2000,
+E4,Epsilon East,50.0000,20.4000,
+E5,Epsilon Detour,50.2000,20.2000,
+E6,Epsilon End,50.1000,20.4000,

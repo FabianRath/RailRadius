@@ -5,7 +5,6 @@ import com.railreach.dto.ReachabilityRequest;
 import com.railreach.dto.ReachabilityResponse;
 import com.railreach.dto.ReachableStation;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -95,15 +94,47 @@ class ReachabilityServiceTest {
                 .containsExactly("NJ", null, "EN");
     }
 
+    // B2: the faster T6 evening train must not hide the T1 -> U1 connection
     @Test
-    @Disabled("Known issue (docs/TODO.md): BFS keeps only the shortest-duration path per station, "
-            + "ignoring arrival time, so the faster T6 evening train hides the T1 -> U1 connection")
-    void pruningShouldNotDiscardEarlierArrivalsThatEnableBetterTransfers(@TempDir Path dir) throws Exception {
+    void slowerEarlierArrivalIsKeptWhenItEnablesAFasterTransfer(@TempDir Path dir) throws Exception {
         TransitGraph withFastTrain = GtfsTestFixtures.load(dir, "alpha-fast-train", "beta");
 
         ReachableStation b2 = find(query(withFastTrain, "alpha:A1", 1, 0, 180), "beta:B2").orElseThrow();
 
-        assertThat(b2.getTotalDurationMinutes()).isEqualTo(120); // currently 250 via T6 -> U3
+        assertThat(b2.getTotalDurationMinutes()).isEqualTo(120); // not 250 via T6 -> U3
+    }
+
+    // B3: the faster Y2 arrival misses Y3 with a 5 min minimum, the slower Y1 arrival still catches it
+    @Test
+    void minimumTransferTimeKeepsTheSlowerArrivalThatCatchesTheTrain(@TempDir Path dir) throws Exception {
+        TransitGraph epsilon = GtfsTestFixtures.load(dir, "epsilon");
+
+        assertThat(find(query(epsilon, "epsilon:E1", 1, 0, 180), "epsilon:E4")).get()
+                .extracting(ReachableStation::getTotalDurationMinutes).isEqualTo(40); // Y2, 2 min wait, Y3
+        assertThat(find(query(epsilon, "epsilon:E1", 1, 5, 180), "epsilon:E4")).get()
+                .extracting(ReachableStation::getTotalDurationMinutes).isEqualTo(90); // Y1, 20 min wait, Y3
+    }
+
+    // B4: without a wait limit, E6 is reached with 1 transfer and an 11.5 h wait, which is over the time limit
+    @Test
+    void stationOverTheTimeLimitWithFewestTransfersShowsTheFasterPathWithMoreTransfers(@TempDir Path dir)
+            throws Exception {
+        ReachabilityService service = GtfsTestFixtures.reachabilityService(GtfsTestFixtures.load(dir, "epsilon"));
+        ReachabilityRequest.ReachabilityRequestBuilder unlimitedWait = ReachabilityRequest.builder()
+                .startStationId("epsilon:E1")
+                .maxTransfers(2)
+                .minTransferTimeMinutes(0)
+                .maxTransferTimeMinutes(99999);
+
+        ReachableStation anyTime = find(service.calculateReachability(unlimitedWait.build()), "epsilon:E6")
+                .orElseThrow();
+        ReachableStation withinTwoHours = find(service.calculateReachability(
+                unlimitedWait.maxJourneyTimeHours(2.0).build()), "epsilon:E6").orElseThrow();
+
+        assertThat(anyTime.getTransfers()).isEqualTo(1);
+        assertThat(anyTime.getTotalDurationMinutes()).isEqualTo(750); // X1, wait until 22:00, X4
+        assertThat(withinTwoHours.getTransfers()).isEqualTo(2);
+        assertThat(withinTwoHours.getTotalDurationMinutes()).isEqualTo(90); // X1, X2, X3
     }
 
     @Test

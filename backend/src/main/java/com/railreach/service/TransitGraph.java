@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -32,8 +33,9 @@ public class TransitGraph {
     private final Map<String, List<String>> tripStops = new ConcurrentHashMap<>();
     // stop ID -> IDs of the trips that serve it
     private final Map<String, Set<String>> stopTrips = new ConcurrentHashMap<>();
-    // Built lazily on first BFS access, so loading stays lean: trip ID -> (stop ID -> position)
-    private final Map<String, Map<String, Integer>> tripStopIndex = new ConcurrentHashMap<>();
+    // Built lazily on first search access, so loading stays lean
+    private final Map<String, TripTimetable> timetables = new ConcurrentHashMap<>();
+    private final Map<String, List<TripTimetable.Departure>> departuresByStop = new ConcurrentHashMap<>();
     // Built lazily: "fromId->toId" -> (trip ID -> connection)
     private final Map<String, Map<String, Connection>> connectionByTrip = new ConcurrentHashMap<>();
 
@@ -61,17 +63,16 @@ public class TransitGraph {
         return tripStops.getOrDefault(tripId, Collections.emptyList());
     }
 
-    /** Position of the stop within the trip's stop sequence, or -1. O(1) via a lazy reverse index. */
-    public int getStopIndexOnTrip(String tripId, String stopId) {
-        Map<String, Integer> index = tripStopIndex.computeIfAbsent(tripId, id -> {
-            List<String> stops = getStopsOnTrip(id);
-            Map<String, Integer> positions = new HashMap<>(stops.size() * 2);
-            for (int i = 0; i < stops.size(); i++) {
-                positions.put(stops.get(i), i);
-            }
-            return positions;
-        });
-        return index.getOrDefault(stopId, -1);
+    TripTimetable getTimetable(String tripId) {
+        return timetables.computeIfAbsent(tripId, id -> TripTimetable.of(id, this));
+    }
+
+    /** Every trip that leaves the stop towards a next stop, by departure time. */
+    List<TripTimetable.Departure> getDeparturesAt(String stopId) {
+        return departuresByStop.computeIfAbsent(stopId, id -> getTripsAtStop(id).stream()
+                .flatMap(tripId -> getTimetable(tripId).departuresFrom(id).stream())
+                .sorted(Comparator.comparingInt(TripTimetable.Departure::departureSeconds))
+                .toList());
     }
 
     /** The trip's connection between two adjacent stops, or null. O(1) via a lazy per-edge index. */
@@ -128,7 +129,8 @@ public class TransitGraph {
         connections.clear();
         tripStops.clear();
         stopTrips.clear();
-        tripStopIndex.clear();
+        timetables.clear();
+        departuresByStop.clear();
         connectionByTrip.clear();
     }
 

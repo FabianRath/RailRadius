@@ -28,14 +28,15 @@ class ReachabilityWarmerTest {
     }
 
     @Test
-    void warmingStopsWhenTheQueriedResultIsNotCached(@TempDir Path dir) throws Exception {
+    void warmingStoresOnlyTheMaximumTransferCount(@TempDir Path dir) throws Exception {
         ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(GtfsTestFixtures.load(dir, "alpha", "beta"));
         ReachabilityWarmer warmer = new ReachabilityWarmer(cache);
-        ReflectionTestUtils.setField(warmer, "predictiveMaxTransfers", 2);
+        ReflectionTestUtils.setField(warmer, "predictiveMaxTransfers", 3);
 
-        warmer.warmHigherTransferCounts(new SearchKey("alpha:A1", 1, 0, 180));
+        warmer.warmHigherTransferCounts(new SearchKey("alpha:A1", 0, 0, 180));
 
-        assertThat(cache.contains(new SearchKey("alpha:A1", 2, 0, 180))).isFalse();
+        assertThat(cache.getStats()).containsEntry("rawPathCacheEntries", 1L);
+        assertThat(cache.contains(new SearchKey("alpha:A1", 3, 0, 180))).isTrue();
     }
 
     // B8

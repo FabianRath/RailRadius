@@ -7,211 +7,200 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
 
 /**
- * Transfer-bounded trip BFS over the {@link TransitGraph}. Keeps one best path per station,
- * ranked by (transfers, total duration).
+ * Transfer-bounded search over the {@link TransitGraph}, one round per transfer (like RAPTOR, but without a start
+ * time: every trip leaving the start station can begin a journey).
+ * <p>
+ * Pruning is per trip, not per station: for each stop of a trip it remembers the shortest duration that reached it
+ * there. A ride that cannot beat that is cut off, because the earlier ride arrived at the same time with no more
+ * transfers and no longer journey, and stays ahead for the rest of the trip. Keeping only the fastest path per
+ * station would drop slower arrivals that catch a train the fastest one misses (B2).
  */
 @Component
 @Slf4j
 @RequiredArgsConstructor
 public class ReachabilitySearch {
 
-    private static final int PROGRESS_LOG_INTERVAL_STATIONS = 50;
-
     private final TransitGraph transitGraph;
 
-    /** durationMinutes is carried along so it never has to be recomputed from the connections. */
-    private record QueueItem(String stationId, int transfers, List<String> path,
-                             List<Connection> connections, String currentTripId, int durationMinutes) {}
+    /** One ride from boardIdx to alightIdx; previous is the ride before the transfer, null for the first one. */
+    private record Ride(TripTimetable trip, int boardIdx, int alightIdx, int transfers, int durationMinutes,
+                        Ride previous) {
 
-    private record SearchState(String startId, int maxTransfers, Map<String, JourneyPath> reachable,
-                               Queue<QueueItem> queue) {}
-
-    /** Every station reachable from startId with at most maxTransfers, including startId itself. */
-    public Map<String, JourneyPath> fullSearch(String startId, int maxTransfers,
-                                               int minTransferMins, int maxTransferMins) {
-        SearchState state = new SearchState(startId, maxTransfers, new HashMap<>(), new ArrayDeque<>());
-        // A (station, trip, transfers) boarding is walked once, however many paths reach the station
-        Set<String> exploredBoardings = new HashSet<>();
-        int lastLoggedCount = 0;
-        int processed = 0;
-        int skipped = 0;
-
-        state.reachable().put(startId, JourneyPath.builder()
-                .stationIds(List.of(startId))
-                .connections(new ArrayList<>())
-                .transfers(0)
-                .totalDurationMinutes(0)
-                .build());
-        state.queue().offer(new QueueItem(startId, 0, List.of(startId), new ArrayList<>(), null, 0));
-
-        while (!state.queue().isEmpty()) {
-            QueueItem cur = state.queue().poll();
-            if (isWorseThanKnown(cur, state.reachable().get(cur.stationId()))) {
-                skipped++;
-                continue;
-            }
-            processed++;
-            if (state.reachable().size() - lastLoggedCount >= PROGRESS_LOG_INTERVAL_STATIONS) {
-                log.debug("  ... {} stations reachable (queue={})", state.reachable().size(), state.queue().size());
-                lastLoggedCount = state.reachable().size();
-            }
-
-            for (String tripId : transitGraph.getTripsAtStop(cur.stationId())) {
-                boolean isTransfer = cur.currentTripId() != null && !tripId.equals(cur.currentTripId());
-                int nextTransfers = isTransfer ? cur.transfers() + 1 : cur.transfers();
-                if (nextTransfers > maxTransfers) continue;
-                if (isTransfer && !isTransferFeasible(cur, tripId, minTransferMins, maxTransferMins)) continue;
-                if (!exploredBoardings.add(boardingKey(cur, tripId, nextTransfers))) {
-                    skipped++;
-                    continue;
-                }
-                rideTrip(state, cur, tripId, nextTransfers);
-            }
+        String stationId() {
+            return trip.stops().get(alightIdx);
         }
 
-        log.info("  BFS stats: {} queue items ({} processed, {} skipped = {}% pruned), {} stations",
-                processed + skipped, processed, skipped,
-                String.format("%.1f", skipRatePercent(processed, skipped)), state.reachable().size());
-        return state.reachable();
+        int arrivalSeconds() {
+            return trip.arrivalSeconds(alightIdx);
+        }
+    }
+
+    /** bestByStation holds per station the rides of its result, by ascending transfers and descending duration. */
+    private record SearchState(String startId, int minTransferMins, int maxTransferMins,
+                               Map<String, int[]> bestDurationsByTrip, Map<String, List<Ride>> bestByStation) {}
+
+    /**
+     * Every station reachable from startId with at most maxTransfers. Per station: the fastest path for each
+     * transfer count that is faster than every path with fewer transfers, ordered by ascending transfers. So the
+     * first path has the fewest transfers and the last one is the fastest. The start station maps to an empty path.
+     */
+    public Map<String, List<JourneyPath>> search(String startId, int maxTransfers,
+                                                 int minTransferMins, int maxTransferMins) {
+        SearchState state = new SearchState(startId, minTransferMins, maxTransferMins,
+                new HashMap<>(), new HashMap<>());
+        List<Ride> arrivals = new ArrayList<>();
+        for (TripTimetable.Departure departure : transitGraph.getDeparturesAt(startId)) {
+            ride(state, departure, 0, 0, null, arrivals);
+        }
+        long arrivalCount = arrivals.size();
+        for (int transfers = 1; transfers <= maxTransfers && !arrivals.isEmpty(); transfers++) {
+            arrivals = transferRound(state, arrivals, transfers);
+            arrivalCount += arrivals.size();
+            log.debug("  Round {}: {} stop arrivals, {} stations", transfers, arrivals.size(),
+                    state.bestByStation().size());
+        }
+
+        log.info("  Search stats: {} stop arrivals on {} trips, {} stations",
+                arrivalCount, state.bestDurationsByTrip().size(), state.bestByStation().size() + 1);
+        return toJourneyPaths(state);
+    }
+
+    /** Boards each station's departures from the previous round's arrivals there; returns the new arrivals. */
+    private List<Ride> transferRound(SearchState state, List<Ride> previousArrivals, int transfers) {
+        // Grouped before this round lowers any best durations, so only same-round overtaking drops an arrival
+        Map<String, List<Ride>> arrivalsByStation = new HashMap<>();
+        for (Ride arrival : previousArrivals) {
+            if (isOvertaken(state, arrival)) continue;
+            arrivalsByStation.computeIfAbsent(arrival.stationId(), id -> new ArrayList<>()).add(arrival);
+        }
+        List<Ride> arrivals = new ArrayList<>();
+        arrivalsByStation.forEach((stationId, stationArrivals) ->
+                transferAt(state, stationId, stationArrivals, transfers, arrivals));
+        return arrivals;
     }
 
     /**
-     * Extends a finished (maxTransfers - 1) result by one transfer. Only stations reached with exactly
-     * maxTransfers - 1 transfers can start the extra transfer, so the search only walks that frontier
-     * instead of the whole network again. Stations already known keep their paths unless beaten.
+     * Boards every departure at the station from the arrival that catches it with the shortest journey so far.
+     * Any other arrival would ride the same trip with as many transfers but longer, so it is not needed. Waits past
+     * midnight get their own window, with the arrivals moved a day back.
      */
-    public Map<String, JourneyPath> incrementalSearch(String startId, Map<String, JourneyPath> previous,
-                                                      int maxTransfers, int minTransferMins, int maxTransferMins) {
-        SearchState state = new SearchState(startId, maxTransfers, new HashMap<>(previous), new ArrayDeque<>());
-        Set<String> exploredBoardings = new HashSet<>();
-        int processed = 0;
-        int skipped = 0;
+    private void transferAt(SearchState state, String stationId, List<Ride> stationArrivals, int transfers,
+                            List<Ride> arrivals) {
+        stationArrivals.sort(Comparator.comparingInt(Ride::arrivalSeconds));
+        int[] arrivalSeconds = stationArrivals.stream().mapToInt(Ride::arrivalSeconds).toArray();
+        int[] durationMinutes = stationArrivals.stream().mapToInt(Ride::durationMinutes).toArray();
+        int minWaitSeconds = state.minTransferMins() * GtfsTime.SECONDS_PER_MINUTE;
+        int maxWaitSeconds = state.maxTransferMins() * GtfsTime.SECONDS_PER_MINUTE;
+        TransferWindow sameDay = new TransferWindow(arrivalSeconds, durationMinutes, 0,
+                minWaitSeconds, maxWaitSeconds);
+        TransferWindow overnight = new TransferWindow(arrivalSeconds, durationMinutes, -GtfsTime.SECONDS_PER_DAY,
+                minWaitSeconds, Math.min(maxWaitSeconds, GtfsTime.MAX_OVERNIGHT_GAP_SECONDS));
 
-        previous.forEach((stopId, path) -> {
-            if (path.getTransfers() == maxTransfers - 1) state.queue().offer(frontierItem(stopId, path));
-        });
-        log.info("  Incremental BFS frontier: {} stations with exactly {} transfers",
-                state.queue().size(), maxTransfers - 1);
-
-        while (!state.queue().isEmpty()) {
-            QueueItem cur = state.queue().poll();
-            processed++;
-            for (String tripId : transitGraph.getTripsAtStop(cur.stationId())) {
-                boolean isContinuation = tripId.equals(cur.currentTripId());
-                int nextTransfers = isContinuation ? cur.transfers() : cur.transfers() + 1;
-                if (nextTransfers > maxTransfers) continue;
-                if (!isContinuation && !cur.connections().isEmpty()
-                        && !isTransferFeasible(cur, tripId, minTransferMins, maxTransferMins)) continue;
-                if (!exploredBoardings.add(boardingKey(cur, tripId, nextTransfers))) {
-                    skipped++;
-                    continue;
-                }
-                rideTrip(state, cur, tripId, nextTransfers);
-            }
-        }
-
-        log.info("  Incremental BFS done: +{} new stations (total {}), {}% pruned",
-                state.reachable().size() - previous.size(), state.reachable().size(),
-                String.format("%.1f", skipRatePercent(processed, skipped)));
-        return state.reachable();
-    }
-
-    private static QueueItem frontierItem(String stopId, JourneyPath path) {
-        List<Connection> connections = path.getConnections();
-        String currentTripId = connections.isEmpty() ? null : connections.getLast().getTripId();
-        return new QueueItem(stopId, path.getTransfers(), path.getStationIds(), connections,
-                currentTripId, path.getTotalDurationMinutes());
-    }
-
-    private static boolean isWorseThanKnown(QueueItem item, JourneyPath known) {
-        if (known == null) return false;
-        return known.getTransfers() < item.transfers()
-                || (known.getTransfers() == item.transfers()
-                    && known.getTotalDurationMinutes() < item.durationMinutes());
-    }
-
-    /** The trip continues past the station and departs within the allowed transfer window. */
-    private boolean isTransferFeasible(QueueItem cur, String tripId, int minTransferMins, int maxTransferMins) {
-        int stopIdx = transitGraph.getStopIndexOnTrip(tripId, cur.stationId());
-        if (stopIdx < 0) return false;
-        List<String> tripStops = transitGraph.getStopsOnTrip(tripId);
-        if (stopIdx >= tripStops.size() - 1) return false;
-        if (cur.connections().isEmpty()) return true;
-
-        Connection departure = transitGraph.getConnectionByTrip(cur.stationId(), tripStops.get(stopIdx + 1), tripId);
-        if (departure == null) return false;
-        int waitMins = GtfsTime.diffMinutes(cur.connections().getLast().getArrivalTimeSeconds(),
-                departure.getDepartureTimeSeconds());
-        return waitMins >= minTransferMins && waitMins <= maxTransferMins;
-    }
-
-    /** Rides the trip from cur's station to its last stop, recording every stop the ride improves. */
-    private void rideTrip(SearchState state, QueueItem cur, String tripId, int transfers) {
-        int boardIdx = transitGraph.getStopIndexOnTrip(tripId, cur.stationId());
-        if (boardIdx < 0) return;
-        List<String> tripStops = transitGraph.getStopsOnTrip(tripId);
-        if (boardIdx >= tripStops.size() - 1) return;
-
-        List<Connection> connections = new ArrayList<>(cur.connections());
-        List<String> path = new ArrayList<>(cur.path());
-        int durationMinutes = cur.durationMinutes();
-        int prevArrivalSeconds = connections.isEmpty() ? -1 : connections.getLast().getArrivalTimeSeconds();
-
-        for (int i = boardIdx + 1; i < tripStops.size(); i++) {
-            Connection conn = transitGraph.getConnectionByTrip(tripStops.get(i - 1), tripStops.get(i), tripId);
-            if (conn == null) break;
-            // Waiting time at the boarding stop (transfer or dwell) counts towards the journey
-            if (prevArrivalSeconds >= 0) {
-                durationMinutes += Math.max(0, GtfsTime.diffMinutes(prevArrivalSeconds, conn.getDepartureTimeSeconds()));
-            }
-            durationMinutes += Math.max(0,
-                    GtfsTime.diffMinutes(conn.getDepartureTimeSeconds(), conn.getArrivalTimeSeconds()));
-            prevArrivalSeconds = conn.getArrivalTimeSeconds();
-            connections.add(conn);
-            String stopId = tripStops.get(i);
-            path.add(stopId);
-            if (stopId.equals(state.startId())) continue;
-
-            if (isBetter(transfers, durationMinutes, state.reachable().get(stopId))) {
-                List<Connection> storedConnections = new ArrayList<>(connections);
-                List<String> storedPath = new ArrayList<>(path);
-                state.reachable().put(stopId, JourneyPath.builder()
-                        .stationIds(storedPath)
-                        .connections(storedConnections)
-                        .transfers(transfers)
-                        .totalDurationMinutes(durationMinutes)
-                        .build());
-                // At the transfer limit the station can only continue on the same trip, which this ride covers
-                if (transfers < state.maxTransfers()) {
-                    state.queue().offer(new QueueItem(stopId, transfers, storedPath, storedConnections,
-                            tripId, durationMinutes));
-                }
-            }
+        for (TripTimetable.Departure departure : transitGraph.getDeparturesAt(stationId)) {
+            Ride from = faster(departure, arrivalAt(stationArrivals, sameDay.bestFor(departure.departureSeconds())),
+                    arrivalAt(stationArrivals, overnight.bestFor(departure.departureSeconds())));
+            // Timetables are shared per trip. Staying on this trip beats changing onto it from any arrival.
+            if (from == null || from.trip() == departure.trip()) continue;
+            ride(state, departure, transfers, boardingMinutes(from, departure), from, arrivals);
         }
     }
 
-    private static boolean isBetter(int transfers, int durationMinutes, JourneyPath known) {
-        return known == null
-                || transfers < known.getTransfers()
-                || (transfers == known.getTransfers() && durationMinutes < known.getTotalDurationMinutes());
+    private static Ride arrivalAt(List<Ride> stationArrivals, int index) {
+        return index >= 0 ? stationArrivals.get(index) : null;
     }
 
-    private static String boardingKey(QueueItem cur, String tripId, int transfers) {
-        return cur.stationId() + "|" + tripId + "|" + transfers;
+    private static Ride faster(TripTimetable.Departure departure, Ride sameDay, Ride overnight) {
+        if (sameDay == null || overnight == null) return sameDay != null ? sameDay : overnight;
+        return boardingMinutes(overnight, departure) < boardingMinutes(sameDay, departure) ? overnight : sameDay;
     }
 
-    private static double skipRatePercent(int processed, int skipped) {
-        int total = processed + skipped;
-        return total > 0 ? skipped * 100.0 / total : 0;
+    /** Journey time up to the departure, the wait included. */
+    private static int boardingMinutes(Ride from, TripTimetable.Departure departure) {
+        return from.durationMinutes() + GtfsTime.diffMinutes(from.arrivalSeconds(), departure.departureSeconds());
+    }
+
+    /** A faster ride of the same round reached the same stop of the same trip later on. */
+    private static boolean isOvertaken(SearchState state, Ride arrival) {
+        int[] bestDurations = state.bestDurationsByTrip().get(arrival.trip().tripId());
+        return bestDurations[arrival.alightIdx()] < arrival.durationMinutes();
+    }
+
+    /** Rides the trip from the departure on, recording each stop until an earlier ride was there no slower. */
+    private void ride(SearchState state, TripTimetable.Departure departure, int transfers, int boardDurationMinutes,
+                      Ride previous, List<Ride> arrivals) {
+        TripTimetable trip = departure.trip();
+        int[] bestDurations = state.bestDurationsByTrip().computeIfAbsent(trip.tripId(), id -> unreached(trip));
+        int boardIdx = departure.stopIdx();
+        for (int alightIdx = boardIdx + 1; alightIdx < trip.stopCount() && trip.hasLeg(alightIdx - 1); alightIdx++) {
+            int durationMinutes = boardDurationMinutes + trip.rideMinutes(boardIdx, alightIdx);
+            if (durationMinutes >= bestDurations[alightIdx]) return;
+            bestDurations[alightIdx] = durationMinutes;
+            if (trip.stops().get(alightIdx).equals(state.startId())) continue;
+
+            Ride ride = new Ride(trip, boardIdx, alightIdx, transfers, durationMinutes, previous);
+            arrivals.add(ride);
+            keepIfFaster(state, ride);
+        }
+    }
+
+    private static int[] unreached(TripTimetable trip) {
+        int[] durations = new int[trip.stopCount()];
+        Arrays.fill(durations, Integer.MAX_VALUE);
+        return durations;
+    }
+
+    /**
+     * Keeps the ride if it is faster than every kept ride of its station. Rounds run by ascending transfers, so all
+     * of those have no more transfers than this one, and the last kept ride is the fastest.
+     */
+    private static void keepIfFaster(SearchState state, Ride ride) {
+        List<Ride> best = state.bestByStation().computeIfAbsent(ride.stationId(), id -> new ArrayList<>());
+        Ride fastest = best.isEmpty() ? null : best.getLast();
+        if (fastest != null && fastest.durationMinutes() <= ride.durationMinutes()) return;
+        if (fastest != null && fastest.transfers() == ride.transfers()) best.removeLast();
+        best.add(ride);
+    }
+
+    private Map<String, List<JourneyPath>> toJourneyPaths(SearchState state) {
+        Map<String, List<JourneyPath>> result = new HashMap<>(state.bestByStation().size() * 2);
+        result.put(state.startId(), List.of(JourneyPath.builder()
+                .stationIds(List.of(state.startId()))
+                .connections(List.of())
+                .transfers(0)
+                .totalDurationMinutes(0)
+                .build()));
+        state.bestByStation().forEach((stationId, rides) ->
+                result.put(stationId, rides.stream().map(ride -> toJourneyPath(state.startId(), ride)).toList()));
+        return result;
+    }
+
+    private JourneyPath toJourneyPath(String startId, Ride last) {
+        List<Ride> rides = new ArrayList<>();
+        for (Ride ride = last; ride != null; ride = ride.previous()) {
+            rides.add(ride);
+        }
+        List<String> stationIds = new ArrayList<>(List.of(startId));
+        List<Connection> connections = new ArrayList<>();
+        for (Ride ride : rides.reversed()) {
+            List<String> stops = ride.trip().stops();
+            for (int i = ride.boardIdx(); i < ride.alightIdx(); i++) {
+                connections.add(transitGraph.getConnectionByTrip(stops.get(i), stops.get(i + 1), ride.trip().tripId()));
+                stationIds.add(stops.get(i + 1));
+            }
+        }
+        return JourneyPath.builder()
+                .stationIds(stationIds)
+                .connections(connections)
+                .transfers(last.transfers())
+                .totalDurationMinutes(last.durationMinutes())
+                .build();
     }
 }
