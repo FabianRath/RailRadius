@@ -17,7 +17,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 - [ ] **F5** `/api/admin/debug/stations?includeIsolated=true` is referenced in old notes but not implemented.
 - [ ] **F6** Add authentification to acces the site with something like https://clerk.com (Seperate dev accounts and user accounts with different acces)
 - [ ] **F7** We currently display the amount of reachable stations under our Calcualte Reachbility button, the same label also shows our selected station when we have not clicked on calculate yet. This label is redundant as we already display the amount of reachable stations under Results just below that.
-- [ ] **F8** Lets make our "side panel" in which the user enters the station etc. something that can be toggled to disapear into a button. That way different screen resulutions can still see the map.
 
 
 ## Structure

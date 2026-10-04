@@ -74,6 +74,55 @@ body {
 .header {
     padding: 32px 28px 24px;
     border-bottom: 1px solid var(--border);
+    position: relative;
+}
+
+/* ── Sidebar toggle ── */
+.container.sidebar-collapsed {
+    grid-template-columns: 1fr;
+}
+
+.container.sidebar-collapsed .sidebar,
+.container:not(.sidebar-collapsed) .sidebar-show {
+    display: none;
+}
+
+.sidebar-hide,
+.sidebar-show {
+    background: var(--bg-overlay);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.sidebar-hide:hover,
+.sidebar-show:hover {
+    border-color: var(--accent-rail);
+    color: var(--accent-rail);
+}
+
+.sidebar-hide {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    font-size: 20px;
+    line-height: 1;
+}
+
+.sidebar-show {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 1000;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    backdrop-filter: blur(4px);
 }
 
 h1 {

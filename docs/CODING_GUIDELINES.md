@@ -59,7 +59,7 @@ Binding for every change. Existing code does not always follow them yet. New and
 - Need new data? Extend `gtfs-mini` and document it in its README. Don't create a parallel fixture.
 
 ## 8. Frontend (`frontend/`)
-- Vanilla, no build step. `index.html` holds markup only, `css/app.css` all styles, `js/` one ES module per concern (`api`, `map`, `search`, `query-form`, `reachability`, `coverage`, `popup`, `debug`, `util`; `main.js` wires them up). New logic goes into the module it belongs to, or a new one.
+- Vanilla, no build step. `index.html` holds markup only, `css/app.css` all styles, `js/` one ES module per concern (`api`, `map`, `search`, `query-form`, `reachability`, `coverage`, `popup`, `debug`, `sidebar`, `util`; `main.js` wires them up). New logic goes into the module it belongs to, or a new one.
 - Only `js/map.js` talks to MapLibre. Other modules call its functions and never touch the map object.
 - Use `const` by default, `let` only when reassigned, never `var`. Use `async`/`await` with `fetch`. Declare functions with `function name() {}`.
 - Reuse existing helpers (`fmtMins`, `escapeHtml`, `showStatus`, `cssVar`, …) before writing new ones.
