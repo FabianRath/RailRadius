@@ -26,7 +26,6 @@ bindPopup(LAYERS.reachable, ({ stopId }) => stationPopupHtml(getStation(stopId))
 initSearch(station => {
     selectedStation = station;
     showQueryForm();
-    showStatus('info', `Selected: ${station.name}`);
 });
 initQueryForm(refreshCoverage);
 initReachability(() => selectedStation);

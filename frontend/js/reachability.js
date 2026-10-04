@@ -3,7 +3,7 @@ import { addReachableStations, clearReachableStations, fitToPoints, getZoom, has
     from './map.js';
 import { buildCoverage } from './coverage.js';
 import { coverageEnabled, readQuery } from './query-form.js';
-import { showStatus } from './util.js';
+import { clearStatus, showStatus } from './util.js';
 
 const calculateBtn = document.getElementById('calculateBtn');
 const resultsSection = document.getElementById('resultsSection');
@@ -50,6 +50,7 @@ function calculate(station) {
     const key = cacheKey(station.id, query);
     console.log('Reachability query:', key);
 
+    clearStatus();
     results.clear();
     clearReachableStations();
     setCoverage(null);
@@ -61,7 +62,6 @@ function calculate(station) {
         addResults(cached);
         fitToResults(cached);
         refreshCoverage();
-        showStatus('info', `Loaded ${cached.length.toLocaleString()} stations from cache (instant)`);
         return;
     }
     streamResults(station.id, query, key);
@@ -98,8 +98,6 @@ function streamResults(stationId, query, key) {
         refreshCoverage();
         console.log('Stream done:', info.total, 'stations in', `${info.calculationTimeMs}ms`,
             info.fromCache ? '(from server cache)' : '');
-        showStatus('info', `Found ${info.total.toLocaleString()} reachable stations`
-            + (info.fromCache ? ' (instant — server cache)' : ''));
     });
 
     // Fires for the backend's own 'error' event (message in e.data) and for a lost connection (no data)
