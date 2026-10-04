@@ -1,7 +1,7 @@
-import { escapeHtml } from './util.js';
+import { countryBadgeHtml, escapeHtml } from './util.js';
 
 export function stationPopupHtml(station) {
-    return `<div class="popup-station">${escapeHtml(station.stopName)}</div>`
+    return `<div class="popup-station">${escapeHtml(station.stopName)}${countryBadgeHtml(station.country)}</div>`
         + `<div class="popup-meta">Transfers: ${station.transfers}</div>`
         + journeyHtml(station);
 }
@@ -19,16 +19,19 @@ function legsHtml(station) {
             return `<div class="leg leg-train">🚂 ${escapeHtml(leg.trainName || 'Train')}${duration}</div>`;
         }
         if (leg.type === 'TRANSFER') {
-            return `<div class="leg leg-transfer">🔄 Transfer at ${escapeHtml(leg.fromStation)}${duration}</div>`;
+            const station = escapeHtml(leg.fromStation) + countryBadgeHtml(leg.fromCountry);
+            return `<div class="leg leg-transfer">🔄 Transfer at ${station}${duration}</div>`;
         }
         return '';
     }).join('');
     return '<div class="popup-path">'
         + `<div class="popup-total">⏱️ Total Journey Time: ${escapeHtml(station.totalDuration || 'N/A')}</div>`
         + '<div class="popup-heading">Journey details</div>'
-        + `<div class="leg leg-stop">🚉 START: ${escapeHtml(station.pathNames?.[0] || 'Start')}</div>`
+        + `<div class="leg leg-stop">🚉 START: ${escapeHtml(station.pathNames?.[0] || 'Start')}`
+        + `${countryBadgeHtml(station.legs[0].fromCountry)}</div>`
         + legs
-        + `<div class="leg leg-stop">🎯 DESTINATION: ${escapeHtml(station.stopName)}</div>`
+        + `<div class="leg leg-stop">🎯 DESTINATION: ${escapeHtml(station.stopName)}`
+        + `${countryBadgeHtml(station.country)}</div>`
         + '</div>';
 }
 

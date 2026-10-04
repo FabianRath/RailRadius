@@ -12,7 +12,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (caching / infrastructure)
 
 ## Features / UX
-- [ ] **F1** Rework station naming. I would like to see the coutry code displayed in some way (DE, NL...)
 
 
 ## Structure

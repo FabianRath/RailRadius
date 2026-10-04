@@ -15,6 +15,11 @@ export function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
 }
 
+/** A small ISO country code pill after a station name; nothing when the country is unknown. */
+export function countryBadgeHtml(country) {
+    return country ? ` <span class="country-badge">${escapeHtml(country)}</span>` : '';
+}
+
 /** Reads a colour or size defined as a CSS variable in app.css, so the map uses the same palette as the UI. */
 export function cssVar(name) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();

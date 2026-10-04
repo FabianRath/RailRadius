@@ -1,5 +1,5 @@
 import { searchStations } from './api.js';
-import { escapeHtml } from './util.js';
+import { countryBadgeHtml, escapeHtml } from './util.js';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const MIN_QUERY_LENGTH = 2;
@@ -44,7 +44,7 @@ function stationItemHtml(station) {
         ? `${station.connections} connection${station.connections !== 1 ? 's' : ''}`
         : station.id;
     return `<div class="station-item" data-id="${escapeHtml(station.id)}" data-name="${escapeHtml(station.name)}">`
-        + `<div class="station-name">${escapeHtml(station.name)}</div>`
+        + `<div class="station-name">${escapeHtml(station.name)}${countryBadgeHtml(station.country)}</div>`
         + `<div class="station-id">${escapeHtml(detail)}</div>`
         + '</div>';
 }

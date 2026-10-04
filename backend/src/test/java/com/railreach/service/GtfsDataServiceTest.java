@@ -155,6 +155,16 @@ class GtfsDataServiceTest {
     }
 
     @Test
+    void stationsCarryTheCountryTheirCoordinatesLieIn(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, "kappa", "lambda");
+
+        assertThat(graph.getStation("kappa:K1").getCountry()).isEqualTo("KA");
+        assertThat(graph.getStation("kappa:K4").getCountry()).as("stop abroad, not snapped").isEqualTo("LA");
+        assertThat(graph.getStation("lambda:L1").getCountry()).isEqualTo("LA");
+        assertThat(gtfs.getStation("alpha:A1").getCountry()).as("outside every border").isNull();
+    }
+
+    @Test
     void connectionsStoreTimesAsSecondsSinceMidnight() {
         var conn = gtfs.getConnectionByTrip("alpha:A1", "alpha:A2", "alpha:T1");
         assertThat(conn.getDepartureTimeSeconds()).isEqualTo(8 * 3600);

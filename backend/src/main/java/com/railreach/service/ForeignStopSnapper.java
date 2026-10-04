@@ -30,19 +30,13 @@ final class ForeignStopSnapper {
     private ForeignStopSnapper() {}
 
     /** Adds alias → local station for every foreign stop with a local station in reach; returns how many. */
-    static int snap(Collection<Station> stations, CountryLocator countryLocator,
-                    Map<String, String> aliasToCanonical) {
-        Map<String, String> countryByStopId = new HashMap<>();
-        for (Station station : stations) {
-            countryLocator.countryAt(station.getLatitude(), station.getLongitude())
-                    .ifPresent(iso -> countryByStopId.put(station.getId(), iso));
-        }
-        Map<String, String> homeBySource = homeCountries(countryByStopId);
+    static int snap(Collection<Station> stations, Map<String, String> aliasToCanonical) {
+        Map<String, String> homeBySource = homeCountries(stations);
         StationGrid grid = new StationGrid(stations, SNAP_CELL_SIZE_DEG);
 
         int snapped = 0;
         for (Station stop : stations) {
-            String country = countryByStopId.get(stop.getId());
+            String country = stop.getCountry();
             String home = homeBySource.get(StopIds.source(stop.getId()));
             if (country == null || home == null || country.equals(home)) continue;
             if (aliasToCanonical.containsKey(stop.getId())) continue;
@@ -57,10 +51,11 @@ final class ForeignStopSnapper {
     }
 
     /** Source → the country most of its located stations lie in, for sources where that is more than half. */
-    private static Map<String, String> homeCountries(Map<String, String> countryByStopId) {
-        Map<String, Map<String, Long>> countsBySource = countryByStopId.entrySet().stream()
-                .collect(Collectors.groupingBy(entry -> StopIds.source(entry.getKey()),
-                        Collectors.groupingBy(Map.Entry::getValue, Collectors.counting())));
+    private static Map<String, String> homeCountries(Collection<Station> stations) {
+        Map<String, Map<String, Long>> countsBySource = stations.stream()
+                .filter(station -> station.getCountry() != null)
+                .collect(Collectors.groupingBy(station -> StopIds.source(station.getId()),
+                        Collectors.groupingBy(Station::getCountry, Collectors.counting())));
         Map<String, String> homeBySource = new HashMap<>();
         countsBySource.forEach((source, counts) -> {
             long total = counts.values().stream().mapToLong(Long::longValue).sum();

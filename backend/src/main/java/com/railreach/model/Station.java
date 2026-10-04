@@ -15,4 +15,6 @@ public class Station {
     private Double latitude;
     private Double longitude;
     private String parentStation;
+    // ISO 3166-1 alpha-2 code from the coordinates; null at sea or outside the covered countries
+    private String country;
 }
