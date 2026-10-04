@@ -2,8 +2,8 @@
 
 Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the name is the folder name up to the first `-`.
 
-- **alpha**: A1 Alpha Central, A2/A2b Alpha North (duplicate stop, merged per feed), A3 Border Town, A4 Alpha West, A9 bus stop (bus route, filtered out), AP parent station of A1 and AE its entrance (no rail trip uses either, so neither becomes a station)
-  - T1 RE1: A1 08:00 → A2b 08:30 → A3 09:00
+- **alpha**: A1 Alpha Central, A5 Alpha Central (platform with parent_station A1, ~390 m away, beyond every distance-based merge, so merged into A1 only via its parent; B23), A2/A2b Alpha North (duplicate stop, merged per feed), A3 Border Town, A4 Alpha West, A9 bus stop (bus route, filtered out), AP Alpha Central Complex and AE its entrance (no rail trip uses either, so neither becomes a station)
+  - T1 RE1: A5 08:00 → A2b 08:30 → A3 09:00
   - T4 NJ: A4 22:50 → A3 23:30
   - T2 bus: A1 → A9 (not rail, ignored)
 - **beta** (every file starts with a UTF-8 BOM, like the Austrian feed; the U1 and U2 rows of stop_times.txt are interleaved, which GTFS allows): B1 Border Town Station (merged with A3 across borders), B2 Beta City

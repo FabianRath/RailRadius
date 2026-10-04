@@ -1,5 +1,6 @@
 stop_id,stop_name,stop_lat,stop_lon,parent_station,location_type
-A1,Alpha Central,48.2000,16.2000,AP,0
+A1,Alpha Central,48.2000,16.2000,,0
+A5,Alpha Central,48.2035,16.2000,A1,0
 A2,Alpha North,48.3000,16.3000,,0
 A2b,Alpha North,48.3005,16.3005,,0
 A3,Border Town,48.0000,17.0000,,0

@@ -93,6 +93,13 @@ class GtfsDataServiceTest {
     }
 
     @Test
+    void platformFarFromItsParentStationIsMergedIntoIt() {
+        // T1 departs from platform A5, ~390 m from its parent_station A1: beyond every distance-based merge
+        assertThat(gtfs.getStation("alpha:A5")).isNull();
+        assertThat(gtfs.getNeighbors("alpha:A1")).contains("alpha:A2");
+    }
+
+    @Test
     void similarNearbyStationsAcrossFeedsAreMerged() {
         // "Border Town" (alpha, no outgoing edges) merges into "Border Town Station" (beta)
         assertThat(gtfs.getStation("alpha:A3")).isNull();
