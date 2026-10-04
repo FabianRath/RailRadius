@@ -66,7 +66,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `GtfsDataService` | service | Fills the `TransitGraph` at startup (cache file, else zips) and on `reload-gtfs`, then rebuilds the station search index and (on reload) clears the reachability caches |
 | `TransitGraph` | service | The merged network: stations, edges, connections, trip indexes. Everything that reads GTFS data injects this |
 | `GtfsFeedLoader` | service | Parses the rail part of each zip into the graph, with per-feed stop dedup |
-| `GtfsCsvReader` | service | Row-by-row reader for one CSV file inside a GTFS zip |
+| `GtfsCsvReader` | service | Row-by-row reader for one CSV file inside a GTFS zip; strips a UTF-8 BOM from the header |
 | `StationSearchIndex` | service | Station name search: trigram → station positions, in degree order; rebuilt after each load |
 | `StationDeduplicator` | service | Within-country and cross-border station merging after all feeds are loaded |
 | `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`: format version, stations, trips); a file with another version is ignored |
@@ -99,6 +99,8 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
    - `neighbors`: stopId → neighbour stopIds
    - `connections`: `"from->to"` → list of `Connection`
    - `tripStops`: tripId → ordered stop list; `stopTrips`: stopId → tripIds
+
+A feed that adds no connections at all (e.g. unreadable headers) is logged as a `!!!` WARN.
 
 After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStations`):
 5. **Within-country dedup**: same exact name, same source, within ~200 m.

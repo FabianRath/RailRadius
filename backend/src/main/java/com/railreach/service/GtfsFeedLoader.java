@@ -86,14 +86,18 @@ public class GtfsFeedLoader {
             log.info("--------------------------------------------------------------------------------------");
             log.info("[{}/{}] Loading: {} (source={})", i + 1, zipFiles.length, zipFile.getName(), source);
             try {
-                loadFeed(zipFile, source, graph);
+                if (loadFeed(zipFile, source, graph) == 0) {
+                    log.warn("!!! {} added no rail connections to the graph; see the messages above",
+                            zipFile.getName());
+                }
             } catch (Exception e) {
                 log.error("Failed to load {}", zipFile.getName(), e);
             }
         }
     }
 
-    private void loadFeed(File file, String source, TransitGraph graph) throws IOException {
+    /** Returns the number of connections added. */
+    private int loadFeed(File file, String source, TransitGraph graph) throws IOException {
         try (ZipFile zipFile = new ZipFile(file)) {
             Map<String, String> routeNames = loadRailRoutes(zipFile);
             Map<String, GtfsStop> stops = loadStops(zipFile);
@@ -102,7 +106,7 @@ public class GtfsFeedLoader {
                     routeNames.size(), stops.size(), tripToRoute.size());
             if (stops.isEmpty()) {
                 log.error("  No stops loaded! Check stops.txt format");
-                return;
+                return 0;
             }
 
             Map<String, Station> stations = new HashMap<>();
@@ -111,9 +115,10 @@ public class GtfsFeedLoader {
                     rawToCanonical.size(), rawToCanonical.values().stream().distinct().count());
             if (rawToCanonical.isEmpty()) {
                 log.error("  No stop ID mappings created! Cannot build graph");
-                return;
+                return 0;
             }
-            loadStopTimes(zipFile, new FeedTables(source, routeNames, tripToRoute, rawToCanonical, stations), graph);
+            FeedTables tables = new FeedTables(source, routeNames, tripToRoute, rawToCanonical, stations);
+            return loadStopTimes(zipFile, tables, graph);
         }
     }
 
@@ -245,10 +250,11 @@ public class GtfsFeedLoader {
         return rawToRepresentative;
     }
 
-    private void loadStopTimes(ZipFile zipFile, FeedTables tables, TransitGraph graph) throws IOException {
+    /** Returns the number of connections added. */
+    private int loadStopTimes(ZipFile zipFile, FeedTables tables, TransitGraph graph) throws IOException {
         if (zipFile.getEntry("stop_times.txt") == null) {
             log.warn("  No stop_times.txt found");
-            return;
+            return 0;
         }
         Map<String, List<GtfsStopTime>> stopTimesByTrip = new HashMap<>();
         int tripsProcessed = 0;
@@ -290,6 +296,7 @@ public class GtfsFeedLoader {
         edgesAdded += addTrips(stopTimesByTrip, tables, graph);
         tripsProcessed += stopTimesByTrip.size();
         log.info("  Trips: {}, edges: {}", tripsProcessed, edgesAdded);
+        return edgesAdded;
     }
 
     /** Adds each buffered trip's stop sequence and edges to the graph. Returns the number of edges added. */

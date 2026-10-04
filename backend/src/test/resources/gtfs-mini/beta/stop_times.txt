@@ -1,4 +1,4 @@
-trip_id,arrival_time,departure_time,stop_id,stop_sequence
+﻿trip_id,arrival_time,departure_time,stop_id,stop_sequence
 U1,09:20:00,09:20:00,B1,1
 U1,10:00:00,10:00:00,B2,2
 U2,12:30:00,12:30:00,B1,1
