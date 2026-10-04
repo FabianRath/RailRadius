@@ -5,7 +5,7 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 **Next free IDs:** B22 · F7 · S12
 
 ## Bugs (data loading)
-- [ ] **S8** Feeds that failed to load: `data/gtfs/broken/` (finland, lithuania).
+- [ ] **S8** Feeds that failed to load: `data/gtfs/broken/` (finland, lithuania). Diagnosed 2026-10-04: both parse fine but contain no rail routes. `gtfs_finnland.zip` has route types 1104 (384, air) and 3 (798, bus); `gtfs_lithuania.zip` has 3 (3,039, bus), 4 (33, ferry) and 11 (31, trolleybus). Fix: download the rail operators' feeds instead (Finland: VR, e.g. via Fintraffic/Digitraffic; Lithuania: LTG Link) and update `docs/gtfs-sources.txt`; the zip for Finland should then be named `gtfs_finland.zip`.
 
 ## Bugs (algorithm)
 - [ ] **B2** BFS pruning ignores arrival time. `ReachabilitySearch` keeps one best path per station, ranked by (transfers, duration). An earlier-arriving but longer trip is pruned even when it enables a much better onward transfer. Repro: the disabled test `ReachabilityServiceTest.pruningShouldNotDiscardEarlierArrivalsThatEnableBetterTransfers` gets 250 min where 120 is possible. Probably the root cause of B3, B4 and B21. Fix direction: keep a Pareto set per station (arrival time × transfers), or switch to a time-dependent algorithm (e.g. RAPTOR / CSA profile).
