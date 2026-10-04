@@ -35,5 +35,3 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 
 
 ## Structure
-- [ ] **S10** `@Value` defaults in `HubRoutingService` disagree with `application.yml`: `num-hubs` 30 vs 50, `timeout-seconds` 300 vs 600. Only the yml values take effect, so the code defaults mislead. Align them with the yml.
-- [ ] **S11** `backend/src/main/resources/application.properties` only sets `spring.application.name`, which `application.yml` already sets. Delete the file.
