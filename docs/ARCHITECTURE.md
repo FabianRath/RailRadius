@@ -66,6 +66,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `GtfsDataService` | service | Fills the `TransitGraph` at startup (cache file, else zips) and on `reload-gtfs`, then rebuilds the station search index and (on reload) clears the reachability caches |
 | `TransitGraph` | service | The merged network: stations, edges, connections, trip indexes. Everything that reads GTFS data injects this |
 | `GtfsFeedLoader` | service | Parses the rail part of each zip into the graph, with per-feed stop dedup |
+| `TripRowBatcher` | service | Buffers stop_times rows per trip and hands whole trips to the loader in batches |
 | `GtfsCsvReader` | service | Row-by-row reader for one CSV file inside a GTFS zip; strips a UTF-8 BOM from the header |
 | `StationSearchIndex` | service | Station name search: trigram → station positions, in degree order; rebuilt after each load |
 | `StationDeduplicator` | service | Within-country and cross-border station merging after all feeds are loaded |
@@ -95,7 +96,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 1. **routes.txt**: keep only rail route types `2` and `100–106`.
 2. **stops.txt / trips.txt**: load stops and the trip→route map.
 3. **Per-feed stop dedup**: stops with the same name within ~0.0015° are merged. IDs are canonicalised to `<source>:<id>`, with `_ARR`/`_DEP`/`ARRIVAL_` style suffixes and prefixes stripped.
-4. **stop_times.txt**: streamed and buffered per trip in batches of 100k trips, rail trips only. Each trip's consecutive stop pairs produce:
+4. **stop_times.txt**: streamed and buffered per trip (`TripRowBatcher`), rail trips only, and handed to the graph in batches of `railreach.gtfs.trip-batch-size` (100k) trips. A batch is only cut where a new trip starts, so trips stay whole in files grouped by `trip_id`. If a trip shows up again after another one started, the rest of the file is read in one batch, and rows of a trip already built are dropped with a WARN. Each trip's consecutive stop pairs produce:
    - `neighbors`: stopId → neighbour stopIds
    - `connections`: `"from->to"` → list of `Connection`
    - `tripStops`: tripId → ordered stop list; `stopTrips`: stopId → tripIds

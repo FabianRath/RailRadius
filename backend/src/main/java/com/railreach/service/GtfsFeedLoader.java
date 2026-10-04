@@ -6,6 +6,7 @@ import com.railreach.util.Coordinates;
 import com.railreach.util.GtfsTime;
 import com.railreach.util.StopIds;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -29,8 +30,6 @@ import static com.railreach.service.GtfsCsvReader.intField;
 @Slf4j
 public class GtfsFeedLoader {
 
-    // Buffered trips are turned into edges in batches, so big feeds don't hold all stop_times in memory
-    private static final int TRIP_BATCH_SIZE = 100_000;
     private static final int STOP_TIMES_PROGRESS_LOG_INTERVAL = 500_000;
     // ~150 m: same-name stops of one feed closer than this are one station
     private static final double SAME_NAME_STOP_RADIUS_DEG = 0.0015;
@@ -51,6 +50,9 @@ public class GtfsFeedLoader {
         Pattern.compile("^ARR_",        Pattern.CASE_INSENSITIVE),
         Pattern.compile("^DEP_",        Pattern.CASE_INSENSITIVE)
     );
+
+    @Value("${railreach.gtfs.trip-batch-size:100000}")
+    private int tripBatchSize;
 
     private record GtfsStop(String stopId, String name, double lat, double lon, String parentStation) {}
 
@@ -256,9 +258,8 @@ public class GtfsFeedLoader {
             log.warn("  No stop_times.txt found");
             return 0;
         }
-        Map<String, List<GtfsStopTime>> stopTimesByTrip = new HashMap<>();
-        int tripsProcessed = 0;
-        int edgesAdded = 0;
+        TripRowBatcher<GtfsStopTime> batcher =
+                new TripRowBatcher<>(tripBatchSize, stopTimesByTrip -> addTrips(stopTimesByTrip, tables, graph));
         int railRowsRead = 0;
         int nonRailRowsSkipped = 0;
         try (GtfsCsvReader csv = GtfsCsvReader.open(zipFile, "stop_times.txt")) {
@@ -276,26 +277,19 @@ public class GtfsFeedLoader {
                     nonRailRowsSkipped++;
                     continue;
                 }
-                stopTimesByTrip.computeIfAbsent(tripId, k -> new ArrayList<>()).add(new GtfsStopTime(stopId,
+                batcher.add(tripId, new GtfsStopTime(stopId,
                         intField(row, sequenceCol),
                         GtfsTime.parseSeconds(field(row, arrivalCol)),
                         GtfsTime.parseSeconds(field(row, departureCol))));
 
                 if (++railRowsRead % STOP_TIMES_PROGRESS_LOG_INTERVAL == 0) {
                     log.info("  ... {} rail stop_times read ({} non-rail skipped), {} trips buffered",
-                            railRowsRead, nonRailRowsSkipped, stopTimesByTrip.size());
-                }
-                if (stopTimesByTrip.size() >= TRIP_BATCH_SIZE) {
-                    edgesAdded += addTrips(stopTimesByTrip, tables, graph);
-                    tripsProcessed += stopTimesByTrip.size();
-                    log.info("  ... {} trips processed total", tripsProcessed);
-                    stopTimesByTrip.clear();
+                            railRowsRead, nonRailRowsSkipped, batcher.bufferedTripCount());
                 }
             }
         }
-        edgesAdded += addTrips(stopTimesByTrip, tables, graph);
-        tripsProcessed += stopTimesByTrip.size();
-        log.info("  Trips: {}, edges: {}", tripsProcessed, edgesAdded);
+        int edgesAdded = batcher.finish();
+        log.info("  Trips: {}, edges: {}", batcher.tripCount(), edgesAdded);
         return edgesAdded;
     }
 
