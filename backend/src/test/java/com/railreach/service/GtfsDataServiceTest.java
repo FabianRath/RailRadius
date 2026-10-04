@@ -34,6 +34,15 @@ class GtfsDataServiceTest {
         assertThat(gtfs.getStopsOnTrip("beta:U1")).containsExactly("beta:B1", "beta:B2");
     }
 
+    // B6
+    @Test
+    void suburbanRailwayTripsAreLoaded(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, "epsilon");
+
+        assertThat(graph.getStopsOnTrip("epsilon:S1")).containsExactly("epsilon:E4", "epsilon:E7");
+        assertThat(graph.getStation("epsilon:E7")).isNotNull();
+    }
+
     @Test
     void tripsStayWholeWhenStopTimesAreReadInSmallBatches(@TempDir Path dir) throws Exception {
         TransitGraph graph = GtfsTestFixtures.load(dir, 1, "alpha");
