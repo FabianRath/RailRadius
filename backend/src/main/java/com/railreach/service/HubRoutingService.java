@@ -38,19 +38,19 @@ public class HubRoutingService {
     private final ReachabilitySearch search;
     private final ObjectMapper objectMapper;
     
-    @Value("${railreach.hub.cache-file:./hub-cache.json}")
+    @Value("${railreach.hub.cache-file:data/hub-cache.json}")
     private String hubCacheFile;
     
     @Value("${railreach.hub.auto-initialize:false}")
     private boolean autoInitialize;
     
-    @Value("${railreach.hub.num-hubs:30}")
+    @Value("${railreach.hub.num-hubs:50}")
     private int numHubs;
     
     @Value("${railreach.hub.precompute-transfers:1}")
     private int precomputeTransfers;
     
-    @Value("${railreach.hub.timeout-seconds:300}")
+    @Value("${railreach.hub.timeout-seconds:600}")
     private int timeoutSeconds;
     
     // Hub data structures
