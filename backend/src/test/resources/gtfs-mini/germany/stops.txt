@@ -1,0 +1,4 @@
+stop_id,stop_name,stop_lat,stop_lon
+GK,Germany Cologne,50.9400,6.9600
+GH,Germany Hamburg,53.5500,10.0000
+GW,Germany Westerland,54.9000,8.3100

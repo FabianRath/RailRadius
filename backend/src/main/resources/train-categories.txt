@@ -1,0 +1,9 @@
+# Train categories for feeds whose trip_short_name is a bare number (TrainCategories). A matching trip's train
+# number becomes "<category> <number>", e.g. DELFI's DB Fernverkehr trip "002310" on a route_type 101 route
+# becomes "ICE 2310", as written on the train.
+# Format: source;agency_name;route_type;category[;route_short_name...]. Without route short names the line matches
+# every route of that type. The first matching line wins, so list specific lines before general ones.
+# The German rules follow Transitous (scripts/de-DELFI.lua), see docs/gtfs-sources.md.
+germany;DB Fernverkehr AG;102;ECE;20;75;85;88
+germany;DB Fernverkehr AG;101;ICE
+germany;DB Fernverkehr AG;102;IC

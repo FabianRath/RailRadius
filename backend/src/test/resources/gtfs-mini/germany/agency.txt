@@ -1,0 +1,3 @@
+agency_id,agency_name,agency_url,agency_timezone
+FV,DB Fernverkehr AG,https://fv.example,Europe/Berlin
+RV,DB Regio AG,https://rv.example,Europe/Berlin

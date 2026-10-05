@@ -36,6 +36,17 @@ class GtfsDataServiceTest {
     }
 
     // B6
+    // F16: rules from train-categories.txt
+    @Test
+    void bareTrainNumbersGetTheCategoryOfTheirRouteType(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, "germany");
+
+        assertThat(trainNumber(graph, "germany:GT1")).isEqualTo("ICE 2310");
+        assertThat(trainNumber(graph, "germany:GT2")).isEqualTo("IC 2214");
+        assertThat(trainNumber(graph, "germany:GT3")).isEqualTo("ECE 9");
+        assertThat(trainNumber(graph, "germany:GT4")).isEqualTo("4711");
+    }
+
     @Test
     void suburbanRailwayTripsAreLoaded(@TempDir Path dir) throws Exception {
         TransitGraph graph = GtfsTestFixtures.load(dir, "epsilon");
@@ -217,5 +228,9 @@ class GtfsDataServiceTest {
     void cacheFileInAnOldFormatIsIgnored(@TempDir Path oldCacheDir) throws Exception {
         Files.writeString(oldCacheDir.resolve("gtfs-cache.json"), "{\"stations\":{},\"graph\":{},\"timestamp\":1}");
         assertThat(GtfsTestFixtures.cacheStore(oldCacheDir).load()).isEmpty();
+    }
+
+    private static String trainNumber(TransitGraph graph, String tripId) {
+        return graph.getTripInfo(tripId).orElseThrow().trainNumber();
     }
 }

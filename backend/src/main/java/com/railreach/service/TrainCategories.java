@@ -1,0 +1,69 @@
+package com.railreach.service;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * The category passengers see on a train ("ICE", "IC") for feeds that only give a bare train number and keep the
+ * category in nothing but the route type. Rules come from {@code train-categories.txt}.
+ */
+final class TrainCategories {
+
+    private static final String RULES_RESOURCE = "/train-categories.txt";
+    private static final int MIN_RULE_FIELDS = 4;
+
+    /** Empty {@code routeShortNames} matches every route. */
+    private record Rule(String source, String agencyName, int routeType, String category,
+                        Set<String> routeShortNames) {
+
+        boolean matches(String feedSource, String agency, int type, String routeShortName) {
+            return source.equals(feedSource) && agencyName.equals(agency) && routeType == type
+                    && (routeShortNames.isEmpty()
+                        || (routeShortName != null && routeShortNames.contains(routeShortName)));
+        }
+    }
+
+    private final List<Rule> rules;
+
+    TrainCategories() {
+        rules = loadRules();
+    }
+
+    /** The category of the first matching rule. */
+    Optional<String> of(String source, String agencyName, int routeType, String routeShortName) {
+        return rules.stream()
+                .filter(rule -> rule.matches(source, agencyName, routeType, routeShortName))
+                .map(Rule::category)
+                .findFirst();
+    }
+
+    private static List<Rule> loadRules() {
+        try (InputStream in = TrainCategories.class.getResourceAsStream(RULES_RESOURCE)) {
+            if (in == null) throw new IllegalStateException("Missing classpath resource " + RULES_RESOURCE);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+            return reader.lines()
+                    .map(String::strip)
+                    .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+                    .map(TrainCategories::parseRule)
+                    .toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    // Format: source;agency_name;route_type;category[;route_short_name...]
+    private static Rule parseRule(String line) {
+        List<String> fields = Arrays.stream(line.split(";")).map(String::strip).toList();
+        if (fields.size() < MIN_RULE_FIELDS) throw new IllegalStateException("Incomplete train category: " + line);
+        return new Rule(fields.get(0), fields.get(1), Integer.parseInt(fields.get(2)), fields.get(3),
+                Set.copyOf(fields.subList(MIN_RULE_FIELDS, fields.size())));
+    }
+}
