@@ -35,31 +35,28 @@ function legsHtml(station) {
 
 /** Train number, times and direction, so the train can be found on the operator's site. */
 function trainLegHtml(leg, duration) {
-    const { title, line } = trainTitle(leg);
-    const lineHtml = line ? ` <span class="leg-detail">line ${escapeHtml(line)}</span>` : '';
     const times = `${fmtGtfsClock(leg.departureTime)} ${escapeHtml(leg.fromStation)}`
         + ` → ${fmtGtfsClock(leg.arrivalTime)} ${escapeHtml(leg.toStation)}`;
     const details = [leg.headsign && `towards ${leg.headsign}`, leg.operator].filter(Boolean);
     const detailsHtml = details.length
         ? `<div class="leg-detail">${escapeHtml(details.join(' · '))}</div>` : '';
-    return `<div class="leg leg-train"><div>🚂 ${escapeHtml(title)}${lineHtml}${duration}</div>`
+    return `<div class="leg leg-train"><div>🚂 ${escapeHtml(trainTitle(leg))}${duration}</div>`
         + `<div class="leg-times">${times}</div>${detailsHtml}</div>`;
 }
 
 /**
  * Feeds split a train's name differently between route name and train number: "Ex 42" + "42", "ICE" + "2",
- * "A10-1" + "RJ 658", "33" + "2310". Shows the route name as a line only when it adds something.
+ * "A10-1" + "RJ 658", "33" + "ICE 2310". Shows what is written on the train; line numbers like "A10-1" or "33"
+ * mean nothing to passengers, so a route name that is no category is dropped.
  */
 function trainTitle(leg) {
     const name = leg.trainName;
     const number = leg.trainNumber;
-    if (!number) return { title: name || 'Train' };
+    if (!number) return name || 'Train';
     const numeric = /^\d+$/.test(number);
-    const numberTitle = numeric ? `Train ${number}` : number;
-    if (!name || number.split(/\s+/).includes(name)) return { title: numberTitle };
-    if (name.split(/\s+/).includes(number)) return { title: name };
-    if (numeric && /^\p{L}+$/u.test(name)) return { title: `${name} ${number}` };
-    return { title: numberTitle, line: name };
+    if (name?.split(/\s+/).includes(number)) return name;
+    if (numeric && name && /^\p{L}+$/u.test(name)) return `${name} ${number}`;
+    return numeric ? `Train ${number}` : number;
 }
 
 /** Fallback when the backend sent no legs: only the station sequence is known. */
