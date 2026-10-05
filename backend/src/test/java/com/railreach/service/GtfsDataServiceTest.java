@@ -132,6 +132,15 @@ class GtfsDataServiceTest {
                 .containsExactly("alpha:A1", "alpha:A2", "beta:B1");
     }
 
+    // B28
+    @Test
+    void crossFeedNamesThatDifferOnlyInAccentsAreMerged(@TempDir Path dir) throws Exception {
+        // gamma's G8 "Séta Halt" and delta's D7 "Seta Halt" are ~110 m apart and share no train
+        TransitGraph graph = GtfsTestFixtures.load(dir, "gamma", "delta");
+
+        assertThat(Stream.of("gamma:G8", "delta:D7").filter(id -> graph.getStation(id) != null)).hasSize(1);
+    }
+
     @Test
     void chainedMergesEndAtTheLastStation(@TempDir Path dir) throws Exception {
         // G2 merges into GX within gamma, then GX merges into delta's D1 across the border

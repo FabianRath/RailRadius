@@ -135,7 +135,7 @@ A feed that adds no connections at all (e.g. unreadable headers) is logged as a 
 After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStations`), every station first gets its `country` from `CountryLocator`; a merge keeps the canonical station's country.
 5. **Within-country dedup**: same exact name, same source, within ~200 m.
 6. **Cross-border dedup**, on pairs of stations of different sources within ~500 m (found via a ~1 km `StationGrid`), in two passes:
-   - **by name**: token Jaccard similarity ≥ 0.4;
+   - **by name**: token Jaccard similarity ≥ 0.4, ignoring case and accents (`StationNameVariants.fold`);
    - **by shared trains** (`SharedTrainMatcher`): at least 3 trains leave both at the same clock minute towards the same next station (or arrive from the same previous one), neighbours compared after the merges so far. Catches translated names ("Aachen, West Bf" / "Aix-la-Chapelle Ouest"). Repeated until a pass merges nothing.
 
    In both, the station with more connections becomes canonical.
