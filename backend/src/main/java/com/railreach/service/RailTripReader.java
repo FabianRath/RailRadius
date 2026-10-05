@@ -74,6 +74,18 @@ final class RailTripReader {
         return routes;
     }
 
+    /** Whether routes.txt has a route the loader keeps as rail, so a download can be checked without loading it. */
+    static boolean hasRailRoutes(ZipFile zipFile) throws IOException {
+        try (GtfsCsvReader csv = GtfsCsvReader.open(zipFile, "routes.txt")) {
+            int typeCol = csv.column("route_type");
+            for (String[] row = csv.next(); row != null; row = csv.next()) {
+                String routeType = field(row, typeCol);
+                if (routeType == null || isRail(GtfsCsvReader.parseInt(routeType))) return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * trip ID -> trip, for trips on the given rail routes only. {@code categoryColumn} is the trips.txt column with
      * the train category, null if the feed has none.

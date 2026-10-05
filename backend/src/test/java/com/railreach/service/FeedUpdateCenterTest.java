@@ -20,6 +20,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.Random;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 
@@ -37,6 +39,8 @@ class FeedUpdateCenterTest {
     private static final String FEED_PATH = "/feed.zip";
     private static final int HTTP_OK = 200;
     private static final int HTTP_NOT_FOUND = 404;
+    // Random bytes don't compress, so the padded zip is several times the size of plain zeta
+    private static final int PADDING_BYTES = 200_000;
 
     @TempDir
     Path tempDir;
@@ -195,6 +199,56 @@ class FeedUpdateCenterTest {
     }
 
     @Test
+    void downloadWithoutServiceDaysIsRejected() throws IOException {
+        Path served = tempDir.resolve("alpha.zip");
+        GtfsTestFixtures.zipFeed("alpha", served);
+        serve(HTTP_OK, Files.readAllBytes(served), false);
+
+        FeedDownloadResult result = center.download(feed(), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REJECTED);
+        assertThat(result.getMessage()).contains("No service days");
+        assertThat(gtfsDir.resolve("gtfs_zeta.zip")).doesNotExist();
+    }
+
+    @Test
+    void downloadWithoutRailRoutesIsRejected() throws IOException {
+        Path served = zipZeta(tempDir.resolve("bus.zip"), text -> text.replace("Zeta Regional,2", "Zeta Regional,3"));
+        serve(HTTP_OK, Files.readAllBytes(served), false);
+
+        FeedDownloadResult result = center.download(feed(), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REJECTED);
+        assertThat(result.getMessage()).contains("No rail routes");
+    }
+
+    @Test
+    void downloadMuchSmallerThanTheCurrentZipIsRejected() throws IOException {
+        Path zip = gtfsDir.resolve("gtfs_zeta.zip");
+        zipZeta(zip, UnaryOperator.identity(), PADDING_BYTES);
+        byte[] original = Files.readAllBytes(zip);
+        serve(HTTP_OK, Files.readAllBytes(zipZetaEndingIn2027(tempDir.resolve("new.zip"))), false);
+
+        FeedDownloadResult result = center.download(feed(), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REJECTED);
+        assertThat(result.getMessage()).contains("of the current zip's size");
+        assertThat(Files.readAllBytes(zip)).isEqualTo(original);
+    }
+
+    @Test
+    void downloadStartingAfterTodayIsRejected() throws IOException {
+        Path served = tempDir.resolve("zeta.zip");
+        GtfsTestFixtures.zipFeed("zeta", served);
+        serve(HTTP_OK, Files.readAllBytes(served), false);
+
+        FeedDownloadResult result = center.download(feed(), ZETA_FIRST_DAY.minusDays(1));
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REJECTED);
+        assertThat(result.getMessage()).isEqualTo("The download starts on " + ZETA_FIRST_DAY);
+    }
+
+    @Test
     void httpErrorIsRejected() throws IOException {
         serve(HTTP_NOT_FOUND, "missing".getBytes(), false);
 
@@ -237,12 +291,25 @@ class FeedUpdateCenterTest {
 
     /** zeta with its weekly services running a year longer. */
     private Path zipZetaEndingIn2027(Path zipFile) throws IOException {
-        Path folder = Files.createDirectories(tempDir.resolve("zeta-2027"));
+        return zipZeta(zipFile, text -> text.replace("20260131", "20270131"));
+    }
+
+    private Path zipZeta(Path zipFile, UnaryOperator<String> edit) throws IOException {
+        return zipZeta(zipFile, edit, 0);
+    }
+
+    /** zeta with {@code edit} applied to every file, plus {@code paddingBytes} of random data as shapes.txt. */
+    private Path zipZeta(Path zipFile, UnaryOperator<String> edit, int paddingBytes) throws IOException {
+        Path folder = Files.createTempDirectory(tempDir, "zeta");
         try (Stream<Path> files = Files.list(GtfsTestFixtures.resource("gtfs-mini/zeta"))) {
             for (Path file : files.toList()) {
-                Files.writeString(folder.resolve(file.getFileName()),
-                        Files.readString(file).replace("20260131", "20270131"));
+                Files.writeString(folder.resolve(file.getFileName()), edit.apply(Files.readString(file)));
             }
+        }
+        if (paddingBytes > 0) {
+            byte[] padding = new byte[paddingBytes];
+            new Random(0).nextBytes(padding);
+            Files.write(folder.resolve("shapes.txt"), padding);
         }
         GtfsTestFixtures.zipFolder(folder, zipFile);
         return zipFile;

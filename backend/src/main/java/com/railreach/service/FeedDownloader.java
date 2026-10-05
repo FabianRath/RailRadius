@@ -35,6 +35,9 @@ public class FeedDownloader {
     private static final int HTTP_OK = 200;
     private static final List<String> REQUIRED_FILES =
             List.of("stops.txt", "stop_times.txt", "trips.txt", "routes.txt");
+    // Real updates grow or shrink a little; a much smaller zip is usually a truncated export or a different feed
+    private static final double MIN_SIZE_RATIO_TO_CURRENT = 0.5;
+    private static final int PERCENT = 100;
     private static final String PART_SUFFIX = ".part";
     static final String PREVIOUS_DIRECTORY = "previous";
 
@@ -44,15 +47,16 @@ public class FeedDownloader {
             .build();
 
     /**
-     * Downloads {@code feed} and replaces {@code target} with it, unless the download is no usable feed, has expired
-     * or ends before {@code currentLastDay}. Returns why it was rejected; {@code target} is then unchanged.
+     * Downloads {@code feed} and replaces {@code target} with it, unless the download is no usable rail feed, is less
+     * than half the size of {@code target}, does not run today or ends before {@code currentLastDay}. Returns why it
+     * was rejected; {@code target} is then unchanged.
      */
     Optional<String> replace(FeedSource feed, Path target, Optional<LocalDate> currentLastDay, LocalDate today)
             throws IOException, InterruptedException {
         Path part = target.resolveSibling(target.getFileName() + PART_SUFFIX);
         try {
             Optional<String> rejection = download(feed, part);
-            if (rejection.isEmpty()) rejection = problemWith(part, currentLastDay, today);
+            if (rejection.isEmpty()) rejection = problemWith(part, target, currentLastDay, today);
             if (rejection.isPresent()) return rejection;
             if (Files.exists(target)) {
                 Path previous = Files.createDirectories(target.resolveSibling(PREVIOUS_DIRECTORY));
@@ -84,22 +88,38 @@ public class FeedDownloader {
         return Optional.empty();
     }
 
-    private static Optional<String> problemWith(Path part, Optional<LocalDate> currentLastDay, LocalDate today)
-            throws IOException {
-        Optional<FeedValidity> validity;
+    private static Optional<String> problemWith(Path part, Path target, Optional<LocalDate> currentLastDay,
+            LocalDate today) throws IOException {
+        FeedValidity validity;
         try (ZipFile zipFile = new ZipFile(part.toFile())) {
             List<String> missing = REQUIRED_FILES.stream().filter(name -> zipFile.getEntry(name) == null).toList();
             if (!missing.isEmpty()) return Optional.of("Not a GTFS feed, missing " + String.join(", ", missing));
-            validity = FeedValidity.read(zipFile);
+            if (!RailTripReader.hasRailRoutes(zipFile)) return Optional.of("No rail routes in routes.txt");
+            Optional<FeedValidity> read = FeedValidity.read(zipFile);
+            if (read.isEmpty()) return Optional.of("No service days in calendar.txt or calendar_dates.txt");
+            validity = read.get();
         } catch (ZipException e) {
             return Optional.of("Not a zip file");
         }
-        if (validity.isEmpty()) return Optional.empty();
-        LocalDate lastDay = validity.get().lastDay();
-        if (lastDay.isBefore(today)) return Optional.of("The download expired on " + lastDay);
-        if (currentLastDay.isPresent() && lastDay.isBefore(currentLastDay.get())) {
-            return Optional.of("The download ends on " + lastDay + ", before the current zip (" + currentLastDay.get()
-                    + ")");
+        Optional<String> sizeProblem = sizeProblem(part, target);
+        return sizeProblem.isPresent() ? sizeProblem : datesProblem(validity, currentLastDay, today);
+    }
+
+    private static Optional<String> sizeProblem(Path part, Path target) throws IOException {
+        if (!Files.exists(target)) return Optional.empty();
+        long partBytes = Files.size(part);
+        long targetBytes = Files.size(target);
+        if (partBytes >= targetBytes * MIN_SIZE_RATIO_TO_CURRENT) return Optional.empty();
+        return Optional.of("The download is only " + partBytes * PERCENT / targetBytes + "% of the current zip's size");
+    }
+
+    private static Optional<String> datesProblem(FeedValidity validity, Optional<LocalDate> currentLastDay,
+            LocalDate today) {
+        if (validity.lastDay().isBefore(today)) return Optional.of("The download expired on " + validity.lastDay());
+        if (validity.firstDay().isAfter(today)) return Optional.of("The download starts on " + validity.firstDay());
+        if (currentLastDay.isPresent() && validity.lastDay().isBefore(currentLastDay.get())) {
+            return Optional.of("The download ends on " + validity.lastDay() + ", before the current zip ("
+                    + currentLastDay.get() + ")");
         }
         return Optional.empty();
     }
