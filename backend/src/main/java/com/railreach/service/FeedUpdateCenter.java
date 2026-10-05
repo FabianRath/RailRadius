@@ -4,6 +4,7 @@ import com.railreach.dto.FeedDownloadResult;
 import com.railreach.dto.FeedDownloadResult.Outcome;
 import com.railreach.dto.FeedStatus;
 import com.railreach.dto.FeedStatus.State;
+import com.railreach.service.FeedDownloader.Replacement;
 import com.railreach.service.FeedRegistry.FeedSource;
 import com.railreach.util.FeedFiles;
 import lombok.RequiredArgsConstructor;
@@ -104,14 +105,16 @@ public class FeedUpdateCenter {
         FeedStatus before = Files.exists(target) ? status(target, today) : null;
         try {
             Optional<LocalDate> currentLastDay = Optional.ofNullable(before).map(FeedStatus::getLastServiceDate);
-            Optional<String> rejection = downloader.replace(feed, target, currentLastDay, today);
-            if (rejection.isPresent()) {
-                log.warn("Feed {} not replaced: {}", feed.source(), rejection.get());
-                return result(feed, Outcome.REJECTED, rejection.get(), before, null);
+            Replacement replacement = downloader.replace(feed, target, currentLastDay, today);
+            if (!replacement.replaced()) {
+                log.warn("Feed {} not replaced: {}", feed.source(), replacement.detail());
+                return result(feed, Outcome.REJECTED, replacement.detail(), before, null);
             }
             FeedStatus after = status(target, today);
-            log.info("Feed {} replaced; last service day {}", feed.source(), after.getLastServiceDate());
-            return result(feed, Outcome.REPLACED, "Downloaded. Reload GTFS to use it.", before, after);
+            log.info("Feed {} replaced from {}; last service day {}", feed.source(), replacement.detail(),
+                    after.getLastServiceDate());
+            String message = "Downloaded from " + replacement.detail() + ". Reload GTFS to use it.";
+            return result(feed, Outcome.REPLACED, message, before, after);
         } catch (IOException e) {
             log.warn("Download of feed {} failed", feed.source(), e);
             return result(feed, Outcome.REJECTED, "Download failed: " + e, before, null);
@@ -136,7 +139,7 @@ public class FeedUpdateCenter {
         FeedStatus.FeedStatusBuilder status = FeedStatus.builder()
                 .source(source)
                 .fileName(fileName)
-                .downloadUrl(registry.of(source).map(FeedSource::url).orElse(null));
+                .downloadUrl(registry.of(source).map(feed -> feed.urls().getFirst().url()).orElse(null));
         try {
             long sizeBytes = Files.size(zip);
             long lastModifiedMs = Files.getLastModifiedTime(zip).toMillis();

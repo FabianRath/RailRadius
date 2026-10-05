@@ -5,10 +5,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /** Where each feed is downloaded from, as listed in {@code gtfs-feeds.txt}. */
@@ -21,25 +21,38 @@ public class FeedRegistry {
     private static final String HEADER_SEPARATOR = "\\|";
     private static final String HEADER_NAME_SEPARATOR = ":";
 
-    /** One registered feed; {@code headers} are sent with the download request. */
-    record FeedSource(String source, String url, Map<String, String> headers) {}
+    /** One download location; {@code headers} are sent with the request. */
+    record FeedUrl(String url, Map<String, String> headers) {}
 
-    private final Map<String, FeedSource> feeds = ResourceLines.read(RESOURCE).stream()
-            .map(FeedRegistry::parse)
-            .collect(Collectors.toUnmodifiableMap(FeedSource::source, Function.identity()));
+    /** One registered feed; {@code urls} in the order they are tried, never empty. */
+    record FeedSource(String source, List<FeedUrl> urls) {}
+
+    private record FeedLine(String source, FeedUrl url) {}
+
+    private final Map<String, FeedSource> feeds = parseAll(ResourceLines.read(RESOURCE));
 
     Optional<FeedSource> of(String source) {
         return Optional.ofNullable(feeds.get(source));
     }
 
+    /** A source on several lines gets their URLs as fallbacks, in line order. */
+    static Map<String, FeedSource> parseAll(List<String> lines) {
+        Map<String, List<FeedUrl>> urlsBySource = lines.stream()
+                .map(FeedRegistry::parse)
+                .collect(Collectors.groupingBy(FeedLine::source, LinkedHashMap::new,
+                        Collectors.mapping(FeedLine::url, Collectors.toList())));
+        return urlsBySource.entrySet().stream().collect(Collectors.toUnmodifiableMap(Map.Entry::getKey,
+                entry -> new FeedSource(entry.getKey(), List.copyOf(entry.getValue()))));
+    }
+
     // Format: source;url[;Header: value|Header: value]
-    static FeedSource parse(String line) {
+    private static FeedLine parse(String line) {
         List<String> fields = Arrays.stream(line.split(";")).map(String::strip).toList();
         if (fields.size() < MIN_FIELDS || fields.size() > MAX_FIELDS) {
             throw new IllegalStateException("Invalid feed line: " + line);
         }
         Map<String, String> headers = fields.size() < MAX_FIELDS ? Map.of() : headers(fields.get(2), line);
-        return new FeedSource(fields.get(0), fields.get(1), headers);
+        return new FeedLine(fields.get(0), new FeedUrl(fields.get(1), headers));
     }
 
     private static Map<String, String> headers(String text, String line) {
