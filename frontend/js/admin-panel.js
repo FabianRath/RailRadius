@@ -42,6 +42,13 @@ const progressText = document.getElementById('adminProgressText');
 export function initAdminPanel() {
     openButton.addEventListener('click', () => dialog.showModal());
     document.getElementById('adminClose').addEventListener('click', () => dialog.close());
+    // A backdrop click targets the dialog itself. Checking where the press started keeps a text selection dragged
+    // out of the JSON output from closing the panel.
+    let pressStartedOutside = false;
+    dialog.addEventListener('pointerdown', event => { pressStartedOutside = isOutsideDialog(event); });
+    dialog.addEventListener('click', event => {
+        if (pressStartedOutside && isOutsideDialog(event)) dialog.close();
+    });
     actionButtons.forEach(button => button.addEventListener('click', () => runAction(button)));
 }
 
@@ -52,6 +59,14 @@ export function showAdminEntry() {
 export function hideAdminPanel() {
     openButton.hidden = true;
     dialog.close();
+}
+
+// The dialog's padding also targets the dialog itself, so the click position decides
+function isOutsideDialog(event) {
+    if (event.target !== dialog) return false;
+    const rect = dialog.getBoundingClientRect();
+    return event.clientX < rect.left || event.clientX > rect.right
+        || event.clientY < rect.top || event.clientY > rect.bottom;
 }
 
 async function runAction(button) {
