@@ -1,5 +1,6 @@
 import { searchStations } from './api.js';
 import { countryBadgeHtml, escapeHtml } from './util.js';
+import { icon } from './icons.js';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const MIN_QUERY_LENGTH = 2;
@@ -35,7 +36,7 @@ async function runSearch(query) {
             : `<div class="station-list">${stations.map(stationItemHtml).join('')}</div>`;
     } catch (error) {
         console.error('Search error:', error);
-        stationResults.innerHTML = '<div class="no-results">⚠️ Backend connection failed</div>';
+        stationResults.innerHTML = `<div class="no-results">${icon('triangle-alert')} Backend connection failed</div>`;
     }
 }
 

@@ -39,7 +39,8 @@ RailReach/
 ├── frontend/css/app.css              # all styles and the map palette (CSS variables)
 ├── frontend/js/                      # ES modules: main (entry), api, map (only MapLibre user), search, query-form,
 │                                     #   reachability (SSE), coverage (Turf), popup, debug, dev-auth (dev login), admin-panel (admin
-│                                     #   endpoints as buttons), sidebar (collapse toggle), util, config
+│                                     #   endpoints as buttons), sidebar (collapse toggle), icons (vendored Lucide SVGs;
+│                                     #   `<span data-icon>` in the markup), util, config
 ├── frontend/backend_test.html        # small manual API test page
 └── backend/
     ├── pom.xml

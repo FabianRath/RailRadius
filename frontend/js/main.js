@@ -9,6 +9,7 @@ import { initDebugOverlay, startDebugPolling, stopDebugPolling } from './debug.j
 import { initDevAuth } from './dev-auth.js';
 import { hideAdminPanel, initAdminPanel, showAdminEntry } from './admin-panel.js';
 import { showStatus } from './util.js';
+import { renderStaticIcons } from './icons.js';
 
 const COVERAGE_REDRAW_DEBOUNCE_MS = 300;
 
@@ -21,6 +22,7 @@ fetchHealth()
         showStatus('error', 'Backend not reachable');
     });
 
+renderStaticIcons();
 initSidebarToggle();
 await initMap('map');
 bindPopup(LAYERS.reachable, ({ stopId }) => stationPopupHtml(getStation(stopId)));

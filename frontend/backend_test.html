@@ -12,21 +12,22 @@
         .status { margin: 10px 0; padding: 10px; border-radius: 4px; }
         .success { background: #00ff9f20; border-left: 3px solid #00ff9f; }
         .error { background: #ff006e20; border-left: 3px solid #ff006e; }
+        .icon { width: 1.1em; height: 1.1em; vertical-align: -0.2em; }
     </style>
 </head>
 <body>
-    <h1>🚆 RailReach Backend Test</h1>
+    <h1><span data-icon="train-front"></span> RailReach Backend Test</h1>
     
     <div class="box">
         <h2>1. Health Check</h2>
-        <button onclick="testHealth()">Check Backend Health</button>
+        <button id="healthButton">Check Backend Health</button>
         <div id="healthResult"></div>
     </div>
     
     <div class="box">
         <h2>2. Search Stations</h2>
         <input id="searchInput" placeholder="Search for station (e.g., Berlin)" />
-        <button onclick="testSearch()">Search</button>
+        <button id="searchButton">Search</button>
         <div id="searchResult"></div>
     </div>
     
@@ -34,11 +35,13 @@
         <h2>3. Calculate Reachability</h2>
         <p>Station ID: <input id="stationId" placeholder="e.g., 8011160" style="width: 200px" /></p>
         <p>Max Transfers: <input id="maxTransfers" value="3" type="number" style="width: 100px" /></p>
-        <button onclick="testReachability()">Calculate</button>
+        <button id="reachabilityButton">Calculate</button>
         <div id="reachabilityResult"></div>
     </div>
 
-    <script>
+    <script type="module">
+        import { icon, renderStaticIcons } from './js/icons.js';
+
         const API_URL = 'http://localhost:8080/api';
 
         async function testHealth() {
@@ -51,14 +54,14 @@
                 
                 result.innerHTML = `
                     <div class="status success">
-                        <strong>✓ Backend is running!</strong>
+                        <strong>${icon('check')} Backend is running!</strong>
                         <pre>${JSON.stringify(data, null, 2)}</pre>
                     </div>
                 `;
             } catch (error) {
                 result.innerHTML = `
                     <div class="status error">
-                        <strong>✗ Connection failed</strong>
+                        <strong>${icon('x')} Connection failed</strong>
                         <p>${error.message}</p>
                         <p>Make sure backend is running on port 8080</p>
                     </div>
@@ -137,7 +140,7 @@
                 
                 result.innerHTML = `
                     <div class="status success">
-                        <strong>✓ Calculation successful!</strong>
+                        <strong>${icon('check')} Calculation successful!</strong>
                         <p>From: <strong>${data.startStationName}</strong></p>
                         <p>Found: <strong>${data.totalReachableStations}</strong> reachable stations</p>
                         <p>Calculation time: <strong>${data.calculationTimeMs}ms</strong></p>
@@ -157,8 +160,13 @@
             }
         }
 
+        renderStaticIcons();
+        document.getElementById('healthButton').addEventListener('click', testHealth);
+        document.getElementById('searchButton').addEventListener('click', testSearch);
+        document.getElementById('reachabilityButton').addEventListener('click', testReachability);
+
         // Auto-test health on load
-        window.addEventListener('load', testHealth);
+        testHealth();
     </script>
 </body>
 </html>
