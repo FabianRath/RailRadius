@@ -51,7 +51,7 @@ final class GtfsTestFixtures {
         Path gtfsDir = Files.createDirectories(tempDir.resolve("gtfs"));
         for (String folder : feedFolders) {
             String source = folder.split("-")[0];
-            zipFolder(resource("gtfs-mini/" + folder), gtfsDir.resolve("gtfs_" + source + ".zip"));
+            zipFeed(folder, gtfsDir.resolve("gtfs_" + source + ".zip"));
         }
 
         GtfsFeedLoader feedLoader = new GtfsFeedLoader();
@@ -87,7 +87,12 @@ final class GtfsTestFixtures {
         return new ReachabilityCache(new ReachabilitySearch(graph), new ConcurrentMapCacheManager(), rawMaxEntries);
     }
 
-    private static Path resource(String name) {
+    /** Zips the gtfs-mini feed folder to {@code zipFile}. */
+    static void zipFeed(String feedFolder, Path zipFile) throws IOException {
+        zipFolder(resource("gtfs-mini/" + feedFolder), zipFile);
+    }
+
+    static Path resource(String name) {
         try {
             return Path.of(GtfsTestFixtures.class.getClassLoader().getResource(name).toURI());
         } catch (URISyntaxException | NullPointerException e) {
@@ -95,7 +100,7 @@ final class GtfsTestFixtures {
         }
     }
 
-    private static void zipFolder(Path folder, Path zipFile) throws IOException {
+    static void zipFolder(Path folder, Path zipFile) throws IOException {
         try (OutputStream out = Files.newOutputStream(zipFile);
              ZipOutputStream zip = new ZipOutputStream(out);
              Stream<Path> files = Files.list(folder)) {

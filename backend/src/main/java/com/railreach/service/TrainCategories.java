@@ -1,11 +1,7 @@
 package com.railreach.service;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
+import com.railreach.util.ResourceLines;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -41,8 +37,8 @@ final class TrainCategories {
     private final Map<String, String> categoryColumns;
 
     TrainCategories() {
-        rules = readLines(RULES_RESOURCE).stream().map(TrainCategories::parseRule).toList();
-        categoryColumns = readLines(COLUMNS_RESOURCE).stream()
+        rules = ResourceLines.read(RULES_RESOURCE).stream().map(TrainCategories::parseRule).toList();
+        categoryColumns = ResourceLines.read(COLUMNS_RESOURCE).stream()
                 .map(TrainCategories::parseColumn)
                 .collect(Collectors.toUnmodifiableMap(List::getFirst, List::getLast));
     }
@@ -58,20 +54,6 @@ final class TrainCategories {
                 .filter(rule -> rule.matches(source, agencyName, routeType, routeShortName))
                 .map(Rule::category)
                 .findFirst();
-    }
-
-    /** The resource's lines without blank lines and # comments. */
-    private static List<String> readLines(String resource) {
-        try (InputStream in = TrainCategories.class.getResourceAsStream(resource)) {
-            if (in == null) throw new IllegalStateException("Missing classpath resource " + resource);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
-            return reader.lines()
-                    .map(String::strip)
-                    .filter(line -> !line.isEmpty() && !line.startsWith("#"))
-                    .toList();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
     }
 
     // Format: source;column

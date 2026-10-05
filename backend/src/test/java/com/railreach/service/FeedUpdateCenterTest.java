@@ -1,0 +1,256 @@
+package com.railreach.service;
+
+import com.railreach.dto.FeedDownloadResult;
+import com.railreach.dto.FeedDownloadResult.Outcome;
+import com.railreach.dto.FeedStatus;
+import com.railreach.dto.FeedStatus.State;
+import com.railreach.service.FeedRegistry.FeedSource;
+import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDate;
+import java.util.Map;
+import java.util.stream.Stream;
+import java.util.zip.GZIPOutputStream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class FeedUpdateCenterTest {
+
+    // zeta's services run from 2026-01-05 to 2026-01-31
+    private static final LocalDate ZETA_FIRST_DAY = LocalDate.of(2026, 1, 5);
+    private static final LocalDate ZETA_LAST_DAY = LocalDate.of(2026, 1, 31);
+    private static final LocalDate DURING_ZETA = LocalDate.of(2026, 1, 10);
+    private static final LocalDate AFTER_ZETA = LocalDate.of(2026, 10, 5);
+    private static final LocalDate LATER_ZETA_LAST_DAY = LocalDate.of(2027, 1, 31);
+    private static final int EXPIRING_DAYS = 30;
+    private static final String FEED_PATH = "/feed.zip";
+    private static final int HTTP_OK = 200;
+    private static final int HTTP_NOT_FOUND = 404;
+
+    @TempDir
+    Path tempDir;
+
+    private Path gtfsDir;
+    private GtfsLoadProgress loadProgress;
+    private FeedUpdateCenter center;
+    private HttpServer server;
+
+    @BeforeEach
+    void setUp() throws IOException {
+        gtfsDir = Files.createDirectories(tempDir.resolve("gtfs"));
+        loadProgress = new GtfsLoadProgress();
+        center = new FeedUpdateCenter(new FeedRegistry(), new FeedDownloader(), loadProgress);
+        ReflectionTestUtils.setField(center, "gtfsDirectory", gtfsDir.toString());
+        ReflectionTestUtils.setField(center, "expiringDays", EXPIRING_DAYS);
+        server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.start();
+    }
+
+    @AfterEach
+    void tearDown() {
+        server.stop(0);
+    }
+
+    @Test
+    void feedPastItsLastServiceDayIsExpired() throws IOException {
+        GtfsTestFixtures.zipFeed("zeta", gtfsDir.resolve("gtfs_zeta.zip"));
+
+        FeedStatus status = center.statuses(AFTER_ZETA).getFirst();
+
+        assertThat(status.getSource()).isEqualTo("zeta");
+        assertThat(status.getState()).isEqualTo(State.EXPIRED);
+        assertThat(status.getFirstServiceDate()).isEqualTo(ZETA_FIRST_DAY);
+        assertThat(status.getLastServiceDate()).isEqualTo(ZETA_LAST_DAY);
+        assertThat(status.getDaysLeft()).isNegative();
+    }
+
+    @Test
+    void feedEndingWithinTheWarningWindowIsExpiring() throws IOException {
+        GtfsTestFixtures.zipFeed("zeta", gtfsDir.resolve("gtfs_zeta.zip"));
+
+        FeedStatus status = center.statuses(DURING_ZETA).getFirst();
+
+        assertThat(status.getState()).isEqualTo(State.EXPIRING);
+        assertThat(status.getDaysLeft()).isEqualTo(21);
+    }
+
+    @Test
+    void feedEndingAfterTheWarningWindowIsOk() throws IOException {
+        zipZetaEndingIn2027(gtfsDir.resolve("gtfs_zeta.zip"));
+
+        assertThat(center.statuses(DURING_ZETA).getFirst().getState()).isEqualTo(State.OK);
+    }
+
+    @Test
+    void feedBeforeItsFirstServiceDayIsNotYetValid() throws IOException {
+        GtfsTestFixtures.zipFeed("zeta", gtfsDir.resolve("gtfs_zeta.zip"));
+
+        assertThat(center.statuses(ZETA_FIRST_DAY.minusDays(1)).getFirst().getState())
+                .isEqualTo(State.NOT_YET_VALID);
+    }
+
+    @Test
+    void feedWithoutCalendarHasNoServiceDays() throws IOException {
+        GtfsTestFixtures.zipFeed("alpha", gtfsDir.resolve("gtfs_alpha.zip"));
+
+        FeedStatus status = center.statuses(AFTER_ZETA).getFirst();
+
+        assertThat(status.getState()).isEqualTo(State.NO_CALENDAR);
+        assertThat(status.getLastServiceDate()).isNull();
+        assertThat(status.getDaysLeft()).isNull();
+    }
+
+    @Test
+    void fileThatIsNoZipIsUnreadable() throws IOException {
+        Files.writeString(gtfsDir.resolve("gtfs_broken.zip"), "not a zip");
+
+        assertThat(center.statuses(AFTER_ZETA).getFirst().getState()).isEqualTo(State.UNREADABLE);
+    }
+
+    @Test
+    void feedMissingFromTheRegistryHasNoDownloadUrl() throws IOException {
+        GtfsTestFixtures.zipFeed("zeta", gtfsDir.resolve("gtfs_zeta.zip"));
+
+        assertThat(center.statuses(AFTER_ZETA).getFirst().getDownloadUrl()).isNull();
+    }
+
+    @Test
+    void downloadReplacesTheFeedAndKeepsThePreviousZip() throws IOException {
+        GtfsTestFixtures.zipFeed("zeta", gtfsDir.resolve("gtfs_zeta.zip"));
+        serve(HTTP_OK, Files.readAllBytes(zipZetaEndingIn2027(tempDir.resolve("new.zip"))), false);
+
+        FeedDownloadResult result = center.download(feed(), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REPLACED);
+        assertThat(result.getBefore().getLastServiceDate()).isEqualTo(ZETA_LAST_DAY);
+        assertThat(result.getAfter().getLastServiceDate()).isEqualTo(LATER_ZETA_LAST_DAY);
+        assertThat(center.statuses(DURING_ZETA).getFirst().getLastServiceDate()).isEqualTo(LATER_ZETA_LAST_DAY);
+        assertThat(gtfsDir.resolve(FeedDownloader.PREVIOUS_DIRECTORY).resolve("gtfs_zeta.zip")).exists();
+        assertNoPartFileLeft();
+    }
+
+    @Test
+    void gzipEncodedDownloadIsUnpacked() throws IOException {
+        serve(HTTP_OK, Files.readAllBytes(zipZetaEndingIn2027(tempDir.resolve("new.zip"))), true);
+
+        FeedDownloadResult result = center.download(feed(), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REPLACED);
+        assertThat(result.getBefore()).isNull();
+        assertThat(result.getAfter().getLastServiceDate()).isEqualTo(LATER_ZETA_LAST_DAY);
+    }
+
+    @Test
+    void downloadThatIsNoZipIsRejectedAndTheFeedKept() throws IOException {
+        Path zip = gtfsDir.resolve("gtfs_zeta.zip");
+        GtfsTestFixtures.zipFeed("zeta", zip);
+        byte[] original = Files.readAllBytes(zip);
+        serve(HTTP_OK, "<html>Moved</html>".getBytes(), false);
+
+        FeedDownloadResult result = center.download(feed(), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REJECTED);
+        assertThat(result.getMessage()).contains("Not a zip");
+        assertThat(Files.readAllBytes(zip)).isEqualTo(original);
+        assertNoPartFileLeft();
+    }
+
+    @Test
+    void expiredDownloadIsRejected() throws IOException {
+        Path served = tempDir.resolve("old.zip");
+        GtfsTestFixtures.zipFeed("zeta", served);
+        serve(HTTP_OK, Files.readAllBytes(served), false);
+
+        FeedDownloadResult result = center.download(feed(), AFTER_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REJECTED);
+        assertThat(result.getMessage()).contains("expired");
+        assertThat(gtfsDir.resolve("gtfs_zeta.zip")).doesNotExist();
+        assertNoPartFileLeft();
+    }
+
+    @Test
+    void downloadEndingBeforeTheCurrentFeedIsRejected() throws IOException {
+        zipZetaEndingIn2027(gtfsDir.resolve("gtfs_zeta.zip"));
+        Path served = tempDir.resolve("old.zip");
+        GtfsTestFixtures.zipFeed("zeta", served);
+        serve(HTTP_OK, Files.readAllBytes(served), false);
+
+        FeedDownloadResult result = center.download(feed(), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REJECTED);
+        assertThat(result.getMessage()).contains("before the current");
+        assertThat(center.statuses(DURING_ZETA).getFirst().getLastServiceDate()).isEqualTo(LATER_ZETA_LAST_DAY);
+    }
+
+    @Test
+    void httpErrorIsRejected() throws IOException {
+        serve(HTTP_NOT_FOUND, "missing".getBytes(), false);
+
+        FeedDownloadResult result = center.download(feed(), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REJECTED);
+        assertThat(result.getMessage()).isEqualTo("HTTP 404");
+        assertNoPartFileLeft();
+    }
+
+    @Test
+    void downloadDuringAGtfsReloadIsRefused() {
+        loadProgress.start();
+
+        assertThat(center.download(feed(), DURING_ZETA).getOutcome()).isEqualTo(Outcome.BUSY);
+    }
+
+    private FeedSource feed() {
+        return new FeedSource("zeta", "http://localhost:" + server.getAddress().getPort() + FEED_PATH, Map.of());
+    }
+
+    private void serve(int statusCode, byte[] body, boolean gzip) {
+        server.createContext(FEED_PATH, exchange -> {
+            byte[] content = gzip ? gzipped(body) : body;
+            if (gzip) exchange.getResponseHeaders().add("Content-Encoding", "gzip");
+            exchange.sendResponseHeaders(statusCode, content.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(content);
+            }
+        });
+    }
+
+    private static byte[] gzipped(byte[] body) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (GZIPOutputStream gzip = new GZIPOutputStream(bytes)) {
+            gzip.write(body);
+        }
+        return bytes.toByteArray();
+    }
+
+    /** zeta with its weekly services running a year longer. */
+    private Path zipZetaEndingIn2027(Path zipFile) throws IOException {
+        Path folder = Files.createDirectories(tempDir.resolve("zeta-2027"));
+        try (Stream<Path> files = Files.list(GtfsTestFixtures.resource("gtfs-mini/zeta"))) {
+            for (Path file : files.toList()) {
+                Files.writeString(folder.resolve(file.getFileName()),
+                        Files.readString(file).replace("20260131", "20270131"));
+            }
+        }
+        GtfsTestFixtures.zipFolder(folder, zipFile);
+        return zipFile;
+    }
+
+    private void assertNoPartFileLeft() throws IOException {
+        try (Stream<Path> files = Files.list(gtfsDir)) {
+            assertThat(files.map(Path::toString)).noneMatch(name -> name.endsWith(".part"));
+        }
+    }
+}

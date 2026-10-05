@@ -5,6 +5,7 @@ import com.railreach.model.Station;
 import com.railreach.service.RailTripReader.RailRoute;
 import com.railreach.service.RailTripReader.RailTrip;
 import com.railreach.util.Coordinates;
+import com.railreach.util.FeedFiles;
 import com.railreach.util.GtfsTime;
 import com.railreach.util.StopIds;
 import lombok.extern.slf4j.Slf4j;
@@ -73,7 +74,7 @@ public class GtfsFeedLoader {
         if (!dir.isDirectory()) {
             throw new IllegalStateException("GTFS directory not found: " + directory);
         }
-        File[] zipFiles = dir.listFiles((d, name) -> name.toLowerCase().endsWith(".zip"));
+        File[] zipFiles = dir.listFiles((d, name) -> FeedFiles.isZip(name));
         if (zipFiles == null || zipFiles.length == 0) {
             throw new IllegalStateException("No .zip files found in: " + directory);
         }
@@ -86,9 +87,7 @@ public class GtfsFeedLoader {
 
         for (int i = 0; i < zipFiles.length; i++) {
             File zipFile = zipFiles[i];
-            String source = zipFile.getName()
-                    .replaceFirst("(?i)\\.zip$", "")
-                    .replaceFirst("(?i)^gtfs_", "");
+            String source = FeedFiles.source(zipFile.getName());
             log.info("--------------------------------------------------------------------------------------");
             log.info("[{}/{}] Loading: {} (source={})", i + 1, zipFiles.length, zipFile.getName(), source);
             progress.feedStarted(zipFile);

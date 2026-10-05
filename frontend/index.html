@@ -141,34 +141,62 @@
                 <h2 class="admin-title" id="adminTitle">Admin panel</h2>
                 <button type="button" class="admin-close" id="adminClose" aria-label="Close">×</button>
             </div>
-            <div class="admin-group">
-                <div class="section-title">Inspect</div>
-                <div class="admin-buttons">
-                    <button type="button" class="admin-btn" data-action="gtfsStats">GTFS stats</button>
-                    <button type="button" class="admin-btn" data-action="cacheStats">Reachability cache stats</button>
+            <div class="admin-tabs" role="tablist">
+                <button type="button" class="admin-tab is-active" role="tab" aria-selected="true"
+                    data-tab="tools">Tools</button>
+                <button type="button" class="admin-tab" role="tab" aria-selected="false" data-tab="feeds">Feeds</button>
+            </div>
+            <section class="admin-view" data-view="tools" role="tabpanel">
+                <div class="admin-group">
+                    <div class="section-title">Inspect</div>
+                    <div class="admin-buttons">
+                        <button type="button" class="admin-btn" data-action="gtfsStats">GTFS stats</button>
+                        <button type="button" class="admin-btn" data-action="cacheStats">
+                            Reachability cache stats</button>
+                    </div>
                 </div>
-            </div>
-            <div class="admin-group">
-                <div class="section-title">Debug overlay</div>
-                <div class="admin-buttons">
-                    <button type="button" class="admin-btn" data-action="debugOn">Show all stations</button>
-                    <button type="button" class="admin-btn" data-action="debugOff">Hide all stations</button>
+                <div class="admin-group">
+                    <div class="section-title">Debug overlay</div>
+                    <div class="admin-buttons">
+                        <button type="button" class="admin-btn" data-action="debugOn">Show all stations</button>
+                        <button type="button" class="admin-btn" data-action="debugOff">Hide all stations</button>
+                    </div>
                 </div>
-            </div>
-            <div class="admin-group">
-                <div class="section-title">GTFS cache</div>
-                <div class="admin-buttons">
-                    <button type="button" class="admin-btn admin-btn-danger" data-action="reloadGtfs">
-                        Rebuild from zips</button>
-                    <button type="button" class="admin-btn admin-btn-danger" data-action="deleteGtfsCache">
-                        Delete cache file</button>
+                <div class="admin-group">
+                    <div class="section-title">GTFS cache</div>
+                    <div class="admin-buttons">
+                        <button type="button" class="admin-btn admin-btn-danger" data-action="reloadGtfs">
+                            Rebuild from zips</button>
+                        <button type="button" class="admin-btn admin-btn-danger" data-action="deleteGtfsCache">
+                            Delete cache file</button>
+                    </div>
                 </div>
-            </div>
-            <div class="admin-progress" id="adminProgress" hidden>
-                <progress class="admin-progress-bar" id="adminProgressBar" max="100" value="0"></progress>
-                <div class="admin-progress-text" id="adminProgressText"></div>
-            </div>
-            <pre class="admin-output" id="adminOutput">Pick an action.</pre>
+                <div class="admin-progress" id="adminProgress" hidden>
+                    <progress class="admin-progress-bar" id="adminProgressBar" max="100" value="0"></progress>
+                    <div class="admin-progress-text" id="adminProgressText"></div>
+                </div>
+                <pre class="admin-output" id="adminOutput">Pick an action.</pre>
+            </section>
+            <section class="admin-view" data-view="feeds" role="tabpanel" hidden>
+                <div class="admin-buttons">
+                    <button type="button" class="admin-btn" id="feedRefresh">Refresh</button>
+                    <button type="button" class="admin-btn admin-btn-danger" id="feedDownloadOutdated">
+                        Download outdated</button>
+                    <button type="button" class="admin-btn admin-btn-danger" id="feedDownloadAll">Download all</button>
+                </div>
+                <div class="feed-summary" id="feedSummary"></div>
+                <div class="feed-table-wrap">
+                    <table class="feed-table">
+                        <thead>
+                            <tr>
+                                <th>Feed</th><th>Runs until</th><th>Days left</th><th>State</th><th>Size</th>
+                                <th>Downloaded</th><th>Source</th><th></th><th>Last download</th>
+                            </tr>
+                        </thead>
+                        <tbody id="feedRows"></tbody>
+                    </table>
+                </div>
+            </section>
         </dialog>
     </div>
 </body>
