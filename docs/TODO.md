@@ -13,6 +13,5 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 
 ## Features / UX
 - [ ] **F14** Popup: show the days a train leg runs on (from the GTFS calendar). The calendar is loaded per trip (`TransitGraph.getServiceDays`).
-- [ ] **F17** Admin panel: close it when the user clicks outside it, not only via the × button in the top right.
 
 ## Structure
