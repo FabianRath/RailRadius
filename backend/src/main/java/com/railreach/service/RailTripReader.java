@@ -74,8 +74,12 @@ final class RailTripReader {
         return routes;
     }
 
-    /** trip ID -> trip, for trips on the given rail routes only. */
-    static Map<String, RailTrip> loadRailTrips(ZipFile zipFile, Map<String, RailRoute> railRoutes) throws IOException {
+    /**
+     * trip ID -> trip, for trips on the given rail routes only. {@code categoryColumn} is the trips.txt column with
+     * the train category, null if the feed has none.
+     */
+    static Map<String, RailTrip> loadRailTrips(ZipFile zipFile, Map<String, RailRoute> railRoutes,
+                                               String categoryColumn) throws IOException {
         Map<String, RailTrip> trips = new HashMap<>();
         try (GtfsCsvReader csv = GtfsCsvReader.open(zipFile, "trips.txt")) {
             int routeCol = csv.column("route_id");
@@ -83,13 +87,14 @@ final class RailTripReader {
             int tripCol = csv.column("trip_id");
             int shortNameCol = csv.column("trip_short_name");
             int headsignCol = csv.column("trip_headsign");
+            int categoryCol = categoryColumn != null ? csv.column(categoryColumn) : -1;
             for (String[] row = csv.next(); row != null; row = csv.next()) {
                 String tripId = field(row, tripCol);
                 String routeId = field(row, routeCol);
                 RailRoute route = routeId != null ? railRoutes.get(routeId) : null;
                 if (tripId == null || route == null) continue;
-                TripInfo info = new TripInfo(trainNumber(field(row, shortNameCol), route.category()),
-                        field(row, headsignCol), route.operator());
+                String trainNumber = trainNumber(field(row, shortNameCol), field(row, categoryCol), route.category());
+                TripInfo info = new TripInfo(trainNumber, field(row, headsignCol), route.operator());
                 trips.put(tripId, new RailTrip(routeId, field(row, serviceCol), info));
             }
         }
@@ -110,10 +115,12 @@ final class RailTripReader {
         return names;
     }
 
-    private static String trainNumber(String tripShortName, String category) {
+    /** A trip's own category comes first; the route's category only goes in front of a bare number. */
+    private static String trainNumber(String tripShortName, String tripCategory, String routeCategory) {
         if (tripShortName == null) return null;
         String number = LEADING_ZEROS.matcher(tripShortName).replaceFirst("");
-        return category != null && DIGITS.matcher(number).matches() ? category + " " + number : number;
+        if (tripCategory != null) return tripCategory + " " + number;
+        return routeCategory != null && DIGITS.matcher(number).matches() ? routeCategory + " " + number : number;
     }
 
     private static boolean isRail(int routeType) {

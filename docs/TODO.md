@@ -12,7 +12,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (caching / infrastructure)
 
 ## Features / UX
-- [ ] **F15** Popup: show the train category passengers see (ICE, IC, Intercity…) from feeds that keep it in extra columns: Netherlands `trip_long_name` ("Intercity"), Poland `plk_category_code`. Feeds that already put it in `route_short_name` or `trip_short_name` ("Ex 42", "RJ 658") need nothing. Germany's DELFI feed has no category column; its DB Fernverkehr categories come from `train-categories.txt` (F16).
 - [ ] **F14** Popup: show the days a train leg runs on (from the GTFS calendar). The calendar is loaded per trip (`TransitGraph.getServiceDays`).
 - [ ] **F17** Admin panel: close it when the user clicks outside it, not only via the × button in the top right.
 

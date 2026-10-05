@@ -1,0 +1,3 @@
+route_id,service_id,trip_id,trip_short_name,trip_long_name
+NR,WD,NT1,2835,Intercity
+NR,WD,NT2,5512,

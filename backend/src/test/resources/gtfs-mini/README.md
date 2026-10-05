@@ -31,6 +31,9 @@ Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the 
   - ZT1 WD: Z1 08:00 → Z2 09:00; ZT7 WE: Z1 08:30 → Z2 09:10 (the better arrival for every departure after it)
   - ZT2 WE: Z2 09:30 → Z3 10:00; ZT3 WD: Z2 09:30 → Z4 10:00 (only from ZT1); ZT6 HOL: Z2 09:40 → Z6 10:10 (shares no day with ZT1 or ZT7)
   - ZT4 FR: Z1 22:00 → Z2 23:30; ZT5 SA: Z2 00:30 → Z5 01:00 (connects across midnight)
+- **netherlands** + **poland** (loaded together, by the category column test; `train-category-columns.txt` names `trip_long_name` for netherlands and `plk_category_code` for poland):
+  - netherlands: N1 Nether Amsterdam, N2 Nether Utrecht; NT1 "2835" with `trip_long_name` Intercity (→ "Intercity 2835"), NT2 "5512" with none (→ "5512")
+  - poland: P1 Polska Warszawa, P2 Polska Lodz; its `trip_long_name` holds route names and is ignored. PT1 IC "1900/1 Zosia" (→ "IC 1900/1 Zosia"), PT2 Os "50324" on route AR (→ "Os 50324")
 - **alpha-fast-train**: alpha plus T6 NJ A1 21:00 → A3 21:30. The faster train reaches the border later and misses U1 (B2 test).
 - **epsilon** (loaded alone): E1 Epsilon Start, E2 Epsilon Fork, E3 Epsilon Junction, E4 Epsilon East, E5 Epsilon Detour, E6 Epsilon End, E7 Epsilon Suburb; route EX (type 2) and S-Bahn route S7 (type 109)
   - Y1: E1 08:00 → E3 08:40; Y2: E1 08:50 → E3 08:58; Y3: E3 09:00 → E4 09:30. The faster Y2 leaves only 2 min to catch Y3, the slower Y1 20 min (B3 test)

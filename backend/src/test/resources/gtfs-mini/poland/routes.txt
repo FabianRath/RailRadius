@@ -1,0 +1,3 @@
+route_id,agency_id,route_short_name,route_long_name,route_type
+IC_IC,IC,IC,InterCity,2
+AR,AR,AR,Arriva,2

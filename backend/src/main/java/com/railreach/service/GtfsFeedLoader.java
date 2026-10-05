@@ -109,7 +109,8 @@ public class GtfsFeedLoader {
         try (ZipFile zipFile = new ZipFile(file)) {
             Map<String, RailRoute> routes = RailTripReader.loadRailRoutes(zipFile, source, trainCategories);
             Map<String, GtfsStop> stops = loadStops(zipFile);
-            Map<String, RailTrip> trips = RailTripReader.loadRailTrips(zipFile, routes);
+            Map<String, RailTrip> trips =
+                    RailTripReader.loadRailTrips(zipFile, routes, trainCategories.columnOf(source).orElse(null));
             log.info("  Loaded {} rail routes, {} stops, {} rail trips", routes.size(), stops.size(), trips.size());
             if (stops.isEmpty()) {
                 log.error("  No stops loaded! Check stops.txt format");
