@@ -164,7 +164,7 @@ public class StationDeduplicator {
                 radiusDeg);
     }
 
-    /** Jaccard similarity of the lower-cased word sets. */
+    /** Jaccard similarity of the word sets, ignoring case and accents. */
     private static double tokenSimilarity(String name1, String name2) {
         if (name1 == null || name2 == null) return 0.0;
         Set<String> tokens1 = tokenize(name1);
@@ -178,7 +178,7 @@ public class StationDeduplicator {
     }
 
     private static Set<String> tokenize(String name) {
-        return Arrays.stream(name.toLowerCase().split("[\\s\\p{Punct}]+"))
+        return Arrays.stream(StationNameVariants.fold(name).split("[\\s\\p{Punct}]+"))
                 .filter(token -> !token.isEmpty())
                 .collect(Collectors.toSet());
     }
