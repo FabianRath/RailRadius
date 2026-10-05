@@ -191,7 +191,7 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 | POST | `/reload-gtfs` | Full reparse of the zips (minutes), rewrite of the cache, clears the raw and response reachability caches |
 | DELETE | `/gtfs-cache` | Deletes the cache file |
 | GET | `/gtfs-stats` | Cache file and data counts |
-| GET | `/feeds` | `FeedStatus` of every zip in the GTFS directory |
+| GET | `/feeds` | `FeedStatus` of every zip in the GTFS directory, sorted by state (expired, not yet valid, no calendar, unreadable, expiring, OK), then by days left, then by file name |
 | POST | `/feeds/{source}/download` | Downloads a new version of the feed and swaps it in (`FeedDownloadResult`); 404 if not in `gtfs-feeds.txt`, 409 when busy. The graph uses it only after `reload-gtfs` |
 | POST | `/feeds/download-outdated` | The same for every expired or expiring feed with a URL, one after the other (`scripts/api.sh feeds-download-outdated`; the admin panel downloads feed by feed instead) |
 | GET | `/gtfs-load-status` | `GtfsLoadStatus` of the running or last load from the zips; the admin panel polls it every second during a reload |

@@ -15,7 +15,8 @@ import java.time.LocalDate;
 @Builder
 public class FeedStatus {
 
-    public enum State { OK, EXPIRING, EXPIRED, NOT_YET_VALID, NO_CALENDAR, UNREADABLE }
+    /** Declared in the order the admin panel lists feeds: the ones that need action first. */
+    public enum State { EXPIRED, NOT_YET_VALID, NO_CALENDAR, UNREADABLE, EXPIRING, OK }
 
     private String source;
     private String fileName;

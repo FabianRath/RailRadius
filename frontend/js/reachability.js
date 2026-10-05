@@ -145,10 +145,10 @@ function setLoadingState(active) {
 
 function startElapsedTimer() {
     const startMs = Date.now();
-    loadingCount.textContent = 'Searching… 0 s';
+    loadingCount.textContent = '0 s';
     elapsedTimer = setInterval(() => {
         if (results.size > 0) return;
         const elapsedSeconds = Math.floor((Date.now() - startMs) / 1000);
-        loadingCount.textContent = `Searching… ${elapsedSeconds} s`;
+        loadingCount.textContent = `${elapsedSeconds} s`;
     }, ELAPSED_TICK_MS);
 }

@@ -20,6 +20,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,6 +40,9 @@ import java.util.zip.ZipFile;
 public class FeedUpdateCenter {
 
     private static final Set<State> OUTDATED = Set.of(State.EXPIRED, State.EXPIRING);
+    private static final Comparator<FeedStatus> BY_STATE_AND_DAYS_LEFT = Comparator
+            .comparing(FeedStatus::getState)
+            .thenComparing(FeedStatus::getDaysLeft, Comparator.nullsLast(Comparator.naturalOrder()));
 
     private final FeedRegistry registry;
     private final FeedDownloader downloader;
@@ -61,8 +65,9 @@ public class FeedUpdateCenter {
         return statuses(LocalDate.now());
     }
 
+    /** Sorted by {@link State}, then by days left; feeds without days left stay in file name order. */
     List<FeedStatus> statuses(LocalDate today) {
-        return feedZips().stream().map(zip -> status(zip, today)).toList();
+        return feedZips().stream().map(zip -> status(zip, today)).sorted(BY_STATE_AND_DAYS_LEFT).toList();
     }
 
     @Scheduled(fixedDelayString = "${railreach.feeds.check-interval:PT24H}")

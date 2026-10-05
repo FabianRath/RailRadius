@@ -132,6 +132,22 @@ class FeedUpdateCenterTest {
     }
 
     @Test
+    void feedsAreSortedByStateThenByDaysLeft() throws IOException {
+        zipZeta(gtfsDir.resolve("gtfs_a.zip"), text -> text.replace("20260131", "20270131"));
+        zipZeta(gtfsDir.resolve("gtfs_b.zip"), text -> text.replace("20260131", "20260920"));
+        GtfsTestFixtures.zipFeed("zeta", gtfsDir.resolve("gtfs_c.zip"));
+        zipZeta(gtfsDir.resolve("gtfs_d.zip"), text -> text.replace("20260131", "20261020"));
+        GtfsTestFixtures.zipFeed("alpha", gtfsDir.resolve("gtfs_e.zip"));
+        Files.writeString(gtfsDir.resolve("gtfs_f.zip"), "not a zip");
+        GtfsTestFixtures.zipFeed("alpha", gtfsDir.resolve("gtfs_g.zip"));
+        zipZeta(gtfsDir.resolve("gtfs_h.zip"),
+                text -> text.replace("2026010", "2026110").replace("20260131", "20270131"));
+
+        assertThat(center.statuses(AFTER_ZETA)).extracting(FeedStatus::getSource)
+                .containsExactly("c", "b", "h", "e", "g", "f", "d", "a");
+    }
+
+    @Test
     void downloadReplacesTheFeedAndKeepsThePreviousZip() throws IOException {
         GtfsTestFixtures.zipFeed("zeta", gtfsDir.resolve("gtfs_zeta.zip"));
         serve(HTTP_OK, Files.readAllBytes(zipZetaEndingIn2027(tempDir.resolve("new.zip"))), false);

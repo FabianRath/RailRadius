@@ -794,7 +794,6 @@ input[type="range"]::-moz-range-thumb {
     font-family: var(--font-mono);
     font-size: 12px;
     color: var(--text-secondary);
-    min-width: 80px;
 }
 
 /* ── Debug banner ── */
