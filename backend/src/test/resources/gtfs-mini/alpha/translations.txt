@@ -1,0 +1,2 @@
+trans_id,lang,translation
+Border Town,de,Grenzstadt

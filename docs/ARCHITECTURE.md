@@ -63,19 +63,20 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `RailReachController` | controller | Public API under `/api` |
 | `AdminController` | controller | Admin/debug API under `/api/admin` |
 | `GtfsDataService` | service | Fills the `TransitGraph` at startup (cache file, else zips) and on `reload-gtfs`, then rebuilds the station search index and (on reload) clears the reachability caches |
-| `TransitGraph` | service | The merged network: stations, edges, connections, trip indexes. Everything that reads GTFS data injects this |
+| `TransitGraph` | service | The merged network: stations, their translated names, edges, connections, trip indexes. Everything that reads GTFS data injects this |
 | `GtfsFeedLoader` | service | Parses the rail part of each zip into the graph, with per-feed stop dedup |
 | `GtfsLoadProgress` | service | Phase (PARSING → MERGING → SAVING → DONE/FAILED), feeds and zip bytes parsed of the running or last load from the zips; read by `/gtfs-load-status` |
 | `TripRowBatcher` | service | Buffers stop_times rows per trip and hands whole trips to the loader in batches |
+| `StopNameTranslations` | service | A feed's translated `stop_name`s from `translations.txt`, by stop ID or by untranslated name; reads the current and the pre-2019 (`trans_id`) format |
 | `GtfsCsvReader` | service | Row-by-row reader for one CSV file inside a GTFS zip; strips a UTF-8 BOM from the header |
-| `StationSearchIndex` | service | Station name search: trigram → station positions, in degree order; rebuilt after each load |
+| `StationSearchIndex` | service | Station name search over the name variants of each station's name and translated names: trigram → station positions, in degree order; rebuilt after each load |
 | `StationNameVariants` | service | Searchable forms of a station name: folded (lowercase, no accents), German umlaut spelling (`koeln`), and the local city name replaced by its translations from `station-aliases.txt` (`cologne`) |
 | `StationDeduplicator` | service | Within-country and cross-border station merging after all feeds are loaded; runs the merge rules in order |
 | `StationGrid` | service | Stations bucketed into square degree cells; `near` = the 3×3 cells around a station |
 | `SharedTrainMatcher` | service | Cross-border rule: two stops are one station if ≥ 3 trains serve both at the same minute with the same neighbour station |
 | `ForeignStopSnapper` | service | Cross-border rule: a feed's stop outside its home country is merged into the nearest station of that country's feed (≤ 1 km) |
 | `CountryLocator` | service | Point → ISO country code, from `borders/europe.geojson` (Natural Earth 1:10m, Europe) |
-| `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`: format version, stations, trips); a file with another version is ignored |
+| `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`: format version, stations, translated names, trips); a file with another version is ignored |
 | `CachedTrip` | service | One trip in the cache file: route name, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
 | `ReachabilityService` | service | Thin orchestrator: request defaults, POST response (`@Cacheable`), SSE streaming, triggers warming |
 | `ReachabilitySearch` | service | Round-based search, one round per transfer; best path per station and transfer count |
@@ -110,6 +111,8 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
    - `connections`: `"from->to"` → list of `Connection`
    - `tripStops`: tripId → ordered stop list; `stopTrips`: stopId → tripIds
 
+   Then `translations.txt` (optional, `StopNameTranslations`): each stop's translated `stop_name`s go to its canonical station in `translatedNames` (stopId → names), minus the station's own name, for stations that a rail trip added. Only search uses them; the API returns the original name.
+
 A feed that adds no connections at all (e.g. unreadable headers) is logged as a `!!!` WARN.
 
 After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStations`), every station first gets its `country` from `CountryLocator`; a merge keeps the canonical station's country.
@@ -119,10 +122,10 @@ After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStati
    - **by shared trains** (`SharedTrainMatcher`): at least 3 trains leave both at the same clock minute towards the same next station (or arrive from the same previous one), neighbours compared after the merges so far. Catches translated names ("Aachen, West Bf" / "Aix-la-Chapelle Ouest"). Repeated until a pass merges nothing.
 
    In both, the station with more connections becomes canonical.
-7. **Foreign stops** (`ForeignStopSnapper`): a source's home country is where more than half of its located stations lie. A stop outside its source's home country is merged into the nearest station within 1 km of a source at home in the stop's country, which stays canonical. Every map is remapped. A canonical station can itself be merged later (A→B, then B→C); `mergeStations` first resolves such chains so every alias maps straight to the last station.
-8. `GtfsCacheStore` saves stations and trips (`CachedTrip`) to the GTFS cache file. On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops` and `stopTrips` from the trips.
+7. **Foreign stops** (`ForeignStopSnapper`): a source's home country is where more than half of its located stations lie. A stop outside its source's home country is merged into the nearest station within 1 km of a source at home in the stop's country, which stays canonical. Every map is remapped. A canonical station can itself be merged later (A→B, then B→C); `mergeStations` first resolves such chains so every alias maps straight to the last station. The alias's translated names move to the canonical station.
+8. `GtfsCacheStore` saves stations, translated names and trips (`CachedTrip`) to the GTFS cache file (format version 4). On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops` and `stopTrips` from the trips.
 
-`StationSearchIndex.rebuild` then indexes the station name variants. `TransitGraph` builds lazy indexes on first access: `timetables` (trip → `TripTimetable`), `departuresByStop` (stop → departures by time) and `connectionByTrip` (edge → tripId → Connection).
+`StationSearchIndex.rebuild` then indexes the variants of each station's name and translated names. `TransitGraph` builds lazy indexes on first access: `timetables` (trip → `TripTimetable`), `departuresByStop` (stop → departures by time) and `connectionByTrip` (edge → tripId → Connection).
 
 ## Reachability algorithm (`ReachabilityCache`, `ReachabilitySearch`)
 
@@ -156,7 +159,7 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 |---|---|---|
 | GET | `/reachability/stream?stationId=&maxTransfers=&minTransferMinutes=0&maxTransferMinutes=180&maxJourneyHours=` | SSE; used by the frontend |
 | POST | `/reachability` | JSON `ReachabilityRequest` → `ReachabilityResponse` (Caffeine-cached) |
-| GET | `/stations/search?q=&limit=50` | Case- and accent-insensitive substring match on any name variant (`StationNameVariants`; names are still returned in the local language); only stations with edges, sorted by degree. Candidates come from the rarest trigram of the query (`StationSearchIndex`); queries under 3 characters scan in degree order and stop at `limit`. Each result: id, name, latitude, longitude, country |
+| GET | `/stations/search?q=&limit=50` | Case- and accent-insensitive substring match on any variant of the station name or of its `translations.txt` names (`StationNameVariants`; names are still returned in the local language); only stations with edges, sorted by degree. Candidates come from the rarest trigram of the query (`StationSearchIndex`); queries under 3 characters scan in degree order and stop at `limit`. Each result: id, name, latitude, longitude, country |
 | GET | `/stations/{id}` | Single station |
 | GET | `/stats` | stations / graphNodes / totalEdges |
 | GET | `/health` | UP/DOWN depending on whether data is loaded |

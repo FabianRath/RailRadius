@@ -25,6 +25,8 @@ public class TransitGraph {
     private static final int MERGE_PROGRESS_LOG_INTERVAL = 1000;
 
     private final Map<String, Station> stations = new ConcurrentHashMap<>();
+    // stop ID -> its names in other languages, from the feeds' translations.txt
+    private final Map<String, Set<String>> translatedNames = new ConcurrentHashMap<>();
     // stop ID -> stop IDs reachable without an intermediate stop
     private final Map<String, Set<String>> neighbors = new ConcurrentHashMap<>();
     // "fromId->toId" -> every trip's connection along that edge
@@ -45,6 +47,10 @@ public class TransitGraph {
 
     public Map<String, Station> getAllStations() {
         return Collections.unmodifiableMap(stations);
+    }
+
+    Set<String> getTranslatedNames(String stopId) {
+        return translatedNames.getOrDefault(stopId, Collections.emptySet());
     }
 
     public Set<String> getNeighbors(String stopId) {
@@ -125,6 +131,7 @@ public class TransitGraph {
 
     void clear() {
         stations.clear();
+        translatedNames.clear();
         neighbors.clear();
         connections.clear();
         tripStops.clear();
@@ -136,6 +143,10 @@ public class TransitGraph {
 
     void addStationIfAbsent(Station station) {
         stations.putIfAbsent(station.getId(), station);
+    }
+
+    void addTranslatedNames(String stopId, Collection<String> names) {
+        translatedNames.computeIfAbsent(stopId, k -> new HashSet<>()).addAll(names);
     }
 
     void addTrip(String tripId, List<String> stopIds) {
@@ -167,19 +178,21 @@ public class TransitGraph {
             log.warn("{} connections match no leg of their trip's stop list and are left out of the cache (B19)",
                     droppedCount);
         }
-        return new GtfsCacheStore.GtfsCacheData(GtfsCacheStore.FORMAT_VERSION, new HashMap<>(stations), trips);
+        return new GtfsCacheStore.GtfsCacheData(GtfsCacheStore.FORMAT_VERSION, new HashMap<>(stations),
+                new HashMap<>(translatedNames), trips);
     }
 
     /** Edges, connections and the stop→trips index are not stored; they are rebuilt from the trips. */
     void restore(GtfsCacheStore.GtfsCacheData data) {
         clear();
         stations.putAll(data.stations());
+        translatedNames.putAll(data.translatedNames());
         data.trips().forEach((tripId, trip) -> trip.addTo(tripId, this));
     }
 
     /**
-     * Folds every alias stop into its canonical stop: edges, connections, trips; then drops the alias. A canonical
-     * stop may itself be an alias (A→B, B→C); A then ends up at C.
+     * Folds every alias stop into its canonical stop: edges, connections, trips, translated names; then drops the
+     * alias. A canonical stop may itself be an alias (A→B, B→C); A then ends up at C.
      */
     void mergeStations(Map<String, String> aliasToCanonicalOrAlias) {
         Map<String, String> aliasToCanonical = resolveChains(aliasToCanonicalOrAlias);
@@ -193,6 +206,8 @@ public class TransitGraph {
             mergeEdges(alias, canonical, aliasToCanonical);
             mergeConnections(alias, aliasToCanonical);
             mergeTrips(alias, canonical);
+            Set<String> aliasTranslatedNames = translatedNames.remove(alias);
+            if (aliasTranslatedNames != null) addTranslatedNames(canonical, aliasTranslatedNames);
             stations.remove(alias);
         }
     }

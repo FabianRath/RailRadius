@@ -9,14 +9,16 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.IntStream;
 
 /**
- * Substring search over station names and their variants ({@link StationNameVariants}). A trigram index finds the
- * candidates, so a search does not scan every station. Must be rebuilt after the graph changes ({@link GtfsDataService} does so after each load).
+ * Substring search over station names, their translations from the feeds and the variants of both
+ * ({@link StationNameVariants}). A trigram index finds the candidates, so a search does not scan every station.
+ * Must be rebuilt after the graph changes ({@link GtfsDataService} does so after each load).
  */
 @Component
 @Slf4j
@@ -44,9 +46,7 @@ public class StationSearchIndex {
                 .sorted(Comparator.comparingInt((Station s) -> graph.getNeighbors(s.getId()).size()).reversed()
                         .thenComparing(Station::getId))
                 .toList();
-        List<String> names = ranked.stream()
-                .map(s -> String.join(VARIANT_SEPARATOR, nameVariants.variants(s.getName())))
-                .toList();
+        List<String> names = ranked.stream().map(this::joinedVariants).toList();
 
         Map<String, List<Integer>> positions = new HashMap<>();
         for (int i = 0; i < names.size(); i++) {
@@ -60,6 +60,15 @@ public class StationSearchIndex {
 
         index = new Index(ranked, names, positionsByGram);
         log.info("Station search index built: {} stations, {} trigrams", ranked.size(), positionsByGram.size());
+    }
+
+    /** The variants of the station's name and of its translated names, without repeats. */
+    private String joinedVariants(Station station) {
+        Set<String> variants = new LinkedHashSet<>(nameVariants.variants(station.getName()));
+        for (String translatedName : graph.getTranslatedNames(station.getId())) {
+            variants.addAll(nameVariants.variants(translatedName));
+        }
+        return String.join(VARIANT_SEPARATOR, variants);
     }
 
     /** Stations with a name variant that contains the query and that have outgoing edges, best connected first. */

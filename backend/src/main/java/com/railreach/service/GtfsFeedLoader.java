@@ -15,9 +15,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.zip.ZipFile;
 
@@ -124,9 +126,30 @@ public class GtfsFeedLoader {
                 log.error("  No stop ID mappings created! Cannot build graph");
                 return 0;
             }
+            Map<String, Set<String>> translatedNames =
+                    translatedNames(StopNameTranslations.load(zipFile), stops, rawToCanonical, stations);
             FeedTables tables = new FeedTables(source, routeNames, tripToRoute, rawToCanonical, stations);
-            return loadStopTimes(zipFile, tables, graph);
+            int connectionsAdded = loadStopTimes(zipFile, tables, graph);
+            translatedNames.forEach((id, names) -> {
+                if (graph.getStation(id) != null) graph.addTranslatedNames(id, names);
+            });
+            return connectionsAdded;
         }
+    }
+
+    /** canonical stop ID -> the translated names of its stops that differ from the station's name. */
+    private static Map<String, Set<String>> translatedNames(StopNameTranslations translations,
+                                                            Map<String, GtfsStop> stops,
+                                                            Map<String, String> rawToCanonical,
+                                                            Map<String, Station> stations) {
+        Map<String, Set<String>> translatedNames = new HashMap<>();
+        rawToCanonical.forEach((rawId, canonical) -> {
+            Set<String> names = translations.of(rawId, stops.get(rawId).name());
+            names.remove(stations.get(canonical).getName());
+            if (!names.isEmpty()) translatedNames.computeIfAbsent(canonical, k -> new HashSet<>()).addAll(names);
+        });
+        log.info("  Translated names: {} stations", translatedNames.size());
+        return translatedNames;
     }
 
     /** route ID -> display name, for rail routes only. */
