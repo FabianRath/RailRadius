@@ -3,6 +3,7 @@
 import { clearDebugTrigger, fetchDebugStations, fetchDebugStatus } from './api.js';
 import { bindPopup, fitToPoints, hasCoordinates, LAYERS, setDebugStations } from './map.js';
 import { cssVar, escapeHtml, lerpColor } from './util.js';
+import { icon } from './icons.js';
 
 const POLL_INTERVAL_MS = 2000;
 const MIN_RADIUS_PX = 2;
@@ -66,7 +67,7 @@ async function showDebugStations() {
         bannerText.textContent = `${stations.length.toLocaleString()} stations in memory`
             + ' · colour = connectivity (green→blue→red)';
     } catch (e) {
-        bannerText.textContent = `⚠ Failed to fetch stations: ${e.message}`;
+        bannerText.innerHTML = `${icon('triangle-alert')} Failed to fetch stations: ${escapeHtml(e.message)}`;
         console.error('Debug overlay error:', e);
     }
 }
