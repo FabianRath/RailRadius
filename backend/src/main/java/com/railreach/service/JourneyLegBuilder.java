@@ -56,21 +56,8 @@ public class JourneyLegBuilder {
             while (rideEnd < connections.size() && isSameRide(connections.get(rideEnd - 1), connections.get(rideEnd))) {
                 rideEnd++;
             }
-            Connection first = connections.get(rideStart);
             Connection last = connections.get(rideEnd - 1);
-            int rideMinutes = GtfsTime.diffMinutes(first.getDepartureTimeSeconds(), last.getArrivalTimeSeconds());
-            legs.add(JourneyLeg.builder()
-                    .type(LEG_TRAIN)
-                    .trainName(first.getRouteName())
-                    .fromStation(stationName(first.getFromStopId()))
-                    .toStation(stationName(last.getToStopId()))
-                    .fromCountry(stationCountry(first.getFromStopId()))
-                    .toCountry(stationCountry(last.getToStopId()))
-                    .departureTime(first.getDepartureTime())
-                    .arrivalTime(last.getArrivalTime())
-                    .duration(GtfsTime.formatDuration(rideMinutes))
-                    .durationMinutes(rideMinutes)
-                    .build());
+            legs.add(trainLeg(connections.get(rideStart), last));
 
             if (rideEnd < connections.size()) {
                 int transferMinutes = Math.max(0, GtfsTime.diffMinutes(
@@ -90,6 +77,26 @@ public class JourneyLegBuilder {
             rideStart = rideEnd;
         }
         return legs;
+    }
+
+    private JourneyLeg trainLeg(Connection first, Connection last) {
+        int rideMinutes = GtfsTime.diffMinutes(first.getDepartureTimeSeconds(), last.getArrivalTimeSeconds());
+        Optional<TripInfo> tripInfo = transitGraph.getTripInfo(first.getTripId());
+        return JourneyLeg.builder()
+                .type(LEG_TRAIN)
+                .trainName(first.getRouteName())
+                .trainNumber(tripInfo.map(TripInfo::trainNumber).orElse(null))
+                .headsign(tripInfo.map(TripInfo::headsign).orElse(null))
+                .operator(tripInfo.map(TripInfo::operator).orElse(null))
+                .fromStation(stationName(first.getFromStopId()))
+                .toStation(stationName(last.getToStopId()))
+                .fromCountry(stationCountry(first.getFromStopId()))
+                .toCountry(stationCountry(last.getToStopId()))
+                .departureTime(first.getDepartureTime())
+                .arrivalTime(last.getArrivalTime())
+                .duration(GtfsTime.formatDuration(rideMinutes))
+                .durationMinutes(rideMinutes)
+                .build();
     }
 
     private static boolean isSameRide(Connection prev, Connection next) {

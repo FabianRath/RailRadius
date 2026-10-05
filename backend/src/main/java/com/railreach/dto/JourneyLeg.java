@@ -12,6 +12,10 @@ import lombok.NoArgsConstructor;
 public class JourneyLeg {
     private String type;  // "TRAIN" or "TRANSFER"
     private String trainName;
+    // Train number, direction and operator, for finding the train on the operator's site; null on TRANSFER legs
+    private String trainNumber;
+    private String headsign;
+    private String operator;
     private String fromStation;
     private String toStation;
     private String fromCountry;

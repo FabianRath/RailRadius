@@ -8,6 +8,14 @@ export function fmtSeconds(seconds) {
     return seconds < 60 ? `${seconds}s` : fmtMins(Math.round(seconds / 60));
 }
 
+/** GTFS HH:MM:SS (hours may exceed 23) as HH:MM, with "+1" for a time on the next day. */
+export function fmtGtfsClock(gtfsTime) {
+    const [hours, minutes] = gtfsTime.split(':').map(Number);
+    const days = Math.floor(hours / 24);
+    const clock = `${String(hours % 24).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    return days > 0 ? `${clock} +${days}` : clock;
+}
+
 const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
 /** GTFS names are untrusted text; escape them before they go into innerHTML. */

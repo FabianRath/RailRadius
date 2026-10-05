@@ -1,4 +1,4 @@
-﻿route_id,service_id,trip_id
-S1,WD,U1
-S1,WD,U2
-SN,WD,U3
+﻿route_id,service_id,trip_id,trip_short_name,trip_headsign
+S1,WD,U1,000123,Beta City
+S1,WD,U2,,
+SN,WD,U3,,

@@ -686,6 +686,16 @@ input[type="range"]::-moz-range-thumb {
     border-left: 3px solid var(--accent-rail);
 }
 
+.leg-times {
+    margin-top: 4px;
+    color: var(--text-primary);
+}
+
+.leg-detail {
+    font-weight: normal;
+    color: var(--text-secondary);
+}
+
 .leg-duration {
     font-weight: normal;
     color: var(--text-secondary);

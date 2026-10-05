@@ -208,6 +208,7 @@ class GtfsDataServiceTest {
             assertThat(restored.getTripsAtStop(stopId)).isEqualTo(gtfs.getTripsAtStop(stopId));
             for (String tripId : gtfs.getTripsAtStop(stopId)) {
                 assertThat(restored.getStopsOnTrip(tripId)).isEqualTo(gtfs.getStopsOnTrip(tripId));
+                assertThat(restored.getTripInfo(tripId)).isEqualTo(gtfs.getTripInfo(tripId));
             }
         }
     }
