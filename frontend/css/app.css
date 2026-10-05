@@ -635,6 +635,10 @@ input[type="range"]::-moz-range-thumb {
     color: var(--text-secondary);
 }
 
+.popup-warning {
+    color: var(--warning);
+}
+
 .popup-mono {
     font-family: var(--font-mono);
     font-size: 11px;

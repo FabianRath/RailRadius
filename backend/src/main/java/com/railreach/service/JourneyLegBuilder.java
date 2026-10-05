@@ -29,6 +29,7 @@ public class JourneyLegBuilder {
     public Optional<ReachableStation> toReachableStation(String stopId, JourneyPath path) {
         Station station = transitGraph.getStation(stopId);
         if (station == null) return Optional.empty();
+        ServiceDays runningDays = JourneyRunningDays.of(path.getConnections(), transitGraph);
         return Optional.of(ReachableStation.builder()
                 .stopId(stopId)
                 .stopName(station.getName())
@@ -41,6 +42,8 @@ public class JourneyLegBuilder {
                 .path(path.getStationIds())
                 .pathNames(path.getStationIds().stream().map(this::stationName).toList())
                 .legs(buildLegs(path.getConnections()))
+                .runningDays(JourneyRunningDays.describe(runningDays).orElse(null))
+                .hasCommonDay(!runningDays.isEmpty())
                 .build());
     }
 

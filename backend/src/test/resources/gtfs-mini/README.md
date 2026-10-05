@@ -27,10 +27,12 @@ Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the 
   - GT2 line 33, type 102, "002214": GK 09:00 → GW 13:00 (→ "IC 2214")
   - GT3 line 85, type 102, "000009": GK 10:00 → GH 14:00 (→ "ECE 9")
   - GT4 RE7, DB Regio, type 106, "04711": GK 11:00 → GH 15:00 (no rule, → "4711")
-- **zeta** (loaded alone, by the service day tests; the only feed with `calendar.txt`/`calendar_dates.txt`, so every other feed's trips run every day): Z1 Zeta Start, Z2 Zeta Hub, Z3 Zeta Weekend, Z4 Zeta Weekday, Z5 Zeta Night, Z6 Zeta Holiday. Services in January 2026: WD Mon–Fri minus 2026-01-06 (removed in calendar_dates), WE Sat–Sun, FR Fridays, SA Saturdays, HOL only 2026-01-06 (calendar_dates only)
+- **zeta** (loaded alone, by the service day tests; the only feed with `calendar.txt`/`calendar_dates.txt`, so every other feed's trips run every day): Z1 Zeta Start, Z2 Zeta Hub, Z3 Zeta Weekend, Z4 Zeta Weekday, Z5 Zeta Night, Z6 Zeta Holiday, Z7 Zeta Junction, Z8 Zeta End, Z9 Zeta Twin. Services in January 2026: WD Mon–Fri minus 2026-01-06 (removed in calendar_dates), WE Sat–Sun, FR Fridays, SA Saturdays, ALL every day, HOL only 2026-01-06 (calendar_dates only)
   - ZT1 WD: Z1 08:00 → Z2 09:00; ZT7 WE: Z1 08:30 → Z2 09:10 (the better arrival for every departure after it)
   - ZT2 WE: Z2 09:30 → Z3 10:00; ZT3 WD: Z2 09:30 → Z4 10:00 (only from ZT1); ZT6 HOL: Z2 09:40 → Z6 10:10 (shares no day with ZT1 or ZT7)
   - ZT4 FR: Z1 22:00 → Z2 23:30; ZT5 SA: Z2 00:30 → Z5 01:00 (connects across midnight)
+  - ZT8 ALL: Z2 09:50 → Z7 10:20; ZT9 WD: Z7 10:40 → Z8 11:10. Z8 is reached via ZT7 (weekend), ZT8, ZT9 (weekdays): each transfer shares a day, the whole journey none
+  - ZT10 WD and ZT11 WE: both Z1 07:00 → Z9 07:40, one train published as two trips that differ only in their days
 - **netherlands** + **poland** (loaded together, by the category column test; `train-category-columns.txt` names `trip_long_name` for netherlands and `plk_category_code` for poland):
   - netherlands: N1 Nether Amsterdam, N2 Nether Utrecht; NT1 "2835" with `trip_long_name` Intercity (→ "Intercity 2835"), NT2 "5512" with none (→ "5512")
   - poland: P1 Polska Warszawa, P2 Polska Lodz; its `trip_long_name` holds route names and is ignored. PT1 IC "1900/1 Zosia" (→ "IC 1900/1 Zosia"), PT2 Os "50324" on route AR (→ "Os 50324")
