@@ -21,12 +21,26 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(ls *)",
-      "Bash(tail *)"
+      "Bash(tail *)",
+      "Bash(unzip -l *)"
     ],
     "deny": [
-      "Read(**/backend/data/**)",
       "Read(**/target/**)",
       "Bash(git push --force*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "grep -qiE \"backend[/\\\\\\\\]+data[/\\\\\\\\]\" && { echo \"backend/data/ holds multi-GB files: peek with capped Bash commands instead (see CLAUDE.md)\" >&2; exit 2; } || exit 0",
+            "statusMessage": "Checking backend/data guard"
+          }
+        ]
+      }
     ]
   }
 }
