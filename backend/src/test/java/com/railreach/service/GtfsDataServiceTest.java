@@ -47,6 +47,18 @@ class GtfsDataServiceTest {
         assertThat(trainNumber(graph, "germany:GT4")).isEqualTo("4711");
     }
 
+    // F15: columns from train-category-columns.txt
+    @Test
+    void trainNumbersGetTheCategoryFromTheFeedsCategoryColumn(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, "netherlands", "poland");
+
+        assertThat(trainNumber(graph, "netherlands:NT1")).isEqualTo("Intercity 2835");
+        assertThat(trainNumber(graph, "netherlands:NT2")).isEqualTo("5512");
+        assertThat(trainNumber(graph, "poland:PT1")).isEqualTo("IC 1900/1 Zosia");
+        // poland's trip_long_name names the route, not a category, and is not configured for it
+        assertThat(trainNumber(graph, "poland:PT2")).isEqualTo("Os 50324");
+    }
+
     @Test
     void suburbanRailwayTripsAreLoaded(@TempDir Path dir) throws Exception {
         TransitGraph graph = GtfsTestFixtures.load(dir, "epsilon");

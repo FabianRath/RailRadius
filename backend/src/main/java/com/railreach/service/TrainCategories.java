@@ -8,17 +8,22 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * The category passengers see on a train ("ICE", "IC") for feeds that only give a bare train number and keep the
- * category in nothing but the route type. Rules come from {@code train-categories.txt}.
+ * The category passengers see on a train ("ICE", "IC"). Feeds that keep it in a trips.txt column of their own have
+ * that column in {@code train-category-columns.txt}. Feeds that only give a bare train number and keep the category
+ * in nothing but the route type have rules in {@code train-categories.txt}.
  */
 final class TrainCategories {
 
     private static final String RULES_RESOURCE = "/train-categories.txt";
     private static final int MIN_RULE_FIELDS = 4;
+    private static final String COLUMNS_RESOURCE = "/train-category-columns.txt";
+    private static final int COLUMN_FIELDS = 2;
 
     /** Empty {@code routeShortNames} matches every route. */
     private record Rule(String source, String agencyName, int routeType, String category,
@@ -32,9 +37,19 @@ final class TrainCategories {
     }
 
     private final List<Rule> rules;
+    // source -> trips.txt column with the category
+    private final Map<String, String> categoryColumns;
 
     TrainCategories() {
-        rules = loadRules();
+        rules = readLines(RULES_RESOURCE).stream().map(TrainCategories::parseRule).toList();
+        categoryColumns = readLines(COLUMNS_RESOURCE).stream()
+                .map(TrainCategories::parseColumn)
+                .collect(Collectors.toUnmodifiableMap(List::getFirst, List::getLast));
+    }
+
+    /** The trips.txt column that holds the source's train categories, if its feed has one. */
+    Optional<String> columnOf(String source) {
+        return Optional.ofNullable(categoryColumns.get(source));
     }
 
     /** The category of the first matching rule. */
@@ -45,18 +60,25 @@ final class TrainCategories {
                 .findFirst();
     }
 
-    private static List<Rule> loadRules() {
-        try (InputStream in = TrainCategories.class.getResourceAsStream(RULES_RESOURCE)) {
-            if (in == null) throw new IllegalStateException("Missing classpath resource " + RULES_RESOURCE);
+    /** The resource's lines without blank lines and # comments. */
+    private static List<String> readLines(String resource) {
+        try (InputStream in = TrainCategories.class.getResourceAsStream(resource)) {
+            if (in == null) throw new IllegalStateException("Missing classpath resource " + resource);
             BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
             return reader.lines()
                     .map(String::strip)
                     .filter(line -> !line.isEmpty() && !line.startsWith("#"))
-                    .map(TrainCategories::parseRule)
                     .toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    // Format: source;column
+    private static List<String> parseColumn(String line) {
+        List<String> fields = Arrays.stream(line.split(";")).map(String::strip).toList();
+        if (fields.size() != COLUMN_FIELDS) throw new IllegalStateException("Invalid category column: " + line);
+        return fields;
     }
 
     // Format: source;agency_name;route_type;category[;route_short_name...]

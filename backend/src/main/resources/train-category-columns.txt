@@ -1,0 +1,7 @@
+# trips.txt columns that hold the category passengers see, for feeds that have one (TrainCategories). A trip with a
+# value there gets its train number as "<category> <number>", e.g. "Intercity 2835". The value wins over a
+# train-categories.txt rule. Only list a column whose values are categories in that feed: Estonia's trip_long_name,
+# for example, names the route ("Tallinn - Keila").
+# Format: source;column
+netherlands;trip_long_name
+poland;plk_category_code

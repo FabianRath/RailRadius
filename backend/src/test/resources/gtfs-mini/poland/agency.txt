@@ -1,0 +1,3 @@
+agency_id,agency_name,agency_url,agency_timezone
+IC,PKP Intercity,https://ic.example,Europe/Warsaw
+AR,Arriva,https://ar.example,Europe/Warsaw

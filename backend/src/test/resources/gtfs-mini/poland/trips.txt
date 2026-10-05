@@ -1,0 +1,3 @@
+trip_id,route_id,service_id,trip_short_name,trip_long_name,plk_category_code
+PT1,IC_IC,WD,1900/1 Zosia,Warszawa - Lodz,IC
+PT2,AR,WD,50324,Lodz - Warszawa,Os
