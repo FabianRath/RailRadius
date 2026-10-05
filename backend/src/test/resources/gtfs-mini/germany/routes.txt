@@ -1,0 +1,5 @@
+route_id,agency_id,route_short_name,route_long_name,route_type
+L33H,FV,33,,101
+L33L,FV,33,,102
+L85,FV,85,,102
+LRE,RV,RE7,,106

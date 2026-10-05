@@ -53,6 +53,8 @@ public class GtfsFeedLoader {
     @Value("${railreach.gtfs.trip-batch-size:100000}")
     private int tripBatchSize;
 
+    private final TrainCategories trainCategories = new TrainCategories();
+
     private record GtfsStop(String stopId, String name, double lat, double lon, String parentStation) {}
 
     private record GtfsStopTime(String stopId, int sequence, int arrivalSeconds, int departureSeconds) {}
@@ -103,7 +105,7 @@ public class GtfsFeedLoader {
     /** Returns the number of connections added. */
     private int loadFeed(File file, String source, TransitGraph graph) throws IOException {
         try (ZipFile zipFile = new ZipFile(file)) {
-            Map<String, RailRoute> routes = RailTripReader.loadRailRoutes(zipFile);
+            Map<String, RailRoute> routes = RailTripReader.loadRailRoutes(zipFile, source, trainCategories);
             Map<String, GtfsStop> stops = loadStops(zipFile);
             Map<String, RailTrip> trips = RailTripReader.loadRailTrips(zipFile, routes);
             log.info("  Loaded {} rail routes, {} stops, {} rail trips", routes.size(), stops.size(), trips.size());

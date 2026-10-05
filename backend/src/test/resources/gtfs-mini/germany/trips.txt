@@ -1,0 +1,5 @@
+route_id,service_id,trip_id,trip_short_name,trip_headsign
+L33H,WD,GT1,002310,Westerland
+L33L,WD,GT2,002214,Westerland
+L85,WD,GT3,000009,Hamburg
+LRE,WD,GT4,04711,Hamburg

@@ -25,14 +25,18 @@ final class RailTripReader {
     // The German feed pads train numbers to six digits ("002310"); operators show them without the zeros
     private static final Pattern LEADING_ZEROS = Pattern.compile("^0+(?=\\d+$)");
 
-    record RailRoute(String name, String operator) {}
+    private static final Pattern DIGITS = Pattern.compile("\\d+");
+
+    /** {@code category} is set only where {@link TrainCategories} prefixes the route's bare train numbers. */
+    record RailRoute(String name, String operator, String category) {}
 
     record RailTrip(String routeId, TripInfo info) {}
 
     private RailTripReader() {}
 
     /** route ID -> route, for rail routes only. */
-    static Map<String, RailRoute> loadRailRoutes(ZipFile zipFile) throws IOException {
+    static Map<String, RailRoute> loadRailRoutes(ZipFile zipFile, String source, TrainCategories trainCategories)
+            throws IOException {
         Map<String, String> agencyNames = loadAgencyNames(zipFile);
         // agency_id may be left out when a feed has a single agency
         String singleAgencyName = agencyNames.size() == 1 ? agencyNames.values().iterator().next() : null;
@@ -48,8 +52,8 @@ final class RailTripReader {
             for (String[] row = csv.next(); row != null; row = csv.next()) {
                 totalRoutes++;
                 String routeType = field(row, typeCol);
-                if (routeType != null) {
-                    int type = GtfsCsvReader.parseInt(routeType);
+                Integer type = routeType != null ? GtfsCsvReader.parseInt(routeType) : null;
+                if (type != null) {
                     routeTypeCounts.merge(type, 1, Integer::sum);
                     if (!isRail(type)) continue;
                 }
@@ -59,7 +63,9 @@ final class RailTripReader {
                 String name = shortName != null ? shortName : field(row, longNameCol);
                 String agencyId = field(row, agencyCol);
                 String operator = agencyId != null ? agencyNames.get(agencyId) : singleAgencyName;
-                routes.put(id, new RailRoute(name != null ? name : "Unknown", operator));
+                String category = type != null
+                        ? trainCategories.of(source, operator, type, shortName).orElse(null) : null;
+                routes.put(id, new RailRoute(name != null ? name : "Unknown", operator, category));
             }
         }
         log.info("  Routes: {} total, {} rail routes selected", totalRoutes, routes.size());
@@ -80,8 +86,8 @@ final class RailTripReader {
                 String routeId = field(row, routeCol);
                 RailRoute route = routeId != null ? railRoutes.get(routeId) : null;
                 if (tripId == null || route == null) continue;
-                TripInfo info = new TripInfo(trainNumber(field(row, shortNameCol)), field(row, headsignCol),
-                        route.operator());
+                TripInfo info = new TripInfo(trainNumber(field(row, shortNameCol), route.category()),
+                        field(row, headsignCol), route.operator());
                 trips.put(tripId, new RailTrip(routeId, info));
             }
         }
@@ -102,8 +108,10 @@ final class RailTripReader {
         return names;
     }
 
-    private static String trainNumber(String tripShortName) {
-        return tripShortName != null ? LEADING_ZEROS.matcher(tripShortName).replaceFirst("") : null;
+    private static String trainNumber(String tripShortName, String category) {
+        if (tripShortName == null) return null;
+        String number = LEADING_ZEROS.matcher(tripShortName).replaceFirst("");
+        return category != null && DIGITS.matcher(number).matches() ? category + " " + number : number;
     }
 
     private static boolean isRail(int routeType) {

@@ -22,6 +22,11 @@ Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the 
 - **kappa** + **lambda** (only loaded together, by the foreign-stop tests). `borders.geojson` puts made-up country KA at lon 30–31 and LA at lon 31–32 (lat 50–51); every other feed lies outside both. kappa: K1 Kappa Central, K2 Kappa East, K5 Kappa North (in KA, so kappa's home is KA), K3 Lambda Gate and K4 Lambda Field (in LA); lambda: L1 Lambdastadt Ost (~700 m from K3), L2 Lambdastadt. K3 merges into L1; K4 has no lambda station within 1 km and stays.
   - KT1 RE2: K1 08:00 → K2 08:30 → K3 09:00; KT2 RE2: K5 10:00 → K4 11:00
   - LT1 R3: L1 09:30 → L2 10:00
+- **germany** (loaded alone, by the train category test; mimics DELFI: routes named by line only, zero-padded train numbers): GK Germany Cologne, GH Germany Hamburg, GW Germany Westerland. Agencies FV "DB Fernverkehr AG" and RV "DB Regio AG", which `train-categories.txt` matches for source `germany`
+  - GT1 line 33, type 101, "002310": GK 08:00 → GW 12:00 (→ "ICE 2310")
+  - GT2 line 33, type 102, "002214": GK 09:00 → GW 13:00 (→ "IC 2214")
+  - GT3 line 85, type 102, "000009": GK 10:00 → GH 14:00 (→ "ECE 9")
+  - GT4 RE7, DB Regio, type 106, "04711": GK 11:00 → GH 15:00 (no rule, → "4711")
 - **alpha-fast-train**: alpha plus T6 NJ A1 21:00 → A3 21:30. The faster train reaches the border later and misses U1 (B2 test).
 - **epsilon** (loaded alone): E1 Epsilon Start, E2 Epsilon Fork, E3 Epsilon Junction, E4 Epsilon East, E5 Epsilon Detour, E6 Epsilon End, E7 Epsilon Suburb; route EX (type 2) and S-Bahn route S7 (type 109)
   - Y1: E1 08:00 → E3 08:40; Y2: E1 08:50 → E3 08:58; Y3: E3 09:00 → E4 09:30. The faster Y2 leaves only 2 min to catch Y3, the slower Y1 20 min (B3 test)

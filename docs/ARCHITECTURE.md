@@ -66,7 +66,8 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `TransitGraph` | service | The merged network: stations, their translated names, edges, connections, trip indexes and `TripInfo`s. Everything that reads GTFS data injects this |
 | `GtfsFeedLoader` | service | Parses the rail part of each zip into the graph, with per-feed stop dedup |
 | `RailTripReader` | service | A feed's rail routes (name, operator from `agency.txt`) and rail trips (route, `TripInfo`) from routes/agency/trips.txt |
-| `TripInfo` | service | A trip's train number (`trip_short_name`, leading zeros of a numeric one stripped), headsign and operator |
+| `TripInfo` | service | A trip's train number (`trip_short_name`, leading zeros of a numeric one stripped, prefixed with a `TrainCategories` category), headsign and operator |
+| `TrainCategories` | service | Category for bare train numbers by source, agency, route type and optionally route short name, from `train-categories.txt` (e.g. DELFI's DB Fernverkehr: 101 → `ICE`, 102 → `IC`/`ECE`) |
 | `GtfsLoadProgress` | service | Phase (PARSING → MERGING → SAVING → DONE/FAILED), feeds and zip bytes parsed of the running or last load from the zips; read by `/gtfs-load-status` |
 | `TripRowBatcher` | service | Buffers stop_times rows per trip and hands whole trips to the loader in batches |
 | `StopNameTranslations` | service | A feed's translated `stop_name`s from `translations.txt`, by stop ID or by untranslated name; reads the current and the pre-2019 (`trans_id`) format |
@@ -106,7 +107,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 
 `GtfsFeedLoader`, for each `data/gtfs/*.zip` (sorted). The source name comes from the filename, e.g. `gtfs_germany.zip` → `germany`:
 1. **routes.txt / agency.txt** (`RailTripReader`): keep only rail route types `2`, `100–106` and `109` (S-Bahn), each with its operator (`agency_name`; a route without `agency_id` gets the feed's only agency).
-2. **stops.txt / trips.txt**: load stops and the rail trips: route plus `TripInfo` (train number, headsign, operator).
+2. **stops.txt / trips.txt**: load stops and the rail trips: route plus `TripInfo` (train number, headsign, operator). A numeric train number on a route that matches a `train-categories.txt` rule gets its category: `002310` → `ICE 2310`.
 3. **Per-feed stop dedup**: a stop whose `parent_station` is in the feed (with coordinates) is merged into that parent, at any distance. The other stops are merged when they have the same name and lie within ~0.0015°. IDs are canonicalised to `<source>:<id>`, with `_ARR`/`_DEP`/`ARRIVAL_` style suffixes and prefixes stripped.
 4. **stop_times.txt**: streamed and buffered per trip (`TripRowBatcher`), rail trips only, and handed to the graph in batches of `railreach.gtfs.trip-batch-size` (100k) trips. A batch is only cut where a new trip starts, so trips stay whole in files grouped by `trip_id`. If a trip shows up again after another one started, the rest of the file is read in one batch, and rows of a trip already built are dropped with a WARN. Each trip's consecutive stop pairs produce:
    - `neighbors`: stopId → neighbour stopIds
@@ -125,7 +126,7 @@ After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStati
 
    In both, the station with more connections becomes canonical.
 7. **Foreign stops** (`ForeignStopSnapper`): a source's home country is where more than half of its located stations lie. A stop outside its source's home country is merged into the nearest station within 1 km of a source at home in the stop's country, which stays canonical. Every map is remapped. A canonical station can itself be merged later (A→B, then B→C); `mergeStations` first resolves such chains so every alias maps straight to the last station. The alias's translated names move to the canonical station.
-8. `GtfsCacheStore` saves stations, translated names and trips (`CachedTrip`) to the GTFS cache file (format version 5). On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops`, `tripInfos` and `stopTrips` from the trips.
+8. `GtfsCacheStore` saves stations, translated names and trips (`CachedTrip`) to the GTFS cache file (format version 6). On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops`, `tripInfos` and `stopTrips` from the trips.
 
 `StationSearchIndex.rebuild` then indexes the variants of each station's name and translated names. `TransitGraph` builds lazy indexes on first access: `timetables` (trip → `TripTimetable`), `departuresByStop` (stop → departures by time) and `connectionByTrip` (edge → tripId → Connection).
 
