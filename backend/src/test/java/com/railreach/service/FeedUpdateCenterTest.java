@@ -5,6 +5,7 @@ import com.railreach.dto.FeedDownloadResult.Outcome;
 import com.railreach.dto.FeedStatus;
 import com.railreach.dto.FeedStatus.State;
 import com.railreach.service.FeedRegistry.FeedSource;
+import com.railreach.service.FeedRegistry.FeedUrl;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +38,7 @@ class FeedUpdateCenterTest {
     private static final LocalDate LATER_ZETA_LAST_DAY = LocalDate.of(2027, 1, 31);
     private static final int EXPIRING_DAYS = 30;
     private static final String FEED_PATH = "/feed.zip";
+    private static final String MIRROR_PATH = "/mirror.zip";
     private static final int HTTP_OK = 200;
     private static final int HTTP_NOT_FOUND = 404;
     // Random bytes don't compress, so the padded zip is several times the size of plain zeta
@@ -137,6 +139,7 @@ class FeedUpdateCenterTest {
         FeedDownloadResult result = center.download(feed(), DURING_ZETA);
 
         assertThat(result.getOutcome()).isEqualTo(Outcome.REPLACED);
+        assertThat(result.getMessage()).startsWith("Downloaded from localhost:");
         assertThat(result.getBefore().getLastServiceDate()).isEqualTo(ZETA_LAST_DAY);
         assertThat(result.getAfter().getLastServiceDate()).isEqualTo(LATER_ZETA_LAST_DAY);
         assertThat(center.statuses(DURING_ZETA).getFirst().getLastServiceDate()).isEqualTo(LATER_ZETA_LAST_DAY);
@@ -260,6 +263,44 @@ class FeedUpdateCenterTest {
     }
 
     @Test
+    void failedUrlFallsBackToTheNextOne() throws IOException {
+        serve(FEED_PATH, HTTP_NOT_FOUND, "missing".getBytes(), false);
+        serve(MIRROR_PATH, HTTP_OK, Files.readAllBytes(zipZetaEndingIn2027(tempDir.resolve("new.zip"))), false);
+
+        FeedDownloadResult result = center.download(feed(FEED_PATH, MIRROR_PATH), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REPLACED);
+        assertThat(result.getAfter().getLastServiceDate()).isEqualTo(LATER_ZETA_LAST_DAY);
+    }
+
+    @Test
+    void rejectedDownloadFallsBackToTheNextUrl() throws IOException {
+        serve(FEED_PATH, HTTP_OK, "<html>Moved</html>".getBytes(), false);
+        serve(MIRROR_PATH, HTTP_OK, Files.readAllBytes(zipZetaEndingIn2027(tempDir.resolve("new.zip"))), false);
+
+        FeedDownloadResult result = center.download(feed(FEED_PATH, MIRROR_PATH), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REPLACED);
+        assertNoPartFileLeft();
+    }
+
+    @Test
+    void feedWhoseUrlsAllFailIsRejectedWithEveryReason() throws IOException {
+        Path zip = gtfsDir.resolve("gtfs_zeta.zip");
+        GtfsTestFixtures.zipFeed("zeta", zip);
+        byte[] original = Files.readAllBytes(zip);
+        serve(FEED_PATH, HTTP_NOT_FOUND, "missing".getBytes(), false);
+        serve(MIRROR_PATH, HTTP_OK, "<html>Moved</html>".getBytes(), false);
+
+        FeedDownloadResult result = center.download(feed(FEED_PATH, MIRROR_PATH), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REJECTED);
+        assertThat(result.getMessage()).contains("HTTP 404", "Not a zip");
+        assertThat(Files.readAllBytes(zip)).isEqualTo(original);
+        assertNoPartFileLeft();
+    }
+
+    @Test
     void downloadDuringAGtfsReloadIsRefused() {
         loadProgress.start();
 
@@ -267,11 +308,20 @@ class FeedUpdateCenterTest {
     }
 
     private FeedSource feed() {
-        return new FeedSource("zeta", "http://localhost:" + server.getAddress().getPort() + FEED_PATH, Map.of());
+        return feed(FEED_PATH);
+    }
+
+    private FeedSource feed(String... paths) {
+        String base = "http://localhost:" + server.getAddress().getPort();
+        return new FeedSource("zeta", Stream.of(paths).map(path -> new FeedUrl(base + path, Map.of())).toList());
     }
 
     private void serve(int statusCode, byte[] body, boolean gzip) {
-        server.createContext(FEED_PATH, exchange -> {
+        serve(FEED_PATH, statusCode, body, gzip);
+    }
+
+    private void serve(String path, int statusCode, byte[] body, boolean gzip) {
+        server.createContext(path, exchange -> {
             byte[] content = gzip ? gzipped(body) : body;
             if (gzip) exchange.getResponseHeaders().add("Content-Encoding", "gzip");
             exchange.sendResponseHeaders(statusCode, content.length);

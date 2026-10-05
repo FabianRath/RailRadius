@@ -1,6 +1,7 @@
 package com.railreach.service;
 
 import com.railreach.service.FeedRegistry.FeedSource;
+import com.railreach.service.FeedRegistry.FeedUrl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.zip.GZIPInputStream;
@@ -46,33 +48,57 @@ public class FeedDownloader {
             .connectTimeout(CONNECT_TIMEOUT)
             .build();
 
+    /** {@code detail} is the host the new zip came from, or why every URL was rejected. */
+    record Replacement(boolean replaced, String detail) {}
+
     /**
      * Downloads {@code feed} and replaces {@code target} with it, unless the download is no usable rail feed, is less
-     * than half the size of {@code target}, does not run today or ends before {@code currentLastDay}. Returns why it
-     * was rejected; {@code target} is then unchanged.
+     * than half the size of {@code target}, does not run today or ends before {@code currentLastDay}. A failed or
+     * rejected URL falls back to the feed's next one; if all fail, {@code target} is unchanged.
      */
-    Optional<String> replace(FeedSource feed, Path target, Optional<LocalDate> currentLastDay, LocalDate today)
+    Replacement replace(FeedSource feed, Path target, Optional<LocalDate> currentLastDay, LocalDate today)
             throws IOException, InterruptedException {
         Path part = target.resolveSibling(target.getFileName() + PART_SUFFIX);
+        List<String> rejections = new ArrayList<>();
         try {
-            Optional<String> rejection = download(feed, part);
-            if (rejection.isEmpty()) rejection = problemWith(part, target, currentLastDay, today);
-            if (rejection.isPresent()) return rejection;
-            if (Files.exists(target)) {
-                Path previous = Files.createDirectories(target.resolveSibling(PREVIOUS_DIRECTORY));
-                Files.move(target, previous.resolve(target.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+            for (FeedUrl url : feed.urls()) {
+                Optional<String> rejection = tryUrl(feed.source(), url, part, target, currentLastDay, today);
+                if (rejection.isEmpty()) {
+                    swapIn(part, target);
+                    return new Replacement(true, host(url));
+                }
+                log.warn("Feed {} from {} rejected: {}", feed.source(), url.url(), rejection.get());
+                rejections.add(feed.urls().size() == 1 ? rejection.get() : host(url) + ": " + rejection.get());
             }
-            Files.move(part, target, StandardCopyOption.ATOMIC_MOVE);
-            return Optional.empty();
+            return new Replacement(false, String.join("; ", rejections));
         } finally {
             Files.deleteIfExists(part);
         }
     }
 
-    private Optional<String> download(FeedSource feed, Path part) throws IOException, InterruptedException {
-        log.info("Downloading feed {} from {}", feed.source(), feed.url());
-        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(feed.url())).timeout(DOWNLOAD_TIMEOUT);
-        feed.headers().forEach(request::header);
+    private Optional<String> tryUrl(String source, FeedUrl url, Path part, Path target,
+            Optional<LocalDate> currentLastDay, LocalDate today) throws InterruptedException {
+        try {
+            Optional<String> rejection = download(source, url, part);
+            return rejection.isPresent() ? rejection : problemWith(part, target, currentLastDay, today);
+        } catch (IOException e) {
+            log.warn("Download of feed {} from {} failed", source, url.url(), e);
+            return Optional.of("Download failed: " + e);
+        }
+    }
+
+    private static void swapIn(Path part, Path target) throws IOException {
+        if (Files.exists(target)) {
+            Path previous = Files.createDirectories(target.resolveSibling(PREVIOUS_DIRECTORY));
+            Files.move(target, previous.resolve(target.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+        }
+        Files.move(part, target, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    private Optional<String> download(String source, FeedUrl url, Path part) throws IOException, InterruptedException {
+        log.info("Downloading feed {} from {}", source, url.url());
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url.url())).timeout(DOWNLOAD_TIMEOUT);
+        url.headers().forEach(request::header);
         HttpResponse<InputStream> response =
                 httpClient.send(request.build(), HttpResponse.BodyHandlers.ofInputStream());
         // Some servers only answer when asked for gzip (Finland), and the client doesn't unpack it
@@ -86,6 +112,10 @@ public class FeedDownloader {
             }
         }
         return Optional.empty();
+    }
+
+    private static String host(FeedUrl url) {
+        return URI.create(url.url()).getAuthority();
     }
 
     private static Optional<String> problemWith(Path part, Path target, Optional<LocalDate> currentLastDay,

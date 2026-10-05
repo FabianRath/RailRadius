@@ -47,7 +47,7 @@ RailReach/
     ├── src/main/java/com/railreach/{controller,service,dto,model,config}/
     ├── src/main/resources/application.yml (+ application-dev.yml), borders/europe.geojson (country borders),
     │                                          #   station-aliases.txt, train-categories.txt, train-category-columns.txt,
-    │                                          #   gtfs-feeds.txt (download URL per feed)
+    │                                          #   gtfs-feeds.txt (download URLs per feed)
     ├── src/test/java/com/railreach/           # service/ (GtfsDataService, Reachability*, GtfsTestFixtures), util/, config/ tests
     ├── src/test/resources/gtfs-mini/          # hand-written fixture feeds (see its README)
     └── data/                                  # GITIGNORED
@@ -85,8 +85,8 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `ForeignStopSnapper` | service | Cross-border rule: a feed's stop outside its home country is merged into the nearest station of that country's feed (≤ 1 km) |
 | `FeedUpdateCenter` | service | Update center for the GTFS zips: status of each zip (`FeedStatus`, validity memoized per file and modification time), a scheduled log check (`railreach.feeds.check-interval`, first run at startup) that WARNs about expired and expiring feeds, and downloads of registered feeds. A download is refused (`BUSY`) during a GTFS load or another download |
 | `FeedValidity` | service | First and last day any service of a feed runs, from `ServiceCalendarReader` over the whole feed (not only rail) |
-| `FeedRegistry` | service | Download URL and request headers per source, from `gtfs-feeds.txt` |
-| `FeedDownloader` | service | Downloads a feed (JDK `HttpClient`, unpacks `Content-Encoding: gzip`) to `gtfs_<source>.zip.part`, checks it (a zip with stops/stop_times/trips/routes.txt, at least one rail route, service days in the calendar, at least half the size of the current zip, running today, not ending before the current zip), moves the old zip to `previous/` and moves the new one in. A rejected download leaves the zip unchanged |
+| `FeedRegistry` | service | Download URLs (with request headers) per source, from `gtfs-feeds.txt`; a source on several lines gets fallback URLs in line order |
+| `FeedDownloader` | service | Downloads a feed, trying its URLs in order until one passes the checks below (JDK `HttpClient`, unpacks `Content-Encoding: gzip`) to `gtfs_<source>.zip.part`, checks it (a zip with stops/stop_times/trips/routes.txt, at least one rail route, service days in the calendar, at least half the size of the current zip, running today, not ending before the current zip), moves the old zip to `previous/` and moves the new one in. If every URL fails or is rejected, the zip is unchanged and the result lists each URL's reason |
 | `CountryLocator` | service | Point → ISO country code, from `borders/europe.geojson` (Natural Earth 1:10m, Europe) |
 | `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`: format version, stations, translated names, services, trips); a file with another version is ignored |
 | `CachedTrip` | service | One trip in the cache file: route name, `TripInfo`, service ID, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
@@ -109,7 +109,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `ReachableStation` | dto | Station (incl. country) + transfers, duration, path ids/names, `legs`, `runningDays` (summary, null without calendar data), `hasCommonDay` |
 | `GtfsLoadStatus` | dto | `GtfsLoadProgress` snapshot plus live station/connection counts; ETA extrapolated from zip bytes parsed |
 | `JourneyLeg` | dto | `TRAIN` or `TRANSFER` leg with from/to station names and countries, times and duration; TRAIN legs also carry route name, train number, headsign and operator |
-| `FeedStatus` | dto | One zip: source, file name, size, download time, first/last service date, days left, state (`OK`, `EXPIRING`, `EXPIRED`, `NOT_YET_VALID`, `NO_CALENDAR`, `UNREADABLE`), download URL (null = updated by hand) |
+| `FeedStatus` | dto | One zip: source, file name, size, download time, first/last service date, days left, state (`OK`, `EXPIRING`, `EXPIRED`, `NOT_YET_VALID`, `NO_CALENDAR`, `UNREADABLE`), download URL (the first one in `gtfs-feeds.txt`; null = updated by hand) |
 | `FeedDownloadResult` | dto | Outcome (`REPLACED`, `REJECTED`, `BUSY`), message, `FeedStatus` before and after |
 | `GtfsTime` | util | Parse/format GTFS times, minute diffs with overnight wrap, clock minute of a time, duration text |
 | `StopIds` | util | Canonical `<source>:<rawId>` stop IDs |
