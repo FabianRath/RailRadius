@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B29 · F20 · S12
+**Next free IDs:** B29 · F21 · S12
 
 ## Bugs (data loading)
 - [ ] **B27** (Possible, unconfirmed) The `european-sleeper` feed names its Aachen stop "Aachen Hauptbahnhof" (stop `8015345`), the other feeds "Aachen Hbf". The cross-border name merge (`StationDeduplicator`, Jaccard word similarity ≥ 0.4) scores the pair 1/3, so after a reload with the full data Aachen may exist twice and the sleeper train would not connect to other trains there. Not seen on the map yet: the feed was added on 2026-10-05 and the running data had not been rebuilt. A 2026-10-05 test load without the German feed showed it unmerged next to Belgium's "Aachen Hbf (DE)". Check after the next rebuild by searching "Aachen Hauptbahnhof". Possible fixes: treat "Hbf" and "Hauptbahnhof" as one word when merging, or match stations by UIC code (European Sleeper and Eurostar both use them).
@@ -14,5 +14,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (caching / infrastructure)
 
 ## Features / UX
+- [ ] **F20** The station popup with the connection info sometimes opens with its bottom slightly cut off by the screen edge. Place it so it fits fully on screen, e.g. pick the anchor or pan the map after the content has its final size. `bindPopup` in `js/map.js` adds the popup first and only then resizes it (`snapToWholePixels`), so MapLibre may choose the anchor for a smaller popup.
 
 ## Structure
