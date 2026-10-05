@@ -27,6 +27,10 @@ Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the 
   - GT2 line 33, type 102, "002214": GK 09:00 → GW 13:00 (→ "IC 2214")
   - GT3 line 85, type 102, "000009": GK 10:00 → GH 14:00 (→ "ECE 9")
   - GT4 RE7, DB Regio, type 106, "04711": GK 11:00 → GH 15:00 (no rule, → "4711")
+- **zeta** (loaded alone, by the service day tests; the only feed with `calendar.txt`/`calendar_dates.txt`, so every other feed's trips run every day): Z1 Zeta Start, Z2 Zeta Hub, Z3 Zeta Weekend, Z4 Zeta Weekday, Z5 Zeta Night, Z6 Zeta Holiday. Services in January 2026: WD Mon–Fri minus 2026-01-06 (removed in calendar_dates), WE Sat–Sun, FR Fridays, SA Saturdays, HOL only 2026-01-06 (calendar_dates only)
+  - ZT1 WD: Z1 08:00 → Z2 09:00; ZT7 WE: Z1 08:30 → Z2 09:10 (the better arrival for every departure after it)
+  - ZT2 WE: Z2 09:30 → Z3 10:00; ZT3 WD: Z2 09:30 → Z4 10:00 (only from ZT1); ZT6 HOL: Z2 09:40 → Z6 10:10 (shares no day with ZT1 or ZT7)
+  - ZT4 FR: Z1 22:00 → Z2 23:30; ZT5 SA: Z2 00:30 → Z5 01:00 (connects across midnight)
 - **alpha-fast-train**: alpha plus T6 NJ A1 21:00 → A3 21:30. The faster train reaches the border later and misses U1 (B2 test).
 - **epsilon** (loaded alone): E1 Epsilon Start, E2 Epsilon Fork, E3 Epsilon Junction, E4 Epsilon East, E5 Epsilon Detour, E6 Epsilon End, E7 Epsilon Suburb; route EX (type 2) and S-Bahn route S7 (type 109)
   - Y1: E1 08:00 → E3 08:40; Y2: E1 08:50 → E3 08:58; Y3: E3 09:00 → E4 09:30. The faster Y2 leaves only 2 min to catch Y3, the slower Y1 20 min (B3 test)

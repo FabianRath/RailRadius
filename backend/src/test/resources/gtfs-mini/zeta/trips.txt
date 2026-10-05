@@ -1,0 +1,8 @@
+route_id,service_id,trip_id
+ZR,WD,ZT1
+ZR,WE,ZT7
+ZR,WE,ZT2
+ZR,WD,ZT3
+ZR,HOL,ZT6
+ZR,FR,ZT4
+ZR,SA,ZT5

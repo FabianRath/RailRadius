@@ -2,6 +2,8 @@ package com.railreach.service;
 
 import com.railreach.util.GtfsTime;
 
+import java.util.function.IntPredicate;
+
 /**
  * Sliding window over one station's arrivals for departures fed in time order: among the arrivals whose wait for
  * the departure lies in [minWaitSeconds, maxWaitSeconds], the one with the latest journey start. Boarding from it
@@ -34,14 +36,43 @@ final class TransferWindow {
         this.queue = new int[arrivalSeconds.length];
     }
 
-    /** Index of the best arrival for the departure, or -1. Departure times must not decrease between calls. */
-    int bestFor(int departureSeconds) {
+    /**
+     * Index of the best arrival for the departure that passes {@code usable}, or -1. Departure times must not
+     * decrease between calls.
+     */
+    int bestFor(int departureSeconds, IntPredicate usable) {
         while (nextArrival < arrivalSeconds.length
                 && arrivalSeconds[nextArrival] <= departureSeconds - minWaitSeconds) {
             while (tail > head && startSeconds[queue[tail - 1]] <= startSeconds[nextArrival]) tail--;
             queue[tail++] = nextArrival++;
         }
         while (tail > head && arrivalSeconds[queue[head]] < departureSeconds - maxWaitSeconds) head++;
-        return tail > head ? queue[head] : -1;
+        if (tail == head) return -1;
+        return usable.test(queue[head]) ? queue[head] : bestUsableScan(departureSeconds, usable);
+    }
+
+    // The queue has dropped the arrivals that the best one outranks, so if the best is not usable, all arrivals in
+    // the wait range are scanned. Usually the best one is usable.
+    private int bestUsableScan(int departureSeconds, IntPredicate usable) {
+        int best = -1;
+        for (int i = firstArrivalFrom(departureSeconds - maxWaitSeconds); i < nextArrival; i++) {
+            if ((best < 0 || startSeconds[i] > startSeconds[best]) && usable.test(i)) best = i;
+        }
+        return best;
+    }
+
+    /** Index of the first arrival at or after the time, among those already added to the window. */
+    private int firstArrivalFrom(int seconds) {
+        int low = 0;
+        int high = nextArrival;
+        while (low < high) {
+            int mid = (low + high) >>> 1;
+            if (arrivalSeconds[mid] < seconds) {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+        return low;
     }
 }

@@ -62,8 +62,10 @@ public class GtfsFeedLoader {
     /**
      * The per-feed lookup tables that stop_times rows are resolved against. Routes and trips are rail only.
      * Stations are keyed by canonical ID and only enter the graph once a rail trip uses them.
+     * Services are those of the rail trips that the calendar knows, by raw ID.
      */
     private record FeedTables(String source, Map<String, RailRoute> routes, Map<String, RailTrip> trips,
+                              Map<String, String> rawToCanonicalService,
                               Map<String, String> rawToCanonicalStop, Map<String, Station> stations) {}
 
     void loadDirectory(String directory, TransitGraph graph, GtfsLoadProgress progress) {
@@ -124,13 +126,42 @@ public class GtfsFeedLoader {
             }
             Map<String, Set<String>> translatedNames =
                     translatedNames(StopNameTranslations.load(zipFile), stops, rawToCanonical, stations);
-            FeedTables tables = new FeedTables(source, routes, trips, rawToCanonical, stations);
+            Map<String, String> rawToCanonicalService =
+                    addServices(ServiceCalendarReader.load(zipFile), trips, source, graph);
+            FeedTables tables = new FeedTables(source, routes, trips, rawToCanonicalService, rawToCanonical,
+                    stations);
             int connectionsAdded = loadStopTimes(zipFile, tables, graph);
             translatedNames.forEach((id, names) -> {
                 if (graph.getStation(id) != null) graph.addTranslatedNames(id, names);
             });
             return connectionsAdded;
         }
+    }
+
+    /**
+     * Adds the services of the rail trips to the graph under canonical IDs and returns raw ID -> canonical ID.
+     * A trip whose service is not in the calendar runs every day.
+     */
+    private static Map<String, String> addServices(Map<String, ServiceDays> services, Map<String, RailTrip> trips,
+                                                   String source, TransitGraph graph) {
+        Map<String, String> rawToCanonical = new HashMap<>();
+        Map<String, ServiceDays> canonicalServices = new HashMap<>();
+        long tripsWithoutService = 0;
+        for (RailTrip trip : trips.values()) {
+            ServiceDays days = trip.serviceId() != null ? services.get(trip.serviceId()) : null;
+            if (days == null) {
+                tripsWithoutService++;
+                continue;
+            }
+            String canonical = rawToCanonical.computeIfAbsent(trip.serviceId(), id -> StopIds.of(source, id));
+            canonicalServices.put(canonical, days);
+        }
+        graph.addServices(canonicalServices);
+        if (tripsWithoutService > 0) {
+            log.warn("  {} of {} rail trips have no service in calendar.txt/calendar_dates.txt; they run every day",
+                    tripsWithoutService, trips.size());
+        }
+        return rawToCanonical;
     }
 
     /** canonical stop ID -> the translated names of its stops that differ from the station's name. */
@@ -310,7 +341,7 @@ public class GtfsFeedLoader {
             }
             if (stopSequence.size() < 2) continue;
             stopSequence.forEach(id -> graph.addStationIfAbsent(tables.stations().get(id)));
-            graph.addTrip(tripId, stopSequence, trip.info());
+            graph.addTrip(tripId, stopSequence, trip.info(), tables.rawToCanonicalService().get(trip.serviceId()));
 
             for (int i = 0; i < stopTimes.size() - 1; i++) {
                 GtfsStopTime from = stopTimes.get(i);

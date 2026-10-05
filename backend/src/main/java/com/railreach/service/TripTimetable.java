@@ -12,8 +12,8 @@ import java.util.List;
  * Offsets are minutes since the trip's first departure, counted like a ride adds them up: each leg's run time plus
  * the dwell before it, both clamped at 0.
  */
-record TripTimetable(String tripId, List<String> stops, int[] legDepartureSeconds, int[] legArrivalSeconds,
-                     int[] departureOffsetMinutes, int[] arrivalOffsetMinutes) {
+record TripTimetable(String tripId, List<String> stops, ServiceDays serviceDays, int[] legDepartureSeconds,
+                     int[] legArrivalSeconds, int[] departureOffsetMinutes, int[] arrivalOffsetMinutes) {
 
     /** A trip leaving a stop; a trip that visits the stop twice has one per visit. */
     record Departure(TripTimetable trip, int stopIdx) {
@@ -44,7 +44,8 @@ record TripTimetable(String tripId, List<String> stops, int[] legDepartureSecond
             if (c != null) offsetMinutes += Math.max(0, GtfsTime.diffMinutes(departures[leg], arrivals[leg]));
             arrivalOffsets[leg + 1] = offsetMinutes;
         }
-        return new TripTimetable(tripId, stops, departures, arrivals, departureOffsets, arrivalOffsets);
+        return new TripTimetable(tripId, stops, graph.getServiceDays(tripId), departures, arrivals, departureOffsets,
+                arrivalOffsets);
     }
 
     int stopCount() {

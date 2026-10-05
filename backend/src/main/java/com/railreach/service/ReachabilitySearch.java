@@ -22,11 +22,18 @@ import java.util.Map;
  * there. A ride that cannot beat that is cut off, because the earlier ride arrived at the same time with no more
  * transfers and no longer journey, and stays ahead for the rest of the trip. Keeping only the fastest path per
  * station would drop slower arrivals that catch a train the fastest one misses (B2).
+ * <p>
+ * There is no travel date, but a transfer needs both trains to run on a common day, the next train a day later for
+ * a wait past midnight (B25). Only consecutive trains are checked, not the whole journey: three trains A, B, C can
+ * pass if A and B share a day and B and C share another one.
  */
 @Component
 @Slf4j
 @RequiredArgsConstructor
 public class ReachabilitySearch {
+
+    private static final int SAME_DAY = 0;
+    private static final int NEXT_DAY = 1;
 
     private final TransitGraph transitGraph;
 
@@ -90,7 +97,8 @@ public class ReachabilitySearch {
     /**
      * Boards every departure at the station from the arrival that catches it with the shortest journey so far.
      * Any other arrival would ride the same trip with as many transfers but longer, so it is not needed. Waits past
-     * midnight get their own window, with the arrivals moved a day back.
+     * midnight get their own window, with the arrivals moved a day back. Only arrivals whose trip runs on a day that
+     * fits the departure's trip count.
      */
     private void transferAt(SearchState state, String stationId, List<Ride> stationArrivals, int transfers,
                             List<Ride> arrivals) {
@@ -105,8 +113,13 @@ public class ReachabilitySearch {
                 minWaitSeconds, Math.min(maxWaitSeconds, GtfsTime.MAX_OVERNIGHT_GAP_SECONDS));
 
         for (TripTimetable.Departure departure : transitGraph.getDeparturesAt(stationId)) {
-            Ride from = faster(departure, arrivalAt(stationArrivals, sameDay.bestFor(departure.departureSeconds())),
-                    arrivalAt(stationArrivals, overnight.bestFor(departure.departureSeconds())));
+            int departureSeconds = departure.departureSeconds();
+            ServiceDays departureDays = departure.trip().serviceDays();
+            Ride sameDayFrom = arrivalAt(stationArrivals, sameDay.bestFor(departureSeconds,
+                    i -> stationArrivals.get(i).trip().serviceDays().sharesDayWith(departureDays, SAME_DAY)));
+            Ride overnightFrom = arrivalAt(stationArrivals, overnight.bestFor(departureSeconds,
+                    i -> stationArrivals.get(i).trip().serviceDays().sharesDayWith(departureDays, NEXT_DAY)));
+            Ride from = faster(departure, sameDayFrom, overnightFrom);
             // Timetables are shared per trip. Staying on this trip beats changing onto it from any arrival.
             if (from == null || from.trip() == departure.trip()) continue;
             ride(state, departure, transfers, boardingMinutes(from, departure), from, arrivals);

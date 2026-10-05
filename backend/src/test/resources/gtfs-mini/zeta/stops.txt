@@ -1,0 +1,7 @@
+stop_id,stop_name,stop_lat,stop_lon,parent_station
+Z1,Zeta Start,50.0000,25.0000,
+Z2,Zeta Hub,50.0000,25.1000,
+Z3,Zeta Weekend,50.1000,25.2000,
+Z4,Zeta Weekday,50.0000,25.2000,
+Z5,Zeta Night,49.9000,25.2000,
+Z6,Zeta Holiday,50.2000,25.2000,

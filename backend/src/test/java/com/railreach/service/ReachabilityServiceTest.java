@@ -164,6 +164,35 @@ class ReachabilityServiceTest {
         assertThat(withinTwoHours.getTotalDurationMinutes()).isEqualTo(90); // X1, X2, X3
     }
 
+    // B25: the faster weekend ZT7 is the best arrival at the hub, but the weekday ZT3 can only be reached from ZT1
+    @Test
+    void transferOnlyBoardsATrainThatRunsOnADayTheArrivingTrainRuns(@TempDir Path dir) throws Exception {
+        ReachabilityResponse response = query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 1, 0, 180);
+
+        ReachableStation weekday = find(response, "zeta:Z4").orElseThrow();
+        assertThat(weekday.getTotalDurationMinutes()).isEqualTo(120); // ZT1 08:00, ZT3 09:30, not 90 via ZT7
+        assertThat(weekday.getLegs().getFirst().getDepartureTime()).isEqualTo("08:00:00");
+        assertThat(find(response, "zeta:Z3")).get()
+                .extracting(ReachableStation::getTotalDurationMinutes).isEqualTo(90); // ZT7 08:30, ZT2 09:30
+    }
+
+    // B25: ZT6 runs only on 2026-01-06, a weekday that calendar_dates.txt removes from ZT1's service
+    @Test
+    void trainsOnlySharingADayRemovedByCalendarDatesDoNotConnect(@TempDir Path dir) throws Exception {
+        ReachabilityResponse response = query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 2, 0, 180);
+
+        assertThat(find(response, "zeta:Z6")).isEmpty();
+    }
+
+    // B25: Friday-only ZT4 arrives 23:30, Saturday-only ZT5 leaves 00:30, so they connect across midnight
+    @Test
+    void transferPastMidnightBoardsATrainRunningTheNextDay(@TempDir Path dir) throws Exception {
+        ReachableStation night = find(query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 1, 0, 180),
+                "zeta:Z5").orElseThrow();
+
+        assertThat(night.getTotalDurationMinutes()).isEqualTo(180); // 90 ride + 60 wait + 30 ride
+    }
+
     @Test
     void doneEventCountsOnlyStationsWithinMaxJourneyTime() {
         // A2 (30 min) and A3/B1 (60 min) fit into 1 h, B2 (120 min) does not
