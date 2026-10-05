@@ -180,6 +180,18 @@ class GtfsDataServiceTest {
     }
 
     @Test
+    void translatedNamesOfAMergedStationMoveToTheSurvivingStation() {
+        assertThat(gtfs.getTranslatedNames("beta:B1")).containsExactly("Grenzstadt");
+        assertThat(gtfs.getTranslatedNames("alpha:A3")).isEmpty();
+    }
+
+    @Test
+    void translationsEqualToTheStationNameAreDropped(@TempDir Path dir) throws Exception {
+        assertThat(GtfsTestFixtures.load(dir, "omega").getTranslatedNames("omega:O1"))
+                .containsExactly("Cologne Main Station");
+    }
+
+    @Test
     void graphRestoredFromCacheEqualsTheParsedGraph() {
         TransitGraph restored = new TransitGraph();
         restored.restore(GtfsTestFixtures.cacheStore(tempDir).load().orElseThrow());
@@ -192,6 +204,7 @@ class GtfsDataServiceTest {
                 assertThat(restored.getConnections(stopId, neighbor))
                         .containsExactlyInAnyOrderElementsOf(gtfs.getConnections(stopId, neighbor));
             }
+            assertThat(restored.getTranslatedNames(stopId)).isEqualTo(gtfs.getTranslatedNames(stopId));
             assertThat(restored.getTripsAtStop(stopId)).isEqualTo(gtfs.getTripsAtStop(stopId));
             for (String tripId : gtfs.getTripsAtStop(stopId)) {
                 assertThat(restored.getStopsOnTrip(tripId)).isEqualTo(gtfs.getStopsOnTrip(tripId));

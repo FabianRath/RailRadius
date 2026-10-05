@@ -10,6 +10,7 @@ import java.io.File;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /** Reads and writes the parsed {@link TransitGraph} as one JSON file, so restarts skip parsing the zips. */
 @Component
@@ -24,13 +25,15 @@ public class GtfsCacheStore {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** Bump on every format change: a cache file with another version is ignored and the zips are re-parsed. */
-    static final int FORMAT_VERSION = 3;
+    static final int FORMAT_VERSION = 4;
 
     /**
-     * Field names are the on-disk format. Only stations and trips are stored, see {@link CachedTrip}.
+     * Field names are the on-disk format. Only stations, their translated names and trips are stored, see
+     * {@link CachedTrip}.
      * {@code formatVersion} is boxed so a file from before versioning (no such field) reads as null, not an error.
      */
-    public record GtfsCacheData(Integer formatVersion, Map<String, Station> stations, Map<String, CachedTrip> trips) {}
+    public record GtfsCacheData(Integer formatVersion, Map<String, Station> stations,
+                                Map<String, Set<String>> translatedNames, Map<String, CachedTrip> trips) {}
 
     Optional<GtfsCacheData> load() {
         File file = file();

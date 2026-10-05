@@ -73,6 +73,21 @@ class StationSearchIndexTest {
     }
 
     @Test
+    void searchFindsStationsByTheirTranslatedStopNames(@TempDir Path dir) throws Exception {
+        StationSearchIndex omegaIndex = new StationSearchIndex(GtfsTestFixtures.load(dir, "omega"));
+        omegaIndex.rebuild();
+
+        assertThat(ids(omegaIndex.search("main station", 10))).containsExactly("omega:O1");
+        assertThat(ids(omegaIndex.search("factory", 10))).containsExactly("omega:O3");
+        assertThat(omegaIndex.search("riverside", 10)).as("translates another field").isEmpty();
+    }
+
+    @Test
+    void searchFindsAMergedStationByTheTranslatedNameOfItsAlias() {
+        assertThat(ids(index.search("grenzstadt", 10))).containsExactly("beta:B1");
+    }
+
+    @Test
     void queryDoesNotMatchAcrossTwoNameVariants(@TempDir Path dir) throws Exception {
         StationSearchIndex omegaIndex = new StationSearchIndex(GtfsTestFixtures.load(dir, "omega"));
         omegaIndex.rebuild();

@@ -2,7 +2,7 @@
 
 Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the name is the folder name up to the first `-`.
 
-- **alpha**: A1 Alpha Central, A5 Alpha Central (platform with parent_station A1, ~390 m away, beyond every distance-based merge, so merged into A1 only via its parent; B23), A2/A2b Alpha North (duplicate stop, merged per feed), A3 Border Town, A4 Alpha West, A9 bus stop (bus route, filtered out), AP Alpha Central Complex and AE its entrance (no rail trip uses either, so neither becomes a station)
+- **alpha** (`translations.txt` in the pre-2019 `trans_id` format: "Border Town" → "Grenzstadt", which ends up on B1 via the cross-border merge): A1 Alpha Central, A5 Alpha Central (platform with parent_station A1, ~390 m away, beyond every distance-based merge, so merged into A1 only via its parent; B23), A2/A2b Alpha North (duplicate stop, merged per feed), A3 Border Town, A4 Alpha West, A9 bus stop (bus route, filtered out), AP Alpha Central Complex and AE its entrance (no rail trip uses either, so neither becomes a station)
   - T1 RE1: A5 08:00 → A2b 08:30 → A3 09:00
   - T4 NJ: A4 22:50 → A3 23:30
   - T2 bus: A1 → A9 (not rail, ignored)
@@ -25,5 +25,5 @@ Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the 
   - Y1: E1 08:00 → E3 08:40; Y2: E1 08:50 → E3 08:58; Y3: E3 09:00 → E4 09:30. The faster Y2 leaves only 2 min to catch Y3, the slower Y1 20 min (B3 test)
   - X1: E1 10:00 → E2 10:30; X2: E2 10:40 → E5 11:00; X3: E5 11:10 → E6 11:30; X4: E2 22:00 → E6 22:30. E6 takes 1 transfer with an 11.5 h wait, or 2 transfers in 90 min (B4 test)
   - S1 S7: E4 09:40 → E7 09:50. E7 is served only by the S-Bahn (B6 test)
-- **omega** (loaded alone, by the station search tests): O1 Köln Hbf (umlaut and a city in `station-aliases.txt`), O2 Wiener Neustadt Hbf ("wien" only inside a longer word, so no "vienna" variant), O3 Łódź Fabryczna (letters NFD does not split)
+- **omega** (loaded alone, by the station search tests; `translations.txt` in the current format: O1 by `record_id` → "Cologne Main Station" and → "Köln Hbf" (its own name, dropped), O3 by `field_value` → "Lodz Factory Station", O2 a `stop_desc` translation that search ignores): O1 Köln Hbf (umlaut and a city in `station-aliases.txt`), O2 Wiener Neustadt Hbf ("wien" only inside a longer word, so no "vienna" variant), O3 Łódź Fabryczna (letters NFD does not split)
   - OT1 RE8: O1 08:00 → O2 08:30 → O3 09:00; OT2 RE8: O3 10:00 → O1 11:00 (every station has an outgoing edge, so all are searchable)
