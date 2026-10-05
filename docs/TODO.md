@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B29 · F19 · S12
+**Next free IDs:** B29 · F20 · S12
 
 ## Bugs (data loading)
 - [ ] **B28** The cross-border name merge doesn't ignore accents: `StationDeduplicator.tokenize` lowercases but keeps diacritics, so "Setúbal" and "Setubal" are different words. In a 2026-10-05 test load (Italy, Spain, Portugal and the new feeds) four nearby pairs stayed separate only because of this: OUIGO's MADRID-CHAMARTIN, VALENCIA JOAQUIN SOROLLA and MALAGA MARIA ZAMBRANO vs Renfe's accented names, and Fertagus' "Setúbal" vs CP's "Setubal". Trains of the two feeds then don't connect there. Folding accents (as `StationNameVariants` does for search) would merge all four. Not checked on the full data.
@@ -15,6 +15,7 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (caching / infrastructure)
 
 ## Features / UX
+- [ ] **F19** Sort the admin panel's Feeds tab by state instead of by name: Expired, Not yet valid, No calendar, Unreadable, Expiring, OK; within each group lowest `daysLeft` first (No calendar and Unreadable have none, so keep those by name). Today the rows come in zip-file order (`FeedUpdateCenter.java:130`).
 - [ ] **F18** The loading overlay says "Calculating…" but its counter says "Searching… N s" (`frontend/js/reachability.js:148`, `:152`). Use "Calculating" in both places for consistency.
 
 ## Structure
