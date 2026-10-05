@@ -11,12 +11,13 @@ import java.util.List;
  * departure {@link #NO_LEG}. Storing trips instead of per-edge connections keeps the file about 10× smaller.
  * A connection that matches no leg of its trip (B19) is left out: the BFS walks stop lists, so it never reaches one.
  */
-public record CachedTrip(String routeName, List<String> stops, int[] legDepartureSeconds, int[] legArrivalSeconds) {
+public record CachedTrip(String routeName, TripInfo info, List<String> stops, int[] legDepartureSeconds,
+                         int[] legArrivalSeconds) {
 
     static final int NO_LEG = -1;
 
     /** Encodes a trip from its stop sequence and all of its connections, in any order. */
-    static CachedTrip of(List<String> stops, List<Connection> tripConnections) {
+    static CachedTrip of(List<String> stops, TripInfo info, List<Connection> tripConnections) {
         int[] departures = new int[Math.max(stops.size() - 1, 0)];
         int[] arrivals = new int[departures.length];
         Arrays.fill(departures, NO_LEG);
@@ -28,7 +29,7 @@ public record CachedTrip(String routeName, List<String> stops, int[] legDepartur
             arrivals[leg] = c.getArrivalTimeSeconds();
             routeName = c.getRouteName();
         }
-        return new CachedTrip(routeName, stops, departures, arrivals);
+        return new CachedTrip(routeName, info, stops, departures, arrivals);
     }
 
     int connectionCount() {
@@ -37,7 +38,7 @@ public record CachedTrip(String routeName, List<String> stops, int[] legDepartur
 
     /** Adds the trip's stop sequence and its connections to the graph. */
     void addTo(String tripId, TransitGraph graph) {
-        graph.addTrip(tripId, stops);
+        graph.addTrip(tripId, stops, info);
         for (int leg = 0; leg < legDepartureSeconds.length; leg++) {
             if (legDepartureSeconds[leg] == NO_LEG) continue;
             graph.addConnection(Connection.builder()

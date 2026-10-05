@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -33,6 +34,8 @@ public class TransitGraph {
     private final Map<String, List<Connection>> connections = new ConcurrentHashMap<>();
     // trip ID -> ordered stop IDs
     private final Map<String, List<String>> tripStops = new ConcurrentHashMap<>();
+    // trip ID -> train number, headsign and operator
+    private final Map<String, TripInfo> tripInfos = new ConcurrentHashMap<>();
     // stop ID -> IDs of the trips that serve it
     private final Map<String, Set<String>> stopTrips = new ConcurrentHashMap<>();
     // Built lazily on first search access, so loading stays lean
@@ -67,6 +70,10 @@ public class TransitGraph {
 
     public List<String> getStopsOnTrip(String tripId) {
         return tripStops.getOrDefault(tripId, Collections.emptyList());
+    }
+
+    public Optional<TripInfo> getTripInfo(String tripId) {
+        return Optional.ofNullable(tripInfos.get(tripId));
     }
 
     TripTimetable getTimetable(String tripId) {
@@ -135,6 +142,7 @@ public class TransitGraph {
         neighbors.clear();
         connections.clear();
         tripStops.clear();
+        tripInfos.clear();
         stopTrips.clear();
         timetables.clear();
         departuresByStop.clear();
@@ -149,8 +157,9 @@ public class TransitGraph {
         translatedNames.computeIfAbsent(stopId, k -> new HashSet<>()).addAll(names);
     }
 
-    void addTrip(String tripId, List<String> stopIds) {
+    void addTrip(String tripId, List<String> stopIds, TripInfo info) {
         tripStops.put(tripId, stopIds);
+        tripInfos.put(tripId, info);
         for (String stopId : stopIds) {
             stopTrips.computeIfAbsent(stopId, k -> new HashSet<>()).add(tripId);
         }
@@ -171,7 +180,8 @@ public class TransitGraph {
         }
         Map<String, CachedTrip> trips = new HashMap<>(tripStops.size() * 2);
         tripStops.forEach((tripId, stops) ->
-                trips.put(tripId, CachedTrip.of(stops, connectionsByTrip.getOrDefault(tripId, List.of()))));
+                trips.put(tripId, CachedTrip.of(stops, tripInfos.get(tripId),
+                        connectionsByTrip.getOrDefault(tripId, List.of()))));
         long droppedCount = connections.values().stream().mapToLong(List::size).sum()
                 - trips.values().stream().mapToLong(CachedTrip::connectionCount).sum();
         if (droppedCount > 0) {

@@ -18,7 +18,7 @@ Where the zips in `backend/data/gtfs/` come from. Name each download `gtfs_<coun
 | L | Denmark | https://data.public-transport.earth/gtfs/dk | |
 | ?? | Estonia | https://data.public-transport.earth/gtfs/ee | |
 | L | Finland | https://rata.digitraffic.fi/api/v1/trains/gtfs-passenger.zip | VR + HSL commuter rail (Fintraffic). Needs header `Accept-Encoding: gzip` (else HTTP 406); send `Digitraffic-User: <app name>`. busmaps' `fintraffic` feed has no rail routes; their `trains-fin` is request-only. |
-| L | Germany | https://data.public-transport.earth/gtfs/de | |
+| L | Germany | https://data.public-transport.earth/gtfs/de | DELFI, the source of our `gtfs_germany.zip` (route IDs like `de:vgn:…`). Mirror refreshed 2026-09-29, 470 MB. Has train numbers (`trip_short_name`, zero-padded: `002310`) and headsigns, but no train category: DB Fernverkehr routes are named by line only (`33`), and only `route_type` tells ICE (101) from IC/EC (102). Transitous derives the category from that, see below. |
 | X | Ireland | https://data.public-transport.earth/gtfs/ie | |
 | L | Lithuania | https://jbb.ghsq.de/gtfs/lt-ltglink.gtfs.zip | LTG Link rail. `data.public-transport.earth/gtfs/lt` has bus, ferry and trolleybus only. |
 | | Luxembourg | https://data.public-transport.earth/gtfs/lu | |
@@ -60,4 +60,6 @@ Not needed: Liechtenstein and Monaco (served by ÖBB / SNCF, so covered by the A
 
 - https://jbb.ghsq.de/gtfs/ (host of the Lithuania feed) also has fresh rail feeds for Bulgaria (`bg-bdz`), Greece (`gr-hellenic-train`, `gr-railway-gov`), Romania (`ro-railway`), Serbia (`rs-srbijavoz`), Montenegro (`me-zpcg`), Slovakia (`sk-zssk`) and Slovenia (`si-nap`). Possible replacements for the `s3.transitpdf.com` links above if those go stale.
 - The same host has European Sleeper (Brussels/Amsterdam–Berlin–Prague night train): https://jbb.ghsq.de/gtfs/eu-es.gtfs.zip
+- **German long-distance with train categories (checked 2026-10-05):** gtfs.de `de_fv` free feed, https://download.gtfs.de/germany/fv_free/latest.zip (424 KB, CC BY 4.0, data from DELFI e.V., updated weekly). Routes carry category + line (`ICE 33`, `IC 33`, `EC 85`, `ECE`, `EN`, `RJ`), but `trips.txt` has only `route_id, service_id, trip_id`: no train numbers or headsigns. Valid for only 30 days (2026-10-03 to 2026-11-02 in the checked download). Regional (`de_rv`) and full (`de_full`) feeds exist in the same form. Paid plans (from €39/month) add headsigns, transfers.txt and full timetable validity; their page doesn't say whether train numbers are included. So no free German feed has both category and train number.
+- Transitous post-processes DELFI with `scripts/de-DELFI.lua` (https://github.com/public-transport/transitous/blob/main/scripts/de-DELFI.lua): route type 101 → `ICE <number>`, 102 → `IC <number>` (`ECE` for a fixed list of route short names), leading zeros stripped.
 - The Transitous feed catalogue (https://github.com/public-transport/transitous/tree/main/feeds, one JSON per country) is the best place to look for new or changed URLs.

@@ -2,6 +2,8 @@ package com.railreach.service;
 
 import com.railreach.model.Connection;
 import com.railreach.model.Station;
+import com.railreach.service.RailTripReader.RailRoute;
+import com.railreach.service.RailTripReader.RailTrip;
 import com.railreach.util.Coordinates;
 import com.railreach.util.GtfsTime;
 import com.railreach.util.StopIds;
@@ -35,13 +37,6 @@ public class GtfsFeedLoader {
     private static final int STOP_TIMES_PROGRESS_LOG_INTERVAL = 500_000;
     // ~150 m: same-name stops of one feed closer than this are one station
     private static final double SAME_NAME_STOP_RADIUS_DEG = 0.0015;
-    private static final int GTFS_ROUTE_TYPE_RAIL = 2;
-    // Extended GTFS rail types 100–106: railway, high speed, long distance, inter-regional, car transport,
-    // sleeper, regional. Trams (0), subways (1), buses (3, 700+) and urban railways (400) are left out.
-    private static final int EXTENDED_RAIL_TYPE_MIN = 100;
-    private static final int EXTENDED_RAIL_TYPE_MAX = 106;
-    // S-Bahn: thousands of stations, mostly in Germany, are served by nothing else (B6)
-    private static final int SUBURBAN_RAILWAY_TYPE = 109;
 
     // Some feeds split one platform into separate arrival and departure stops
     private static final List<Pattern> ARRIVAL_DEPARTURE_PATTERNS = List.of(
@@ -63,10 +58,10 @@ public class GtfsFeedLoader {
     private record GtfsStopTime(String stopId, int sequence, int arrivalSeconds, int departureSeconds) {}
 
     /**
-     * The per-feed lookup tables that stop_times rows are resolved against. Route names hold rail routes only.
+     * The per-feed lookup tables that stop_times rows are resolved against. Routes and trips are rail only.
      * Stations are keyed by canonical ID and only enter the graph once a rail trip uses them.
      */
-    private record FeedTables(String source, Map<String, String> routeNames, Map<String, String> tripToRoute,
+    private record FeedTables(String source, Map<String, RailRoute> routes, Map<String, RailTrip> trips,
                               Map<String, String> rawToCanonicalStop, Map<String, Station> stations) {}
 
     void loadDirectory(String directory, TransitGraph graph, GtfsLoadProgress progress) {
@@ -108,11 +103,10 @@ public class GtfsFeedLoader {
     /** Returns the number of connections added. */
     private int loadFeed(File file, String source, TransitGraph graph) throws IOException {
         try (ZipFile zipFile = new ZipFile(file)) {
-            Map<String, String> routeNames = loadRailRoutes(zipFile);
+            Map<String, RailRoute> routes = RailTripReader.loadRailRoutes(zipFile);
             Map<String, GtfsStop> stops = loadStops(zipFile);
-            Map<String, String> tripToRoute = loadTrips(zipFile);
-            log.info("  Loaded {} rail routes, {} stops, {} trips",
-                    routeNames.size(), stops.size(), tripToRoute.size());
+            Map<String, RailTrip> trips = RailTripReader.loadRailTrips(zipFile, routes);
+            log.info("  Loaded {} rail routes, {} stops, {} rail trips", routes.size(), stops.size(), trips.size());
             if (stops.isEmpty()) {
                 log.error("  No stops loaded! Check stops.txt format");
                 return 0;
@@ -128,7 +122,7 @@ public class GtfsFeedLoader {
             }
             Map<String, Set<String>> translatedNames =
                     translatedNames(StopNameTranslations.load(zipFile), stops, rawToCanonical, stations);
-            FeedTables tables = new FeedTables(source, routeNames, tripToRoute, rawToCanonical, stations);
+            FeedTables tables = new FeedTables(source, routes, trips, rawToCanonical, stations);
             int connectionsAdded = loadStopTimes(zipFile, tables, graph);
             translatedNames.forEach((id, names) -> {
                 if (graph.getStation(id) != null) graph.addTranslatedNames(id, names);
@@ -152,41 +146,6 @@ public class GtfsFeedLoader {
         return translatedNames;
     }
 
-    /** route ID -> display name, for rail routes only. */
-    private Map<String, String> loadRailRoutes(ZipFile zipFile) throws IOException {
-        Map<String, String> routeNames = new HashMap<>();
-        Map<Integer, Integer> routeTypeCounts = new HashMap<>();
-        int totalRoutes = 0;
-        try (GtfsCsvReader csv = GtfsCsvReader.open(zipFile, "routes.txt")) {
-            int idCol = csv.column("route_id");
-            int shortNameCol = csv.column("route_short_name");
-            int longNameCol = csv.column("route_long_name");
-            int typeCol = csv.column("route_type");
-            for (String[] row = csv.next(); row != null; row = csv.next()) {
-                totalRoutes++;
-                String routeType = field(row, typeCol);
-                if (routeType != null) {
-                    int type = GtfsCsvReader.parseInt(routeType);
-                    routeTypeCounts.merge(type, 1, Integer::sum);
-                    if (!isRail(type)) continue;
-                }
-                String id = field(row, idCol);
-                if (id == null) continue;
-                String shortName = field(row, shortNameCol);
-                String name = shortName != null ? shortName : field(row, longNameCol);
-                routeNames.put(id, name != null ? name : "Unknown");
-            }
-        }
-        log.info("  Routes: {} total, {} rail routes selected", totalRoutes, routeNames.size());
-        log.info("  Route type distribution: {}", routeTypeCounts);
-        return routeNames;
-    }
-
-    private static boolean isRail(int routeType) {
-        return routeType == GTFS_ROUTE_TYPE_RAIL || routeType == SUBURBAN_RAILWAY_TYPE
-                || (routeType >= EXTENDED_RAIL_TYPE_MIN && routeType <= EXTENDED_RAIL_TYPE_MAX);
-    }
-
     private Map<String, GtfsStop> loadStops(ZipFile zipFile) throws IOException {
         Map<String, GtfsStop> stops = new HashMap<>();
         try (GtfsCsvReader csv = GtfsCsvReader.open(zipFile, "stops.txt")) {
@@ -203,20 +162,6 @@ public class GtfsFeedLoader {
             }
         }
         return stops;
-    }
-
-    private Map<String, String> loadTrips(ZipFile zipFile) throws IOException {
-        Map<String, String> tripToRoute = new HashMap<>();
-        try (GtfsCsvReader csv = GtfsCsvReader.open(zipFile, "trips.txt")) {
-            int routeCol = csv.column("route_id");
-            int tripCol = csv.column("trip_id");
-            for (String[] row = csv.next(); row != null; row = csv.next()) {
-                String tripId = field(row, tripCol);
-                String routeId = field(row, routeCol);
-                if (tripId != null && routeId != null) tripToRoute.put(tripId, routeId);
-            }
-        }
-        return tripToRoute;
     }
 
     /**
@@ -323,8 +268,7 @@ public class GtfsFeedLoader {
                 String tripId = field(row, tripCol);
                 String stopId = field(row, stopCol);
                 if (tripId == null || stopId == null) continue;
-                String routeId = tables.tripToRoute().get(tripId);
-                if (routeId == null || !tables.routeNames().containsKey(routeId)) {
+                if (!tables.trips().containsKey(tripId)) {
                     nonRailRowsSkipped++;
                     continue;
                 }
@@ -354,7 +298,7 @@ public class GtfsFeedLoader {
             if (stopTimes.size() < 2) continue;
             stopTimes.sort(Comparator.comparingInt(GtfsStopTime::sequence));
             String rawTripId = tripEntry.getKey();
-            String routeId = tables.tripToRoute().get(rawTripId);
+            RailTrip trip = tables.trips().get(rawTripId);
             String tripId = StopIds.of(tables.source(), rawTripId);
 
             List<String> stopSequence = new ArrayList<>();
@@ -364,7 +308,7 @@ public class GtfsFeedLoader {
             }
             if (stopSequence.size() < 2) continue;
             stopSequence.forEach(id -> graph.addStationIfAbsent(tables.stations().get(id)));
-            graph.addTrip(tripId, stopSequence);
+            graph.addTrip(tripId, stopSequence, trip.info());
 
             for (int i = 0; i < stopTimes.size() - 1; i++) {
                 GtfsStopTime from = stopTimes.get(i);
@@ -381,7 +325,7 @@ public class GtfsFeedLoader {
                 }
                 graph.addConnection(Connection.builder()
                         .tripId(tripId)
-                        .routeName(tables.routeNames().get(routeId))
+                        .routeName(tables.routes().get(trip.routeId()).name())
                         .fromStopId(fromCanonical)
                         .toStopId(toCanonical)
                         .departureTimeSeconds(from.departureSeconds())

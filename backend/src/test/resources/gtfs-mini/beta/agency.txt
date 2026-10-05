@@ -1,0 +1,3 @@
+﻿agency_id,agency_name,agency_url,agency_timezone
+BR,Beta Rail,https://beta.example,Europe/Berlin
+BN,Beta Night,https://night.example,Europe/Berlin

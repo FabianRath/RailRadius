@@ -1,0 +1,2 @@
+agency_name,agency_url,agency_timezone
+Alpha Rail,https://alpha.example,Europe/Vienna

@@ -63,8 +63,10 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `RailReachController` | controller | Public API under `/api` |
 | `AdminController` | controller | Admin/debug API under `/api/admin` |
 | `GtfsDataService` | service | Fills the `TransitGraph` at startup (cache file, else zips) and on `reload-gtfs`, then rebuilds the station search index and (on reload) clears the reachability caches |
-| `TransitGraph` | service | The merged network: stations, their translated names, edges, connections, trip indexes. Everything that reads GTFS data injects this |
+| `TransitGraph` | service | The merged network: stations, their translated names, edges, connections, trip indexes and `TripInfo`s. Everything that reads GTFS data injects this |
 | `GtfsFeedLoader` | service | Parses the rail part of each zip into the graph, with per-feed stop dedup |
+| `RailTripReader` | service | A feed's rail routes (name, operator from `agency.txt`) and rail trips (route, `TripInfo`) from routes/agency/trips.txt |
+| `TripInfo` | service | A trip's train number (`trip_short_name`, leading zeros of a numeric one stripped), headsign and operator |
 | `GtfsLoadProgress` | service | Phase (PARSING → MERGING → SAVING → DONE/FAILED), feeds and zip bytes parsed of the running or last load from the zips; read by `/gtfs-load-status` |
 | `TripRowBatcher` | service | Buffers stop_times rows per trip and hands whole trips to the loader in batches |
 | `StopNameTranslations` | service | A feed's translated `stop_name`s from `translations.txt`, by stop ID or by untranslated name; reads the current and the pre-2019 (`trans_id`) format |
@@ -77,7 +79,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `ForeignStopSnapper` | service | Cross-border rule: a feed's stop outside its home country is merged into the nearest station of that country's feed (≤ 1 km) |
 | `CountryLocator` | service | Point → ISO country code, from `borders/europe.geojson` (Natural Earth 1:10m, Europe) |
 | `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`: format version, stations, translated names, trips); a file with another version is ignored |
-| `CachedTrip` | service | One trip in the cache file: route name, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
+| `CachedTrip` | service | One trip in the cache file: route name, `TripInfo`, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
 | `ReachabilityService` | service | Thin orchestrator: request defaults, POST response (`@Cacheable`), SSE streaming, triggers warming |
 | `ReachabilitySearch` | service | Round-based search, one round per transfer; best path per station and transfer count |
 | `TripTimetable` | service | One trip as arrays for the search: stops, leg times, minute offsets; `Departure` = trip leaving a stop |
@@ -95,7 +97,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `ReachabilityResponse` | dto | Start info, count, calcTime, list of `ReachableStation` |
 | `ReachableStation` | dto | Station (incl. country) + transfers, duration, path ids/names, `legs` |
 | `GtfsLoadStatus` | dto | `GtfsLoadProgress` snapshot plus live station/connection counts; ETA extrapolated from zip bytes parsed |
-| `JourneyLeg` | dto | `TRAIN` or `TRANSFER` leg with from/to station names and countries, times and duration |
+| `JourneyLeg` | dto | `TRAIN` or `TRANSFER` leg with from/to station names and countries, times and duration; TRAIN legs also carry route name, train number, headsign and operator |
 | `GtfsTime` | util | Parse/format GTFS times, minute diffs with overnight wrap, clock minute of a time, duration text |
 | `StopIds` | util | Canonical `<source>:<rawId>` stop IDs |
 | `Coordinates` | util | Degree-box proximity check, distance in metres |
@@ -103,13 +105,13 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 ## Data pipeline (`GtfsDataService.loadFromFiles`)
 
 `GtfsFeedLoader`, for each `data/gtfs/*.zip` (sorted). The source name comes from the filename, e.g. `gtfs_germany.zip` → `germany`:
-1. **routes.txt**: keep only rail route types `2`, `100–106` and `109` (S-Bahn).
-2. **stops.txt / trips.txt**: load stops and the trip→route map.
+1. **routes.txt / agency.txt** (`RailTripReader`): keep only rail route types `2`, `100–106` and `109` (S-Bahn), each with its operator (`agency_name`; a route without `agency_id` gets the feed's only agency).
+2. **stops.txt / trips.txt**: load stops and the rail trips: route plus `TripInfo` (train number, headsign, operator).
 3. **Per-feed stop dedup**: a stop whose `parent_station` is in the feed (with coordinates) is merged into that parent, at any distance. The other stops are merged when they have the same name and lie within ~0.0015°. IDs are canonicalised to `<source>:<id>`, with `_ARR`/`_DEP`/`ARRIVAL_` style suffixes and prefixes stripped.
 4. **stop_times.txt**: streamed and buffered per trip (`TripRowBatcher`), rail trips only, and handed to the graph in batches of `railreach.gtfs.trip-batch-size` (100k) trips. A batch is only cut where a new trip starts, so trips stay whole in files grouped by `trip_id`. If a trip shows up again after another one started, the rest of the file is read in one batch, and rows of a trip already built are dropped with a WARN. Each trip's consecutive stop pairs produce:
    - `neighbors`: stopId → neighbour stopIds
    - `connections`: `"from->to"` → list of `Connection`
-   - `tripStops`: tripId → ordered stop list; `stopTrips`: stopId → tripIds
+   - `tripStops`: tripId → ordered stop list; `tripInfos`: tripId → `TripInfo`; `stopTrips`: stopId → tripIds
 
    Then `translations.txt` (optional, `StopNameTranslations`): each stop's translated `stop_name`s go to its canonical station in `translatedNames` (stopId → names), minus the station's own name, for stations that a rail trip added. Only search uses them; the API returns the original name.
 
@@ -123,7 +125,7 @@ After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStati
 
    In both, the station with more connections becomes canonical.
 7. **Foreign stops** (`ForeignStopSnapper`): a source's home country is where more than half of its located stations lie. A stop outside its source's home country is merged into the nearest station within 1 km of a source at home in the stop's country, which stays canonical. Every map is remapped. A canonical station can itself be merged later (A→B, then B→C); `mergeStations` first resolves such chains so every alias maps straight to the last station. The alias's translated names move to the canonical station.
-8. `GtfsCacheStore` saves stations, translated names and trips (`CachedTrip`) to the GTFS cache file (format version 4). On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops` and `stopTrips` from the trips.
+8. `GtfsCacheStore` saves stations, translated names and trips (`CachedTrip`) to the GTFS cache file (format version 5). On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops`, `tripInfos` and `stopTrips` from the trips.
 
 `StationSearchIndex.rebuild` then indexes the variants of each station's name and translated names. `TransitGraph` builds lazy indexes on first access: `timetables` (trip → `TripTimetable`), `departuresByStop` (stop → departures by time) and `connectionByTrip` (edge → tripId → Connection).
 
@@ -143,7 +145,7 @@ The search has no start time: every trip leaving the start station can begin a j
 
 Overnight wrap: a time difference below −60 min gets +24 h added.
 
-`JourneyLegBuilder` merges consecutive connections into one TRAIN leg (same tripId, or same route name and continuous in time) and inserts TRANSFER legs between them.
+`JourneyLegBuilder` merges consecutive connections into one TRAIN leg (same tripId, or same route name and continuous in time) and inserts TRANSFER legs between them. A TRAIN leg's train number, headsign and operator come from its first trip.
 
 **Caching layers:**
 - `ReachabilityCache` (Caffeine, max `cache.raw-max-entries` (30) results) holds raw results (station → paths). A stored result also answers every lower transfer count.

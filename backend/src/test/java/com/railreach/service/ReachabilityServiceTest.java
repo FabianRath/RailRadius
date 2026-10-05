@@ -64,6 +64,22 @@ class ReachabilityServiceTest {
     }
 
     @Test
+    void trainLegsCarryTrainNumberHeadsignAndOperator() {
+        ReachableStation b2 = find(query(gtfs, "alpha:A1", 1, 0, 180), "beta:B2").orElseThrow();
+
+        // alpha's routes name no agency, so its only agency is the operator
+        JourneyLeg t1 = b2.getLegs().get(0);
+        assertThat(t1.getTrainNumber()).isEqualTo("RE 4711");
+        assertThat(t1.getHeadsign()).isEqualTo("Border Town");
+        assertThat(t1.getOperator()).isEqualTo("Alpha Rail");
+        // U1's trip_short_name is "000123"
+        JourneyLeg u1 = b2.getLegs().get(2);
+        assertThat(u1.getTrainNumber()).isEqualTo("123");
+        assertThat(u1.getOperator()).isEqualTo("Beta Rail");
+        assertThat(b2.getLegs().get(1).getTrainNumber()).isNull();
+    }
+
+    @Test
     void legsShowTheNameOfAStationMergedAcrossFeeds() {
         // T1 ends at alpha:A3, which was merged into beta:B1 "Border Town Station"
         ReachableStation b2 = find(query(gtfs, "alpha:A1", 1, 0, 180), "beta:B2").orElseThrow();
