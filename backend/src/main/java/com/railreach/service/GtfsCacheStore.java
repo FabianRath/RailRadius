@@ -25,15 +25,16 @@ public class GtfsCacheStore {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** Bump on every format change: a cache file with another version is ignored and the zips are re-parsed. */
-    static final int FORMAT_VERSION = 6;
+    static final int FORMAT_VERSION = 7;
 
     /**
-     * Field names are the on-disk format. Only stations, their translated names and trips are stored, see
-     * {@link CachedTrip}.
+     * Field names are the on-disk format. Only stations, their translated names, the services of the trips and the
+     * trips are stored, see {@link CachedTrip}.
      * {@code formatVersion} is boxed so a file from before versioning (no such field) reads as null, not an error.
      */
     public record GtfsCacheData(Integer formatVersion, Map<String, Station> stations,
-                                Map<String, Set<String>> translatedNames, Map<String, CachedTrip> trips) {}
+                                Map<String, Set<String>> translatedNames, Map<String, ServiceDays> services,
+                                Map<String, CachedTrip> trips) {}
 
     Optional<GtfsCacheData> load() {
         File file = file();

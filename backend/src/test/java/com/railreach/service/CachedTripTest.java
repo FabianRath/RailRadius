@@ -14,7 +14,7 @@ class CachedTripTest {
         Connection onTrip = connection("x:A", "x:B", 100, 200);
         Connection offTrip = connection("x:A", "x:Z", 100, 300);
 
-        CachedTrip trip = CachedTrip.of(List.of("x:A", "x:B", "x:C"), new TripInfo(null, null, null),
+        CachedTrip trip = CachedTrip.of(List.of("x:A", "x:B", "x:C"), new TripInfo(null, null, null), null,
                 List.of(offTrip, onTrip));
         TransitGraph graph = new TransitGraph();
         trip.addTo("x:T", graph);

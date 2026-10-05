@@ -30,7 +30,8 @@ final class RailTripReader {
     /** {@code category} is set only where {@link TrainCategories} prefixes the route's bare train numbers. */
     record RailRoute(String name, String operator, String category) {}
 
-    record RailTrip(String routeId, TripInfo info) {}
+    /** {@code serviceId} is the raw ID from trips.txt, null if missing. */
+    record RailTrip(String routeId, String serviceId, TripInfo info) {}
 
     private RailTripReader() {}
 
@@ -78,6 +79,7 @@ final class RailTripReader {
         Map<String, RailTrip> trips = new HashMap<>();
         try (GtfsCsvReader csv = GtfsCsvReader.open(zipFile, "trips.txt")) {
             int routeCol = csv.column("route_id");
+            int serviceCol = csv.column("service_id");
             int tripCol = csv.column("trip_id");
             int shortNameCol = csv.column("trip_short_name");
             int headsignCol = csv.column("trip_headsign");
@@ -88,7 +90,7 @@ final class RailTripReader {
                 if (tripId == null || route == null) continue;
                 TripInfo info = new TripInfo(trainNumber(field(row, shortNameCol), route.category()),
                         field(row, headsignCol), route.operator());
-                trips.put(tripId, new RailTrip(routeId, info));
+                trips.put(tripId, new RailTrip(routeId, field(row, serviceCol), info));
             }
         }
         return trips;

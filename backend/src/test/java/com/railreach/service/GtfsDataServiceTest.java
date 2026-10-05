@@ -225,6 +225,25 @@ class GtfsDataServiceTest {
     }
 
     @Test
+    void serviceDaysOfTripsSurviveTheCache(@TempDir Path dir) throws Exception {
+        TransitGraph parsed = GtfsTestFixtures.load(dir, "zeta");
+        TransitGraph restored = new TransitGraph();
+        restored.restore(GtfsTestFixtures.cacheStore(dir).load().orElseThrow());
+
+        for (String tripId : parsed.getTripsAtStop("zeta:Z2")) {
+            assertThat(restored.getServiceDays(tripId)).usingRecursiveComparison()
+                    .isEqualTo(parsed.getServiceDays(tripId));
+        }
+        assertThat(restored.getServiceDays("zeta:ZT1").sharesDayWith(restored.getServiceDays("zeta:ZT3"), 0))
+                .isTrue();
+    }
+
+    @Test
+    void tripsOfAFeedWithoutCalendarRunEveryDay() {
+        assertThat(gtfs.getServiceDays("alpha:T1")).isSameAs(ServiceDays.EVERY_DAY);
+    }
+
+    @Test
     void cacheFileInAnOldFormatIsIgnored(@TempDir Path oldCacheDir) throws Exception {
         Files.writeString(oldCacheDir.resolve("gtfs-cache.json"), "{\"stations\":{},\"graph\":{},\"timestamp\":1}");
         assertThat(GtfsTestFixtures.cacheStore(oldCacheDir).load()).isEmpty();

@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,6 +37,10 @@ public class TransitGraph {
     private final Map<String, List<String>> tripStops = new ConcurrentHashMap<>();
     // trip ID -> train number, headsign and operator
     private final Map<String, TripInfo> tripInfos = new ConcurrentHashMap<>();
+    // service ID -> the days it runs; only services of rail trips
+    private final Map<String, ServiceDays> services = new ConcurrentHashMap<>();
+    // trip ID -> the days it runs, shared per service; trips without a known service are missing (every day)
+    private final Map<String, ServiceDays> tripServiceDays = new ConcurrentHashMap<>();
     // stop ID -> IDs of the trips that serve it
     private final Map<String, Set<String>> stopTrips = new ConcurrentHashMap<>();
     // Built lazily on first search access, so loading stays lean
@@ -74,6 +79,11 @@ public class TransitGraph {
 
     public Optional<TripInfo> getTripInfo(String tripId) {
         return Optional.ofNullable(tripInfos.get(tripId));
+    }
+
+    /** The days the trip runs; {@link ServiceDays#EVERY_DAY} if its feed has no calendar entry for it. */
+    ServiceDays getServiceDays(String tripId) {
+        return tripServiceDays.getOrDefault(tripId, ServiceDays.EVERY_DAY);
     }
 
     TripTimetable getTimetable(String tripId) {
@@ -143,6 +153,8 @@ public class TransitGraph {
         connections.clear();
         tripStops.clear();
         tripInfos.clear();
+        services.clear();
+        tripServiceDays.clear();
         stopTrips.clear();
         timetables.clear();
         departuresByStop.clear();
@@ -157,9 +169,16 @@ public class TransitGraph {
         translatedNames.computeIfAbsent(stopId, k -> new HashSet<>()).addAll(names);
     }
 
-    void addTrip(String tripId, List<String> stopIds, TripInfo info) {
+    void addServices(Map<String, ServiceDays> serviceDaysById) {
+        services.putAll(serviceDaysById);
+    }
+
+    /** serviceId may be null or unknown; the trip then runs every day. Add its service first. */
+    void addTrip(String tripId, List<String> stopIds, TripInfo info, String serviceId) {
         tripStops.put(tripId, stopIds);
         tripInfos.put(tripId, info);
+        ServiceDays days = serviceId != null ? services.get(serviceId) : null;
+        if (days != null) tripServiceDays.put(tripId, days);
         for (String stopId : stopIds) {
             stopTrips.computeIfAbsent(stopId, k -> new HashSet<>()).add(tripId);
         }
@@ -178,9 +197,12 @@ public class TransitGraph {
                 connectionsByTrip.computeIfAbsent(c.getTripId(), k -> new ArrayList<>()).add(c);
             }
         }
+        // Trips hold their service's shared ServiceDays, not its ID
+        Map<ServiceDays, String> serviceIds = new IdentityHashMap<>(services.size() * 2);
+        services.forEach((serviceId, days) -> serviceIds.put(days, serviceId));
         Map<String, CachedTrip> trips = new HashMap<>(tripStops.size() * 2);
         tripStops.forEach((tripId, stops) ->
-                trips.put(tripId, CachedTrip.of(stops, tripInfos.get(tripId),
+                trips.put(tripId, CachedTrip.of(stops, tripInfos.get(tripId), serviceIds.get(getServiceDays(tripId)),
                         connectionsByTrip.getOrDefault(tripId, List.of()))));
         long droppedCount = connections.values().stream().mapToLong(List::size).sum()
                 - trips.values().stream().mapToLong(CachedTrip::connectionCount).sum();
@@ -189,7 +211,7 @@ public class TransitGraph {
                     droppedCount);
         }
         return new GtfsCacheStore.GtfsCacheData(GtfsCacheStore.FORMAT_VERSION, new HashMap<>(stations),
-                new HashMap<>(translatedNames), trips);
+                new HashMap<>(translatedNames), new HashMap<>(services), trips);
     }
 
     /** Edges, connections and the stop→trips index are not stored; they are rebuilt from the trips. */
@@ -197,6 +219,7 @@ public class TransitGraph {
         clear();
         stations.putAll(data.stations());
         translatedNames.putAll(data.translatedNames());
+        services.putAll(data.services());
         data.trips().forEach((tripId, trip) -> trip.addTo(tripId, this));
     }
 

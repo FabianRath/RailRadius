@@ -63,9 +63,11 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `RailReachController` | controller | Public API under `/api` |
 | `AdminController` | controller | Admin/debug API under `/api/admin` |
 | `GtfsDataService` | service | Fills the `TransitGraph` at startup (cache file, else zips) and on `reload-gtfs`, then rebuilds the station search index and (on reload) clears the reachability caches |
-| `TransitGraph` | service | The merged network: stations, their translated names, edges, connections, trip indexes and `TripInfo`s. Everything that reads GTFS data injects this |
+| `TransitGraph` | service | The merged network: stations, their translated names, edges, connections, trip indexes, `TripInfo`s and each trip's `ServiceDays`. Everything that reads GTFS data injects this |
 | `GtfsFeedLoader` | service | Parses the rail part of each zip into the graph, with per-feed stop dedup |
-| `RailTripReader` | service | A feed's rail routes (name, operator from `agency.txt`) and rail trips (route, `TripInfo`) from routes/agency/trips.txt |
+| `RailTripReader` | service | A feed's rail routes (name, operator from `agency.txt`) and rail trips (route, service ID, `TripInfo`) from routes/agency/trips.txt |
+| `ServiceCalendarReader` | service | A feed's services and the days they run, from `calendar.txt` (weekly pattern in a date range) and `calendar_dates.txt` (days added or removed) |
+| `ServiceDays` | service | The days one service runs, as a bitset over epoch days; `sharesDayWith(later, dayShift)` for the transfer check. `EVERY_DAY` for trips without a calendar entry |
 | `TripInfo` | service | A trip's train number (`trip_short_name`, leading zeros of a numeric one stripped, prefixed with a `TrainCategories` category), headsign and operator |
 | `TrainCategories` | service | Category for bare train numbers by source, agency, route type and optionally route short name, from `train-categories.txt` (e.g. DELFI's DB Fernverkehr: 101 → `ICE`, 102 → `IC`/`ECE`) |
 | `GtfsLoadProgress` | service | Phase (PARSING → MERGING → SAVING → DONE/FAILED), feeds and zip bytes parsed of the running or last load from the zips; read by `/gtfs-load-status` |
@@ -79,12 +81,12 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `SharedTrainMatcher` | service | Cross-border rule: two stops are one station if ≥ 3 trains serve both at the same minute with the same neighbour station |
 | `ForeignStopSnapper` | service | Cross-border rule: a feed's stop outside its home country is merged into the nearest station of that country's feed (≤ 1 km) |
 | `CountryLocator` | service | Point → ISO country code, from `borders/europe.geojson` (Natural Earth 1:10m, Europe) |
-| `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`: format version, stations, translated names, trips); a file with another version is ignored |
-| `CachedTrip` | service | One trip in the cache file: route name, `TripInfo`, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
+| `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`: format version, stations, translated names, services, trips); a file with another version is ignored |
+| `CachedTrip` | service | One trip in the cache file: route name, `TripInfo`, service ID, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
 | `ReachabilityService` | service | Thin orchestrator: request defaults, POST response (`@Cacheable`), SSE streaming, triggers warming |
 | `ReachabilitySearch` | service | Round-based search, one round per transfer; best path per station and transfer count |
-| `TripTimetable` | service | One trip as arrays for the search: stops, leg times, minute offsets; `Departure` = trip leaving a stop |
-| `TransferWindow` | service | Sliding window over a station's arrivals: the arrival that boards a departure with the shortest journey |
+| `TripTimetable` | service | One trip as arrays for the search: stops, service days, leg times, minute offsets; `Departure` = trip leaving a stop |
+| `TransferWindow` | service | Sliding window over a station's arrivals: the arrival that boards a departure with the shortest journey, among those passing a filter (the day check); scans the wait range when the window's best fails it |
 | `ReachabilityCache` | service | Raw search results per `SearchKey`; get-or-compute (stored, cut down from a stored higher transfer count, or searched); Caffeine eviction and stats |
 | `ReachabilityWarmer` | service | `@Async` predictive warming of the maximum transfer count (own bean so the proxy applies) |
 | `JourneyLegBuilder` | service | Search path → `ReachableStation` with TRAIN/TRANSFER legs |
@@ -107,12 +109,12 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 
 `GtfsFeedLoader`, for each `data/gtfs/*.zip` (sorted). The source name comes from the filename, e.g. `gtfs_germany.zip` → `germany`:
 1. **routes.txt / agency.txt** (`RailTripReader`): keep only rail route types `2`, `100–106` and `109` (S-Bahn), each with its operator (`agency_name`; a route without `agency_id` gets the feed's only agency).
-2. **stops.txt / trips.txt**: load stops and the rail trips: route plus `TripInfo` (train number, headsign, operator). A numeric train number on a route that matches a `train-categories.txt` rule gets its category: `002310` → `ICE 2310`.
+2. **stops.txt / trips.txt / calendar**: load stops and the rail trips: route, service ID and `TripInfo` (train number, headsign, operator). `ServiceCalendarReader` reads the days of each service; the services of rail trips go to the graph as `<source>:<serviceId>`. A trip whose service is in neither calendar file (or whose feed has neither) runs every day, with a WARN count. A numeric train number on a route that matches a `train-categories.txt` rule gets its category: `002310` → `ICE 2310`.
 3. **Per-feed stop dedup**: a stop whose `parent_station` is in the feed (with coordinates) is merged into that parent, at any distance. The other stops are merged when they have the same name and lie within ~0.0015°. IDs are canonicalised to `<source>:<id>`, with `_ARR`/`_DEP`/`ARRIVAL_` style suffixes and prefixes stripped.
 4. **stop_times.txt**: streamed and buffered per trip (`TripRowBatcher`), rail trips only, and handed to the graph in batches of `railreach.gtfs.trip-batch-size` (100k) trips. A batch is only cut where a new trip starts, so trips stay whole in files grouped by `trip_id`. If a trip shows up again after another one started, the rest of the file is read in one batch, and rows of a trip already built are dropped with a WARN. Each trip's consecutive stop pairs produce:
    - `neighbors`: stopId → neighbour stopIds
    - `connections`: `"from->to"` → list of `Connection`
-   - `tripStops`: tripId → ordered stop list; `tripInfos`: tripId → `TripInfo`; `stopTrips`: stopId → tripIds
+   - `tripStops`: tripId → ordered stop list; `tripInfos`: tripId → `TripInfo`; `tripServiceDays`: tripId → its service's shared `ServiceDays`; `stopTrips`: stopId → tripIds
 
    Then `translations.txt` (optional, `StopNameTranslations`): each stop's translated `stop_name`s go to its canonical station in `translatedNames` (stopId → names), minus the station's own name, for stations that a rail trip added. Only search uses them; the API returns the original name.
 
@@ -126,7 +128,7 @@ After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStati
 
    In both, the station with more connections becomes canonical.
 7. **Foreign stops** (`ForeignStopSnapper`): a source's home country is where more than half of its located stations lie. A stop outside its source's home country is merged into the nearest station within 1 km of a source at home in the stop's country, which stays canonical. Every map is remapped. A canonical station can itself be merged later (A→B, then B→C); `mergeStations` first resolves such chains so every alias maps straight to the last station. The alias's translated names move to the canonical station.
-8. `GtfsCacheStore` saves stations, translated names and trips (`CachedTrip`) to the GTFS cache file (format version 6). On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops`, `tripInfos` and `stopTrips` from the trips.
+8. `GtfsCacheStore` saves stations, translated names, services and trips (`CachedTrip`) to the GTFS cache file (format version 7). On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops`, `tripInfos`, `tripServiceDays` and `stopTrips` from the trips.
 
 `StationSearchIndex.rebuild` then indexes the variants of each station's name and translated names. `TransitGraph` builds lazy indexes on first access: `timetables` (trip → `TripTimetable`), `departuresByStop` (stop → departures by time) and `connectionByTrip` (edge → tripId → Connection).
 
@@ -141,6 +143,7 @@ The search has no start time: every trip leaving the start station can begin a j
 - Round 0 rides every trip from the start station. Round k boards trips from the arrivals of round k−1. Riding a trip forward records each stop as an arrival.
 - **Pruning is per trip**: each trip keeps the shortest duration per stop (`bestDurationsByTrip`). A ride stops as soon as it cannot beat that value, because an earlier ride got there at the same time with no more transfers and stays ahead for the rest of the trip. Arrival time is part of the state, so a slower but earlier arrival that catches a better train is kept (B2).
 - **Transfers**: per station and round, departures are swept in time order against the arrivals sorted by time (`TransferWindow`). Each departure is boarded only from the arrival that catches it within the min/max wait window with the shortest journey so far. Waits past midnight use a second window with the arrivals moved a day back.
+- **Service days (B25)**: there is no travel date, but a transfer needs the two trains to run on a common day (for a wait past midnight: the departing train the day after). If the window's best arrival fails this, the arrivals in the wait range are scanned for the best one that passes. Only consecutive trains are checked, not the whole journey, and round 0 boards every trip regardless of its days. Feeds whose validity periods don't overlap (B24) therefore don't connect at transfers.
 - **Result**: per station, a list of paths by ascending transfers. Each path is the fastest for its transfer count and faster than every path with fewer transfers. Paths are kept as `previous` pointers during the search and turned into `JourneyPath`s at the end.
 - The response picks per station the path with the fewest transfers that fits `maxJourneyTimeHours` (B4). Without a limit, that is the first path.
 
