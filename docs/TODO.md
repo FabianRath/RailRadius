@@ -15,7 +15,5 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (caching / infrastructure)
 
 ## Features / UX
-- [ ] **F19** Sort the admin panel's Feeds tab by state instead of by name: Expired, Not yet valid, No calendar, Unreadable, Expiring, OK; within each group lowest `daysLeft` first (No calendar and Unreadable have none, so keep those by name). Today the rows come in zip-file order (`FeedUpdateCenter.java:130`).
-- [ ] **F18** The loading overlay says "Calculating…" but its counter says "Searching… N s" (`frontend/js/reachability.js:148`, `:152`). Use "Calculating" in both places for consistency.
 
 ## Structure
