@@ -1,9 +1,10 @@
 // Admin panel: buttons for the /api/admin endpoints, only reachable after the dev login. Each action shows the raw
-// JSON response, so it replaces the matching `scripts/api.sh` command.
+// JSON response, so it replaces the matching `scripts/api.sh` command. The Feeds tab is its own view (feeds.js).
 import {
     clearDebugTrigger, deleteGtfsCache, fetchCacheStats, fetchGtfsLoadStatus, fetchGtfsStats, reloadGtfs,
     setDebugTrigger,
 } from './api.js';
+import { initFeeds, refreshFeeds } from './feeds.js';
 import { fmtSeconds } from './util.js';
 
 const JSON_INDENT = 2;
@@ -34,6 +35,8 @@ const ACTIONS = {
 const openButton = document.getElementById('adminOpen');
 const dialog = document.getElementById('adminPanel');
 const actionButtons = dialog.querySelectorAll('[data-action]');
+const tabs = dialog.querySelectorAll('[data-tab]');
+const views = dialog.querySelectorAll('[data-view]');
 const output = document.getElementById('adminOutput');
 const progress = document.getElementById('adminProgress');
 const progressBar = document.getElementById('adminProgressBar');
@@ -50,6 +53,8 @@ export function initAdminPanel() {
         if (pressStartedOutside && isOutsideDialog(event)) dialog.close();
     });
     actionButtons.forEach(button => button.addEventListener('click', () => runAction(button)));
+    tabs.forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
+    initFeeds();
 }
 
 export function showAdminEntry() {
@@ -59,6 +64,18 @@ export function showAdminEntry() {
 export function hideAdminPanel() {
     openButton.hidden = true;
     dialog.close();
+}
+
+// The feed table needs more room, so the panel widens while the Feeds tab is open
+function showTab(name) {
+    tabs.forEach(tab => {
+        const active = tab.dataset.tab === name;
+        tab.classList.toggle('is-active', active);
+        tab.setAttribute('aria-selected', String(active));
+    });
+    views.forEach(view => { view.hidden = view.dataset.view !== name; });
+    dialog.classList.toggle('admin-panel-wide', name === 'feeds');
+    if (name === 'feeds') refreshFeeds();
 }
 
 // The dialog's padding also targets the dialog itself, so the click position decides

@@ -87,3 +87,11 @@ export function fetchGtfsLoadStatus() {
 export function deleteGtfsCache() {
     return adminJson('/api/admin/gtfs-cache', 'DELETE');
 }
+
+export function fetchFeeds() {
+    return adminJson('/api/admin/feeds');
+}
+
+export function downloadFeed(source) {
+    return adminJson(`/api/admin/feeds/${encodeURIComponent(source)}/download`, 'POST');
+}

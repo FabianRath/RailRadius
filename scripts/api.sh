@@ -15,6 +15,10 @@ case "${1:-help}" in
   reach)         curl -sN "$BASE/api/reachability/stream?stationId=${2:?stationId}&maxTransfers=${3:?maxTransfers}&minTransferMinutes=${4:-0}&maxTransferMinutes=${5:-180}" | grep -A1 '^event:done' ;;
   cache-stats)   admin "$BASE/api/admin/cache-stats" ;;
   gtfs-stats)    admin "$BASE/api/admin/gtfs-stats" ;;
+  # Feed update center: validity of every zip; downloads replace zips (old one kept in previous/), then reload-gtfs
+  feeds)         admin "$BASE/api/admin/feeds" ;;
+  feed-download) admin -X POST "$BASE/api/admin/feeds/${2:?source}/download" ;;
+  feeds-download-outdated) admin -X POST "$BASE/api/admin/feeds/download-outdated" ;;
   # Slow / destructive: full GTFS reparse (minutes), cache deletion
   reload-gtfs)   admin -X POST "$BASE/api/admin/reload-gtfs" ;;
   clear-gtfs)    admin -X DELETE "$BASE/api/admin/gtfs-cache" ;;

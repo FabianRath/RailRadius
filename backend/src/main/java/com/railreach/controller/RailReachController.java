@@ -6,8 +6,8 @@ import com.railreach.model.Station;
 import com.railreach.service.ReachabilityService;
 import com.railreach.service.StationSearchIndex;
 import com.railreach.service.TransitGraph;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -27,7 +27,6 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
-@RequiredArgsConstructor
 @Slf4j
 @CrossOrigin(origins = "*")
 public class RailReachController {
@@ -36,6 +35,16 @@ public class RailReachController {
     private final TransitGraph transitGraph;
     private final StationSearchIndex stationSearchIndex;
     private final AsyncTaskExecutor taskExecutor;
+
+    // With @EnableScheduling the task scheduler is an AsyncTaskExecutor too; SSE streams use the task executor
+    public RailReachController(ReachabilityService reachabilityService, TransitGraph transitGraph,
+                               StationSearchIndex stationSearchIndex,
+                               @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor) {
+        this.reachabilityService = reachabilityService;
+        this.transitGraph = transitGraph;
+        this.stationSearchIndex = stationSearchIndex;
+        this.taskExecutor = taskExecutor;
+    }
     
     /**
      * Streaming reachability via Server-Sent Events.

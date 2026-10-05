@@ -28,6 +28,12 @@ railreach:
     # stop_times.txt is handed to the graph in batches of this many trips, so big feeds don't hold all of it in memory
     trip-batch-size: 100000
 
+  feeds:
+    # Update center: a feed whose last service day is at most this many days away counts as expiring
+    expiring-days: 30
+    # How often the update center logs expired and expiring feeds (first check right after startup)
+    check-interval: PT24H
+
   algorithm:
     max-transfer-time-minutes: 180
     cache-size: 10000

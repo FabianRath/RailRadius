@@ -1,0 +1,37 @@
+# Download URL of each feed, for the update center (FeedUpdateCenter, admin panel "Feeds"). The source is the
+# <source> of the feed's gtfs_<source>.zip. Feeds without a direct download (portal login, fee, web page) are not
+# listed and are updated by hand; docs/gtfs-sources.md has notes on every source.
+# Format: source;url[;Header: value|Header: value]
+bosnia;https://owncloud.cesnet.cz/index.php/s/yWJhi9wjUIc3IC2/download
+bulgaria;https://s3.transitpdf.com/files/sourcedata/bg-bdz-gtfs.zip
+croatia;https://s3.transitpdf.com/files/sourcedata/putnickog-prijevoza.zip
+czechia;https://motis.obehy.cz/get-feeds/cz-czptt-gtfs.zip
+denmark;https://data.public-transport.earth/gtfs/dk
+estonia;https://s3.transitpdf.com/files/sourcedata/maanteeamet.zip
+finland;https://rata.digitraffic.fi/api/v1/trains/gtfs-passenger.zip;Accept-Encoding: gzip|Digitraffic-User: RailReach
+france;https://www.data.gouv.fr/api/1/datasets/r/84f7501c-de7b-46d9-8e0c-14c30d9fa58b
+germany;https://data.public-transport.earth/gtfs/de
+greece;https://s3.transitpdf.com/files/sourcedata/trainose.zip
+hungary;https://s3.transitpdf.com/files/sourcedata/mav-menetrend.zip
+italy;https://github.com/deryclem/trenitalia-gtfs/raw/main/gtfs-trenitalia.zip
+italy-italo;https://github.com/deryclem/italo-gtfs/raw/main/gtfs-italo.zip
+latvia;https://vivi.lv/uploads/GTFS.zip
+lithuania;https://jbb.ghsq.de/gtfs/lt-ltglink.gtfs.zip
+luxembourg;https://data.public-transport.earth/gtfs/lu
+moldova;https://hoermalmeister.github.io/gtfs-rehost/cfm/cfm.zip
+montenegro;https://s3.transitpdf.com/files/sourcedata/crne-gore.zip
+netherlands;https://data.public-transport.earth/gtfs/nl
+northmacedonia;https://hoermalmeister.github.io/gtfs-rehost/mzi/mzi.zip
+norway;https://data.public-transport.earth/gtfs/no
+poland;https://mkuran.pl/gtfs/polish_trains.zip
+portugal;https://publico.cp.pt/gtfs/gtfs.zip
+romania;https://s3.transitpdf.com/files/sourcedata/ro-railway-gtfs.zip
+serbia;https://s3.transitpdf.com/files/sourcedata/srbijavoz.zip
+slovakia;https://s3.transitpdf.com/files/sourcedata/zsr.zip
+slovenia;https://s3.transitpdf.com/files/sourcedata/si-nap-gtfs.zip
+spain;https://ssl.renfe.com/gtransit/Fichero_AV_LD/google_transit.zip
+spain-cercanias;https://ssl.renfe.com/ftransit/Fichero_CER_FOMENTO/fomento_transit.zip
+sweden;https://data.public-transport.earth/gtfs/se
+switzerland;https://data.public-transport.earth/gtfs/ch
+turkey;https://github.com/yasinkaraaslan/tcdd-gtfs/raw/main/output/tcdd.zip
+ukraine;https://jbb.ghsq.de/gtfs/ua-ukrzaliznytsya.gtfs.zip

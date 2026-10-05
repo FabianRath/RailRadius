@@ -961,6 +961,118 @@ input[type="range"]::-moz-range-thumb {
     cursor: wait;
 }
 
+/* The Feeds tab fills the window; the panel is a column whose last item, the table, takes the rest and scrolls */
+.admin-panel-wide[open] {
+    display: flex;
+    flex-direction: column;
+    width: min(1400px, calc(100vw - 32px));
+    height: calc(100vh - 32px);
+    overflow: hidden;
+}
+
+.admin-panel-wide .admin-view:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.admin-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.admin-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.admin-tab:hover {
+    color: var(--text-primary);
+}
+
+.admin-tab.is-active {
+    border-bottom-color: var(--accent-rail);
+    color: var(--accent-rail);
+}
+
+.feed-summary {
+    margin: 12px 0;
+    color: var(--text-secondary);
+}
+
+.feed-summary.is-error {
+    color: var(--danger);
+}
+
+.feed-table-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.feed-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.feed-table th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-align: left;
+}
+
+.feed-table th,
+.feed-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+/* Headers, states, hosts and download messages wrap, so the table fits the panel without scrolling sideways */
+.feed-table td:not(.feed-wrap) {
+    white-space: nowrap;
+}
+
+.feed-download {
+    padding: 4px 8px;
+}
+
+.feed-muted,
+.feed-state-not-yet-valid,
+.feed-state-no-calendar,
+.feed-result-pending {
+    color: var(--text-secondary);
+}
+
+.feed-state-ok,
+.feed-result-replaced {
+    color: var(--accent-rail);
+}
+
+.feed-state-expiring,
+.feed-result-busy {
+    color: var(--warning);
+}
+
+.feed-state-expired,
+.feed-state-unreadable,
+.feed-result-rejected,
+.feed-result-failed {
+    color: var(--danger);
+}
+
 .admin-progress {
     margin-bottom: 12px;
 }

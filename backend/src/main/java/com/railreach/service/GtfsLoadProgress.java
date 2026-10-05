@@ -59,6 +59,12 @@ public class GtfsLoadProgress {
         if (next == Phase.DONE || next == Phase.FAILED) finishedAtMs = System.currentTimeMillis();
     }
 
+    /** True while a load from the zips reads or writes them. */
+    boolean isRunning() {
+        Phase current = phase;
+        return current == Phase.PARSING || current == Phase.MERGING || current == Phase.SAVING;
+    }
+
     GtfsLoadStatus status(int stationCount, int connectionCount) {
         Phase current = phase;
         long endMs = finishedAtMs != 0 ? finishedAtMs : System.currentTimeMillis();

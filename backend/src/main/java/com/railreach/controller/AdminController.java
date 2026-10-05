@@ -1,16 +1,21 @@
 package com.railreach.controller;
 
+import com.railreach.dto.FeedDownloadResult;
+import com.railreach.dto.FeedStatus;
 import com.railreach.dto.GtfsLoadStatus;
 import com.railreach.model.Station;
+import com.railreach.service.FeedUpdateCenter;
 import com.railreach.service.GtfsDataService;
 import com.railreach.service.ReachabilityService;
 import com.railreach.service.TransitGraph;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,6 +41,7 @@ public class AdminController {
     /** Debug flag — toggled by POST/DELETE /api/admin/debug/trigger */
     private final AtomicBoolean debugShowAllStations = new AtomicBoolean(false);
     private final ReachabilityService reachabilityService;
+    private final FeedUpdateCenter feedUpdateCenter;
 
     /**
      * Show what is currently in the reachability cache and what is being warmed.
@@ -97,6 +103,30 @@ public class AdminController {
     @GetMapping("/gtfs-load-status")
     public GtfsLoadStatus getGtfsLoadStatus() {
         return gtfsDataService.getLoadStatus();
+    }
+
+    /** Every GTFS zip with the days its timetable covers. */
+    @GetMapping("/feeds")
+    public List<FeedStatus> getFeeds() {
+        return feedUpdateCenter.statuses();
+    }
+
+    /** Downloads a new version of one feed (minutes for the big ones); 404 if it has no download URL. */
+    @PostMapping("/feeds/{source}/download")
+    public ResponseEntity<FeedDownloadResult> downloadFeed(@PathVariable String source) {
+        return feedUpdateCenter.download(source)
+                .map(result -> ResponseEntity.status(statusOf(result)).body(result))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /** Downloads every expired or expiring feed that has a download URL. */
+    @PostMapping("/feeds/download-outdated")
+    public List<FeedDownloadResult> downloadOutdatedFeeds() {
+        return feedUpdateCenter.downloadOutdated();
+    }
+
+    private static HttpStatus statusOf(FeedDownloadResult result) {
+        return result.getOutcome() == FeedDownloadResult.Outcome.BUSY ? HttpStatus.CONFLICT : HttpStatus.OK;
     }
 
     // =========================================================================
