@@ -194,6 +194,44 @@ class ReachabilityServiceTest {
     }
 
     @Test
+    void journeyShowsTheDaysOnWhichAllItsTrainsRun(@TempDir Path dir) throws Exception {
+        ReachabilityResponse response = query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 1, 0, 180);
+
+        assertThat(find(response, "zeta:Z4")).get().extracting(ReachableStation::getRunningDays)
+                .isEqualTo("Runs Mon–Fri");
+        // Counted from the Friday train; the Saturday one after midnight is a day later
+        assertThat(find(response, "zeta:Z5")).get().extracting(ReachableStation::getRunningDays)
+                .isEqualTo("Runs Fri");
+    }
+
+    // The search keeps one of the twin trips ZT10/ZT11; the journey runs on the days of both
+    @Test
+    void rideRunsOnTheDaysOfEveryTripWithTheSameTimes(@TempDir Path dir) throws Exception {
+        ReachableStation twin = find(query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 0, 0, 180), "zeta:Z9")
+                .orElseThrow();
+
+        assertThat(twin.getRunningDays()).isEqualTo("Runs daily");
+    }
+
+    // B25 only checks consecutive trains: weekend ZT7 and daily ZT8 share a day, ZT8 and weekday ZT9 too
+    @Test
+    void journeyWhoseTrainsShareNoDayIsFlagged(@TempDir Path dir) throws Exception {
+        ReachableStation end = find(query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 2, 0, 180), "zeta:Z8")
+                .orElseThrow();
+
+        assertThat(end.getHasCommonDay()).isFalse();
+        assertThat(end.getRunningDays()).isNull();
+    }
+
+    @Test
+    void journeyWithoutCalendarDataHasNoRunningDays() {
+        ReachableStation b2 = find(query(gtfs, "alpha:A1", 1, 0, 180), "beta:B2").orElseThrow();
+
+        assertThat(b2.getRunningDays()).isNull();
+        assertThat(b2.getHasCommonDay()).isTrue();
+    }
+
+    @Test
     void doneEventCountsOnlyStationsWithinMaxJourneyTime() {
         // A2 (30 min) and A3/B1 (60 min) fit into 1 h, B2 (120 min) does not
         RecordingEmitter emitter = new RecordingEmitter();

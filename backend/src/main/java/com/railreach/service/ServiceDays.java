@@ -1,6 +1,8 @@
 package com.railreach.service;
 
+import java.util.Arrays;
 import java.util.BitSet;
+import java.util.stream.IntStream;
 
 /**
  * The days a GTFS service runs, as a bitset over epoch days: bit j of {@code words[i]} is epoch day
@@ -34,6 +36,63 @@ public record ServiceDays(int firstWord, long[] words) {
             if ((words[i] & later.wordMovedBack(firstWord + i, dayShift)) != 0) return true;
         }
         return false;
+    }
+
+    /**
+     * The days of this service on which {@code later} runs {@code dayShift} days (0 to 63) later. {@link #EVERY_DAY}
+     * on either side keeps the other side's days.
+     */
+    ServiceDays intersect(ServiceDays later, int dayShift) {
+        if (later == EVERY_DAY) return this;
+        if (this == EVERY_DAY) return later.movedBack(dayShift);
+        long[] result = new long[words.length];
+        for (int i = 0; i < words.length; i++) {
+            result[i] = words[i] & later.wordMovedBack(firstWord + i, dayShift);
+        }
+        return trimmed(firstWord, result);
+    }
+
+    /** The days on which this service or {@code other} runs. */
+    ServiceDays union(ServiceDays other) {
+        if (this == EVERY_DAY || other == EVERY_DAY) return EVERY_DAY;
+        if (other.words.length == 0) return this;
+        if (words.length == 0) return other;
+        int first = Math.min(firstWord, other.firstWord);
+        int last = Math.max(firstWord + words.length, other.firstWord + other.words.length);
+        long[] result = new long[last - first];
+        for (int i = 0; i < result.length; i++) {
+            result[i] = wordAt(first + i) | other.wordAt(first + i);
+        }
+        return new ServiceDays(first, result);
+    }
+
+    /** True if this service never runs; {@link #EVERY_DAY} runs on every day. */
+    boolean isEmpty() {
+        return this != EVERY_DAY && words.length == 0;
+    }
+
+    /** The epoch days, ascending. Empty for {@link #EVERY_DAY}. */
+    IntStream epochDays() {
+        return IntStream.range(0, words.length).flatMap(i -> BitSet.valueOf(new long[] {words[i]}).stream()
+                .map(j -> (firstWord + i) * DAYS_PER_WORD + j));
+    }
+
+    private ServiceDays movedBack(int dayShift) {
+        if (dayShift == 0) return this;
+        // Moving back can reach into the word before the first one
+        long[] result = new long[words.length + 1];
+        for (int i = 0; i < result.length; i++) {
+            result[i] = wordMovedBack(firstWord - 1 + i, dayShift);
+        }
+        return trimmed(firstWord - 1, result);
+    }
+
+    private static ServiceDays trimmed(int firstWord, long[] words) {
+        int start = 0;
+        int end = words.length;
+        while (start < end && words[start] == 0) start++;
+        while (end > start && words[end - 1] == 0) end--;
+        return new ServiceDays(firstWord + start, Arrays.copyOfRange(words, start, end));
     }
 
     /** Word {@code word} as if every day ran dayShift days earlier: bit j is day {@code word * 64 + j + dayShift}. */

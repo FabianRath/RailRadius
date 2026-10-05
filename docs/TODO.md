@@ -2,9 +2,10 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B26 · F18 · S12
+**Next free IDs:** B27 · F18 · S12
 
 ## Bugs (data loading)
+- [ ] **B26** The Belgian feed (dated 2026-02-11) has Nightjet NJ 479 Brussels → Wien on only 10 and 12 Dec 2025: three trips (`…:3413:20251210`, `…:3413:20251210:0`, `…:3413:20251212`) whose services have no weekdays in `calendar.txt` and 1–2 added dates in `calendar_dates.txt`. The real train runs several times a week, so the popup shows "Irregular: 1 day in the timetable" (e.g. Aachen Hbf → Wien Meidling). Check whether a newer feed or the ÖBB feed has the full schedule.
 - [ ] **B24** Several GTFS feeds have expired, so their trains can no longer be found on the operators' sites. Last service date per feed (checked 2026-10-05, from `calendar.txt`/`calendar_dates.txt`): greece 2019-01-31, france 2025-04-22, hungary 2025-11-23, bosnia 2025-12-13, croatia 2025-12-14, luxembourg 2026-04-30, denmark 2026-05-06, germany 2026-06-13, poland 2026-06-13. Download current feeds; a check at load time that warns about expired feeds would catch this earlier.
 
 ## Bugs (algorithm)
@@ -12,6 +13,5 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (caching / infrastructure)
 
 ## Features / UX
-- [ ] **F14** Popup: show the days a train leg runs on (from the GTFS calendar). The calendar is loaded per trip (`TransitGraph.getServiceDays`).
 
 ## Structure

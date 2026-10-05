@@ -3,7 +3,17 @@ import { countryBadgeHtml, escapeHtml, fmtGtfsClock } from './util.js';
 export function stationPopupHtml(station) {
     return `<div class="popup-station">${escapeHtml(station.stopName)}${countryBadgeHtml(station.country)}</div>`
         + `<div class="popup-meta">Transfers: ${station.transfers}</div>`
+        + runningDaysHtml(station)
         + journeyHtml(station);
+}
+
+/** The search only checks consecutive trains, so a journey can pass whose trains never all run on one day (B25). */
+function runningDaysHtml(station) {
+    if (station.hasCommonDay === false) {
+        return '<div class="popup-meta popup-warning">⚠️ No single day on which all these trains run</div>';
+    }
+    if (!station.runningDays) return '';
+    return `<div class="popup-meta">📅 ${escapeHtml(station.runningDays)}</div>`;
 }
 
 function journeyHtml(station) {

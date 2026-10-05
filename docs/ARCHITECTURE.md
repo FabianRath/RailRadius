@@ -67,7 +67,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `GtfsFeedLoader` | service | Parses the rail part of each zip into the graph, with per-feed stop dedup |
 | `RailTripReader` | service | A feed's rail routes (name, operator from `agency.txt`) and rail trips (route, service ID, `TripInfo`) from routes/agency/trips.txt |
 | `ServiceCalendarReader` | service | A feed's services and the days they run, from `calendar.txt` (weekly pattern in a date range) and `calendar_dates.txt` (days added or removed) |
-| `ServiceDays` | service | The days one service runs, as a bitset over epoch days; `sharesDayWith(later, dayShift)` for the transfer check. `EVERY_DAY` for trips without a calendar entry |
+| `ServiceDays` | service | The days one service runs, as a bitset over epoch days; `sharesDayWith(later, dayShift)` for the transfer check, `intersect(later, dayShift)` and `union` for a journey's days. `EVERY_DAY` for trips without a calendar entry |
 | `TripInfo` | service | A trip's train number (`trip_short_name`, leading zeros of a numeric one stripped, prefixed with a `TrainCategories` category), headsign and operator |
 | `TrainCategories` | service | Where a train's category comes from: per source the trips.txt column that holds it, from `train-category-columns.txt` (Netherlands `trip_long_name`, Poland `plk_category_code`); else, for bare train numbers, rules by source, agency, route type and optionally route short name, from `train-categories.txt` (e.g. DELFI's DB Fernverkehr: 101 → `ICE`, 102 → `IC`/`ECE`) |
 | `GtfsLoadProgress` | service | Phase (PARSING → MERGING → SAVING → DONE/FAILED), feeds and zip bytes parsed of the running or last load from the zips; read by `/gtfs-load-status` |
@@ -90,6 +90,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `ReachabilityCache` | service | Raw search results per `SearchKey`; get-or-compute (stored, cut down from a stored higher transfer count, or searched); Caffeine eviction and stats |
 | `ReachabilityWarmer` | service | `@Async` predictive warming of the maximum transfer count (own bean so the proxy applies) |
 | `JourneyLegBuilder` | service | Search path → `ReachableStation` with TRAIN/TRANSFER legs |
+| `JourneyRunningDays` | service | Days on which every train of a returned journey runs, and their summary ("Runs Mon–Fri", "Irregular: 2 days in the timetable") |
 | `CacheConfig` | config | Caffeine `CacheManager` ("reachability" cache), `@EnableAsync` |
 | `AdminTokenInterceptor` | config | Guards `/api/admin/**`: `X-Admin-Token` must equal `railreach.admin.token` (constant-time); 401 if wrong or missing, 403 for every call when no token is configured; CORS preflights pass |
 | `WebConfig` | config | Registers `AdminTokenInterceptor` on `/api/admin/**` (same path matching as the controllers) |
@@ -98,7 +99,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `JourneyPath` | model | Internal search result: stationIds, connections, transfers, totalDurationMinutes |
 | `ReachabilityRequest` | dto | startStationId, maxTransfers, maxJourneyTimeHours, min/maxTransferTimeMinutes |
 | `ReachabilityResponse` | dto | Start info, count, calcTime, list of `ReachableStation` |
-| `ReachableStation` | dto | Station (incl. country) + transfers, duration, path ids/names, `legs` |
+| `ReachableStation` | dto | Station (incl. country) + transfers, duration, path ids/names, `legs`, `runningDays` (summary, null without calendar data), `hasCommonDay` |
 | `GtfsLoadStatus` | dto | `GtfsLoadProgress` snapshot plus live station/connection counts; ETA extrapolated from zip bytes parsed |
 | `JourneyLeg` | dto | `TRAIN` or `TRANSFER` leg with from/to station names and countries, times and duration; TRAIN legs also carry route name, train number, headsign and operator |
 | `GtfsTime` | util | Parse/format GTFS times, minute diffs with overnight wrap, clock minute of a time, duration text |
@@ -150,6 +151,8 @@ The search has no start time: every trip leaving the start station can begin a j
 Overnight wrap: a time difference below −60 min gets +24 h added.
 
 `JourneyLegBuilder` merges consecutive connections into one TRAIN leg (same tripId, or same route name and continuous in time) and inserts TRANSFER legs between them. A TRAIN leg's train number, headsign and operator come from its first trip.
+
+`JourneyRunningDays` intersects the days of every ride on the path, counted from the first train's service day: a ride boarded at an earlier clock time than the previous one arrived is shifted by a day (the search's overnight transfer). A ride's days are the union of its trip's and those of every trip leaving the boarding station and reaching the alighting station at the same times, because feeds publish one train as several trips with different days and the search keeps only one. The summary is the weekdays on which the journey runs on at least half of their dates ("Runs daily", "Runs Mon–Fri", "Runs Sat, Sun"); with fewer than 4 days or no such weekday it is "Irregular: N days in the timetable". No dates are shown. No common day sets `hasCommonDay` to false, which the popup shows as a warning (the B25 check only covers consecutive trains).
 
 **Caching layers:**
 - `ReachabilityCache` (Caffeine, max `cache.raw-max-entries` (30) results) holds raw results (station → paths). A stored result also answers every lower transfer count.
