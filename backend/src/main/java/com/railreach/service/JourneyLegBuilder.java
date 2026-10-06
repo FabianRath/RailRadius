@@ -65,12 +65,15 @@ public class JourneyLegBuilder {
             if (rideEnd < connections.size()) {
                 int transferMinutes = Math.max(0, GtfsTime.diffMinutes(
                         last.getArrivalTimeSeconds(), connections.get(rideEnd).getDepartureTimeSeconds()));
-                String transferStation = stationName(last.getToStopId());
-                String transferCountry = stationCountry(last.getToStopId());
+                String transferStopId = last.getToStopId();
+                String transferStation = stationName(transferStopId);
+                String transferCountry = stationCountry(transferStopId);
                 legs.add(JourneyLeg.builder()
                         .type(LEG_TRANSFER)
                         .fromStation(transferStation)
                         .toStation(transferStation)
+                        .fromStopId(transferStopId)
+                        .toStopId(transferStopId)
                         .fromCountry(transferCountry)
                         .toCountry(transferCountry)
                         .duration(GtfsTime.formatDuration(transferMinutes))
@@ -93,6 +96,8 @@ public class JourneyLegBuilder {
                 .operator(tripInfo.map(TripInfo::operator).orElse(null))
                 .fromStation(stationName(first.getFromStopId()))
                 .toStation(stationName(last.getToStopId()))
+                .fromStopId(first.getFromStopId())
+                .toStopId(last.getToStopId())
                 .fromCountry(stationCountry(first.getFromStopId()))
                 .toCountry(stationCountry(last.getToStopId()))
                 .departureTime(first.getDepartureTime())
