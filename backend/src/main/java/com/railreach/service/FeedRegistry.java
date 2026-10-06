@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /** Where each feed is downloaded from, as listed in {@code gtfs-feeds.txt}. */
@@ -33,6 +34,10 @@ public class FeedRegistry {
 
     Optional<FeedSource> of(String source) {
         return Optional.ofNullable(feeds.get(source));
+    }
+
+    Set<String> sources() {
+        return feeds.keySet();
     }
 
     /** A source on several lines gets their URLs as fallbacks, in line order. */

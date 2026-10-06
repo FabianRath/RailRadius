@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
@@ -40,6 +41,7 @@ import java.util.zip.ZipFile;
 public class FeedUpdateCenter {
 
     private static final Set<State> OUTDATED = Set.of(State.EXPIRED, State.EXPIRING);
+    private static final Set<State> TO_DOWNLOAD = Set.of(State.MISSING, State.EXPIRED, State.EXPIRING);
     private static final Comparator<FeedStatus> BY_STATE_AND_DAYS_LEFT = Comparator
             .comparing(FeedStatus::getState)
             .thenComparing(FeedStatus::getDaysLeft, Comparator.nullsLast(Comparator.naturalOrder()));
@@ -54,6 +56,10 @@ public class FeedUpdateCenter {
     @Value("${railreach.feeds.expiring-days:30}")
     private int expiringDays;
 
+    // The feeds that belong in the GTFS directory; empty means every feed in gtfs-feeds.txt
+    @Value("${railreach.feeds.sources:}")
+    private List<String> sources;
+
     // Reading the calendar of a big feed takes seconds, so it is redone only when the zip changes
     private final Map<Path, ReadValidity> validityByZip = new ConcurrentHashMap<>();
     private final ReentrantLock downloadLock = new ReentrantLock();
@@ -65,9 +71,17 @@ public class FeedUpdateCenter {
         return statuses(LocalDate.now());
     }
 
-    /** Sorted by {@link State}, then by days left; feeds without days left stay in file name order. */
+    /**
+     * Every zip in the GTFS directory plus a {@link State#MISSING} row per expected feed without one. Sorted by
+     * {@link State}, then by days left; feeds without days left stay in file name order.
+     */
     List<FeedStatus> statuses(LocalDate today) {
-        return feedZips().stream().map(zip -> status(zip, today)).sorted(BY_STATE_AND_DAYS_LEFT).toList();
+        List<Path> zips = feedZips();
+        Set<String> missing = new TreeSet<>(sources.isEmpty() ? registry.sources() : sources);
+        zips.forEach(zip -> missing.remove(FeedFiles.source(zip.getFileName().toString())));
+        return Stream.concat(missing.stream().map(this::missingStatus), zips.stream().map(zip -> status(zip, today)))
+                .sorted(BY_STATE_AND_DAYS_LEFT)
+                .toList();
     }
 
     @Scheduled(fixedDelayString = "${railreach.feeds.check-interval:PT24H}")
@@ -76,7 +90,15 @@ public class FeedUpdateCenter {
         List<FeedStatus> outdated = statuses.stream().filter(status -> OUTDATED.contains(status.getState())).toList();
         outdated.forEach(status -> log.warn("Feed {} {}: last service day {} ({} days left)", status.getSource(),
                 status.getState(), status.getLastServiceDate(), status.getDaysLeft()));
-        log.info("Feed check: {} feeds, {} expired or expiring", statuses.size(), outdated.size());
+        List<String> missing = statuses.stream()
+                .filter(status -> status.getState() == State.MISSING)
+                .map(FeedStatus::getSource)
+                .toList();
+        if (!missing.isEmpty()) {
+            log.warn("Feeds without a zip: {}. Download them in the admin panel (Feeds tab)", missing);
+        }
+        log.info("Feed check: {} feeds, {} missing, {} expired or expiring", statuses.size(), missing.size(),
+                outdated.size());
     }
 
     /** Empty if the source has no download URL. */
@@ -84,11 +106,11 @@ public class FeedUpdateCenter {
         return registry.of(source).map(feed -> download(feed, LocalDate.now()));
     }
 
-    /** Downloads every expired or expiring feed that has a download URL, one after the other. */
+    /** Downloads every missing, expired or expiring feed that has a download URL, one after the other. */
     public List<FeedDownloadResult> downloadOutdated() {
         LocalDate today = LocalDate.now();
         return statuses(today).stream()
-                .filter(status -> OUTDATED.contains(status.getState()))
+                .filter(status -> TO_DOWNLOAD.contains(status.getState()))
                 .flatMap(status -> registry.of(status.getSource()).stream())
                 .map(feed -> download(feed, today))
                 .toList();
@@ -138,13 +160,13 @@ public class FeedUpdateCenter {
         }
     }
 
+    private FeedStatus missingStatus(String source) {
+        return statusBuilder(source, FeedFiles.zipName(source)).state(State.MISSING).build();
+    }
+
     private FeedStatus status(Path zip, LocalDate today) {
         String fileName = zip.getFileName().toString();
-        String source = FeedFiles.source(fileName);
-        FeedStatus.FeedStatusBuilder status = FeedStatus.builder()
-                .source(source)
-                .fileName(fileName)
-                .downloadUrl(registry.of(source).map(feed -> feed.urls().getFirst().url()).orElse(null));
+        FeedStatus.FeedStatusBuilder status = statusBuilder(FeedFiles.source(fileName), fileName);
         try {
             long sizeBytes = Files.size(zip);
             long lastModifiedMs = Files.getLastModifiedTime(zip).toMillis();
@@ -160,6 +182,13 @@ public class FeedUpdateCenter {
             log.warn("Cannot read feed {}", fileName, e);
             return status.state(State.UNREADABLE).build();
         }
+    }
+
+    private FeedStatus.FeedStatusBuilder statusBuilder(String source, String fileName) {
+        return FeedStatus.builder()
+                .source(source)
+                .fileName(fileName)
+                .downloadUrl(registry.of(source).map(feed -> feed.urls().getFirst().url()).orElse(null));
     }
 
     private State state(FeedValidity validity, LocalDate today) {

@@ -58,6 +58,8 @@ public class FeedDownloader {
      */
     Replacement replace(FeedSource feed, Path target, Optional<LocalDate> currentLastDay, LocalDate today)
             throws IOException, InterruptedException {
+        // A fresh checkout has no GTFS directory yet
+        Files.createDirectories(target.getParent());
         Path part = target.resolveSibling(target.getFileName() + PART_SUFFIX);
         List<String> rejections = new ArrayList<>();
         try {

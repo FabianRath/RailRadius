@@ -7,6 +7,10 @@ railreach:
     auto-load-from-files: true
     cache-file: data/gtfs-dev-cache.json
 
+  # A fresh checkout starts without zips: download these in the admin panel (Feeds tab), then reload GTFS
+  feeds:
+    sources: austria,hungary,slovakia
+
   cache:
     predictive-enabled: false
 

@@ -8,15 +8,18 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.time.LocalDate;
 
-/** One GTFS zip in the feed directory and how long its timetable runs; returned by {@code GET /api/admin/feeds}. */
+/** One GTFS zip in the feed directory (or an expected one without a zip) and how long its timetable runs; returned by {@code GET /api/admin/feeds}. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class FeedStatus {
 
-    /** Declared in the order the admin panel lists feeds: the ones that need action first. */
-    public enum State { EXPIRED, NOT_YET_VALID, NO_CALENDAR, UNREADABLE, EXPIRING, OK }
+    /**
+     * Declared in the order the admin panel lists feeds: the ones that need action first. {@code MISSING}: an
+     * expected feed (see {@code railreach.feeds.sources}) has no zip yet.
+     */
+    public enum State { MISSING, EXPIRED, NOT_YET_VALID, NO_CALENDAR, UNREADABLE, EXPIRING, OK }
 
     private String source;
     private String fileName;

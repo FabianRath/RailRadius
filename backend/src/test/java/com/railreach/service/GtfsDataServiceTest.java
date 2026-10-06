@@ -3,6 +3,7 @@ package com.railreach.service;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,6 +21,21 @@ class GtfsDataServiceTest {
     @BeforeAll
     static void loadFixture() throws Exception {
         gtfs = GtfsTestFixtures.load(tempDir, "alpha", "beta");
+    }
+
+    // F25: a fresh checkout starts without zips, so the feeds can be downloaded in the running app
+    @Test
+    void startupWithoutZipsLoadsNothingInsteadOfFailing(@TempDir Path dir) throws Exception {
+        TransitGraph graph = new TransitGraph();
+        GtfsDataService service = GtfsTestFixtures.dataService(dir, graph,
+                GtfsTestFixtures.reachabilityCache(graph), new StationSearchIndex(graph));
+        ReflectionTestUtils.setField(service, "gtfsDirectory", dir.resolve("missing").toString());
+        ReflectionTestUtils.setField(service, "autoLoadFromFiles", true);
+
+        service.initialize();
+
+        assertThat(graph.stationCount()).isZero();
+        assertThat(service.getCacheStats()).containsEntry("dataLoaded", false);
     }
 
     @Test

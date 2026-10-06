@@ -5,10 +5,12 @@ import { icon } from './icons.js';
 import { escapeHtml } from './util.js';
 
 const STATE_LABELS = {
-    OK: 'OK', EXPIRING: 'Expiring', EXPIRED: 'Expired', NOT_YET_VALID: 'Not yet valid', NO_CALENDAR: 'No calendar',
+    MISSING: 'Missing', OK: 'OK', EXPIRING: 'Expiring', EXPIRED: 'Expired', NOT_YET_VALID: 'Not yet valid', NO_CALENDAR: 'No calendar',
     UNREADABLE: 'Unreadable',
 };
 const OUTDATED_STATES = ['EXPIRED', 'EXPIRING'];
+// A fresh checkout has no zips; "Download outdated" fetches them too
+const TO_DOWNLOAD_STATES = ['MISSING', ...OUTDATED_STATES];
 const BYTES_PER_MB = 1024 * 1024;
 const ISO_DATE_LENGTH = 10;
 const PENDING = { outcome: 'PENDING', message: 'Downloading…' };
@@ -25,7 +27,8 @@ let busy = false;
 export function initFeeds() {
     document.getElementById('feedRefresh').addEventListener('click', refreshFeeds);
     document.getElementById('feedDownloadOutdated').addEventListener('click', () => downloadFeeds(
-        feeds.filter(feed => feed.downloadUrl && OUTDATED_STATES.includes(feed.state)), 'expired or expiring'));
+        feeds.filter(feed => feed.downloadUrl && TO_DOWNLOAD_STATES.includes(feed.state)),
+        'missing, expired or expiring'));
     document.getElementById('feedDownloadAll').addEventListener('click', () => downloadFeeds(
         feeds.filter(feed => feed.downloadUrl), 'downloadable'));
     rows.addEventListener('click', event => {
@@ -80,8 +83,9 @@ async function download(source) {
 
 function overview() {
     const outdated = feeds.filter(feed => OUTDATED_STATES.includes(feed.state)).length;
+    const missing = feeds.filter(feed => feed.state === 'MISSING').length;
     const manual = feeds.filter(feed => !feed.downloadUrl).length;
-    return `${feeds.length} feeds: ${outdated} expired or expiring, ${manual} updated by hand.`;
+    return `${feeds.length} feeds: ${missing} missing, ${outdated} expired or expiring, ${manual} updated by hand.`;
 }
 
 function downloadSummary(sources) {
@@ -99,7 +103,7 @@ function feedRowHtml(feed) {
     const runsUntil = feed.lastServiceDate
         ? `<span title="Runs from ${feed.firstServiceDate}">${feed.lastServiceDate}</span>` : '–';
     const stateClass = `feed-state-${feed.state.toLowerCase().replaceAll('_', '-')}`;
-    const size = `${(feed.sizeBytes / BYTES_PER_MB).toFixed(1)} MB`;
+    const size = feed.state === 'MISSING' ? '–' : `${(feed.sizeBytes / BYTES_PER_MB).toFixed(1)} MB`;
     const downloaded = feed.downloadedAt?.slice(0, ISO_DATE_LENGTH) ?? '–';
     return `<tr><td>${escapeHtml(feed.source)}</td><td>${runsUntil}</td><td>${feed.daysLeft ?? '–'}</td>`
         + `<td class="feed-wrap"><span class="${stateClass}">${STATE_LABELS[feed.state]}</span></td><td>${size}</td>`

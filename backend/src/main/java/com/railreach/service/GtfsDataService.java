@@ -49,6 +49,11 @@ public class GtfsDataService {
             log.info("GTFS auto-load disabled. Use POST /api/admin/reload-gtfs to load from files.");
             return;
         }
+        if (!feedLoader.hasFeeds(gtfsDirectory)) {
+            log.warn("No GTFS zips in {}. Download the feeds in the admin panel (Feeds tab), then reload GTFS.",
+                    gtfsDirectory);
+            return;
+        }
         loadFromFiles();
     }
 
