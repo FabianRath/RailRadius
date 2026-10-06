@@ -213,6 +213,37 @@ class ReachabilityServiceTest {
         assertThat(twin.getRunningDays()).isEqualTo("Runs daily");
     }
 
+    // HT2 is 20 min faster than HT1 but runs on 8 days, HT1 on 27
+    @Test
+    void slightlyFasterTrainThatRunsOnFarFewerDaysLosesToTheRegularOne(@TempDir Path dir) throws Exception {
+        ReachableStation end = find(query(GtfsTestFixtures.load(dir, "eta"), "eta:H1", 0, 0, 180), "eta:H2")
+                .orElseThrow();
+
+        assertThat(end.getLegs()).extracting(JourneyLeg::getTrainNumber).containsExactly("469");
+        assertThat(end.getTotalDurationMinutes()).isEqualTo(120);
+        assertThat(end.getRunningDays()).isEqualTo("Runs daily");
+    }
+
+    // HT4 runs on 8 days like HT2, but is 70 min faster than the regular HT3
+    @Test
+    void rareTrainMoreThanHalfAnHourFasterStillWins(@TempDir Path dir) throws Exception {
+        ReachableStation far = find(query(GtfsTestFixtures.load(dir, "eta"), "eta:H1", 0, 0, 180), "eta:H3")
+                .orElseThrow();
+
+        assertThat(far.getLegs()).extracting(JourneyLeg::getTrainNumber).containsExactly("473");
+        assertThat(far.getTotalDurationMinutes()).isEqualTo(110);
+    }
+
+    // ZT1 (weekdays, 19 days) is 20 min slower than ZT7 (weekends, 8 days)
+    @Test
+    void slowerTrainIsShownWhenItRunsOnTwiceAsManyDays(@TempDir Path dir) throws Exception {
+        ReachableStation hub = find(query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 0, 0, 180), "zeta:Z2")
+                .orElseThrow();
+
+        assertThat(hub.getTotalDurationMinutes()).isEqualTo(60);
+        assertThat(hub.getRunningDays()).isEqualTo("Runs Mon–Fri");
+    }
+
     // B25 only checks consecutive trains: weekend ZT7 and daily ZT8 share a day, ZT8 and weekday ZT9 too
     @Test
     void journeyWhoseTrainsShareNoDayIsFlagged(@TempDir Path dir) throws Exception {

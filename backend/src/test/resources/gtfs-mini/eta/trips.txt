@@ -1,0 +1,8 @@
+route_id,service_id,trip_id,trip_short_name
+HR,REG,HT1,469
+HR,FEW,HT2,479
+HR,REG,HT3,471
+HR,FEW,HT4,473
+HR,RARE,HT5,499
+HR,SPLITA,HT6,481
+HR,SPLITB,HT7,481

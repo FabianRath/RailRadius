@@ -126,8 +126,9 @@ public class GtfsFeedLoader {
             }
             Map<String, Set<String>> translatedNames =
                     translatedNames(StopNameTranslations.load(zipFile), stops, rawToCanonical, stations);
-            Map<String, String> rawToCanonicalService =
-                    addServices(ServiceCalendarReader.load(zipFile), trips, source, graph);
+            Map<String, ServiceDays> services = ServiceCalendarReader.load(zipFile);
+            RareTrainFilter.dropRareTrains(trips, services);
+            Map<String, String> rawToCanonicalService = addServices(services, trips, source, graph);
             FeedTables tables = new FeedTables(source, routes, trips, rawToCanonicalService, rawToCanonical,
                     stations);
             int connectionsAdded = loadStopTimes(zipFile, tables, graph);
