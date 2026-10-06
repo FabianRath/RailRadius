@@ -16,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SearchTimetablesTest {
 
     private static final TripInfo NO_INFO = new TripInfo(null, null, null);
+    private static final int HOUR_SECONDS = 3600;
 
     @Test
     void departuresAtAStopAreSortedByTime(@TempDir Path tempDir) throws IOException {
@@ -32,7 +33,7 @@ class SearchTimetablesTest {
     void tripsGetTheWeekPeriodDaysOfTheirServiceAsOfTheGivenDay() {
         TransitGraph graph = new TransitGraph();
         graph.addServices(Map.of("x:S1", days(100)));
-        addTrip(graph, "x:T1", "x:S1");
+        addTrip(graph, "x:T1", "x:S1", 0);
 
         SearchTimetables timetables = graph.searchTimetables();
 
@@ -43,7 +44,7 @@ class SearchTimetablesTest {
     @Test
     void eachLegHoldsItsConnectionAndStationsAreNumbered() {
         TransitGraph graph = new TransitGraph();
-        addTrip(graph, "x:T1", null);
+        addTrip(graph, "x:T1", null, 0);
 
         SearchTimetables timetables = graph.searchTimetables();
         TripTimetable trip = trip(timetables, "x:A", "x:T1");
@@ -57,7 +58,7 @@ class SearchTimetablesTest {
     @Test
     void clearingTheGraphDropsTheTimetables() {
         TransitGraph graph = new TransitGraph();
-        addTrip(graph, "x:T1", null);
+        addTrip(graph, "x:T1", null, 0);
         assertThat(graph.searchTimetables().tripCount()).isEqualTo(1);
 
         graph.clear();
@@ -65,15 +66,30 @@ class SearchTimetablesTest {
         assertThat(graph.searchTimetables().tripCount()).isZero();
     }
 
+    @Test
+    void tripsWithTheSameStationsAndTimesBecomeOneThatRunsOnAllTheirDays() {
+        TransitGraph graph = new TransitGraph();
+        graph.addServices(Map.of("x:S1", days(100), "x:S2", days(101), "x:S3", days(102)));
+        addTrip(graph, "x:T1", "x:S1", 0);
+        addTrip(graph, "x:T2", "x:S2", 0);
+        addTrip(graph, "x:T3", "x:S3", HOUR_SECONDS);
+
+        SearchTimetables timetables = graph.searchTimetables();
+
+        assertThat(timetables.tripCount()).isEqualTo(2);
+        assertThat(timetables.departuresAt("x:A")).extracting(d -> d.trip().tripId()).containsExactly("x:T1", "x:T3");
+        assertThat(trip(timetables, "x:A", "x:T1").serviceDays().epochDays()).containsExactly(100, 101);
+    }
+
     private static TripTimetable trip(SearchTimetables timetables, String stopId, String tripId) {
         return timetables.departuresAt(stopId).stream().map(TripTimetable.Departure::trip)
                 .filter(trip -> trip.tripId().equals(tripId)).findFirst().orElseThrow();
     }
 
-    private static void addTrip(TransitGraph graph, String tripId, String serviceId) {
+    private static void addTrip(TransitGraph graph, String tripId, String serviceId, int laterSeconds) {
         graph.addTrip(tripId, List.of("x:A", "x:B", "x:C"), NO_INFO, serviceId);
-        graph.addConnection(connection(tripId, "x:A", "x:B", 100, 200));
-        graph.addConnection(connection(tripId, "x:B", "x:C", 300, 400));
+        graph.addConnection(connection(tripId, "x:A", "x:B", 100 + laterSeconds, 200 + laterSeconds));
+        graph.addConnection(connection(tripId, "x:B", "x:C", 300 + laterSeconds, 400 + laterSeconds));
     }
 
     private static Connection connection(String tripId, String fromId, String toId, int departureSeconds,
