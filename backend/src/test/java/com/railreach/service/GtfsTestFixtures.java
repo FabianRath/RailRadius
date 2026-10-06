@@ -8,6 +8,9 @@ import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -25,14 +28,27 @@ final class GtfsTestFixtures {
     private static final int TRIP_BATCH_SIZE = 100_000;
     // Made-up countries KA and LA around the kappa and lambda feeds; every other feed lies outside them
     private static final String BORDERS_FILE = "gtfs-mini/borders.geojson";
+    // Before every fixture's first service day, so no day counts as past (B31)
+    private static final LocalDate TODAY = LocalDate.of(2026, 1, 1);
 
     static TransitGraph load(Path tempDir, String... feedFolders) throws IOException {
-        return load(tempDir, TRIP_BATCH_SIZE, feedFolders);
+        return load(tempDir, TRIP_BATCH_SIZE, TODAY, feedFolders);
     }
 
     /** Like {@link #load(Path, String...)}, with stop_times handed to the graph in batches of this many trips. */
     static TransitGraph load(Path tempDir, int tripBatchSize, String... feedFolders) throws IOException {
-        TransitGraph graph = new TransitGraph();
+        return load(tempDir, tripBatchSize, TODAY, feedFolders);
+    }
+
+    /** Like {@link #load(Path, String...)}, with the given day as today. */
+    static TransitGraph load(Path tempDir, LocalDate today, String... feedFolders) throws IOException {
+        return load(tempDir, TRIP_BATCH_SIZE, today, feedFolders);
+    }
+
+    private static TransitGraph load(Path tempDir, int tripBatchSize, LocalDate today, String... feedFolders)
+            throws IOException {
+        TransitGraph graph = new TransitGraph(Clock.fixed(today.atStartOfDay(ZoneOffset.UTC).toInstant(),
+                ZoneOffset.UTC));
         dataService(tempDir, graph, reachabilityCache(graph), new StationSearchIndex(graph), tripBatchSize,
                 feedFolders).loadFromFiles();
         return graph;

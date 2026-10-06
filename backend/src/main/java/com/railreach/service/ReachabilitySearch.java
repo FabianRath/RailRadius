@@ -22,13 +22,16 @@ import java.util.stream.Collectors;
  * time: every trip leaving the start station can begin a journey).
  * <p>
  * Pruning is per trip, not per station: for each stop of a trip it remembers the shortest duration that reached it
- * there. A ride that cannot beat that is cut off, because the earlier ride arrived at the same time with no more
- * transfers and no longer journey, and stays ahead for the rest of the trip. Keeping only the fastest path per
- * station would drop slower arrivals that catch a train the fastest one misses (B2).
+ * there. A ride that cannot beat that is cut off if earlier rides there also ran on all its days, because they
+ * arrived at the same time with no more transfers, and stay ahead for the rest of the trip. Keeping only the fastest
+ * path per station would drop slower arrivals that catch a train the fastest one misses (B2), and ignoring the days
+ * would drop a slower ride that runs on the days a later train needs (B33).
  * <p>
- * There is no travel date, but a transfer needs both trains to run on a common day, the next train a day later for
- * a wait past midnight (B25). Only consecutive trains are checked, not the whole journey: three trains A, B, C can
- * pass if A and B share a day and B and C share another one.
+ * There is no travel date, but a journey only counts its first train's days from today on (B31), and a transfer
+ * needs a day on which every train of the journey so far runs together with the next one, that one a day later for
+ * a wait past midnight (B25). Checking only consecutive trains let three trains A, B, C pass if A and B shared one
+ * day and B and C another (B33). A ride's days come from its trip alone; the shown running days also count trips
+ * with the same times ({@link JourneyRunningDays}), so they are never fewer.
  * <p>
  * A station's result is not always the fastest journey: one up to {@link #MAX_SLOWER_MINUTES} slower is shown
  * instead if it runs on many more days ({@link RegularJourneyChooser}). Transfers still continue from the fastest
@@ -46,9 +49,17 @@ public class ReachabilitySearch {
 
     private final TransitGraph transitGraph;
 
-    /** One ride from boardIdx to alightIdx; previous is the ride before the transfer, null for the first one. */
+    /**
+     * One ride from boardIdx to alightIdx; previous is the ride before the transfer, null for the first one. days are
+     * the service days of the trip on which the journey so far works: every earlier train runs on its day.
+     */
     private record Ride(TripTimetable trip, int boardIdx, int alightIdx, int transfers, int durationMinutes,
-                        Ride previous) {
+                        Ride previous, ServiceDays days) {
+
+        /** Whether {@code next} runs extraDays after a day of this ride. */
+        boolean continuesWith(TripTimetable next, int extraDays) {
+            return days.sharesDayWith(next.serviceDays(), extraDays);
+        }
 
         String stationId() {
             return trip.stops().get(alightIdx);
@@ -64,9 +75,57 @@ public class ReachabilitySearch {
         }
     }
 
+    /** The previous round's arrivals at one station, sorted by arrival time, with their transfer windows. */
+    private record StationArrivals(List<Ride> rides, TransferWindow sameDay, TransferWindow overnight) {
+
+        Ride at(int index) {
+            return index >= 0 ? rides.get(index) : null;
+        }
+    }
+
     private record SearchState(String startId, int minTransferMins, int maxTransferMins,
-                               Map<String, int[]> bestDurationsByTrip,
+                               Map<String, TripProgress> progressByTrip,
                                Map<String, StationCandidates> bestByStation) {}
+
+    /**
+     * Per stop of a trip: the shortest duration that reached it there, the days of that ride, and the days of every
+     * ride recorded there. Rides of one trip arrive at a stop at the same time and catch the same trains from there,
+     * so a ride is cut off where it is no faster and all its days are already reached. On some of those days the
+     * journey shown can then be a bit slower than the fastest possible.
+     */
+    private static final class TripProgress {
+
+        private final int[] durationMinutes;
+        private final ServiceDays[] fastestDays;
+        private final ServiceDays[] reachedDays;
+
+        TripProgress(int stopCount) {
+            durationMinutes = new int[stopCount];
+            Arrays.fill(durationMinutes, Integer.MAX_VALUE);
+            fastestDays = new ServiceDays[stopCount];
+            reachedDays = new ServiceDays[stopCount];
+        }
+
+        boolean reachedNoSlower(int stopIdx, int rideMinutes, ServiceDays rideDays) {
+            return durationMinutes[stopIdx] <= rideMinutes && reachedDays[stopIdx].covers(rideDays);
+        }
+
+        boolean reachedFaster(int stopIdx, int rideMinutes, ServiceDays rideDays) {
+            return durationMinutes[stopIdx] < rideMinutes && fastestDays[stopIdx].covers(rideDays);
+        }
+
+        void record(int stopIdx, int rideMinutes, ServiceDays rideDays) {
+            ServiceDays reached = reachedDays[stopIdx];
+            if (reached == null) {
+                reachedDays[stopIdx] = rideDays;
+            } else if (!reached.covers(rideDays)) {
+                reachedDays[stopIdx] = reached.union(rideDays);
+            }
+            if (rideMinutes >= durationMinutes[stopIdx]) return;
+            durationMinutes[stopIdx] = rideMinutes;
+            fastestDays[stopIdx] = rideDays;
+        }
+    }
 
     /**
      * The candidate rides of a station's result, by ascending transfers: per transfer count the fastest one and those
@@ -109,7 +168,9 @@ public class ReachabilitySearch {
                 new HashMap<>(), new HashMap<>());
         List<Ride> arrivals = new ArrayList<>();
         for (TripTimetable.Departure departure : transitGraph.getDeparturesAt(startId)) {
-            ride(state, departure, 0, 0, null, arrivals);
+            TripTimetable trip = departure.trip();
+            ServiceDays days = transitGraph.upcomingDays(trip.serviceDays());
+            if (!days.isEmpty()) ride(state, departure, 0, 0, null, days, arrivals);
         }
         long arrivalCount = arrivals.size();
         for (int transfers = 1; transfers <= maxTransfers && !arrivals.isEmpty(); transfers++) {
@@ -120,7 +181,7 @@ public class ReachabilitySearch {
         }
 
         log.info("  Search stats: {} stop arrivals on {} trips, {} stations",
-                arrivalCount, state.bestDurationsByTrip().size(), state.bestByStation().size() + 1);
+                arrivalCount, state.progressByTrip().size(), state.bestByStation().size() + 1);
         return toJourneyPaths(state);
     }
 
@@ -139,10 +200,8 @@ public class ReachabilitySearch {
     }
 
     /**
-     * Boards every departure at the station from the arrival that catches it with the shortest journey so far.
-     * Any other arrival would ride the same trip with as many transfers but longer, so it is not needed. Waits past
-     * midnight get their own window, with the arrivals moved a day back. Only arrivals whose trip runs on a day that
-     * fits the departure's trip count.
+     * Boards every departure at the station from the arrivals that catch it with the shortest journey so far (see
+     * {@link #board}). Waits past midnight get their own window, with the arrivals moved a day back.
      */
     private void transferAt(SearchState state, String stationId, List<Ride> stationArrivals, int transfers,
                             List<Ride> arrivals) {
@@ -155,23 +214,45 @@ public class ReachabilitySearch {
                 minWaitSeconds, maxWaitSeconds);
         TransferWindow overnight = new TransferWindow(arrivalSeconds, durationMinutes, -GtfsTime.SECONDS_PER_DAY,
                 minWaitSeconds, Math.min(maxWaitSeconds, GtfsTime.MAX_OVERNIGHT_GAP_SECONDS));
+        StationArrivals station = new StationArrivals(stationArrivals, sameDay, overnight);
 
         for (TripTimetable.Departure departure : transitGraph.getDeparturesAt(stationId)) {
-            int departureSeconds = departure.departureSeconds();
-            ServiceDays departureDays = departure.trip().serviceDays();
-            Ride sameDayFrom = arrivalAt(stationArrivals, sameDay.bestFor(departureSeconds,
-                    i -> stationArrivals.get(i).trip().serviceDays().sharesDayWith(departureDays, SAME_DAY)));
-            Ride overnightFrom = arrivalAt(stationArrivals, overnight.bestFor(departureSeconds,
-                    i -> stationArrivals.get(i).trip().serviceDays().sharesDayWith(departureDays, NEXT_DAY)));
-            Ride from = faster(departure, sameDayFrom, overnightFrom);
-            // Timetables are shared per trip. Staying on this trip beats changing onto it from any arrival.
-            if (from == null || from.trip() == departure.trip()) continue;
-            ride(state, departure, transfers, boardingMinutes(from, departure), from, arrivals);
+            board(state, departure, station, transfers, arrivals);
         }
     }
 
-    private static Ride arrivalAt(List<Ride> stationArrivals, int index) {
-        return index >= 0 ? stationArrivals.get(index) : null;
+    /**
+     * Boards the departure from the arrival that catches it with the shortest journey so far, then from slower ones
+     * only for days of the departing trip that no faster one runs on (B33). Any other arrival would ride the same
+     * trip on the same days with as many transfers but longer, so it is not needed. Only arrivals whose journey runs
+     * on a day that fits the departure's trip count.
+     */
+    private void board(SearchState state, TripTimetable.Departure departure, StationArrivals station, int transfers,
+                       List<Ride> arrivals) {
+        TripTimetable next = departure.trip();
+        if (!transitGraph.getRegularDepartures(next)[departure.stopIdx()]) return;
+        ServiceDays served = null;
+        while (served == null || !served.covers(next.serviceDays())) {
+            ServiceDays servedSoFar = served;
+            Ride sameDayFrom = station.at(station.sameDay().bestFor(departure.departureSeconds(),
+                    i -> addsDays(station.rides().get(i), next, SAME_DAY, servedSoFar)));
+            Ride overnightFrom = station.at(station.overnight().bestFor(departure.departureSeconds(),
+                    i -> addsDays(station.rides().get(i), next, NEXT_DAY, servedSoFar)));
+            Ride from = faster(departure, sameDayFrom, overnightFrom);
+            if (from == null) return;
+            ServiceDays days = next.serviceDays().after(from.days(), from == sameDayFrom ? SAME_DAY : NEXT_DAY);
+            served = served == null ? days : served.union(days);
+            // Timetables are shared per trip. Staying on this trip beats changing onto it from any arrival.
+            if (from.trip() != next) {
+                ride(state, departure, transfers, boardingMinutes(from, departure), from, days, arrivals);
+            }
+        }
+    }
+
+    /** Whether next, running extraDays after the arrival, runs on a day of the journey that served lacks. */
+    private static boolean addsDays(Ride arrival, TripTimetable next, int extraDays, ServiceDays served) {
+        if (!arrival.continuesWith(next, extraDays)) return false;
+        return served == null || !served.coversAfter(next.serviceDays(), arrival.days(), extraDays);
     }
 
     private static Ride faster(TripTimetable.Departure departure, Ride sameDay, Ride overnight) {
@@ -184,34 +265,35 @@ public class ReachabilitySearch {
         return from.durationMinutes() + GtfsTime.diffMinutes(from.arrivalSeconds(), departure.departureSeconds());
     }
 
-    /** A faster ride of the same round reached the same stop of the same trip later on. */
+    /** A faster ride of the same round on all its days reached the same stop of the same trip later on. */
     private static boolean isOvertaken(SearchState state, Ride arrival) {
-        int[] bestDurations = state.bestDurationsByTrip().get(arrival.trip().tripId());
-        return bestDurations[arrival.alightIdx()] < arrival.durationMinutes();
+        return state.progressByTrip().get(arrival.trip().tripId())
+                .reachedFaster(arrival.alightIdx(), arrival.durationMinutes(), arrival.days());
     }
 
-    /** Rides the trip from the departure on, recording each stop until an earlier ride was there no slower. */
+    /**
+     * Rides the trip from the departure on, recording each stop until an earlier ride was there no slower on all its
+     * days, or the trip leaves a stop at a time that runs on too few days ({@link RareTrainFilter#regularDepartures}).
+     * days are the trip's days on which the journey works.
+     */
     private void ride(SearchState state, TripTimetable.Departure departure, int transfers, int boardDurationMinutes,
-                      Ride previous, List<Ride> arrivals) {
+                      Ride previous, ServiceDays days, List<Ride> arrivals) {
         TripTimetable trip = departure.trip();
-        int[] bestDurations = state.bestDurationsByTrip().computeIfAbsent(trip.tripId(), id -> unreached(trip));
+        TripProgress progress = state.progressByTrip()
+                .computeIfAbsent(trip.tripId(), id -> new TripProgress(trip.stopCount()));
+        boolean[] regularDepartures = transitGraph.getRegularDepartures(trip);
         int boardIdx = departure.stopIdx();
-        for (int alightIdx = boardIdx + 1; alightIdx < trip.stopCount() && trip.hasLeg(alightIdx - 1); alightIdx++) {
+        for (int alightIdx = boardIdx + 1; alightIdx < trip.stopCount() && trip.hasLeg(alightIdx - 1)
+                && regularDepartures[alightIdx - 1]; alightIdx++) {
             int durationMinutes = boardDurationMinutes + trip.rideMinutes(boardIdx, alightIdx);
-            if (durationMinutes >= bestDurations[alightIdx]) return;
-            bestDurations[alightIdx] = durationMinutes;
+            if (progress.reachedNoSlower(alightIdx, durationMinutes, days)) return;
+            progress.record(alightIdx, durationMinutes, days);
             if (trip.stops().get(alightIdx).equals(state.startId())) continue;
 
-            Ride ride = new Ride(trip, boardIdx, alightIdx, transfers, durationMinutes, previous);
+            Ride ride = new Ride(trip, boardIdx, alightIdx, transfers, durationMinutes, previous, days);
             arrivals.add(ride);
             state.bestByStation().computeIfAbsent(ride.stationId(), id -> new StationCandidates()).offer(ride);
         }
-    }
-
-    private static int[] unreached(TripTimetable trip) {
-        int[] durations = new int[trip.stopCount()];
-        Arrays.fill(durations, Integer.MAX_VALUE);
-        return durations;
     }
 
     private Map<String, List<JourneyPath>> toJourneyPaths(SearchState state) {

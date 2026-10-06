@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -27,15 +28,15 @@ final class RareTrainFilter {
     private static final int MIN_RUNNING_DAYS = 8;
 
     /**
-     * Feeds publish one train as several trips with different days, so the days are counted per train: route and
-     * train number, or for a trip without a number (B32) route and its first stop and departure time.
+     * Feeds publish one train as several trips with different days, so the days are counted per train: the trips of
+     * one route and train number (none for many feeds, B32) that leave the same first stop at the same time. The
+     * departure keeps a rare timing variant of a regular train apart from it (B33).
      */
     private record Train(String routeId, String number, String firstStopId, int departureSeconds) {
 
         static Optional<Train> of(RailTrip trip, FirstDeparture firstDeparture) {
-            if (hasNumber(trip)) return Optional.of(new Train(trip.routeId(), trip.info().trainNumber(), null, 0));
             if (firstDeparture == null) return Optional.empty();
-            return Optional.of(new Train(trip.routeId(), null, firstDeparture.stopId(),
+            return Optional.of(new Train(trip.routeId(), trip.info().trainNumber(), firstDeparture.stopId(),
                     firstDeparture.departureSeconds()));
         }
     }
@@ -46,13 +47,12 @@ final class RareTrainFilter {
 
     /**
      * Removes the trips of every train that runs on fewer than {@link #MIN_RUNNING_DAYS} days. A train with a trip
-     * that has no calendar entry is kept, and so is a trip without a number that has no stop_times.
-     * {@code servicesByRawId} is the feed's calendar; stop_times.txt is only read if a trip has no train number.
+     * that has no calendar entry is kept, and so is a trip without stop_times. {@code servicesByRawId} is the feed's
+     * calendar.
      */
     static void dropRareTrains(ZipFile zipFile, Map<String, RailTrip> trips, Map<String, ServiceDays> servicesByRawId,
                                Map<String, String> rawToCanonicalStop) throws IOException {
-        Map<String, FirstDeparture> firstDepartures = trips.values().stream().allMatch(RareTrainFilter::hasNumber)
-                ? Map.of() : firstDepartures(zipFile, trips, rawToCanonicalStop);
+        Map<String, FirstDeparture> firstDepartures = firstDepartures(zipFile, trips, rawToCanonicalStop);
         Map<String, Train> trainByTripId = new HashMap<>();
         Map<Train, ServiceDays> daysByTrain = new HashMap<>();
         trips.forEach((tripId, trip) -> Train.of(trip, firstDepartures.get(tripId)).ifPresent(train -> {
@@ -61,8 +61,7 @@ final class RareTrainFilter {
             daysByTrain.merge(train, days != null ? days : ServiceDays.EVERY_DAY, ServiceDays::union);
         }));
         Set<Train> rareTrains = daysByTrain.entrySet().stream()
-                .filter(entry -> entry.getValue() != ServiceDays.EVERY_DAY
-                        && entry.getValue().dayCount() < MIN_RUNNING_DAYS)
+                .filter(entry -> !runsOftenEnough(entry.getValue()))
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
         if (rareTrains.isEmpty()) return;
@@ -73,8 +72,35 @@ final class RareTrainFilter {
     }
 
     /**
-     * trip ID -> first stop and departure of each trip without a train number. The stop is canonical where known,
-     * so trips leaving from different platforms of one station match.
+     * Per stop index of the trip: whether its departure there runs on at least {@link #MIN_RUNNING_DAYS} days,
+     * counting every trip that leaves the stop at the same time. A variant can match its regular train at the first
+     * stop and leave a later one at another time on a few days only (B33: Snälltåget NT from Berlin at 21:07 on 4
+     * days, the regular ones at 20:53, 21:06 and 21:09); a ride must not continue from such a stop.
+     */
+    static boolean[] regularDepartures(TripTimetable trip, TransitGraph graph) {
+        boolean[] regular = new boolean[trip.stopCount()];
+        for (int stopIdx = 0; stopIdx < trip.stopCount() - 1; stopIdx++) {
+            if (!trip.hasLeg(stopIdx)) continue;
+            List<TripTimetable.Departure> departures = graph.getDeparturesAt(trip.stops().get(stopIdx));
+            int departureSeconds = trip.legDepartureSeconds()[stopIdx];
+            ServiceDays days = null;
+            for (int i = TripTimetable.firstDepartureAt(departures, departureSeconds); i < departures.size()
+                    && departures.get(i).departureSeconds() == departureSeconds; i++) {
+                ServiceDays twinDays = departures.get(i).trip().serviceDays();
+                days = days == null ? twinDays : days.union(twinDays);
+            }
+            regular[stopIdx] = days == null || runsOftenEnough(days);
+        }
+        return regular;
+    }
+
+    private static boolean runsOftenEnough(ServiceDays days) {
+        return days == ServiceDays.EVERY_DAY || days.dayCount() >= MIN_RUNNING_DAYS;
+    }
+
+    /**
+     * trip ID -> first stop and departure of each trip. The stop is canonical where known, so trips leaving from
+     * different platforms of one station match.
      */
     private static Map<String, FirstDeparture> firstDepartures(ZipFile zipFile, Map<String, RailTrip> trips,
                                                                Map<String, String> rawToCanonicalStop)
@@ -88,8 +114,7 @@ final class RareTrainFilter {
             for (String[] row = csv.next(); row != null; row = csv.next()) {
                 String tripId = field(row, tripCol);
                 String stopId = field(row, stopCol);
-                RailTrip trip = tripId != null ? trips.get(tripId) : null;
-                if (trip == null || stopId == null || hasNumber(trip)) continue;
+                if (tripId == null || stopId == null || !trips.containsKey(tripId)) continue;
                 int sequence = intField(row, sequenceCol);
                 FirstDeparture known = firstDepartures.get(tripId);
                 if (known != null && known.sequence() <= sequence) continue;
@@ -98,9 +123,5 @@ final class RareTrainFilter {
             }
         }
         return firstDepartures;
-    }
-
-    private static boolean hasNumber(RailTrip trip) {
-        return trip.info().trainNumber() != null;
     }
 }

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -225,6 +226,35 @@ class ReachabilityServiceTest {
         assertThat(twin.getRunningDays()).isEqualTo("Runs daily");
     }
 
+    // B33: HT13 is loaded with the regular HT12, but leaves H7 at a time that runs on 2 days only
+    @Test
+    void rideEndsWhereItsTripLeavesAtATimeThatRunsOnFewDays(@TempDir Path dir) throws Exception {
+        ReachabilityResponse response = query(GtfsTestFixtures.load(dir, "eta"), "eta:H1", 0, 0, 180);
+
+        assertThat(find(response, "eta:H7")).isPresent();
+        assertThat(find(response, "eta:H8")).isEmpty();
+    }
+
+    // B31: on Sat 2026-03-28 only that weekend is left of zeta's services, which end on Sun 2026-03-29
+    @Test
+    void journeyCountsOnlyItsDaysFromToday(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, LocalDate.of(2026, 3, 28), "zeta");
+        ReachabilityResponse response = query(graph, "zeta:Z1", 1, 0, 180);
+
+        assertThat(find(response, "zeta:Z9")).get().extracting(ReachableStation::getRunningDays)
+                .isEqualTo("Irregular: 2 days in the timetable");
+        // ZT1 → ZT3 runs on weekdays only, and none is left
+        assertThat(find(response, "zeta:Z4")).isEmpty();
+    }
+
+    // B31: zeta's last service day is 2026-03-29
+    @Test
+    void trainsWhoseDaysAreAllPastAreNotRidden(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, LocalDate.of(2026, 10, 6), "zeta");
+
+        assertThat(find(query(graph, "zeta:Z1", 1, 0, 180), "zeta:Z2")).isEmpty();
+    }
+
     // HT2 is 20 min faster than HT1 but runs on 8 days, HT1 on 27
     @Test
     void slightlyFasterTrainThatRunsOnFarFewerDaysLosesToTheRegularOne(@TempDir Path dir) throws Exception {
@@ -256,14 +286,16 @@ class ReachabilityServiceTest {
         assertThat(hub.getRunningDays()).isEqualTo("Runs Mon–Fri");
     }
 
-    // B25 only checks consecutive trains: weekend ZT7 and daily ZT8 share a day, ZT8 and weekday ZT9 too
+    // B33: weekend ZT7 and daily ZT8 share a day, ZT8 and weekday ZT9 too, but all three share none. The faster
+    // ZT7 ride on ZT8 must not cut off the slower weekday ZT1 ride that ZT9 needs.
     @Test
-    void journeyWhoseTrainsShareNoDayIsFlagged(@TempDir Path dir) throws Exception {
+    void journeyWhoseTrainsShareNoDayGivesWayToOneThatRuns(@TempDir Path dir) throws Exception {
         ReachableStation end = find(query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 2, 0, 180), "zeta:Z8")
                 .orElseThrow();
 
-        assertThat(end.getHasCommonDay()).isFalse();
-        assertThat(end.getRunningDays()).isNull();
+        assertThat(end.getLegs().getFirst().getDepartureTime()).isEqualTo("08:00:00");
+        assertThat(end.getTotalDurationMinutes()).isEqualTo(190); // ZT1 08:00, ZT8 09:50, ZT9 10:40 → 11:10
+        assertThat(end.getRunningDays()).isEqualTo("Runs Mon–Fri");
     }
 
     @Test
@@ -271,7 +303,6 @@ class ReachabilityServiceTest {
         ReachableStation b2 = find(query(gtfs, "alpha:A1", 1, 0, 180), "beta:B2").orElseThrow();
 
         assertThat(b2.getRunningDays()).isNull();
-        assertThat(b2.getHasCommonDay()).isTrue();
     }
 
     @Test

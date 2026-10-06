@@ -60,7 +60,10 @@ final class JourneyRunningDays {
      */
     static SoFar withRide(SoFar before, RideTimes ride, TransitGraph graph) {
         int dayShift = ride.departureSeconds() < before.arrivalSeconds() ? before.dayShift() + 1 : before.dayShift();
-        return new SoFar(before.days().intersect(rideDays(ride, graph), dayShift), dayShift, ride.arrivalSeconds());
+        ServiceDays rideDays = rideDays(ride, graph);
+        // The first train's days from today on set the journey's dates (B31)
+        if (before == SoFar.START) rideDays = graph.upcomingDays(rideDays);
+        return new SoFar(before.days().intersect(rideDays, dayShift), dayShift, ride.arrivalSeconds());
     }
 
     /**
@@ -71,7 +74,7 @@ final class JourneyRunningDays {
     private static ServiceDays rideDays(RideTimes ride, TransitGraph graph) {
         List<TripTimetable.Departure> departures = graph.getDeparturesAt(ride.fromStopId());
         ServiceDays days = graph.getServiceDays(ride.tripId());
-        for (int i = firstDepartureAt(departures, ride.departureSeconds()); i < departures.size()
+        for (int i = TripTimetable.firstDepartureAt(departures, ride.departureSeconds()); i < departures.size()
                 && departures.get(i).departureSeconds() == ride.departureSeconds(); i++) {
             TripTimetable.Departure twin = departures.get(i);
             if (!twin.trip().tripId().equals(ride.tripId()) && arrivesLikeRide(twin, ride)) {
@@ -79,18 +82,6 @@ final class JourneyRunningDays {
             }
         }
         return days;
-    }
-
-    /** Departures are sorted by time. */
-    private static int firstDepartureAt(List<TripTimetable.Departure> departures, int departureSeconds) {
-        int low = 0;
-        int high = departures.size();
-        while (low < high) {
-            int mid = (low + high) >>> 1;
-            if (departures.get(mid).departureSeconds() < departureSeconds) low = mid + 1;
-            else high = mid;
-        }
-        return low;
     }
 
     private static boolean arrivesLikeRide(TripTimetable.Departure departure, RideTimes ride) {

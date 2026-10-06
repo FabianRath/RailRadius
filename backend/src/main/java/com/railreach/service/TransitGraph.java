@@ -5,6 +5,8 @@ import com.railreach.model.Station;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -48,6 +50,18 @@ public class TransitGraph {
     private final Map<String, List<TripTimetable.Departure>> departuresByStop = new ConcurrentHashMap<>();
     // Built lazily: "fromId->toId" -> (trip ID -> connection)
     private final Map<String, Map<String, Connection>> connectionByTrip = new ConcurrentHashMap<>();
+    // trip ID -> per stop index whether its departure there runs often enough, filled on first use
+    private final Map<String, boolean[]> regularDeparturesByTrip = new ConcurrentHashMap<>();
+    private final Clock clock;
+
+    public TransitGraph() {
+        this(Clock.systemDefaultZone());
+    }
+
+    /** {@code clock} says which days are past (B31). */
+    TransitGraph(Clock clock) {
+        this.clock = clock;
+    }
 
     public Station getStation(String stopId) {
         return stations.get(stopId);
@@ -88,6 +102,20 @@ public class TransitGraph {
 
     TripTimetable getTimetable(String tripId) {
         return timetables.computeIfAbsent(tripId, id -> TripTimetable.of(id, this));
+    }
+
+    /**
+     * The days from today on (B31). A journey's dates start with its first train's, so a train whose days are all
+     * past, such as one of an expired feed, is not ridden until its feed is downloaded again.
+     */
+    ServiceDays upcomingDays(ServiceDays days) {
+        return days.from((int) LocalDate.now(clock).toEpochDay());
+    }
+
+    /** Per stop index of the trip: whether it may be ridden away from that stop ({@link RareTrainFilter}). */
+    boolean[] getRegularDepartures(TripTimetable trip) {
+        return regularDeparturesByTrip.computeIfAbsent(trip.tripId(),
+                id -> RareTrainFilter.regularDepartures(trip, this));
     }
 
     /** Every trip that leaves the stop towards a next stop, by departure time. */
@@ -159,6 +187,7 @@ public class TransitGraph {
         timetables.clear();
         departuresByStop.clear();
         connectionByTrip.clear();
+        regularDeparturesByTrip.clear();
     }
 
     void addStationIfAbsent(Station station) {

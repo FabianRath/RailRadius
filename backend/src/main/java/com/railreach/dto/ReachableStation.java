@@ -25,6 +25,4 @@ public class ReachableStation {
     private List<JourneyLeg> legs;
     // When every train of the journey runs, e.g. "Runs Mon–Fri" or "Irregular: 2 days in the timetable"; null without calendar data
     private String runningDays;
-    // False if the trains share no day: the search only checks consecutive trains (B25)
-    private Boolean hasCommonDay;
 }
