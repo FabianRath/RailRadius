@@ -7,6 +7,7 @@ final class SearchCounters {
     long fallbackScans;
     long fallbackScannedArrivals;
     long pathsNanos;
+    int reachedStations;
 
     void addFallbacks(TransferWindow window) {
         fallbackScans += window.fallbackScanCount();
