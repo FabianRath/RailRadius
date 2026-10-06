@@ -14,10 +14,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /** Answers reachability requests: resolves defaults, gets the (cached) search result and maps it to DTOs. */
 @Service
@@ -67,31 +69,27 @@ public class ReachabilityService {
     }
 
     /**
-     * Resolves the request and sends the result to the emitter in batches, then a "done" event.
-     * Runs on a worker thread; the HTTP response stays open until it completes.
+     * Resolves the request and sends the stations to the emitter in batches, then a "done" event. A search sends
+     * each round's stations when the round ends; a stored result is sent at once. Runs on a worker thread; the HTTP
+     * response stays open until it completes.
      */
     public void calculateReachabilityStreaming(ReachabilityRequest request, SseEmitter emitter) {
         long startMs = System.currentTimeMillis();
         SearchKey key = searchKey(request);
         try {
-            // Stream only the finished result: the BFS improves paths as it goes, so emitting
-            // during the search would send stations more than once and with non-final paths.
-            Map<String, List<JourneyPath>> reachable = cache.getOrCompute(key);
-            long legsStartMs = System.currentTimeMillis();
-            List<ReachableStation> stations = toStreamedStations(request, reachable);
-            long sendStartMs = System.currentTimeMillis();
-            for (int i = 0; i < stations.size(); i += STREAM_BATCH_SIZE) {
-                flushBatch(emitter, stations.subList(i, Math.min(i + STREAM_BATCH_SIZE, stations.size())));
-            }
-            log.info("Streamed {} stations: search {} ms, legs {} ms, sending {} ms", stations.size(),
-                    legsStartMs - startMs, sendStartMs - legsStartMs, System.currentTimeMillis() - sendStartMs);
+            StreamedStations streamed = new StreamedStations(request, emitter, startMs);
+            // A station is sent once, with its first path within the time limit. Rounds add paths by ascending
+            // transfers, so that is the path the response picks too (B4).
+            streamed.sendNew(cache.getOrCompute(key, streamed::sendNew));
+            log.info("Streamed {} stations in {} ms, the first after {} ms", streamed.sent.size(),
+                    System.currentTimeMillis() - startMs, streamed.firstSentMs);
             // The raw cache now holds the authoritative result; a Caffeine entry may be older
             cache.evictResponse(key);
 
             emitter.send(SseEmitter.event()
                     .name("done")
                     .data(Map.of(
-                        "total", stations.size(),
+                        "total", streamed.sent.size(),
                         "calculationTimeMs", System.currentTimeMillis() - startMs
                     )));
             emitter.complete();
@@ -132,18 +130,40 @@ public class ReachabilityService {
         return hours != null ? (int) (hours * MINUTES_PER_HOUR) : Integer.MAX_VALUE;
     }
 
-    /** The start station itself is not a destination, so it is never streamed. */
-    private List<ReachableStation> toStreamedStations(ReachabilityRequest request,
-                                                      Map<String, List<JourneyPath>> reachable) {
-        int maxJourneyMins = maxJourneyMinutes(request);
-        List<ReachableStation> stations = new ArrayList<>();
-        reachable.forEach((stopId, paths) -> {
-            if (stopId.equals(request.getStartStationId())) return;
-            fewestTransfersWithin(paths, maxJourneyMins)
-                    .flatMap(path -> legBuilder.toReachableStation(stopId, path))
-                    .ifPresent(stations::add);
-        });
-        return stations;
+    /** The stations a stream has sent so far. The start station is not a destination, so it is never sent. */
+    private final class StreamedStations {
+
+        private final ReachabilityRequest request;
+        private final SseEmitter emitter;
+        private final long startMs;
+        private final int maxJourneyMins;
+        private final Set<String> sent = new HashSet<>();
+        private long firstSentMs = -1;
+
+        StreamedStations(ReachabilityRequest request, SseEmitter emitter, long startMs) {
+            this.request = request;
+            this.emitter = emitter;
+            this.startMs = startMs;
+            this.maxJourneyMins = maxJourneyMinutes(request);
+        }
+
+        /** Sends the stations not sent yet that have a path within the time limit among the given ones. */
+        void sendNew(Map<String, List<JourneyPath>> pathsByStation) {
+            List<ReachableStation> stations = new ArrayList<>();
+            pathsByStation.forEach((stopId, paths) -> {
+                if (stopId.equals(request.getStartStationId()) || sent.contains(stopId)) return;
+                fewestTransfersWithin(paths, maxJourneyMins)
+                        .flatMap(path -> legBuilder.toReachableStation(stopId, path))
+                        .ifPresent(station -> {
+                            stations.add(station);
+                            sent.add(stopId);
+                        });
+            });
+            if (!stations.isEmpty() && firstSentMs < 0) firstSentMs = System.currentTimeMillis() - startMs;
+            for (int i = 0; i < stations.size(); i += STREAM_BATCH_SIZE) {
+                flushBatch(emitter, stations.subList(i, Math.min(i + STREAM_BATCH_SIZE, stations.size())));
+            }
+        }
     }
 
     // The paths are ordered by ascending transfers, so a station whose fewest-transfer path is too long still shows

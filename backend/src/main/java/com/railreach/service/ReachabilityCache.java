@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * Raw search results per search, computed on demand. Kept apart from the Caffeine response cache because a stored
@@ -55,6 +56,12 @@ public class ReachabilityCache {
      * result, else cut down from a stored result with more transfers, else searched and stored.
      */
     public Map<String, List<JourneyPath>> getOrCompute(SearchKey key) {
+        return getOrCompute(key, roundPaths -> {});
+    }
+
+    /** Like {@link #getOrCompute(SearchKey)}; a search hands roundPaths each round's new paths as it goes. */
+    public Map<String, List<JourneyPath>> getOrCompute(SearchKey key,
+                                                       Consumer<Map<String, List<JourneyPath>>> roundPaths) {
         Map<String, List<JourneyPath>> cached = rawPaths.getIfPresent(key);
         if (cached != null) {
             log.info("  Raw cache HIT: {} x{} ({} stations)", key.startId(), key.maxTransfers(), cached.size());
@@ -69,7 +76,7 @@ public class ReachabilityCache {
 
         log.info("  Search: {} x{}", key.startId(), key.maxTransfers());
         Map<String, List<JourneyPath>> result = search.search(key.startId(), key.maxTransfers(),
-                key.minTransferMins(), key.maxTransferMins());
+                key.minTransferMins(), key.maxTransferMins(), roundPaths);
         rawPaths.put(key, result);
         log.info("  Cached raw result: {} x{} ({} stations)", key.startId(), key.maxTransfers(), result.size());
         return result;

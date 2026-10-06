@@ -17,7 +17,7 @@ const results = new Map();
 // Finished queries by cacheKey(); repeating one skips the backend entirely
 const localResultsCache = new Map();
 let activeStream = null;
-// Stations only arrive once the backend search has finished, so until then the overlay shows elapsed time
+// Until the first round's stations arrive, the overlay shows elapsed time
 let elapsedTimer = null;
 const ELAPSED_TICK_MS = 1000;
 
@@ -93,7 +93,7 @@ function streamResults(stationId, query, key) {
         reachableCount.textContent = info.total.toLocaleString();
         const all = [...results.values()];
         localResultsCache.set(key, all);
-        // Fit once at the end: batches only arrive after the search finished, so waiting costs little
+        // Fit once at the end, so the view doesn't jump with every round of the search
         fitToResults(all);
         refreshCoverage();
         console.log('Stream done:', info.total, 'stations in', `${info.calculationTimeMs}ms`,
