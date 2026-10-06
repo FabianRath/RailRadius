@@ -11,6 +11,7 @@ const FIT_MAX_ZOOM = 12;
 const RAILWAY_MIN_ZOOM = 8;
 const POPUP_MAX_WIDTH = '360px';
 const POPUP_SCREEN_MARGIN_PX = 10;
+const JOURNEY_LINE_WIDTH_PX = 3;
 const EMPTY_COLLECTION = { type: 'FeatureCollection', features: [] };
 
 let map;
@@ -71,6 +72,12 @@ function addDataLayers() {
     map.addLayer({ id: LAYERS.debug, type: 'circle', source: 'debug',
         paint: { 'circle-color': ['get', 'color'], 'circle-radius': ['get', 'radius'], 'circle-opacity': 0.75 } });
 
+    // Below the stations, so the stops of the journey stay clickable on top of its lines
+    map.addSource('journey', { type: 'geojson', data: EMPTY_COLLECTION });
+    map.addLayer({ id: 'journey-lines', type: 'line', source: 'journey',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': colorByLevel, 'line-width': JOURNEY_LINE_WIDTH_PX } });
+
     map.addSource('reachable', { type: 'geojson', data: EMPTY_COLLECTION });
     map.addLayer({ id: LAYERS.reachable, type: 'circle', source: 'reachable',
         // Direct connections (level 0) are drawn on top and slightly larger
@@ -98,6 +105,7 @@ export function addReachableStations(stations) {
 }
 
 export function clearReachableStations() {
+    clearJourney();
     reachableFeatures = [];
     scheduleReachableRender();
 }
@@ -109,6 +117,19 @@ function scheduleReachableRender() {
         reachableRenderPending = false;
         map.getSource('reachable').setData({ type: 'FeatureCollection', features: reachableFeatures });
     });
+}
+
+/** Draws the lines ([lon, lat] coordinates and a level for the colour) and hides every station not in stopIds. */
+export function showJourney({ stopIds, lines }) {
+    const features = lines.map(line => ({ type: 'Feature',
+        geometry: { type: 'LineString', coordinates: line.coordinates }, properties: { level: line.level } }));
+    map.getSource('journey').setData({ type: 'FeatureCollection', features });
+    map.setFilter(LAYERS.reachable, ['in', ['get', 'stopId'], ['literal', stopIds]]);
+}
+
+export function clearJourney() {
+    map.getSource('journey').setData(EMPTY_COLLECTION);
+    map.setFilter(LAYERS.reachable, null);
 }
 
 /** Each station needs lat, lon, color, radius; all its fields become feature properties for the popup. */
@@ -128,14 +149,25 @@ export function fitToPoints(points) {
     map.fitBounds(bounds, { padding: FIT_PADDING_PX, maxZoom: FIT_MAX_ZOOM });
 }
 
-/** Shows a popup with buildHtml(featureProperties) when a point of the layer is clicked. */
-export function bindPopup(layerId, buildHtml) {
+/**
+ * Shows a popup with buildHtml(featureProperties) when a point of the layer is clicked, and calls onClose (optional)
+ * when it closes. Clicking another point may close the old popup after the new one opened, so only the current
+ * popup's close counts.
+ */
+export function bindPopup(layerId, buildHtml, onClose) {
+    let currentPopup = null;
     map.on('click', layerId, e => {
         const feature = e.features[0];
         const popup = new Popup({ maxWidth: POPUP_MAX_WIDTH, className: 'station-popup' })
             .setLngLat(feature.geometry.coordinates)
             .setHTML(buildHtml(feature.properties))
             .addTo(map);
+        currentPopup = popup;
+        popup.on('close', () => {
+            if (popup !== currentPopup) return;
+            currentPopup = null;
+            onClose?.();
+        });
         snapToWholePixels(popup.getElement());
         panIntoView(popup.getElement());
     });

@@ -89,6 +89,18 @@ class ReachabilityServiceTest {
     }
 
     @Test
+    void legsCarryTheStopIdsOfTheirPathStations() {
+        // T1 runs A1 → A2 → A3 (merged into beta:B1), U1 continues to B2
+        ReachableStation b2 = find(query(gtfs, "alpha:A1", 1, 0, 180), "beta:B2").orElseThrow();
+
+        assertThat(b2.getPath()).containsExactly("alpha:A1", "alpha:A2", "beta:B1", "beta:B2");
+        assertThat(b2.getLegs()).extracting(JourneyLeg::getFromStopId)
+                .containsExactly("alpha:A1", "beta:B1", "beta:B1");
+        assertThat(b2.getLegs()).extracting(JourneyLeg::getToStopId)
+                .containsExactly("beta:B1", "beta:B1", "beta:B2");
+    }
+
+    @Test
     void stationAndLegsCarryTheCountries(@TempDir Path dir) throws Exception {
         // KT1 runs from K1 in KA to L1 in LA (K3 was snapped into it), then LT1 continues to L2
         TransitGraph graph = GtfsTestFixtures.load(dir, "kappa", "lambda");

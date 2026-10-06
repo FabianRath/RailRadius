@@ -1,5 +1,6 @@
 import { fetchHealth } from './api.js';
-import { bindPopup, initMap, LAYERS, onZoomEnd } from './map.js';
+import { bindPopup, clearJourney, initMap, LAYERS, onZoomEnd, showJourney } from './map.js';
+import { journeyRoute } from './journey.js';
 import { stationPopupHtml } from './popup.js';
 import { initSearch } from './search.js';
 import { initSidebarToggle } from './sidebar.js';
@@ -25,7 +26,11 @@ fetchHealth()
 renderStaticIcons();
 initSidebarToggle();
 await initMap('map');
-bindPopup(LAYERS.reachable, ({ stopId }) => stationPopupHtml(getStation(stopId)));
+bindPopup(LAYERS.reachable, ({ stopId }) => {
+    const station = getStation(stopId);
+    showJourney(journeyRoute(station));
+    return stationPopupHtml(station);
+}, clearJourney);
 
 initSearch(station => {
     selectedStation = station;
