@@ -30,12 +30,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class FeedUpdateCenterTest {
 
-    // zeta's services run from 2026-01-05 to 2026-01-31
+    // zeta's services run from 2026-01-05 to 2026-03-29
     private static final LocalDate ZETA_FIRST_DAY = LocalDate.of(2026, 1, 5);
-    private static final LocalDate ZETA_LAST_DAY = LocalDate.of(2026, 1, 31);
-    private static final LocalDate DURING_ZETA = LocalDate.of(2026, 1, 10);
+    private static final LocalDate ZETA_LAST_DAY = LocalDate.of(2026, 3, 29);
+    private static final LocalDate DURING_ZETA = LocalDate.of(2026, 3, 8);
     private static final LocalDate AFTER_ZETA = LocalDate.of(2026, 10, 5);
-    private static final LocalDate LATER_ZETA_LAST_DAY = LocalDate.of(2027, 1, 31);
+    private static final LocalDate LATER_ZETA_LAST_DAY = LocalDate.of(2027, 3, 29);
     private static final int EXPIRING_DAYS = 30;
     private static final String FEED_PATH = "/feed.zip";
     private static final String MIRROR_PATH = "/mirror.zip";
@@ -133,15 +133,15 @@ class FeedUpdateCenterTest {
 
     @Test
     void feedsAreSortedByStateThenByDaysLeft() throws IOException {
-        zipZeta(gtfsDir.resolve("gtfs_a.zip"), text -> text.replace("20260131", "20270131"));
-        zipZeta(gtfsDir.resolve("gtfs_b.zip"), text -> text.replace("20260131", "20260920"));
+        zipZeta(gtfsDir.resolve("gtfs_a.zip"), text -> text.replace("20260329", "20270329"));
+        zipZeta(gtfsDir.resolve("gtfs_b.zip"), text -> text.replace("20260329", "20260920"));
         GtfsTestFixtures.zipFeed("zeta", gtfsDir.resolve("gtfs_c.zip"));
-        zipZeta(gtfsDir.resolve("gtfs_d.zip"), text -> text.replace("20260131", "20261020"));
+        zipZeta(gtfsDir.resolve("gtfs_d.zip"), text -> text.replace("20260329", "20261020"));
         GtfsTestFixtures.zipFeed("alpha", gtfsDir.resolve("gtfs_e.zip"));
         Files.writeString(gtfsDir.resolve("gtfs_f.zip"), "not a zip");
         GtfsTestFixtures.zipFeed("alpha", gtfsDir.resolve("gtfs_g.zip"));
         zipZeta(gtfsDir.resolve("gtfs_h.zip"),
-                text -> text.replace("2026010", "2026110").replace("20260131", "20270131"));
+                text -> text.replace("2026", "2027"));
 
         assertThat(center.statuses(AFTER_ZETA)).extracting(FeedStatus::getSource)
                 .containsExactly("c", "b", "h", "e", "g", "f", "d", "a");
@@ -357,7 +357,7 @@ class FeedUpdateCenterTest {
 
     /** zeta with its weekly services running a year longer. */
     private Path zipZetaEndingIn2027(Path zipFile) throws IOException {
-        return zipZeta(zipFile, text -> text.replace("20260131", "20270131"));
+        return zipZeta(zipFile, text -> text.replace("20260329", "20270329"));
     }
 
     private Path zipZeta(Path zipFile, UnaryOperator<String> edit) throws IOException {
