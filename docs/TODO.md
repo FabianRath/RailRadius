@@ -16,7 +16,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (caching / infrastructure)
 
 ## Features / UX
-- [ ] **F20** The station popup with the connection info sometimes opens with its bottom slightly cut off by the screen edge. Place it so it fits fully on screen, e.g. pick the anchor or pan the map after the content has its final size. `bindPopup` in `js/map.js` adds the popup first and only then resizes it (`snapToWholePixels`), so MapLibre may choose the anchor for a smaller popup.
 - [ ] **F21** When a station is clicked and its connection popup opens, draw that connection on the map as lines (one per train leg, from the start station through each transfer station to the destination) and hide all other reachable stations. When the popup is closed, remove the lines and show all stations again. `ReachableStation.path` holds the stop IDs of the start, transfer and destination stations, and the frontend already has their coordinates from the streamed results, so straight lines between them need no API change. Lines that follow the track through every intermediate stop would need each leg's stop sequence from the backend (a public API change, ask first). Drawing and hiding go into `js/map.js` (only module that talks to MapLibre), line colours as CSS variables.
 
 ## Structure
