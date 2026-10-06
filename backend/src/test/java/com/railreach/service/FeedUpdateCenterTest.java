@@ -20,6 +20,7 @@ import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.function.UnaryOperator;
@@ -59,6 +60,7 @@ class FeedUpdateCenterTest {
         center = new FeedUpdateCenter(new FeedRegistry(), new FeedDownloader(), loadProgress);
         ReflectionTestUtils.setField(center, "gtfsDirectory", gtfsDir.toString());
         ReflectionTestUtils.setField(center, "expiringDays", EXPIRING_DAYS);
+        expectSources("zeta");
         server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         server.start();
     }
@@ -108,6 +110,7 @@ class FeedUpdateCenterTest {
 
     @Test
     void feedWithoutCalendarHasNoServiceDays() throws IOException {
+        expectSources("alpha");
         GtfsTestFixtures.zipFeed("alpha", gtfsDir.resolve("gtfs_alpha.zip"));
 
         FeedStatus status = center.statuses(AFTER_ZETA).getFirst();
@@ -119,6 +122,7 @@ class FeedUpdateCenterTest {
 
     @Test
     void fileThatIsNoZipIsUnreadable() throws IOException {
+        expectSources("broken");
         Files.writeString(gtfsDir.resolve("gtfs_broken.zip"), "not a zip");
 
         assertThat(center.statuses(AFTER_ZETA).getFirst().getState()).isEqualTo(State.UNREADABLE);
@@ -133,6 +137,7 @@ class FeedUpdateCenterTest {
 
     @Test
     void feedsAreSortedByStateThenByDaysLeft() throws IOException {
+        expectSources("a", "missing");
         zipZeta(gtfsDir.resolve("gtfs_a.zip"), text -> text.replace("20260329", "20270329"));
         zipZeta(gtfsDir.resolve("gtfs_b.zip"), text -> text.replace("20260329", "20260920"));
         GtfsTestFixtures.zipFeed("zeta", gtfsDir.resolve("gtfs_c.zip"));
@@ -144,7 +149,41 @@ class FeedUpdateCenterTest {
                 text -> text.replace("2026", "2027"));
 
         assertThat(center.statuses(AFTER_ZETA)).extracting(FeedStatus::getSource)
-                .containsExactly("c", "b", "h", "e", "g", "f", "d", "a");
+                .containsExactly("missing", "c", "b", "h", "e", "g", "f", "d", "a");
+    }
+
+    @Test
+    void expectedFeedWithoutZipIsMissingAndDownloadable() throws IOException {
+        expectSources("zeta", "austria");
+        GtfsTestFixtures.zipFeed("zeta", gtfsDir.resolve("gtfs_zeta.zip"));
+
+        FeedStatus missing = center.statuses(DURING_ZETA).getFirst();
+
+        assertThat(missing.getSource()).isEqualTo("austria");
+        assertThat(missing.getState()).isEqualTo(State.MISSING);
+        assertThat(missing.getFileName()).isEqualTo("gtfs_austria.zip");
+        assertThat(missing.getDownloadUrl()).isNotNull();
+        assertThat(center.statuses(DURING_ZETA)).hasSize(2);
+    }
+
+    @Test
+    void withoutConfiguredSourcesEveryRegisteredFeedIsExpected() {
+        expectSources();
+
+        assertThat(center.statuses(DURING_ZETA)).extracting(FeedStatus::getSource).contains("austria", "germany");
+        assertThat(center.statuses(DURING_ZETA)).extracting(FeedStatus::getState).containsOnly(State.MISSING);
+    }
+
+    @Test
+    void downloadCreatesAMissingGtfsDirectory() throws IOException {
+        Path freshDir = tempDir.resolve("fresh-checkout").resolve("gtfs");
+        ReflectionTestUtils.setField(center, "gtfsDirectory", freshDir.toString());
+        serve(HTTP_OK, Files.readAllBytes(zipZetaEndingIn2027(tempDir.resolve("new.zip"))), false);
+
+        FeedDownloadResult result = center.download(feed(), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REPLACED);
+        assertThat(freshDir.resolve("gtfs_zeta.zip")).exists();
     }
 
     @Test
@@ -321,6 +360,10 @@ class FeedUpdateCenterTest {
         loadProgress.start();
 
         assertThat(center.download(feed(), DURING_ZETA).getOutcome()).isEqualTo(Outcome.BUSY);
+    }
+
+    private void expectSources(String... sources) {
+        ReflectionTestUtils.setField(center, "sources", List.of(sources));
     }
 
     private FeedSource feed() {

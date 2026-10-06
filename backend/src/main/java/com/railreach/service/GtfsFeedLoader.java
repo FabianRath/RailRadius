@@ -69,13 +69,23 @@ public class GtfsFeedLoader {
                               Map<String, String> rawToCanonicalService,
                               Map<String, String> rawToCanonicalStop, Map<String, Station> stations) {}
 
+    /** False if the directory is missing or has no zip, as in a fresh checkout. */
+    boolean hasFeeds(String directory) {
+        return zipFiles(new File(directory)).length > 0;
+    }
+
+    private static File[] zipFiles(File dir) {
+        File[] zipFiles = dir.listFiles((d, name) -> FeedFiles.isZip(name));
+        return zipFiles == null ? new File[0] : zipFiles;
+    }
+
     void loadDirectory(String directory, TransitGraph graph, GtfsLoadProgress progress) {
         File dir = new File(directory);
         if (!dir.isDirectory()) {
             throw new IllegalStateException("GTFS directory not found: " + directory);
         }
-        File[] zipFiles = dir.listFiles((d, name) -> FeedFiles.isZip(name));
-        if (zipFiles == null || zipFiles.length == 0) {
+        File[] zipFiles = zipFiles(dir);
+        if (zipFiles.length == 0) {
             throw new IllegalStateException("No .zip files found in: " + directory);
         }
         Arrays.sort(zipFiles, Comparator.comparing(File::getName));

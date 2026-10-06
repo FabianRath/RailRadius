@@ -13,6 +13,7 @@ description: Start the RailReach backend with the small dev dataset (Austria/Hun
    ```
    - Maven runs the app with `backend/` as its working directory, so the relative `data/...` paths resolve.
    - The first start parses the zips and writes `backend/data/gtfs-dev-cache.json`. Either way, startup takes about 5–10 s.
+   - Without zips in `backend/data/gtfs-dev/` (fresh checkout) it starts empty. After step 3, run `scripts/api.sh feeds-download-outdated` (downloads the missing dev feeds), then `scripts/api.sh reload-gtfs`.
 3. Wait for health with a second background Bash command that exits on success *or* failure, so you get exactly one notification:
    ```
    for i in $(seq 1 60); do curl -s localhost:8080/api/health | grep -q '"UP"' && { echo UP; break; }; grep -qE "APPLICATION FAILED|BUILD FAILURE|OutOfMemory" <log> && { echo FAILED; break; }; sleep 3; done

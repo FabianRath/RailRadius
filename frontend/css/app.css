@@ -1113,6 +1113,7 @@ input[type="range"]::-moz-range-thumb {
     color: var(--warning);
 }
 
+.feed-state-missing,
 .feed-state-expired,
 .feed-state-unreadable,
 .feed-result-rejected,

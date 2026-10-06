@@ -26,9 +26,10 @@ Run from `backend/`; the cache paths are relative to the working directory. The 
   - `data/gtfs-cache.json` is ~360 MB (3.6 GB before the trip-based format, S9); it loads in ~17 s.
 - **Dev data:** `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev`
   - Austria + Hungary + Slovakia from `data/gtfs-dev/`, cache in `data/gtfs-dev-cache.json`.
+- **Fresh checkout:** `backend/data/` is not in git, so there are no zips. Start the app (it starts empty), open the admin panel → Feeds, click "Download outdated" (it includes the `MISSING` feeds), then Tools → reload. Or with `scripts/api.sh`: `feeds-download-outdated`, then `reload-gtfs`. Which feeds are expected comes from `feeds.sources` (dev: austria, hungary, slovakia; default: every feed in `gtfs-feeds.txt`).
 
 **Startup flow:**
-1. `GtfsDataService` loads the GTFS cache file if present. Otherwise it parses the zips only if `auto-load-from-files` is true (true for dev, false for default). With no data, use `POST /api/admin/reload-gtfs`.
+1. `GtfsDataService` loads the GTFS cache file if present. Otherwise it parses the zips only if `auto-load-from-files` is true (true for dev, false for default) and the GTFS directory has a zip; with none (fresh checkout) it logs a WARN and starts empty. With no data, use `POST /api/admin/reload-gtfs`.
 
 ## Directory layout
 
@@ -85,10 +86,10 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `StationGrid` | service | Stations bucketed into square degree cells; `near` = the 3×3 cells around a station |
 | `SharedTrainMatcher` | service | Cross-border rule: two stops are one station if ≥ 3 trains serve both at the same minute with the same neighbour station |
 | `ForeignStopSnapper` | service | Cross-border rule: a feed's stop outside its home country is merged into the nearest station of that country's feed (≤ 1 km) |
-| `FeedUpdateCenter` | service | Update center for the GTFS zips: status of each zip (`FeedStatus`, validity memoized per file and modification time), a scheduled log check (`railreach.feeds.check-interval`, first run at startup) that WARNs about expired and expiring feeds, and downloads of registered feeds. A download is refused (`BUSY`) during a GTFS load or another download |
+| `FeedUpdateCenter` | service | Update center for the GTFS zips: status of each zip (`FeedStatus`, validity memoized per file and modification time) plus a `MISSING` status for each expected feed (`railreach.feeds.sources`) without a zip, a scheduled log check (`railreach.feeds.check-interval`, first run at startup) that WARNs about missing, expired and expiring feeds, and downloads of registered feeds. A download is refused (`BUSY`) during a GTFS load or another download |
 | `FeedValidity` | service | First and last day any service of a feed runs, from `ServiceCalendarReader` over the whole feed (not only rail) |
 | `FeedRegistry` | service | Download URLs (with request headers) per source, from `gtfs-feeds.txt`; a source on several lines gets fallback URLs in line order |
-| `FeedDownloader` | service | Downloads a feed, trying its URLs in order until one passes the checks below (JDK `HttpClient`, unpacks `Content-Encoding: gzip`) to `gtfs_<source>.zip.part`, checks it (a zip with stops/stop_times/trips/routes.txt, at least one rail route, service days in the calendar, at least half the size of the current zip, running today, not ending before the current zip), moves the old zip to `previous/` and moves the new one in. If every URL fails or is rejected, the zip is unchanged and the result lists each URL's reason |
+| `FeedDownloader` | service | Downloads a feed, trying its URLs in order until one passes the checks below (JDK `HttpClient`, unpacks `Content-Encoding: gzip`) to `gtfs_<source>.zip.part` (creating the GTFS directory if needed), checks it (a zip with stops/stop_times/trips/routes.txt, at least one rail route, service days in the calendar, at least half the size of the current zip, running today, not ending before the current zip), moves the old zip to `previous/` and moves the new one in. If every URL fails or is rejected, the zip is unchanged and the result lists each URL's reason |
 | `CountryLocator` | service | Point → ISO country code, from `borders/europe.geojson` (Natural Earth 1:10m, Europe) |
 | `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`: format version, stations, translated names, services, trips); a file with another version is ignored |
 | `CachedTrip` | service | One trip in the cache file: route name, `TripInfo`, service ID, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
@@ -118,7 +119,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `ReachableStationSummary` | dto | What the stream sends per station: id, name, country, coordinates, transfers, duration; the journey is fetched on click |
 | `GtfsLoadStatus` | dto | `GtfsLoadProgress` snapshot plus live station/connection counts; ETA extrapolated from zip bytes parsed |
 | `JourneyLeg` | dto | `TRAIN` or `TRANSFER` leg with from/to station names, stop IDs and countries, times and duration; TRAIN legs also carry route name, train number, headsign and operator |
-| `FeedStatus` | dto | One zip: source, file name, size, download time, first/last service date, days left, state (`OK`, `EXPIRING`, `EXPIRED`, `NOT_YET_VALID`, `NO_CALENDAR`, `UNREADABLE`), download URL (the first one in `gtfs-feeds.txt`; null = updated by hand) |
+| `FeedStatus` | dto | One zip: source, file name, size, download time, first/last service date, days left, state (`MISSING` = expected but no zip yet, `OK`, `EXPIRING`, `EXPIRED`, `NOT_YET_VALID`, `NO_CALENDAR`, `UNREADABLE`), download URL (the first one in `gtfs-feeds.txt`; null = updated by hand) |
 | `FeedDownloadResult` | dto | Outcome (`REPLACED`, `REJECTED`, `BUSY`), message, `FeedStatus` before and after |
 | `GtfsTime` | util | Parse/format GTFS times, minute diffs with overnight wrap, clock minute of a time, duration text |
 | `StopIds` | util | Canonical `<source>:<rawId>` stop IDs |
@@ -196,16 +197,16 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 | GET | `/stats` | stations / graphNodes / totalEdges |
 | GET | `/health` | UP/DOWN depending on whether data is loaded |
 
-**Admin (`/api/admin`)**: every call needs the header `X-Admin-Token: <railreach.admin.token>` (see `AdminTokenInterceptor`). `scripts/api.sh` sends `RAILREACH_ADMIN_TOKEN` (default `dev`). In the browser, the "Dev login" at the bottom of the side panel (`js/dev-auth.js`) checks the token against `/debug/status`, keeps it in `localStorage` and only then starts the debug polling and shows the "Admin panel" button. That opens a `<dialog>` (`js/admin-panel.js`) with two tabs. "Tools" has buttons for the stats, debug-trigger, reload and cache-delete endpoints below; it prints the raw JSON response and asks for confirmation before reload and delete. "Feeds" (`js/feeds.js`) widens the panel to nearly the whole window and lists every zip from `/feeds`: last service day (first day as a tooltip), days left, state, size, download date, source host, and a download button for feeds in `gtfs-feeds.txt` ("manual" otherwise). "Download outdated" and "Download all" call `/feeds/{source}/download` for one feed after another, so each row shows its progress and the result of its last download. During a reload it shows a progress bar with phase, feeds, % parsed, elapsed time, ETA and graph size.
+**Admin (`/api/admin`)**: every call needs the header `X-Admin-Token: <railreach.admin.token>` (see `AdminTokenInterceptor`). `scripts/api.sh` sends `RAILREACH_ADMIN_TOKEN` (default `dev`). In the browser, the "Dev login" at the bottom of the side panel (`js/dev-auth.js`) checks the token against `/debug/status`, keeps it in `localStorage` and only then starts the debug polling and shows the "Admin panel" button. That opens a `<dialog>` (`js/admin-panel.js`) with two tabs. "Tools" has buttons for the stats, debug-trigger, reload and cache-delete endpoints below; it prints the raw JSON response and asks for confirmation before reload and delete. "Feeds" (`js/feeds.js`) widens the panel to nearly the whole window and lists every zip and missing feed from `/feeds`: last service day (first day as a tooltip), days left, state, size, download date, source host, and a download button for feeds in `gtfs-feeds.txt` ("manual" otherwise). "Download outdated" (missing, expired and expiring feeds) and "Download all" call `/feeds/{source}/download` for one feed after another, so each row shows its progress and the result of its last download. During a reload it shows a progress bar with phase, feeds, % parsed, elapsed time, ETA and graph size.
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/cache-stats` | Caffeine stats, warming jobs, rawPathCache keys |
 | POST | `/reload-gtfs` | Full reparse of the zips (minutes), rewrite of the cache, clears the raw and response reachability caches |
 | DELETE | `/gtfs-cache` | Deletes the cache file |
 | GET | `/gtfs-stats` | Cache file and data counts |
-| GET | `/feeds` | `FeedStatus` of every zip in the GTFS directory, sorted by state (expired, not yet valid, no calendar, unreadable, expiring, OK), then by days left, then by file name |
+| GET | `/feeds` | `FeedStatus` of every zip in the GTFS directory and of every expected feed without one, sorted by state (missing, expired, not yet valid, no calendar, unreadable, expiring, OK), then by days left, then by file name |
 | POST | `/feeds/{source}/download` | Downloads a new version of the feed and swaps it in (`FeedDownloadResult`); 404 if not in `gtfs-feeds.txt`, 409 when busy. The graph uses it only after `reload-gtfs` |
-| POST | `/feeds/download-outdated` | The same for every expired or expiring feed with a URL, one after the other (`scripts/api.sh feeds-download-outdated`; the admin panel downloads feed by feed instead) |
+| POST | `/feeds/download-outdated` | The same for every missing, expired or expiring feed with a URL, one after the other (`scripts/api.sh feeds-download-outdated`; the admin panel downloads feed by feed instead) |
 | GET | `/gtfs-load-status` | `GtfsLoadStatus` of the running or last load from the zips; the admin panel polls it every second during a reload |
 | POST / DELETE | `/debug/trigger` | Toggle the frontend overlay that shows all stations |
 | GET | `/debug/status` | Polled every 2 s by a browser logged in as dev; also used to check a dev login |
@@ -214,12 +215,12 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 ## Configuration (`application.yml`, prefix `railreach.`)
 
 - `gtfs.directory` (`./data/gtfs`, env `GTFS_DIRECTORY`), `gtfs.auto-load-from-files` (false), `gtfs.cache-file`
-- `feeds.expiring-days` (30): feeds that end within this many days are `EXPIRING`; `feeds.check-interval` (`PT24H`): how often the expired/expiring feeds are logged
+- `feeds.expiring-days` (30): feeds that end within this many days are `EXPIRING`; `feeds.check-interval` (`PT24H`): how often the missing/expired/expiring feeds are logged; `feeds.sources` (empty = every feed in `gtfs-feeds.txt`): comma-separated feeds expected in the GTFS directory, listed as `MISSING` without a zip
 - `algorithm.max-transfer-time-minutes` (180), `algorithm.cache-size` (10000), `algorithm.cache-ttl-minutes` (60)
 - `cache.predictive-enabled` (true), `cache.predictive-max-transfers` (5), `cache.raw-max-entries` (30)
 - `admin.token` (empty, env `RAILREACH_ADMIN_TOKEN`): shared secret for the admin API; empty disables it
 
-`application-dev.yml` overrides the GTFS directory and cache file, sets `auto-load-from-files: true`, turns predictive warming off and defaults `admin.token` to `dev`.
+`application-dev.yml` overrides the GTFS directory and cache file, sets `auto-load-from-files: true` and `feeds.sources: austria,hungary,slovakia`, turns predictive warming off and defaults `admin.token` to `dev`.
 
 ## Known issues and TODOs
 

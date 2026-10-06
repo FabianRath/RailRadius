@@ -31,8 +31,11 @@ railreach:
   feeds:
     # Update center: a feed whose last service day is at most this many days away counts as expiring
     expiring-days: 30
-    # How often the update center logs expired and expiring feeds (first check right after startup)
+    # How often the update center logs missing, expired and expiring feeds (first check right after startup)
     check-interval: PT24H
+    # Comma-separated sources that belong in the GTFS directory; one without a zip is listed as MISSING in the
+    # update center, ready to download. Empty = every feed in gtfs-feeds.txt
+    sources:
 
   algorithm:
     max-transfer-time-minutes: 180
