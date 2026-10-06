@@ -14,7 +14,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/** Turns a search path into the API's {@link ReachableStation}, with the rides and transfers as legs, or its summary. */
+/**
+ * Turns a search path into the API's {@link ReachableStation}, with the rides and transfers as legs, or into its
+ * summary.
+ */
 @Component
 @RequiredArgsConstructor
 public class JourneyLegBuilder {

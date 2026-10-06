@@ -11,10 +11,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
@@ -36,9 +37,9 @@ import java.util.stream.IntStream;
  * date: exact dates made the check too costly. The shown running days are exact dates ({@link JourneyRunningDays}),
  * so a found journey can show none.
  * <p>
- * A station's result is not always the fastest journey: one up to {@link #MAX_SLOWER_MINUTES} slower is shown
- * instead if it runs on many more days ({@link RegularJourneyChooser}). Transfers still continue from the fastest
- * arrival.
+ * A station's result is not always the fastest journey: one up to {@link StationCandidates#MAX_SLOWER_MINUTES}
+ * slower is shown instead if it runs on many more days ({@link RegularJourneyChooser}). Transfers still continue from
+ * the fastest arrival.
  * <p>
  * A station's path with k transfers is chosen as soon as round k ends: later rounds only add rides with more
  * transfers. So each round's new paths can be handed out before the search goes on.
@@ -55,36 +56,8 @@ public class ReachabilitySearch {
 
     private static final int SAME_DAY = 0;
     private static final int NEXT_DAY = 1;
-    // A journey this much slower than the fastest can still be shown for a station, if it runs more often
-    private static final int MAX_SLOWER_MINUTES = 30;
 
     private final TransitGraph transitGraph;
-
-    /**
-     * One ride from boardIdx to alightIdx; previous is the ride before the transfer, null for the first one. days are
-     * the {@link WeekPeriodDays} of the trip on which the journey so far works: every earlier train runs on its day.
-     */
-    private record Ride(TripTimetable trip, int boardIdx, int alightIdx, int transfers, int durationMinutes,
-                        Ride previous, long days) {
-
-        /** The days of a next trip, running on nextTripDays, that come extraDays after a day of this ride. */
-        long nextDays(long nextTripDays, int extraDays) {
-            return nextTripDays & WeekPeriodDays.movedForward(days, extraDays);
-        }
-
-        String stationId() {
-            return trip.stops().get(alightIdx);
-        }
-
-        int arrivalSeconds() {
-            return trip.arrivalSeconds(alightIdx);
-        }
-
-        JourneyRunningDays.RideTimes times() {
-            return new JourneyRunningDays.RideTimes(trip.tripId(), trip.stops().get(boardIdx),
-                    trip.legDepartureSeconds()[boardIdx], stationId(), arrivalSeconds());
-        }
-    }
 
     /** A departure boarded from an arrival: the days of the departing trip it gives, and the journey time so far. */
     private record Boarding(TripTimetable.Departure departure, Ride from, long days, int boardMinutes) {}
@@ -108,42 +81,24 @@ public class ReachabilitySearch {
      */
     private record SearchState(SearchTimetables timetables, String startId, int startIndex, int minTransferMins,
                                int maxTransferMins, long[] tripDays, TripProgress[] progressByTrip,
-                               Map<String, StationCandidates> bestByStation, List<StationCandidates> roundStations,
-                               Map<String, List<JourneyPath>> paths, Map<Ride, JourneyRunningDays.SoFar> daysByRide,
+                               StationCandidates[] candidatesByStation, List<StationCandidates> roundStations,
+                               Map<String, List<JourneyPath>> paths, Map<RideKey, JourneyRunningDays.SoFar> daysByRide,
                                SearchCounters counters) {}
 
     /**
-     * The candidate rides of a station's result, by ascending transfers: per transfer count the fastest one and those
-     * at most {@link #MAX_SLOWER_MINUTES} slower, all faster than every ride with fewer transfers. Rounds run by
-     * ascending transfers, so rides arrive in that order.
+     * A ride as a map key by identity: candidates share their earlier rides, and a Ride's record hash would walk its
+     * whole previous chain.
      */
-    private static final class StationCandidates {
+    private record RideKey(Ride ride) {
 
-        private final String stationId;
-        private final List<Ride> rides = new ArrayList<>();
-        private int transfers = -1;
-        private int fastestWithFewerMinutes = Integer.MAX_VALUE;
-        private int fastestMinutes = Integer.MAX_VALUE;
-
-        StationCandidates(String stationId) {
-            this.stationId = stationId;
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof RideKey key && key.ride == ride;
         }
 
-        void offer(Ride ride) {
-            if (ride.transfers() != transfers) {
-                fastestWithFewerMinutes = Math.min(fastestWithFewerMinutes, fastestMinutes);
-                fastestMinutes = Integer.MAX_VALUE;
-                transfers = ride.transfers();
-            }
-            int durationMinutes = ride.durationMinutes();
-            if (durationMinutes >= fastestWithFewerMinutes) return;
-            if (durationMinutes - MAX_SLOWER_MINUTES > fastestMinutes) return;
-            if (durationMinutes < fastestMinutes) {
-                fastestMinutes = durationMinutes;
-                rides.removeIf(kept -> kept.transfers() == transfers
-                        && kept.durationMinutes() - MAX_SLOWER_MINUTES > durationMinutes);
-            }
-            rides.add(ride);
+        @Override
+        public int hashCode() {
+            return System.identityHashCode(ride);
         }
     }
 
@@ -158,12 +113,10 @@ public class ReachabilitySearch {
                                                  Consumer<Map<String, List<JourneyPath>>> roundPaths) {
         SearchCounters counters = new SearchCounters();
         SearchTimetables timetables = transitGraph.searchTimetables();
-        // Candidates share their earlier rides, so each ride's days are worked out once. Identity keys: a Ride's
-        // record hash would walk its whole previous chain.
         SearchState state = new SearchState(timetables, startId, timetables.stationIndex(startId), minTransferMins,
                 maxTransferMins, timetables.weekPeriodDays(transitGraph.todayEpochDay()),
-                new TripProgress[timetables.tripCount()], new HashMap<>(), new ArrayList<>(), new HashMap<>(),
-                new IdentityHashMap<>(), counters);
+                new TripProgress[timetables.tripCount()], new StationCandidates[timetables.stationCount()],
+                new ArrayList<>(), new HashMap<>(), new ConcurrentHashMap<>(), counters);
         long startNanos = System.nanoTime();
         List<Ride> arrivals = new ArrayList<>();
         for (TripTimetable.Departure departure : timetables.departuresAt(startId)) {
@@ -183,7 +136,7 @@ public class ReachabilitySearch {
 
         log.info("  Search stats: {} stop arrivals on {} trips, {} stations; {} ms, of which choosing paths {} ms; "
                         + "{} departures scanned, {} fallback scans over {} arrivals",
-                arrivalCount, reachedTripCount(state), state.bestByStation().size() + 1, millisSince(startNanos),
+                arrivalCount, reachedTripCount(state), counters.reachedStations + 1, millisSince(startNanos),
                 TimeUnit.NANOSECONDS.toMillis(counters.pathsNanos), counters.departuresScanned,
                 counters.fallbackScans, counters.fallbackScannedArrivals);
         Map<String, List<JourneyPath>> result = state.paths();
@@ -202,29 +155,40 @@ public class ReachabilitySearch {
      */
     private void finishRound(SearchState state, int transfers, Consumer<Map<String, List<JourneyPath>>> roundPaths) {
         long startNanos = System.nanoTime();
+        // Choosing only reads the round's candidates and earlier paths, so stations do it in parallel
+        List<StationCandidates> stations = state.roundStations();
+        List<Optional<JourneyPath>> newPaths = IntStream.range(0, stations.size()).parallel()
+                .mapToObj(i -> newPath(state, stations.get(i), transfers))
+                .toList();
         Map<String, List<JourneyPath>> added = new HashMap<>();
-        for (StationCandidates candidates : state.roundStations()) {
-            List<Ride> rides = candidates.rides.stream().filter(ride -> ride.transfers() == transfers).toList();
-            if (rides.isEmpty()) continue;
-            Ride chosen = RegularJourneyChooser.choose(rides, ride -> runningDays(ride, state.daysByRide()).days(),
-                    Ride::durationMinutes);
-            List<JourneyPath> paths = state.paths().computeIfAbsent(candidates.stationId, id -> new ArrayList<>());
-            if (paths.isEmpty() || chosen.durationMinutes() < paths.getLast().getTotalDurationMinutes()) {
-                JourneyPath path = toJourneyPath(state.startId(), chosen);
-                paths.add(path);
-                added.put(candidates.stationId, List.of(path));
-            }
+        for (int i = 0; i < stations.size(); i++) {
+            String stationId = stations.get(i).stationId;
+            newPaths.get(i).ifPresent(path -> {
+                state.paths().computeIfAbsent(stationId, id -> new ArrayList<>()).add(path);
+                added.put(stationId, List.of(path));
+            });
         }
-        state.roundStations().clear();
+        stations.clear();
         state.counters().pathsNanos += System.nanoTime() - startNanos;
         if (!added.isEmpty()) roundPaths.accept(added);
     }
 
-    // SearchCounters are cumulative, so a round's share is the difference to the previous log line
+    /** The station's chosen path with this many transfers, unless it has none or it is not faster. */
+    private Optional<JourneyPath> newPath(SearchState state, StationCandidates candidates, int transfers) {
+        List<Ride> rides = candidates.rides.stream().filter(ride -> ride.transfers() == transfers).toList();
+        if (rides.isEmpty()) return Optional.empty();
+        Ride chosen = RegularJourneyChooser.choose(rides, ride -> runningDays(ride, state.daysByRide()).days(),
+                Ride::durationMinutes);
+        List<JourneyPath> paths = state.paths().get(candidates.stationId);
+        boolean faster = paths == null || chosen.durationMinutes() < paths.getLast().getTotalDurationMinutes();
+        return faster ? Optional.of(toJourneyPath(state.startId(), chosen)) : Optional.empty();
+    }
+
+    // Counters are cumulative, so a round's share is the difference to the previous log line
     private static void logRound(int transfers, int arrivalCount, SearchState state, long startNanos) {
         SearchCounters counters = state.counters();
         log.debug("  Round {}: {} stop arrivals, {} stations, {} ms; so far {} departures scanned, "
-                        + "{} fallback scans over {} arrivals", transfers, arrivalCount, state.bestByStation().size(),
+                        + "{} fallback scans over {} arrivals", transfers, arrivalCount, counters.reachedStations,
                 millisSince(startNanos), counters.departuresScanned, counters.fallbackScans,
                 counters.fallbackScannedArrivals);
     }
@@ -239,17 +203,11 @@ public class ReachabilitySearch {
 
     /** Boards each station's departures from the previous round's arrivals there; returns the new arrivals. */
     private List<Ride> transferRound(SearchState state, List<Ride> previousArrivals, int transfers) {
-        // Grouped before this round lowers any best durations, so only same-round overtaking drops an arrival
-        Map<String, List<Ride>> arrivalsByStation = new HashMap<>();
-        for (Ride arrival : previousArrivals) {
-            if (isOvertaken(state, arrival)) continue;
-            arrivalsByStation.computeIfAbsent(arrival.stationId(), id -> new ArrayList<>()).add(arrival);
-        }
-        List<Map.Entry<String, List<Ride>>> stations = new ArrayList<>(arrivalsByStation.entrySet());
+        List<List<Ride>> stations = arrivalsByStation(state, previousArrivals);
         List<StationBoardings> boardings = IntStream.range(0, stations.size()).parallel()
-                .mapToObj(i -> boardingsAt(state, stations.get(i).getKey(), stations.get(i).getValue()))
+                .mapToObj(i -> boardingsAt(state, stations.get(i).getFirst().stationId(), stations.get(i)))
                 .toList();
-        List<Ride> arrivals = new ArrayList<>();
+        List<Ride> arrivals = new ArrayList<>(previousArrivals.size());
         SearchCounters counters = state.counters();
         for (StationBoardings station : boardings) {
             counters.departuresScanned += station.departureCount();
@@ -261,6 +219,35 @@ public class ReachabilitySearch {
             }
         }
         return arrivals;
+    }
+
+    /**
+     * The arrivals no faster ride of their round overtook, per station in station index order, each in the order they
+     * came. Checked before this round lowers any best durations, so only same-round overtaking drops an arrival.
+     */
+    private static List<List<Ride>> arrivalsByStation(SearchState state, List<Ride> previousArrivals) {
+        int[] starts = new int[state.timetables().stationCount() + 1];
+        List<Ride> kept = new ArrayList<>(previousArrivals.size());
+        for (Ride arrival : previousArrivals) {
+            if (isOvertaken(state, arrival)) continue;
+            kept.add(arrival);
+            starts[arrival.stationIndex() + 1]++;
+        }
+        for (int station = 1; station < starts.length; station++) {
+            starts[station] += starts[station - 1];
+        }
+        Ride[] grouped = new Ride[kept.size()];
+        int[] next = starts.clone();
+        for (Ride arrival : kept) {
+            grouped[next[arrival.stationIndex()]++] = arrival;
+        }
+        List<List<Ride>> stations = new ArrayList<>();
+        for (int station = 0; station < starts.length - 1; station++) {
+            if (starts[station + 1] > starts[station]) {
+                stations.add(new ArrayList<>(Arrays.asList(grouped).subList(starts[station], starts[station + 1])));
+            }
+        }
+        return stations;
     }
 
     /**
@@ -360,20 +347,30 @@ public class ReachabilitySearch {
 
             Ride ride = new Ride(trip, boardIdx, alightIdx, transfers, durationMinutes, previous, days);
             arrivals.add(ride);
-            StationCandidates candidates = state.bestByStation().computeIfAbsent(ride.stationId(),
-                    StationCandidates::new);
+            StationCandidates candidates = candidatesAt(state, ride);
             if (candidates.transfers != transfers) state.roundStations().add(candidates);
             candidates.offer(ride);
         }
     }
 
-    private JourneyRunningDays.SoFar runningDays(Ride ride, Map<Ride, JourneyRunningDays.SoFar> daysByRide) {
-        JourneyRunningDays.SoFar known = daysByRide.get(ride);
+    private static StationCandidates candidatesAt(SearchState state, Ride ride) {
+        StationCandidates candidates = state.candidatesByStation()[ride.stationIndex()];
+        if (candidates == null) {
+            candidates = new StationCandidates(ride.stationId());
+            state.candidatesByStation()[ride.stationIndex()] = candidates;
+            state.counters().reachedStations++;
+        }
+        return candidates;
+    }
+
+    /** Worked out once per ride (two threads may both work one out): a station's candidates share earlier rides. */
+    private JourneyRunningDays.SoFar runningDays(Ride ride, Map<RideKey, JourneyRunningDays.SoFar> daysByRide) {
+        JourneyRunningDays.SoFar known = daysByRide.get(new RideKey(ride));
         if (known != null) return known;
         JourneyRunningDays.SoFar before = ride.previous() != null
                 ? runningDays(ride.previous(), daysByRide) : JourneyRunningDays.SoFar.START;
         JourneyRunningDays.SoFar soFar = JourneyRunningDays.withRide(before, ride.times(), transitGraph);
-        daysByRide.put(ride, soFar);
+        daysByRide.put(new RideKey(ride), soFar);
         return soFar;
     }
 

@@ -46,8 +46,8 @@ record TripTimetable(int index, String tripId, List<String> stops, int[] station
             if (c != null) offsetMinutes += Math.max(0, GtfsTime.diffMinutes(departures[leg], arrivals[leg]));
             arrivalOffsets[leg + 1] = offsetMinutes;
         }
-        return new TripTimetable(index, tripId, stops, stationIndexes, serviceDays, legConnections, departures, arrivals,
-                departureOffsets, arrivalOffsets);
+        return new TripTimetable(index, tripId, stops, stationIndexes, serviceDays, legConnections, departures,
+                arrivals, departureOffsets, arrivalOffsets);
     }
 
     int stopCount() {

@@ -114,6 +114,10 @@ final class SearchTimetables {
         return trips.length;
     }
 
+    int stationCount() {
+        return stationIndexes.size();
+    }
+
     /** The stop's position in {@link TripTimetable#stationIndexes()}; -1 if no trip serves it. */
     int stationIndex(String stopId) {
         return stationIndexes.getOrDefault(stopId, -1);
