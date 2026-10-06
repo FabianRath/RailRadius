@@ -3,6 +3,7 @@ package com.railreach.service;
 import com.railreach.dto.ReachabilityRequest;
 import com.railreach.dto.ReachabilityResponse;
 import com.railreach.dto.ReachableStation;
+import com.railreach.dto.ReachableStationSummary;
 import com.railreach.model.JourneyPath;
 import com.railreach.model.Station;
 import com.railreach.service.ReachabilityCache.SearchKey;
@@ -66,6 +67,18 @@ public class ReachabilityService {
                 .calculationTimeMs(durationMs)
                 .reachableStations(stations)
                 .build();
+    }
+
+    /**
+     * The journey to targetId as {@link #calculateReachability} returns it, without building every other station's;
+     * empty if the target is not reachable within the request's limits. The search result is usually stored by the
+     * stream that showed the station.
+     */
+    public Optional<ReachableStation> journey(ReachabilityRequest request, String targetId) {
+        List<JourneyPath> paths = cache.getOrCompute(searchKey(request)).get(targetId);
+        if (paths == null || targetId.equals(request.getStartStationId())) return Optional.empty();
+        return fewestTransfersWithin(paths, maxJourneyMinutes(request))
+                .flatMap(path -> legBuilder.toReachableStation(targetId, path));
     }
 
     /**
@@ -147,13 +160,16 @@ public class ReachabilityService {
             this.maxJourneyMins = maxJourneyMinutes(request);
         }
 
-        /** Sends the stations not sent yet that have a path within the time limit among the given ones. */
+        /**
+         * Sends the stations not sent yet that have a path within the time limit among the given ones, as summaries:
+         * a station's journey is fetched when it is clicked ({@link #journey}).
+         */
         void sendNew(Map<String, List<JourneyPath>> pathsByStation) {
-            List<ReachableStation> stations = new ArrayList<>();
+            List<ReachableStationSummary> stations = new ArrayList<>();
             pathsByStation.forEach((stopId, paths) -> {
                 if (stopId.equals(request.getStartStationId()) || sent.contains(stopId)) return;
                 fewestTransfersWithin(paths, maxJourneyMins)
-                        .flatMap(path -> legBuilder.toReachableStation(stopId, path))
+                        .flatMap(path -> legBuilder.toSummary(stopId, path))
                         .ifPresent(station -> {
                             stations.add(station);
                             sent.add(stopId);
@@ -172,7 +188,7 @@ public class ReachabilityService {
         return paths.stream().filter(path -> path.getTotalDurationMinutes() <= maxJourneyMins).findFirst();
     }
 
-    private void flushBatch(SseEmitter emitter, List<ReachableStation> stations) {
+    private void flushBatch(SseEmitter emitter, List<ReachableStationSummary> stations) {
         try {
             emitter.send(SseEmitter.event().name("stations").data(stations));
         } catch (Exception e) {

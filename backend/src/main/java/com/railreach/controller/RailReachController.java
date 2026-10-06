@@ -2,6 +2,7 @@ package com.railreach.controller;
 
 import com.railreach.dto.ReachabilityRequest;
 import com.railreach.dto.ReachabilityResponse;
+import com.railreach.dto.ReachableStation;
 import com.railreach.model.Station;
 import com.railreach.service.ReachabilityService;
 import com.railreach.service.StationSearchIndex;
@@ -48,10 +49,11 @@ public class RailReachController {
     
     /**
      * Streaming reachability via Server-Sent Events.
-     * The frontend connects once and receives station batches as BFS discovers them.
+     * The frontend connects once and receives station batches as each round of the search finishes.
      *
      * Events emitted:
-     *   "stations" — JSON array of ReachableStation objects (batch)
+     *   "stations" — JSON array of ReachableStationSummary objects (batch); the journey comes from
+     *                /reachability/journey when a station is clicked
      *   "done"     — {"total": N, "calculationTimeMs": M}
      *   "error"    — error message string
      *
@@ -81,6 +83,28 @@ public class RailReachController {
                 reachabilityService.calculateReachabilityStreaming(req, emitter));
 
         return emitter;
+    }
+
+    /**
+     * One reachable station with its journey (path, legs, running days), for the same parameters as the stream.
+     * 404 if targetId is not reachable within them.
+     */
+    @GetMapping("/reachability/journey")
+    public ResponseEntity<ReachableStation> journey(
+            @RequestParam("stationId")           String stationId,
+            @RequestParam("maxTransfers")         int maxTransfers,
+            @RequestParam(value = "minTransferMinutes", defaultValue = "0")   int minTransferMinutes,
+            @RequestParam(value = "maxTransferMinutes", defaultValue = "180") int maxTransferMinutes,
+            @RequestParam(value = "maxJourneyHours", required = false) Double maxJourneyHours,
+            @RequestParam("targetId")             String targetId) {
+        ReachabilityRequest req = ReachabilityRequest.builder()
+                .startStationId(stationId)
+                .maxTransfers(maxTransfers)
+                .minTransferTimeMinutes(minTransferMinutes)
+                .maxTransferTimeMinutes(maxTransferMinutes)
+                .maxJourneyTimeHours(maxJourneyHours)
+                .build();
+        return ResponseEntity.of(reachabilityService.journey(req, targetId));
     }
 
     @PostMapping("/reachability")

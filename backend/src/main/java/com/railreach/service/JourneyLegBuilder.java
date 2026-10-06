@@ -2,6 +2,7 @@ package com.railreach.service;
 
 import com.railreach.dto.JourneyLeg;
 import com.railreach.dto.ReachableStation;
+import com.railreach.dto.ReachableStationSummary;
 import com.railreach.model.Connection;
 import com.railreach.model.JourneyPath;
 import com.railreach.model.Station;
@@ -13,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/** Turns a BFS path into the API's {@link ReachableStation}, with the rides and transfers as legs. */
+/** Turns a search path into the API's {@link ReachableStation}, with the rides and transfers as legs, or its summary. */
 @Component
 @RequiredArgsConstructor
 public class JourneyLegBuilder {
@@ -44,6 +45,22 @@ public class JourneyLegBuilder {
                 .legs(buildLegs(path.getConnections()))
                 .runningDays(JourneyRunningDays.describe(runningDays).orElse(null))
                 .hasCommonDay(!runningDays.isEmpty())
+                .build());
+    }
+
+    /** The station and the path's transfers and duration, without the journey; empty if the station is unknown. */
+    public Optional<ReachableStationSummary> toSummary(String stopId, JourneyPath path) {
+        Station station = transitGraph.getStation(stopId);
+        if (station == null) return Optional.empty();
+        return Optional.of(ReachableStationSummary.builder()
+                .stopId(stopId)
+                .stopName(station.getName())
+                .country(station.getCountry())
+                .latitude(station.getLatitude())
+                .longitude(station.getLongitude())
+                .transfers(path.getTransfers())
+                .totalDuration(GtfsTime.formatDuration(path.getTotalDurationMinutes()))
+                .totalDurationMinutes(path.getTotalDurationMinutes())
                 .build());
     }
 

@@ -51,6 +51,11 @@ export function openReachabilityStream(params) {
     return new EventSource(`${API_BASE}/api/reachability/stream?${new URLSearchParams(params)}`);
 }
 
+/** One reachable station with its journey; params are the stream's plus targetId. */
+export function fetchJourney(params) {
+    return requestJson(`/api/reachability/journey?${new URLSearchParams(params)}`);
+}
+
 export function fetchDebugStatus() {
     return adminJson('/api/admin/debug/status');
 }

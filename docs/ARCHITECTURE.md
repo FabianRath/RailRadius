@@ -38,7 +38,7 @@ RailReach/
 ├── frontend/index.html               # markup; served at / by Spring (static-locations: file:../frontend/)
 ├── frontend/css/app.css              # all styles and the map palette (CSS variables)
 ├── frontend/js/                      # ES modules: main (entry), api, map (only MapLibre user), search, query-form,
-│                                     #   reachability (SSE), coverage (Turf), station-details (clicked station's journey, shown over the side panel), journey (its lines on the map), debug, dev-auth (dev login), admin-panel (admin
+│                                     #   reachability (SSE; fetches a station's journey on click), coverage (Turf), station-details (clicked station's journey, shown over the side panel), journey (its lines on the map), debug, dev-auth (dev login), admin-panel (admin
 │                                     #   endpoints as buttons), feeds (Feeds tab of the admin panel), sidebar (collapse toggle), icons (vendored Lucide SVGs;
 │                                     #   `<span data-icon>` in the markup), util, config
 ├── frontend/backend_test.html        # small manual API test page
@@ -111,6 +111,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `ReachabilityRequest` | dto | startStationId, maxTransfers, maxJourneyTimeHours, min/maxTransferTimeMinutes |
 | `ReachabilityResponse` | dto | Start info, count, calcTime, list of `ReachableStation` |
 | `ReachableStation` | dto | Station (incl. country) + transfers, duration, path ids/names, `legs`, `runningDays` (summary, null without calendar data), `hasCommonDay` (false if the trains share no date: the search's day check is coarse) |
+| `ReachableStationSummary` | dto | What the stream sends per station: id, name, country, coordinates, transfers, duration; the journey is fetched on click |
 | `GtfsLoadStatus` | dto | `GtfsLoadProgress` snapshot plus live station/connection counts; ETA extrapolated from zip bytes parsed |
 | `JourneyLeg` | dto | `TRAIN` or `TRANSFER` leg with from/to station names, stop IDs and countries, times and duration; TRAIN legs also carry route name, train number, headsign and operator |
 | `FeedStatus` | dto | One zip: source, file name, size, download time, first/last service date, days left, state (`OK`, `EXPIRING`, `EXPIRED`, `NOT_YET_VALID`, `NO_CALENDAR`, `UNREADABLE`), download URL (the first one in `gtfs-feeds.txt`; null = updated by hand) |
@@ -176,7 +177,7 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 - Caffeine `"reachability"` cache holds full `ReachabilityResponse`s from `POST /api/reachability` (max 10k entries, 60 min TTL).
 - **Predictive warming**: after a streaming request with N < `predictive-max-transfers` (5), `ReachabilityWarmer` searches that maximum with the same transfer window on a background thread, into the raw cache only (the stream never reads Caffeine). Every count from N+1 up is then cut down from it.
 
-**Streaming** (`calculateReachabilityStreaming`): a search sends each round's stations as soon as the round ends; a stored result is sent at once. A station is sent once, with its first path within `maxJourneyHours`; paths come by ascending transfers, so that is the path the response picks too (B4), and a later round never changes a sent station. Stations go out as SSE `stations` events in batches of 30, followed by a `done` event (`{total, calculationTimeMs}`), or an `error` event on failure.
+**Streaming** (`calculateReachabilityStreaming`): a search sends each round's stations as soon as the round ends; a stored result is sent at once. A station is sent once, with its first path within `maxJourneyHours`; paths come by ascending transfers, so that is the path the response picks too (B4), and a later round never changes a sent station. Stations go out as `ReachableStationSummary`s (no path, legs or running days: on the full data those made the stream about 100 MB) in SSE `stations` events in batches of 30, followed by a `done` event (`{total, calculationTimeMs}`), or an `error` event on failure.
 
 ## REST API
 
@@ -184,6 +185,7 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/reachability/stream?stationId=&maxTransfers=&minTransferMinutes=0&maxTransferMinutes=180&maxJourneyHours=` | SSE; used by the frontend |
+| GET | `/reachability/journey?stationId=&maxTransfers=&minTransferMinutes=0&maxTransferMinutes=180&maxJourneyHours=&targetId=` | One station's `ReachableStation` (path, legs, running days) for the stream's parameters, built from the stored search result (searched again if it was evicted); 404 if the target is not reachable within them. The frontend calls it when a station is clicked |
 | POST | `/reachability` | JSON `ReachabilityRequest` → `ReachabilityResponse` (Caffeine-cached) |
 | GET | `/stations/search?q=&limit=50` | Case- and accent-insensitive substring match on any variant of the station name or of its `translations.txt` names (`StationNameVariants`; names are still returned in the local language); only stations with edges, sorted by degree. Candidates come from the rarest trigram of the query (`StationSearchIndex`); queries under 3 characters scan in degree order and stop at `limit`. Each result: id, name, latitude, longitude, country |
 | GET | `/stations/{id}` | Single station |
