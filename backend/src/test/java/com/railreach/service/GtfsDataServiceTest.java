@@ -68,6 +68,30 @@ class GtfsDataServiceTest {
     }
 
     @Test
+    void trainsThatRunOnFewerThanEightDaysAreNotLoaded(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, "eta");
+
+        assertThat(graph.getTripInfo("eta:HT5")).isEmpty();
+        assertThat(graph.getStation("eta:H4")).isNull();
+        assertThat(graph.getTripInfo("eta:HT2")).isPresent();
+    }
+
+    @Test
+    void daysOfATrainSplitIntoSeveralTripsAreCountedTogether(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, "eta");
+
+        assertThat(graph.getTripInfo("eta:HT6")).isPresent();
+        assertThat(graph.getTripInfo("eta:HT7")).isPresent();
+    }
+
+    @Test
+    void tripsWithoutTrainNumberAreKeptHoweverRarelyTheyRun(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, "zeta");
+
+        assertThat(graph.getTripInfo("zeta:ZT6")).isPresent();
+    }
+
+    @Test
     void tripsStayWholeWhenStopTimesAreReadInSmallBatches(@TempDir Path dir) throws Exception {
         TransitGraph graph = GtfsTestFixtures.load(dir, 1, "alpha");
 

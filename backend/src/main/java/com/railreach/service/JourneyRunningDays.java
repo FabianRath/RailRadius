@@ -20,16 +20,24 @@ final class JourneyRunningDays {
     private static final int MIN_PATTERN_DAYS = 4;
     private static final int MIN_RANGE_LENGTH = 3;
 
+    /** One ride of a journey: boarded on trip tripId at fromStopId, left at toStopId. */
+    record RideTimes(String tripId, String fromStopId, int departureSeconds, String toStopId, int arrivalSeconds) {}
+
+    /**
+     * The days, counted from the first train's service day, on which every ride so far runs; dayShift is how many
+     * days after the first train the last ride runs, arrivalSeconds when it arrives.
+     */
+    record SoFar(ServiceDays days, int dayShift, int arrivalSeconds) {
+
+        static final SoFar START = new SoFar(ServiceDays.EVERY_DAY, 0, 0);
+    }
+
     private JourneyRunningDays() {
     }
 
-    /**
-     * The days, counted from the first train's service day, on which every ride of the journey runs. A ride boarded
-     * at an earlier clock time than the previous one arrived runs a day later: that is the search's overnight transfer.
-     */
+    /** The days, counted from the first train's service day, on which every ride of the journey runs. */
     static ServiceDays of(List<Connection> connections, TransitGraph graph) {
-        ServiceDays days = ServiceDays.EVERY_DAY;
-        int dayShift = 0;
+        SoFar soFar = SoFar.START;
         int rideStart = 0;
         while (rideStart < connections.size()) {
             int rideEnd = rideStart;
@@ -38,14 +46,21 @@ final class JourneyRunningDays {
                 rideEnd++;
             }
             Connection board = connections.get(rideStart);
-            int previousArrivalSeconds = rideStart > 0 ? connections.get(rideStart - 1).getArrivalTimeSeconds() : 0;
-            if (board.getDepartureTimeSeconds() < previousArrivalSeconds) {
-                dayShift++;
-            }
-            days = days.intersect(rideDays(board, connections.get(rideEnd), graph), dayShift);
+            Connection alight = connections.get(rideEnd);
+            soFar = withRide(soFar, new RideTimes(board.getTripId(), board.getFromStopId(),
+                    board.getDepartureTimeSeconds(), alight.getToStopId(), alight.getArrivalTimeSeconds()), graph);
             rideStart = rideEnd + 1;
         }
-        return days;
+        return soFar.days();
+    }
+
+    /**
+     * The journey's days after one more ride. A ride boarded at an earlier clock time than the previous one arrived
+     * runs a day later: that is the search's overnight transfer.
+     */
+    static SoFar withRide(SoFar before, RideTimes ride, TransitGraph graph) {
+        int dayShift = ride.departureSeconds() < before.arrivalSeconds() ? before.dayShift() + 1 : before.dayShift();
+        return new SoFar(before.days().intersect(rideDays(ride, graph), dayShift), dayShift, ride.arrivalSeconds());
     }
 
     /**
@@ -53,13 +68,13 @@ final class JourneyRunningDays {
      * one train as several trips with different days (NS: train 9535 as 7 trips, one stop ID apart), and the search
      * keeps only the one it met first.
      */
-    private static ServiceDays rideDays(Connection board, Connection alight, TransitGraph graph) {
-        List<TripTimetable.Departure> departures = graph.getDeparturesAt(board.getFromStopId());
-        ServiceDays days = graph.getServiceDays(board.getTripId());
-        for (int i = firstDepartureAt(departures, board.getDepartureTimeSeconds()); i < departures.size()
-                && departures.get(i).departureSeconds() == board.getDepartureTimeSeconds(); i++) {
+    private static ServiceDays rideDays(RideTimes ride, TransitGraph graph) {
+        List<TripTimetable.Departure> departures = graph.getDeparturesAt(ride.fromStopId());
+        ServiceDays days = graph.getServiceDays(ride.tripId());
+        for (int i = firstDepartureAt(departures, ride.departureSeconds()); i < departures.size()
+                && departures.get(i).departureSeconds() == ride.departureSeconds(); i++) {
             TripTimetable.Departure twin = departures.get(i);
-            if (!twin.trip().tripId().equals(board.getTripId()) && arrivesLikeRide(twin, alight)) {
+            if (!twin.trip().tripId().equals(ride.tripId()) && arrivesLikeRide(twin, ride)) {
                 days = days.union(twin.trip().serviceDays());
             }
         }
@@ -78,12 +93,12 @@ final class JourneyRunningDays {
         return low;
     }
 
-    private static boolean arrivesLikeRide(TripTimetable.Departure departure, Connection alight) {
+    private static boolean arrivesLikeRide(TripTimetable.Departure departure, RideTimes ride) {
         TripTimetable trip = departure.trip();
         for (int stopIdx = departure.stopIdx() + 1; stopIdx < trip.stopCount() && trip.hasLeg(stopIdx - 1);
              stopIdx++) {
-            if (trip.stops().get(stopIdx).equals(alight.getToStopId())) {
-                return trip.arrivalSeconds(stopIdx) == alight.getArrivalTimeSeconds();
+            if (trip.stops().get(stopIdx).equals(ride.toStopId())) {
+                return trip.arrivalSeconds(stopIdx) == ride.arrivalSeconds();
             }
         }
         return false;

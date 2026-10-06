@@ -71,6 +71,11 @@ public record ServiceDays(int firstWord, long[] words) {
         return this != EVERY_DAY && words.length == 0;
     }
 
+    /** The number of days it runs; 0 for {@link #EVERY_DAY}. */
+    int dayCount() {
+        return Arrays.stream(words).mapToInt(Long::bitCount).sum();
+    }
+
     /** The epoch days, ascending. Empty for {@link #EVERY_DAY}. */
     IntStream epochDays() {
         return IntStream.range(0, words.length).flatMap(i -> BitSet.valueOf(new long[] {words[i]}).stream()
