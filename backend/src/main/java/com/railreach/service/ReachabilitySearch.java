@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.IntStream;
 
 /**
  * Transfer-bounded search over the {@link TransitGraph}, one round per transfer (like RAPTOR, but without a start
@@ -41,6 +42,11 @@ import java.util.function.Consumer;
  * <p>
  * A station's path with k transfers is chosen as soon as round k ends: later rounds only add rides with more
  * transfers. So each round's new paths can be handed out before the search goes on.
+ * <p>
+ * Within a round, stations choose what to board in parallel: that only reads what earlier rounds wrote. Riding the
+ * boarded trips writes the shared per-trip state, so it runs afterwards in station order, and the result is the
+ * same as on one thread. The work is CPU-bound, so it uses the common fork-join pool (one thread per core), not the
+ * virtual threads Spring runs requests on.
  */
 @Component
 @Slf4j
@@ -80,6 +86,13 @@ public class ReachabilitySearch {
         }
     }
 
+    /** A departure boarded from an arrival: the days of the departing trip it gives, and the journey time so far. */
+    private record Boarding(TripTimetable.Departure departure, Ride from, long days, int boardMinutes) {}
+
+    /** What one station boards in a round, in departure order, with the windows that hold its fallback counts. */
+    private record StationBoardings(List<Boarding> boardings, int departureCount, TransferWindow sameDay,
+                                    TransferWindow overnight) {}
+
     /** The previous round's arrivals at one station, sorted by arrival time, with their transfer windows. */
     private record StationArrivals(List<Ride> rides, TransferWindow sameDay, TransferWindow overnight) {
 
@@ -97,56 +110,7 @@ public class ReachabilitySearch {
                                int maxTransferMins, long[] tripDays, TripProgress[] progressByTrip,
                                Map<String, StationCandidates> bestByStation, List<StationCandidates> roundStations,
                                Map<String, List<JourneyPath>> paths, Map<Ride, JourneyRunningDays.SoFar> daysByRide,
-                               Counters counters) {}
-
-    /** What a search did, for its log: where the time goes on large data. */
-    private static final class Counters {
-
-        private long departuresScanned;
-        private long fallbackScans;
-        private long fallbackScannedArrivals;
-        private long pathsNanos;
-
-        void addFallbacks(TransferWindow window) {
-            fallbackScans += window.fallbackScanCount();
-            fallbackScannedArrivals += window.fallbackScannedArrivals();
-        }
-    }
-
-    /**
-     * Per stop of a trip: the shortest duration that reached it there, the days of that ride, and the days of every
-     * ride recorded there. Rides of one trip arrive at a stop at the same time and catch the same trains from there,
-     * so a ride is cut off where it is no faster and all its days are already reached. On some of those days the
-     * journey shown can then be a bit slower than the fastest possible.
-     */
-    private static final class TripProgress {
-
-        private final int[] durationMinutes;
-        private final long[] fastestDays;
-        private final long[] reachedDays;
-
-        TripProgress(int stopCount) {
-            durationMinutes = new int[stopCount];
-            Arrays.fill(durationMinutes, Integer.MAX_VALUE);
-            fastestDays = new long[stopCount];
-            reachedDays = new long[stopCount];
-        }
-
-        boolean reachedNoSlower(int stopIdx, int rideMinutes, long rideDays) {
-            return durationMinutes[stopIdx] <= rideMinutes && (rideDays & ~reachedDays[stopIdx]) == 0;
-        }
-
-        boolean reachedFaster(int stopIdx, int rideMinutes, long rideDays) {
-            return durationMinutes[stopIdx] < rideMinutes && (rideDays & ~fastestDays[stopIdx]) == 0;
-        }
-
-        void record(int stopIdx, int rideMinutes, long rideDays) {
-            reachedDays[stopIdx] |= rideDays;
-            if (rideMinutes >= durationMinutes[stopIdx]) return;
-            durationMinutes[stopIdx] = rideMinutes;
-            fastestDays[stopIdx] = rideDays;
-        }
-    }
+                               SearchCounters counters) {}
 
     /**
      * The candidate rides of a station's result, by ascending transfers: per transfer count the fastest one and those
@@ -192,7 +156,7 @@ public class ReachabilitySearch {
     public Map<String, List<JourneyPath>> search(String startId, int maxTransfers, int minTransferMins,
                                                  int maxTransferMins,
                                                  Consumer<Map<String, List<JourneyPath>>> roundPaths) {
-        Counters counters = new Counters();
+        SearchCounters counters = new SearchCounters();
         SearchTimetables timetables = transitGraph.searchTimetables();
         // Candidates share their earlier rides, so each ride's days are worked out once. Identity keys: a Ride's
         // record hash would walk its whole previous chain.
@@ -256,9 +220,9 @@ public class ReachabilitySearch {
         if (!added.isEmpty()) roundPaths.accept(added);
     }
 
-    // Counters are cumulative, so a round's share is the difference to the previous log line
+    // SearchCounters are cumulative, so a round's share is the difference to the previous log line
     private static void logRound(int transfers, int arrivalCount, SearchState state, long startNanos) {
-        Counters counters = state.counters();
+        SearchCounters counters = state.counters();
         log.debug("  Round {}: {} stop arrivals, {} stations, {} ms; so far {} departures scanned, "
                         + "{} fallback scans over {} arrivals", transfers, arrivalCount, state.bestByStation().size(),
                 millisSince(startNanos), counters.departuresScanned, counters.fallbackScans,
@@ -281,18 +245,30 @@ public class ReachabilitySearch {
             if (isOvertaken(state, arrival)) continue;
             arrivalsByStation.computeIfAbsent(arrival.stationId(), id -> new ArrayList<>()).add(arrival);
         }
+        List<Map.Entry<String, List<Ride>>> stations = new ArrayList<>(arrivalsByStation.entrySet());
+        List<StationBoardings> boardings = IntStream.range(0, stations.size()).parallel()
+                .mapToObj(i -> boardingsAt(state, stations.get(i).getKey(), stations.get(i).getValue()))
+                .toList();
         List<Ride> arrivals = new ArrayList<>();
-        arrivalsByStation.forEach((stationId, stationArrivals) ->
-                transferAt(state, stationId, stationArrivals, transfers, arrivals));
+        SearchCounters counters = state.counters();
+        for (StationBoardings station : boardings) {
+            counters.departuresScanned += station.departureCount();
+            counters.addFallbacks(station.sameDay());
+            counters.addFallbacks(station.overnight());
+            for (Boarding boarding : station.boardings()) {
+                ride(state, boarding.departure(), transfers, boarding.boardMinutes(), boarding.from(),
+                        boarding.days(), arrivals);
+            }
+        }
         return arrivals;
     }
 
     /**
-     * Boards every departure at the station from the arrivals that catch it with the shortest journey so far (see
-     * {@link #board}). Waits past midnight get their own window, with the arrivals moved a day back.
+     * What every departure at the station boards: the arrivals that catch it with the shortest journey so far (see
+     * {@link #board}). Waits past midnight get their own window, with the arrivals moved a day back. Only reads the
+     * search state.
      */
-    private void transferAt(SearchState state, String stationId, List<Ride> stationArrivals, int transfers,
-                            List<Ride> arrivals) {
+    private static StationBoardings boardingsAt(SearchState state, String stationId, List<Ride> stationArrivals) {
         stationArrivals.sort(Comparator.comparingInt(Ride::arrivalSeconds));
         int[] arrivalSeconds = stationArrivals.stream().mapToInt(Ride::arrivalSeconds).toArray();
         int[] durationMinutes = stationArrivals.stream().mapToInt(Ride::durationMinutes).toArray();
@@ -305,12 +281,11 @@ public class ReachabilitySearch {
         StationArrivals station = new StationArrivals(stationArrivals, sameDay, overnight);
 
         List<TripTimetable.Departure> departures = state.timetables().departuresAt(stationId);
-        state.counters().departuresScanned += departures.size();
+        List<Boarding> boardings = new ArrayList<>();
         for (TripTimetable.Departure departure : departures) {
-            board(state, departure, station, transfers, arrivals);
+            board(state, departure, station, boardings);
         }
-        state.counters().addFallbacks(sameDay);
-        state.counters().addFallbacks(overnight);
+        return new StationBoardings(boardings, departures.size(), sameDay, overnight);
     }
 
     /**
@@ -319,8 +294,8 @@ public class ReachabilitySearch {
      * trip on the same days with as many transfers but longer, so it is not needed. Only arrivals whose journey runs
      * on a day that fits the departure's trip count.
      */
-    private void board(SearchState state, TripTimetable.Departure departure, StationArrivals station, int transfers,
-                       List<Ride> arrivals) {
+    private static void board(SearchState state, TripTimetable.Departure departure, StationArrivals station,
+                              List<Boarding> boardings) {
         TripTimetable next = departure.trip();
         if (!state.timetables().regularDepartures(next)[departure.stopIdx()]) return;
         long nextDays = state.tripDays()[next.index()];
@@ -337,7 +312,7 @@ public class ReachabilitySearch {
             served |= days;
             // Timetables are shared per trip. Staying on this trip beats changing onto it from any arrival.
             if (from.trip() != next) {
-                ride(state, departure, transfers, boardingMinutes(from, departure), from, days, arrivals);
+                boardings.add(new Boarding(departure, from, days, boardingMinutes(from, departure)));
             }
         }
     }
