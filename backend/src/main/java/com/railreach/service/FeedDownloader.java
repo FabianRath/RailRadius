@@ -124,7 +124,9 @@ public class FeedDownloader {
             LocalDate today) throws IOException {
         FeedValidity validity;
         try (ZipFile zipFile = new ZipFile(part.toFile())) {
-            List<String> missing = REQUIRED_FILES.stream().filter(name -> zipFile.getEntry(name) == null).toList();
+            List<String> missing = REQUIRED_FILES.stream()
+                    .filter(name -> GtfsCsvReader.findEntry(zipFile, name).isEmpty())
+                    .toList();
             if (!missing.isEmpty()) return Optional.of("Not a GTFS feed, missing " + String.join(", ", missing));
             if (!RailTripReader.hasRailRoutes(zipFile)) return Optional.of("No rail routes in routes.txt");
             Optional<FeedValidity> read = FeedValidity.read(zipFile);

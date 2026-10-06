@@ -108,6 +108,11 @@ final class GtfsTestFixtures {
         zipFolder(resource("gtfs-mini/" + feedFolder), zipFile);
     }
 
+    /** Like {@link #zipFeed}, with every file inside {@code entryFolder} instead of at the top level (B35). */
+    static void zipFeedInFolder(String feedFolder, Path zipFile, String entryFolder) throws IOException {
+        zipFolder(resource("gtfs-mini/" + feedFolder), zipFile, entryFolder + "/");
+    }
+
     static Path resource(String name) {
         try {
             return Path.of(GtfsTestFixtures.class.getClassLoader().getResource(name).toURI());
@@ -117,11 +122,15 @@ final class GtfsTestFixtures {
     }
 
     static void zipFolder(Path folder, Path zipFile) throws IOException {
+        zipFolder(folder, zipFile, "");
+    }
+
+    private static void zipFolder(Path folder, Path zipFile, String entryPrefix) throws IOException {
         try (OutputStream out = Files.newOutputStream(zipFile);
              ZipOutputStream zip = new ZipOutputStream(out);
              Stream<Path> files = Files.list(folder)) {
             for (Path file : (Iterable<Path>) files.filter(p -> p.toString().endsWith(".txt"))::iterator) {
-                zip.putNextEntry(new ZipEntry(file.getFileName().toString()));
+                zip.putNextEntry(new ZipEntry(entryPrefix + file.getFileName()));
                 Files.copy(file, zip);
                 zip.closeEntry();
             }

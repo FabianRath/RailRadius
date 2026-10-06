@@ -294,7 +294,7 @@ public class GtfsFeedLoader {
 
     /** Returns the number of connections added. */
     private int loadStopTimes(ZipFile zipFile, FeedTables tables, TransitGraph graph) throws IOException {
-        if (zipFile.getEntry("stop_times.txt") == null) {
+        if (GtfsCsvReader.findEntry(zipFile, "stop_times.txt").isEmpty()) {
             log.warn("  No stop_times.txt found");
             return 0;
         }
