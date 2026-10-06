@@ -10,7 +10,6 @@ const FIT_PADDING_PX = 50;
 const FIT_MAX_ZOOM = 12;
 const RAILWAY_MIN_ZOOM = 8;
 const POPUP_MAX_WIDTH = '360px';
-const POPUP_SCREEN_MARGIN_PX = 10;
 const JOURNEY_LINE_WIDTH_PX = 3;
 const EMPTY_COLLECTION = { type: 'FeatureCollection', features: [] };
 
@@ -149,28 +148,32 @@ export function fitToPoints(points) {
     map.fitBounds(bounds, { padding: FIT_PADDING_PX, maxZoom: FIT_MAX_ZOOM });
 }
 
-/**
- * Shows a popup with buildHtml(featureProperties) when a point of the layer is clicked, and calls onClose (optional)
- * when it closes. Clicking another point may close the old popup after the new one opened, so only the current
- * popup's close counts.
- */
-export function bindPopup(layerId, buildHtml, onClose) {
-    let currentPopup = null;
-    map.on('click', layerId, e => {
-        const feature = e.features[0];
+/** Shows a popup with buildHtml(featureProperties) when a point of the layer is clicked. */
+export function bindPopup(layerId, buildHtml) {
+    bindClick(layerId, feature => {
         const popup = new Popup({ maxWidth: POPUP_MAX_WIDTH, className: 'station-popup' })
             .setLngLat(feature.geometry.coordinates)
             .setHTML(buildHtml(feature.properties))
             .addTo(map);
-        currentPopup = popup;
-        popup.on('close', () => {
-            if (popup !== currentPopup) return;
-            currentPopup = null;
-            onClose?.();
-        });
         snapToWholePixels(popup.getElement());
-        panIntoView(popup.getElement());
     });
+}
+
+/** Calls callback(featureProperties) when a point of the layer is clicked. */
+export function onPointClick(layerId, callback) {
+    bindClick(layerId, feature => callback(feature.properties));
+}
+
+/** Calls callback when the map is clicked anywhere but on a point. */
+export function onEmptyMapClick(callback) {
+    map.on('click', e => {
+        const hits = map.queryRenderedFeatures(e.point, { layers: [LAYERS.reachable, LAYERS.debug] });
+        if (hits.length === 0) callback();
+    });
+}
+
+function bindClick(layerId, onClick) {
+    map.on('click', layerId, e => onClick(e.features[0]));
     map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
 }
@@ -185,26 +188,6 @@ function snapToWholePixels(popupElement) {
     const inner = content.getBoundingClientRect();
     content.style.width = `${inner.width + roundUpToEven(outer.width) - outer.width}px`;
     content.style.height = `${inner.height + roundUpToEven(outer.height) - outer.height}px`;
-}
-
-/**
- * MapLibre only picks the side of the point with more room; it never moves the map. A long journey near the top
- * edge is placed below the point and its bottom is cut off, so pan until the whole popup is visible.
- */
-function panIntoView(popupElement) {
-    const popupRect = popupElement.getBoundingClientRect();
-    const mapRect = map.getContainer().getBoundingClientRect();
-    const dx = panToFit(popupRect.left, popupRect.right, mapRect.left, mapRect.right);
-    const dy = panToFit(popupRect.top, popupRect.bottom, mapRect.top, mapRect.bottom);
-    if (dx !== 0 || dy !== 0) map.panBy([dx, dy]);
-}
-
-/** Pixels to pan so [start, end] lies within [min, max] plus margin; if it cannot fit, its start stays visible. */
-function panToFit(start, end, min, max) {
-    const startOverflow = min + POPUP_SCREEN_MARGIN_PX - start;
-    if (startOverflow > 0) return -startOverflow;
-    const endOverflow = end - (max - POPUP_SCREEN_MARGIN_PX);
-    return Math.min(Math.max(endOverflow, 0), -startOverflow);
 }
 
 function roundUpToEven(px) {

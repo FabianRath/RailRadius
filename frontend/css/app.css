@@ -69,6 +69,8 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    /* Anchors the station details, which cover the whole panel */
+    position: relative;
 }
 
 .header {
@@ -577,6 +579,55 @@ input[type="range"]::-moz-range-thumb {
     color: var(--accent-rail);
 }
 
+/* ── Station details (covers the side panel) ── */
+.station-details {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+}
+
+.station-details-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 28px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.station-details-header .section-title {
+    margin-bottom: 0;
+}
+
+.station-details-close {
+    width: 32px;
+    height: 32px;
+    background: var(--bg-overlay);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.station-details-close:hover {
+    border-color: var(--accent-rail);
+    color: var(--accent-rail);
+}
+
+.station-details-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 28px;
+}
+
+.station-details-body .popup-station {
+    font-size: 18px;
+}
+
 /* ── Map and popups ── */
 #map {
     width: 100%;
@@ -590,9 +641,6 @@ input[type="range"]::-moz-range-thumb {
     border-radius: 8px;
     border: 1px solid var(--border);
     padding: 12px 16px;
-    /* Grows with the journey; scrolls only when it would not fit on screen at all */
-    max-height: 85vh;
-    overflow-y: auto;
 }
 
 .station-popup .maplibregl-popup-close-button {

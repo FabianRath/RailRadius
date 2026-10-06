@@ -1,7 +1,6 @@
 import { fetchHealth } from './api.js';
-import { bindPopup, clearJourney, initMap, LAYERS, onZoomEnd, showJourney } from './map.js';
-import { journeyRoute } from './journey.js';
-import { stationPopupHtml } from './popup.js';
+import { initMap, LAYERS, onEmptyMapClick, onPointClick, onZoomEnd } from './map.js';
+import { closeStationDetails, initStationDetails, showStationDetails } from './station-details.js';
 import { initSearch } from './search.js';
 import { initSidebarToggle } from './sidebar.js';
 import { initQueryForm, showQueryForm } from './query-form.js';
@@ -26,11 +25,9 @@ fetchHealth()
 renderStaticIcons();
 initSidebarToggle();
 await initMap('map');
-bindPopup(LAYERS.reachable, ({ stopId }) => {
-    const station = getStation(stopId);
-    showJourney(journeyRoute(station));
-    return stationPopupHtml(station);
-}, clearJourney);
+initStationDetails();
+onPointClick(LAYERS.reachable, ({ stopId }) => showStationDetails(getStation(stopId)));
+onEmptyMapClick(closeStationDetails);
 
 initSearch(station => {
     selectedStation = station;

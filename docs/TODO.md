@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B32 · F23 · S12
+**Next free IDs:** B32 · F24 · S12
 
 ## Bugs (data loading)
 - [ ] **B29** (High priority) The cross-border name merge (`StationDeduplicator`, Jaccard ≥ 0.4 within 500 m) leaves about 28 stations duplicated within 400 m, found in the full cache of 2026-10-05. Trains don't connect between the two copies. Causes and examples: (1) Cyrillic vs Latin names: 9 stations of the Bulgarian and the Turkish feed, e.g. "Централна гара София" / "SOFYA(SOFIA)", Plovdiv, Ruse; (2) Italian abbreviations: "Bologna Centrale" (Italo) / "BOLOGNA C.LE" (Trenitalia) 3 m apart, "S.DONA' DI PIAVE", "NA Afragola PES", "Szkl. Poręba Górna"; (3) ø not folded: "København H" / "Koebenhavn H" (70 m); (4) one name is part of the other: "Split" / "Split željeznički kolodvor", "Malahide" / "Malahide railway station", Peschiera, Chambéry, Scalea, Fortezza; also Roissy CDG 2 (Eurostar vs Swiss feed) and the sleeper's "Berlin Ostbf" next to "S Ostbahnhof (Berlin)". Possible fixes, in order of reach: merge within the radius when one name's words are all in the other's, ignoring generic words (railway station, Bahnhof, kolodvor, …); fold ø/æ/ß and transliterate Cyrillic; expand common Italian abbreviations (C.LE, S.). Don't merge nearby but separate stations: Madrid Atocha Cercanías / Atocha (124 m) and Málaga M.Z. Cercanías / María Zambrano are separate stations; Avignon Centre / Avignon-TGV show 33 m apart only because one feed has wrong coordinates.
@@ -16,6 +16,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (caching / infrastructure)
 
 ## Features / UX
-- [ ] **F22** Show the connection details in the side panel instead of a popup on the map. Since F21 draws the journey as lines, the popup next to the clicked station covers a large part of that route; it can also be cut off at the top or bottom of the screen (F20 only works around this by panning the map). Show the station's details (journey, legs, running days) on top of the side panel on the left, so the map stays clear. Closing that view removes the lines and shows all stations again, like closing the popup does now.
+- [ ] **F23** (Decide first) While a station's journey is shown (F21), the dots of the stations it passes through keep their own transfer-level colour, so they don't always match the line colour of the train passing them (first train green, second cyan, …): a stop on the third train can be green because another train reaches it directly. The route looks inconsistent, but the colour also tells the user that this stop can be reached with fewer transfers, and clicking it shows that shorter journey. Options: (1) recolour the path's dots by the train they are on while the journey is shown; (2) keep the station's own colour (current behaviour), maybe explained in the details panel; (3) both, e.g. the train's colour as fill and the station's own level as outline. Decide with the user, then implement.
 
 ## Structure
