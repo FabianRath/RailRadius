@@ -1,4 +1,4 @@
-import { openReachabilityStream } from './api.js';
+import { fetchJourney, openReachabilityStream } from './api.js';
 import { addReachableStations, clearReachableStations, fitToPoints, getZoom, hasCoordinates, setCoverage }
     from './map.js';
 import { buildCoverage } from './coverage.js';
@@ -12,10 +12,13 @@ const maxTransfersUsed = document.getElementById('maxTransfersUsed');
 const loadingOverlay = document.getElementById('loadingOverlay');
 const loadingCount = document.getElementById('loadingCount');
 
-// stopId -> station as sent by the stream
+// stopId -> station as sent by the stream: position, transfers and duration, without the journey
 const results = new Map();
 // Finished queries by cacheKey(); repeating one skips the backend entirely
 const localResultsCache = new Map();
+// The shown query's stream parameters, and its stations' journeys fetched so far (stopId -> station)
+let shownParams = null;
+let journeys = new Map();
 let activeStream = null;
 // Until the first round's stations arrive, the overlay shows elapsed time
 let elapsedTimer = null;
@@ -36,6 +39,18 @@ export function getStation(stopId) {
     return results.get(stopId);
 }
 
+/** The station with its journey (path, legs, running days), fetched on first use for the shown query. */
+export async function getJourney(stopId) {
+    // A new query may start while this one loads; its journey must not land in the new query's map
+    const queryJourneys = journeys;
+    let journey = queryJourneys.get(stopId);
+    if (!journey) {
+        journey = await fetchJourney({ ...shownParams, targetId: stopId });
+        queryJourneys.set(stopId, journey);
+    }
+    return journey;
+}
+
 export function refreshCoverage() {
     setCoverage(coverageEnabled() ? buildCoverage(results.values(), getZoom()) : null);
 }
@@ -51,6 +66,8 @@ function calculate(station) {
     console.log('Reachability query:', key);
 
     clearStatus();
+    shownParams = streamParams(station.id, query);
+    journeys = new Map();
     results.clear();
     clearReachableStations();
     setCoverage(null);
@@ -64,10 +81,10 @@ function calculate(station) {
         refreshCoverage();
         return;
     }
-    streamResults(station.id, query, key);
+    streamResults(shownParams, key);
 }
 
-function streamResults(stationId, query, key) {
+function streamParams(stationId, query) {
     const params = {
         stationId,
         maxTransfers: query.maxTransfers,
@@ -75,7 +92,10 @@ function streamResults(stationId, query, key) {
         maxTransferMinutes: query.maxTransferMinutes
     };
     if (query.maxJourneyHours != null) params.maxJourneyHours = query.maxJourneyHours;
+    return params;
+}
 
+function streamResults(params, key) {
     setLoadingState(true);
     reachableCount.textContent = '…';
     const stream = openReachabilityStream(params);

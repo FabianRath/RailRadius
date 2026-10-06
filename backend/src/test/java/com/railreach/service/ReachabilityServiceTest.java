@@ -4,6 +4,7 @@ import com.railreach.dto.JourneyLeg;
 import com.railreach.dto.ReachabilityRequest;
 import com.railreach.dto.ReachabilityResponse;
 import com.railreach.dto.ReachableStation;
+import com.railreach.dto.ReachableStationSummary;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 class ReachabilityServiceTest {
 
@@ -371,9 +373,44 @@ class ReachabilityServiceTest {
                 .filter(station -> !station.getStopId().equals("epsilon:E1"))
                 .toList();
 
-        assertThat(emitter.streamedStations()).usingRecursiveFieldByFieldElementComparator()
-                .containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(emitter.streamedStations())
+                .extracting(ReachableStationSummary::getStopId, ReachableStationSummary::getTransfers,
+                        ReachableStationSummary::getTotalDurationMinutes)
+                .containsExactlyInAnyOrderElementsOf(expected.stream()
+                        .map(station -> tuple(station.getStopId(), station.getTransfers(),
+                                station.getTotalDurationMinutes()))
+                        .toList());
         assertThat(emitter.streamedStopIds()).contains("epsilon:E6");
+    }
+
+    @Test
+    void journeyOfAStationIsItsStationInTheResponse() {
+        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs);
+        ReachabilityRequest request = ReachabilityRequest.builder()
+                .startStationId("alpha:A1")
+                .maxTransfers(1)
+                .minTransferTimeMinutes(0)
+                .maxTransferTimeMinutes(180)
+                .build();
+
+        ReachableStation journey = service.journey(request, "beta:B2").orElseThrow();
+
+        assertThat(journey).usingRecursiveComparison()
+                .isEqualTo(find(service.calculateReachability(request), "beta:B2").orElseThrow());
+    }
+
+    @Test
+    void journeyToAStationOutOfReachOrToTheStartIsEmpty() {
+        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs);
+        ReachabilityRequest request = ReachabilityRequest.builder()
+                .startStationId("alpha:A1")
+                .maxTransfers(0)
+                .minTransferTimeMinutes(0)
+                .maxTransferTimeMinutes(180)
+                .build();
+
+        assertThat(service.journey(request, "beta:B2")).isEmpty();
+        assertThat(service.journey(request, "alpha:A1")).isEmpty();
     }
 
     /** Captures the data objects of every sent SSE event instead of writing them to a response. */
@@ -387,16 +424,16 @@ class ReachabilityServiceTest {
                     .forEach(payloads::add);
         }
 
-        List<ReachableStation> streamedStations() {
+        List<ReachableStationSummary> streamedStations() {
             return payloads.stream()
                     .filter(List.class::isInstance)
                     .flatMap(batch -> ((List<?>) batch).stream())
-                    .map(ReachableStation.class::cast)
+                    .map(ReachableStationSummary.class::cast)
                     .toList();
         }
 
         List<String> streamedStopIds() {
-            return streamedStations().stream().map(ReachableStation::getStopId).toList();
+            return streamedStations().stream().map(ReachableStationSummary::getStopId).toList();
         }
 
         Map<?, ?> done() {
