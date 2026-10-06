@@ -353,6 +353,29 @@ class ReachabilityServiceTest {
         assertThat(repeat.done().get("total")).isEqualTo(repeat.streamedStopIds().size());
     }
 
+    // B4 while streaming by round: E6 is first reached in round 1, but only round 2 brings it within the time limit
+    @Test
+    void streamWithATimeLimitSendsTheSameStationsAsTheResponse(@TempDir Path dir) throws Exception {
+        ReachabilityService service = GtfsTestFixtures.reachabilityService(GtfsTestFixtures.load(dir, "epsilon"));
+        ReachabilityRequest request = ReachabilityRequest.builder()
+                .startStationId("epsilon:E1")
+                .maxTransfers(2)
+                .minTransferTimeMinutes(0)
+                .maxTransferTimeMinutes(99999)
+                .maxJourneyTimeHours(2.0)
+                .build();
+
+        RecordingEmitter emitter = new RecordingEmitter();
+        service.calculateReachabilityStreaming(request, emitter);
+        List<ReachableStation> expected = service.calculateReachability(request).getReachableStations().stream()
+                .filter(station -> !station.getStopId().equals("epsilon:E1"))
+                .toList();
+
+        assertThat(emitter.streamedStations()).usingRecursiveFieldByFieldElementComparator()
+                .containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(emitter.streamedStopIds()).contains("epsilon:E6");
+    }
+
     /** Captures the data objects of every sent SSE event instead of writing them to a response. */
     private static class RecordingEmitter extends SseEmitter {
         final List<Object> payloads = new ArrayList<>();
@@ -364,12 +387,16 @@ class ReachabilityServiceTest {
                     .forEach(payloads::add);
         }
 
-        List<String> streamedStopIds() {
+        List<ReachableStation> streamedStations() {
             return payloads.stream()
                     .filter(List.class::isInstance)
                     .flatMap(batch -> ((List<?>) batch).stream())
-                    .map(station -> ((ReachableStation) station).getStopId())
+                    .map(ReachableStation.class::cast)
                     .toList();
+        }
+
+        List<String> streamedStopIds() {
+            return streamedStations().stream().map(ReachableStation::getStopId).toList();
         }
 
         Map<?, ?> done() {

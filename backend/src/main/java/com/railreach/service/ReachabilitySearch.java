@@ -15,9 +15,8 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+import java.util.function.Consumer;
 
 /**
  * Transfer-bounded search over the {@link TransitGraph}, one round per transfer (like RAPTOR, but without a start
@@ -39,6 +38,9 @@ import java.util.stream.Collectors;
  * A station's result is not always the fastest journey: one up to {@link #MAX_SLOWER_MINUTES} slower is shown
  * instead if it runs on many more days ({@link RegularJourneyChooser}). Transfers still continue from the fastest
  * arrival.
+ * <p>
+ * A station's path with k transfers is chosen as soon as round k ends: later rounds only add rides with more
+ * transfers. So each round's new paths can be handed out before the search goes on.
  */
 @Component
 @Slf4j
@@ -88,11 +90,14 @@ public class ReachabilitySearch {
 
     /**
      * tripDays are the trips' {@link WeekPeriodDays} and progressByTrip their progress, both by
-     * {@link TripTimetable#index()}; progress is null for a trip no ride reached yet.
+     * {@link TripTimetable#index()}; progress is null for a trip no ride reached yet. roundStations holds the
+     * stations that got a ride in the running round, paths the chosen paths so far.
      */
     private record SearchState(SearchTimetables timetables, String startId, int startIndex, int minTransferMins,
                                int maxTransferMins, long[] tripDays, TripProgress[] progressByTrip,
-                               Map<String, StationCandidates> bestByStation, Counters counters) {}
+                               Map<String, StationCandidates> bestByStation, List<StationCandidates> roundStations,
+                               Map<String, List<JourneyPath>> paths, Map<Ride, JourneyRunningDays.SoFar> daysByRide,
+                               Counters counters) {}
 
     /** What a search did, for its log: where the time goes on large data. */
     private static final class Counters {
@@ -100,6 +105,7 @@ public class ReachabilitySearch {
         private long departuresScanned;
         private long fallbackScans;
         private long fallbackScannedArrivals;
+        private long pathsNanos;
 
         void addFallbacks(TransferWindow window) {
             fallbackScans += window.fallbackScanCount();
@@ -149,10 +155,15 @@ public class ReachabilitySearch {
      */
     private static final class StationCandidates {
 
+        private final String stationId;
         private final List<Ride> rides = new ArrayList<>();
         private int transfers = -1;
         private int fastestWithFewerMinutes = Integer.MAX_VALUE;
         private int fastestMinutes = Integer.MAX_VALUE;
+
+        StationCandidates(String stationId) {
+            this.stationId = stationId;
+        }
 
         void offer(Ride ride) {
             if (ride.transfers() != transfers) {
@@ -176,38 +187,73 @@ public class ReachabilitySearch {
      * Every station reachable from startId with at most maxTransfers. Per station: the fastest path for each
      * transfer count that is faster than every path with fewer transfers, ordered by ascending transfers. So the
      * first path has the fewest transfers and the last one is the fastest. The start station maps to an empty path.
+     * After each round, roundPaths gets the paths that round added, per station (never the start station).
      */
-    public Map<String, List<JourneyPath>> search(String startId, int maxTransfers,
-                                                 int minTransferMins, int maxTransferMins) {
+    public Map<String, List<JourneyPath>> search(String startId, int maxTransfers, int minTransferMins,
+                                                 int maxTransferMins,
+                                                 Consumer<Map<String, List<JourneyPath>>> roundPaths) {
         Counters counters = new Counters();
         SearchTimetables timetables = transitGraph.searchTimetables();
+        // Candidates share their earlier rides, so each ride's days are worked out once. Identity keys: a Ride's
+        // record hash would walk its whole previous chain.
         SearchState state = new SearchState(timetables, startId, timetables.stationIndex(startId), minTransferMins,
                 maxTransferMins, timetables.weekPeriodDays(transitGraph.todayEpochDay()),
-                new TripProgress[timetables.tripCount()], new HashMap<>(), counters);
-        long roundsStartNanos = System.nanoTime();
+                new TripProgress[timetables.tripCount()], new HashMap<>(), new ArrayList<>(), new HashMap<>(),
+                new IdentityHashMap<>(), counters);
+        long startNanos = System.nanoTime();
         List<Ride> arrivals = new ArrayList<>();
         for (TripTimetable.Departure departure : timetables.departuresAt(startId)) {
             long days = state.tripDays()[departure.trip().index()];
             if (days != 0) ride(state, departure, 0, 0, null, days, arrivals);
         }
         long arrivalCount = arrivals.size();
-        logRound(0, arrivals.size(), state, roundsStartNanos);
+        finishRound(state, 0, roundPaths);
+        logRound(0, arrivals.size(), state, startNanos);
         for (int transfers = 1; transfers <= maxTransfers && !arrivals.isEmpty(); transfers++) {
             long roundStartNanos = System.nanoTime();
             arrivals = transferRound(state, arrivals, transfers);
             arrivalCount += arrivals.size();
+            finishRound(state, transfers, roundPaths);
             logRound(transfers, arrivals.size(), state, roundStartNanos);
         }
-        long roundsMs = millisSince(roundsStartNanos);
 
-        long pathsStartNanos = System.nanoTime();
-        Map<String, List<JourneyPath>> result = toJourneyPaths(state);
-        log.info("  Search stats: {} stop arrivals on {} trips, {} stations; rounds {} ms, paths {} ms; "
+        log.info("  Search stats: {} stop arrivals on {} trips, {} stations; {} ms, of which choosing paths {} ms; "
                         + "{} departures scanned, {} fallback scans over {} arrivals",
-                arrivalCount, reachedTripCount(state), state.bestByStation().size() + 1, roundsMs,
-                millisSince(pathsStartNanos), counters.departuresScanned, counters.fallbackScans,
-                counters.fallbackScannedArrivals);
+                arrivalCount, reachedTripCount(state), state.bestByStation().size() + 1, millisSince(startNanos),
+                TimeUnit.NANOSECONDS.toMillis(counters.pathsNanos), counters.departuresScanned,
+                counters.fallbackScans, counters.fallbackScannedArrivals);
+        Map<String, List<JourneyPath>> result = state.paths();
+        result.put(startId, List.of(JourneyPath.builder()
+                .stationIds(List.of(startId))
+                .connections(List.of())
+                .transfers(0)
+                .totalDurationMinutes(0)
+                .build()));
         return result;
+    }
+
+    /**
+     * Chooses the path with this many transfers of each station the round reached, among its candidates. A path that
+     * is not faster than the chosen one with fewer transfers is left out: choosing a slower candidate can make it so.
+     */
+    private void finishRound(SearchState state, int transfers, Consumer<Map<String, List<JourneyPath>>> roundPaths) {
+        long startNanos = System.nanoTime();
+        Map<String, List<JourneyPath>> added = new HashMap<>();
+        for (StationCandidates candidates : state.roundStations()) {
+            List<Ride> rides = candidates.rides.stream().filter(ride -> ride.transfers() == transfers).toList();
+            if (rides.isEmpty()) continue;
+            Ride chosen = RegularJourneyChooser.choose(rides, ride -> runningDays(ride, state.daysByRide()).days(),
+                    Ride::durationMinutes);
+            List<JourneyPath> paths = state.paths().computeIfAbsent(candidates.stationId, id -> new ArrayList<>());
+            if (paths.isEmpty() || chosen.durationMinutes() < paths.getLast().getTotalDurationMinutes()) {
+                JourneyPath path = toJourneyPath(state.startId(), chosen);
+                paths.add(path);
+                added.put(candidates.stationId, List.of(path));
+            }
+        }
+        state.roundStations().clear();
+        state.counters().pathsNanos += System.nanoTime() - startNanos;
+        if (!added.isEmpty()) roundPaths.accept(added);
     }
 
     // Counters are cumulative, so a round's share is the difference to the previous log line
@@ -339,43 +385,11 @@ public class ReachabilitySearch {
 
             Ride ride = new Ride(trip, boardIdx, alightIdx, transfers, durationMinutes, previous, days);
             arrivals.add(ride);
-            state.bestByStation().computeIfAbsent(ride.stationId(), id -> new StationCandidates()).offer(ride);
+            StationCandidates candidates = state.bestByStation().computeIfAbsent(ride.stationId(),
+                    StationCandidates::new);
+            if (candidates.transfers != transfers) state.roundStations().add(candidates);
+            candidates.offer(ride);
         }
-    }
-
-    private Map<String, List<JourneyPath>> toJourneyPaths(SearchState state) {
-        Map<String, List<JourneyPath>> result = new HashMap<>(state.bestByStation().size() * 2);
-        result.put(state.startId(), List.of(JourneyPath.builder()
-                .stationIds(List.of(state.startId()))
-                .connections(List.of())
-                .transfers(0)
-                .totalDurationMinutes(0)
-                .build()));
-        // Candidates share their earlier rides, so each ride's days are worked out once. Identity keys: a Ride's
-        // record hash would walk its whole previous chain.
-        Map<Ride, JourneyRunningDays.SoFar> daysByRide = new IdentityHashMap<>();
-        state.bestByStation().forEach((stationId, candidates) ->
-                result.put(stationId, chosenPaths(state.startId(), candidates.rides, daysByRide)));
-        return result;
-    }
-
-    /**
-     * One path per transfer count, chosen among its candidates. A path that is not faster than the chosen one with
-     * fewer transfers is left out: choosing a slower candidate can make it so.
-     */
-    private List<JourneyPath> chosenPaths(String startId, List<Ride> candidates,
-                                          Map<Ride, JourneyRunningDays.SoFar> daysByRide) {
-        Map<Integer, List<Ride>> candidatesByTransfers = candidates.stream()
-                .collect(Collectors.groupingBy(Ride::transfers, TreeMap::new, Collectors.toList()));
-        List<JourneyPath> paths = new ArrayList<>(candidatesByTransfers.size());
-        for (List<Ride> rides : candidatesByTransfers.values()) {
-            Ride chosen = RegularJourneyChooser.choose(rides, ride -> runningDays(ride, daysByRide).days(),
-                    Ride::durationMinutes);
-            if (paths.isEmpty() || chosen.durationMinutes() < paths.getLast().getTotalDurationMinutes()) {
-                paths.add(toJourneyPath(startId, chosen));
-            }
-        }
-        return paths;
     }
 
     private JourneyRunningDays.SoFar runningDays(Ride ride, Map<Ride, JourneyRunningDays.SoFar> daysByRide) {

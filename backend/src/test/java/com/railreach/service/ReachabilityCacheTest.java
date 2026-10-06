@@ -33,7 +33,7 @@ class ReachabilityCacheTest {
         for (int transfers = 0; transfers < MAX_TRANSFERS; transfers++) {
             assertThat(cache.contains(key(transfers))).isTrue();
             assertThat(cache.getOrCompute(key(transfers))).as("%d transfers", transfers)
-                    .isEqualTo(search.search(START_ID, transfers, 0, 180));
+                    .isEqualTo(search.search(START_ID, transfers, 0, 180, roundPaths -> {}));
         }
         assertThat(cache.getStats()).containsEntry("rawPathCacheEntries", 1L);
     }
