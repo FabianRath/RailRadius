@@ -44,3 +44,7 @@ Thumbs.db
 
 # Personal manual test notes
 MANUAL_TEST.md
+
+# llm-council skill output
+council-report-*.html
+council-transcript-*.md
