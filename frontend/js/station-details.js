@@ -39,12 +39,7 @@ function stationDetailsHtml(station) {
         + journeyHtml(station);
 }
 
-/** The search only checks consecutive trains, so a journey can pass whose trains never all run on one day (B25). */
 function runningDaysHtml(station) {
-    if (station.hasCommonDay === false) {
-        return `<div class="popup-meta popup-warning">${icon('triangle-alert')}`
-            + ' No single day on which all these trains run</div>';
-    }
     if (!station.runningDays) return '';
     return `<div class="popup-meta">${icon('calendar')} ${escapeHtml(station.runningDays)}</div>`;
 }

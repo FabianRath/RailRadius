@@ -92,6 +92,15 @@ class GtfsDataServiceTest {
         assertThat(graph.getStation("eta:H6")).isNull();
     }
 
+    // B33: HT11 has the number of the daily HT1 but leaves at another time on 2 days
+    @Test
+    void rareTimingVariantOfARegularTrainIsNotLoaded(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, "eta");
+
+        assertThat(graph.getTripInfo("eta:HT11")).isEmpty();
+        assertThat(graph.getTripInfo("eta:HT1")).isPresent();
+    }
+
     // B32: without a number, trips of one route leaving the same stop at the same time are one train
     @Test
     void tripsWithoutNumberLeavingTogetherAreCountedAsOneTrain(@TempDir Path dir) throws Exception {

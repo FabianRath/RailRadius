@@ -34,13 +34,15 @@ Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the 
   - ZT4 FR: Z1 22:00 → Z2 23:30; ZT5 SA: Z2 00:30 → Z5 01:00 (connects across midnight)
   - ZT8 ALL: Z2 09:50 → Z7 10:20; ZT9 WD: Z7 10:40 → Z8 11:10. Z8 is reached via ZT7 (weekend), ZT8, ZT9 (weekdays): each transfer shares a day, the whole journey none
   - ZT10 WD and ZT11 WE: both Z1 07:00 → Z9 07:40, one train published as two trips that differ only in their days
-- **eta** (loaded alone, by the rare-train tests of B26; route HR "NJ", HT1–HT7 have a train number, HT8–HT10 none): H1 Eta Start, H2 Eta End, H3 Eta Far, H4 Eta Special, H5 Eta Split, H6 Eta Unnumbered. Services in January 2026: REG daily 5–31 Jan (27 days), FEW 8 days, RARE 2 days, SPLITA and SPLITB 4 days each (calendar_dates only)
+- **eta** (loaded alone, by the rare-train tests of B26; route HR "NJ", HT1–HT7 and HT11–HT13 have a train number, HT8–HT10 none): H1 Eta Start, H2 Eta End, H3 Eta Far, H4 Eta Special, H5 Eta Split, H6 Eta Unnumbered, H7 Eta Junction, H8 Eta Variant End. Services in January 2026: REG daily 5–31 Jan (27 days), FEW 8 days, RARE 2 days, SPLITA and SPLITB 4 days each (calendar_dates only)
   - HT1 "469" REG: H1 08:00 → H2 10:00; HT2 "479" FEW: H1 08:20 → H2 10:00 (20 min faster, under half the days)
   - HT3 "471" REG: H1 08:00 → H3 11:00; HT4 "473" FEW: H1 08:30 → H3 10:20 (70 min faster)
   - HT5 "499" RARE: H1 09:00 → H4 09:30 (dropped at load, so H4 is no station)
   - HT6 "481" SPLITA and HT7 "481" SPLITB: H1 12:00 → H5 13:00 (one train with 8 days, kept)
   - HT8 RARE, no number: H1 14:00 → H6 14:30 (dropped at load, so H6 is no station; B32)
   - HT9 SPLITA and HT10 SPLITB, no number: H1 15:00 → H5 16:00 (same route, first stop and departure, so one train with 8 days, kept)
+  - HT11 "469" RARE: H1 06:00 → H2 07:30, a faster timing variant of the regular HT1 (dropped at load; B33)
+  - HT12 "483" REG: H1 07:00 → H7 07:30; HT13 "483" RARE: H1 07:00 → H7 07:30, leaves 07:35 → H8 08:00. Same first departure, so HT13 is loaded with HT12, but no other trip leaves H7 at 07:35: a ride on HT13 ends at H7, and H8 is not reachable (B33)
 - **netherlands** + **poland** (loaded together, by the category column test; `train-category-columns.txt` names `trip_long_name` for netherlands and `plk_category_code` for poland):
   - netherlands: N1 Nether Amsterdam, N2 Nether Utrecht; NT1 "2835" with `trip_long_name` Intercity (→ "Intercity 2835"), NT2 "5512" with none (→ "5512")
   - poland: P1 Polska Warszawa, P2 Polska Lodz; its `trip_long_name` holds route names and is ignored. PT1 IC "1900/1 Zosia" (→ "IC 1900/1 Zosia"), PT2 Os "50324" on route AR (→ "Os 50324")

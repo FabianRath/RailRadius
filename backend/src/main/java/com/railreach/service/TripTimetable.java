@@ -65,6 +65,18 @@ record TripTimetable(String tripId, List<String> stops, ServiceDays serviceDays,
         return arrivalOffsetMinutes[alightIdx] - departureOffsetMinutes[boardIdx];
     }
 
+    /** Index of the first departure at or after departureSeconds in departures sorted by time. */
+    static int firstDepartureAt(List<Departure> departures, int departureSeconds) {
+        int low = 0;
+        int high = departures.size();
+        while (low < high) {
+            int mid = (low + high) >>> 1;
+            if (departures.get(mid).departureSeconds() < departureSeconds) low = mid + 1;
+            else high = mid;
+        }
+        return low;
+    }
+
     List<Departure> departuresFrom(String stopId) {
         List<Departure> result = new ArrayList<>(1);
         for (int i = 0; i < legDepartureSeconds.length; i++) {
