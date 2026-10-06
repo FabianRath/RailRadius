@@ -188,7 +188,7 @@ class ReachabilityServiceTest {
                 .extracting(ReachableStation::getTotalDurationMinutes).isEqualTo(90); // ZT7 08:30, ZT2 09:30
     }
 
-    // B25: ZT6 runs only on 2026-01-06, a weekday that calendar_dates.txt removes from ZT1's service
+    // B25: ZT6 runs only on 8 weekdays that calendar_dates.txt removes from ZT1's service
     @Test
     void trainsOnlySharingADayRemovedByCalendarDatesDoNotConnect(@TempDir Path dir) throws Exception {
         ReachabilityResponse response = query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 2, 0, 180);
@@ -246,7 +246,7 @@ class ReachabilityServiceTest {
         assertThat(far.getTotalDurationMinutes()).isEqualTo(110);
     }
 
-    // ZT1 (weekdays, 19 days) is 20 min slower than ZT7 (weekends, 8 days)
+    // ZT1 (weekdays, 52 days) is 20 min slower than ZT7 (weekends, 24 days)
     @Test
     void slowerTrainIsShownWhenItRunsOnTwiceAsManyDays(@TempDir Path dir) throws Exception {
         ReachableStation hub = find(query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 0, 0, 180), "zeta:Z2")

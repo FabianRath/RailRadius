@@ -85,10 +85,20 @@ class GtfsDataServiceTest {
     }
 
     @Test
-    void tripsWithoutTrainNumberAreKeptHoweverRarelyTheyRun(@TempDir Path dir) throws Exception {
-        TransitGraph graph = GtfsTestFixtures.load(dir, "zeta");
+    void trainsWithoutNumberThatRunOnFewerThanEightDaysAreNotLoaded(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, "eta");
 
-        assertThat(graph.getTripInfo("zeta:ZT6")).isPresent();
+        assertThat(graph.getTripInfo("eta:HT8")).isEmpty();
+        assertThat(graph.getStation("eta:H6")).isNull();
+    }
+
+    // B32: without a number, trips of one route leaving the same stop at the same time are one train
+    @Test
+    void tripsWithoutNumberLeavingTogetherAreCountedAsOneTrain(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, "eta");
+
+        assertThat(graph.getTripInfo("eta:HT9")).isPresent();
+        assertThat(graph.getTripInfo("eta:HT10")).isPresent();
     }
 
     @Test
