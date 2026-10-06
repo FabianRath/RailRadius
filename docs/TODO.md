@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B32 · F21 · S12
+**Next free IDs:** B32 · F22 · S12
 
 ## Bugs (data loading)
 - [ ] **B29** (High priority) The cross-border name merge (`StationDeduplicator`, Jaccard ≥ 0.4 within 500 m) leaves about 28 stations duplicated within 400 m, found in the full cache of 2026-10-05. Trains don't connect between the two copies. Causes and examples: (1) Cyrillic vs Latin names: 9 stations of the Bulgarian and the Turkish feed, e.g. "Централна гара София" / "SOFYA(SOFIA)", Plovdiv, Ruse; (2) Italian abbreviations: "Bologna Centrale" (Italo) / "BOLOGNA C.LE" (Trenitalia) 3 m apart, "S.DONA' DI PIAVE", "NA Afragola PES", "Szkl. Poręba Górna"; (3) ø not folded: "København H" / "Koebenhavn H" (70 m); (4) one name is part of the other: "Split" / "Split željeznički kolodvor", "Malahide" / "Malahide railway station", Peschiera, Chambéry, Scalea, Fortezza; also Roissy CDG 2 (Eurostar vs Swiss feed) and the sleeper's "Berlin Ostbf" next to "S Ostbahnhof (Berlin)". Possible fixes, in order of reach: merge within the radius when one name's words are all in the other's, ignoring generic words (railway station, Bahnhof, kolodvor, …); fold ø/æ/ß and transliterate Cyrillic; expand common Italian abbreviations (C.LE, S.). Don't merge nearby but separate stations: Madrid Atocha Cercanías / Atocha (124 m) and Málaga M.Z. Cercanías / María Zambrano are separate stations; Avignon Centre / Avignon-TGV show 33 m apart only because one feed has wrong coordinates.
@@ -17,5 +17,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 
 ## Features / UX
 - [ ] **F20** The station popup with the connection info sometimes opens with its bottom slightly cut off by the screen edge. Place it so it fits fully on screen, e.g. pick the anchor or pan the map after the content has its final size. `bindPopup` in `js/map.js` adds the popup first and only then resizes it (`snapToWholePixels`), so MapLibre may choose the anchor for a smaller popup.
+- [ ] **F21** When a station is clicked and its connection popup opens, draw that connection on the map as lines (one per train leg, from the start station through each transfer station to the destination) and hide all other reachable stations. When the popup is closed, remove the lines and show all stations again. `ReachableStation.path` holds the stop IDs of the start, transfer and destination stations, and the frontend already has their coordinates from the streamed results, so straight lines between them need no API change. Lines that follow the track through every intermediate stop would need each leg's stop sequence from the backend (a public API change, ask first). Drawing and hiding go into `js/map.js` (only module that talks to MapLibre), line colours as CSS variables.
 
 ## Structure
