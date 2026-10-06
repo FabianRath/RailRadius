@@ -21,6 +21,9 @@ final class TransferWindow {
     private int head;
     private int tail;
     private int nextArrival;
+    // How often the best arrival was not usable and the wait range was scanned, and the arrivals those scans checked
+    private int fallbackScanCount;
+    private long fallbackScannedArrivals;
 
     /** arrivalSeconds must be ascending; durationMinutes[i] is the journey time up to arrival i. */
     TransferWindow(int[] arrivalSeconds, int[] durationMinutes, int shiftSeconds,
@@ -54,11 +57,22 @@ final class TransferWindow {
     // The queue has dropped the arrivals that the best one outranks, so if the best is not usable, all arrivals in
     // the wait range are scanned. Usually the best one is usable.
     private int bestUsableScan(int departureSeconds, IntPredicate usable) {
+        int first = firstArrivalFrom(departureSeconds - maxWaitSeconds);
+        fallbackScanCount++;
+        fallbackScannedArrivals += nextArrival - first;
         int best = -1;
-        for (int i = firstArrivalFrom(departureSeconds - maxWaitSeconds); i < nextArrival; i++) {
+        for (int i = first; i < nextArrival; i++) {
             if ((best < 0 || startSeconds[i] > startSeconds[best]) && usable.test(i)) best = i;
         }
         return best;
+    }
+
+    int fallbackScanCount() {
+        return fallbackScanCount;
+    }
+
+    long fallbackScannedArrivals() {
+        return fallbackScannedArrivals;
     }
 
     /** Index of the first arrival at or after the time, among those already added to the window. */
