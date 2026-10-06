@@ -66,7 +66,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `RailReachController` | controller | Public API under `/api` |
 | `AdminController` | controller | Admin/debug API under `/api/admin` |
 | `GtfsDataService` | service | Fills the `TransitGraph` at startup (cache file, else zips) and on `reload-gtfs`, then rebuilds the station search index and (on reload) clears the reachability caches |
-| `TransitGraph` | service | The merged network: stations, their translated names, edges, connections, trip indexes, `TripInfo`s and each trip's `ServiceDays`; `upcomingDays` (from today on, by its `Clock`) and per trip which departures may be ridden (`getRegularDepartures`). Everything that reads GTFS data injects this |
+| `TransitGraph` | service | The merged network: stations, their translated names, edges, connections, trip indexes, `TripInfo`s and each trip's `ServiceDays`; `upcomingDays` and `todayEpochDay` (by its `Clock`), and its `SearchTimetables`, built on first use after a load. Everything that reads GTFS data injects this |
 | `GtfsFeedLoader` | service | Parses the rail part of each zip into the graph, with per-feed stop dedup |
 | `RailTripReader` | service | A feed's rail routes (name, operator from `agency.txt`) and rail trips (route, service ID, `TripInfo`) from routes/agency/trips.txt |
 | `RareTrainFilter` | service | Drops a feed's trains that run on fewer than 8 days, all their trips together, before the graph is built (B26). A train is route + train number (if any, B32) + first stop + departure time (B33). `regularDepartures`: per stop of a trip, whether all trips leaving there at that time run on 8 days or more; the search doesn't ride a trip away from a stop where they don't (B33) |
@@ -94,7 +94,8 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `CachedTrip` | service | One trip in the cache file: route name, `TripInfo`, service ID, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
 | `ReachabilityService` | service | Thin orchestrator: request defaults, POST response (`@Cacheable`), SSE streaming, triggers warming |
 | `ReachabilitySearch` | service | Round-based search, one round per transfer; best path per station and transfer count |
-| `TripTimetable` | service | One trip as arrays for the search: stops, service days, leg times, minute offsets; `Departure` = trip leaving a stop |
+| `TripTimetable` | service | One trip as arrays for the search: its index, stops and their station indexes, service days, each leg's connection, leg times, minute offsets; `Departure` = trip leaving a stop |
+| `SearchTimetables` | service | Every trip as a `TripTimetable` (numbered in trip ID order), every stop's departures by time (equal times in trip order) and per trip which departures may be ridden (`RareTrainFilter.regularDepartures`), built in one pass; stations numbered for the search; the trips' `WeekPeriodDays`, worked out once per day |
 | `TransferWindow` | service | Sliding window over a station's arrivals: the arrival that boards a departure with the shortest journey, among those passing a filter (the day check); scans the wait range when the window's best fails it |
 | `ReachabilityCache` | service | Raw search results per `SearchKey`; get-or-compute (stored, cut down from a stored higher transfer count, or searched); Caffeine eviction and stats. A stored result keeps the days it was searched with, so it can include a day that has passed since (B31) |
 | `ReachabilityWarmer` | service | `@Async` predictive warming of the maximum transfer count (own bean so the proxy applies) |
@@ -145,7 +146,7 @@ After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStati
 7. **Foreign stops** (`ForeignStopSnapper`): a source's home country is where more than half of its located stations lie. A stop outside its source's home country is merged into the nearest station within 1 km of a source at home in the stop's country, which stays canonical. Every map is remapped. A canonical station can itself be merged later (A→B, then B→C); `mergeStations` first resolves such chains so every alias maps straight to the last station. The alias's translated names move to the canonical station.
 8. `GtfsCacheStore` saves stations, translated names, services and trips (`CachedTrip`) to the GTFS cache file (format version 8). On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops`, `tripInfos`, `tripServiceDays` and `stopTrips` from the trips.
 
-`StationSearchIndex.rebuild` then indexes the variants of each station's name and translated names. `TransitGraph` builds lazy indexes on first access: `timetables` (trip → `TripTimetable`), `departuresByStop` (stop → departures by time) and `connectionByTrip` (edge → tripId → Connection).
+`StationSearchIndex.rebuild` then indexes the variants of each station's name and translated names. `GtfsDataService` then has `TransitGraph` build its `SearchTimetables` in one pass (about 35 s on the full data, most of it the rare-departure check per trip and stop; clearing or merging the graph drops them, and the next search rebuilds them), so the first search is as fast as later ones. `connectionByTrip` (edge → tripId → Connection) is still built lazily, but the search no longer uses it.
 
 ## Reachability algorithm (`ReachabilityCache`, `ReachabilitySearch`)
 

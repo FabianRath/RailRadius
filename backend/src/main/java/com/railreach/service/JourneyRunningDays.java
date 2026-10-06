@@ -72,7 +72,7 @@ final class JourneyRunningDays {
      * keeps only the one it met first.
      */
     private static ServiceDays rideDays(RideTimes ride, TransitGraph graph) {
-        List<TripTimetable.Departure> departures = graph.getDeparturesAt(ride.fromStopId());
+        List<TripTimetable.Departure> departures = graph.searchTimetables().departuresAt(ride.fromStopId());
         ServiceDays days = graph.getServiceDays(ride.tripId());
         for (int i = TripTimetable.firstDepartureAt(departures, ride.departureSeconds()); i < departures.size()
                 && departures.get(i).departureSeconds() == ride.departureSeconds(); i++) {

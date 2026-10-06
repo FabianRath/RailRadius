@@ -1,7 +1,5 @@
 package com.railreach.service;
 
-import java.util.Map;
-
 /**
  * The days a service runs as the search sees them: one bit per weekday of each 6-week period of the coming year, set
  * if the service runs on at least one such date from today on. Bit {@code period * 7 + weekday} (Monday = 0); periods
@@ -26,14 +24,6 @@ final class WeekPeriodDays {
     /** Every weekday of every period: a service without calendar data. */
     static final long ALL = (1L << (PERIODS * DAYS_PER_WEEK)) - 1;
     private static final long SUNDAYS = sundays();
-
-    /** The services' masks as of one day, each worked out once: services are shared by many trips. */
-    record OfDay(int epochDay, Map<ServiceDays, Long> masks) {
-
-        long of(ServiceDays days) {
-            return masks.computeIfAbsent(days, service -> WeekPeriodDays.of(service, epochDay));
-        }
-    }
 
     private WeekPeriodDays() {
     }
