@@ -43,6 +43,7 @@ public class JourneyLegBuilder {
                 .pathNames(path.getStationIds().stream().map(this::stationName).toList())
                 .legs(buildLegs(path.getConnections()))
                 .runningDays(JourneyRunningDays.describe(runningDays).orElse(null))
+                .hasCommonDay(!runningDays.isEmpty())
                 .build());
     }
 

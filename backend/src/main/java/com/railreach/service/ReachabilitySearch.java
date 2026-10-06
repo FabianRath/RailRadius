@@ -31,8 +31,9 @@ import java.util.stream.Collectors;
  * There is no travel date, but a journey only counts its first train's days from today on (B31), and a transfer
  * needs a day on which every train of the journey so far runs together with the next one, that one a day later for
  * a wait past midnight (B25). Checking only consecutive trains let three trains A, B, C pass if A and B shared one
- * day and B and C another (B33). A ride's days come from its trip alone; the shown running days also count trips
- * with the same times ({@link JourneyRunningDays}), so they are never fewer.
+ * day and B and C another (B33). Days are compared by weekday and 6-week period ({@link WeekPeriodDays}), not by
+ * date: exact dates made the check too costly. The shown running days are exact dates ({@link JourneyRunningDays}),
+ * so a found journey can show none.
  * <p>
  * A station's result is not always the fastest journey: one up to {@link #MAX_SLOWER_MINUTES} slower is shown
  * instead if it runs on many more days ({@link RegularJourneyChooser}). Transfers still continue from the fastest
@@ -52,14 +53,14 @@ public class ReachabilitySearch {
 
     /**
      * One ride from boardIdx to alightIdx; previous is the ride before the transfer, null for the first one. days are
-     * the service days of the trip on which the journey so far works: every earlier train runs on its day.
+     * the {@link WeekPeriodDays} of the trip on which the journey so far works: every earlier train runs on its day.
      */
     private record Ride(TripTimetable trip, int boardIdx, int alightIdx, int transfers, int durationMinutes,
-                        Ride previous, ServiceDays days) {
+                        Ride previous, long days) {
 
-        /** Whether {@code next} runs extraDays after a day of this ride. */
-        boolean continuesWith(TripTimetable next, int extraDays) {
-            return days.sharesDayWith(next.serviceDays(), extraDays);
+        /** The days of a next trip, running on nextTripDays, that come extraDays after a day of this ride. */
+        long nextDays(long nextTripDays, int extraDays) {
+            return nextTripDays & WeekPeriodDays.movedForward(days, extraDays);
         }
 
         String stationId() {
@@ -85,7 +86,7 @@ public class ReachabilitySearch {
     }
 
     private record SearchState(String startId, int minTransferMins, int maxTransferMins,
-                               Map<String, TripProgress> progressByTrip,
+                               WeekPeriodDays.OfDay weekPeriodDays, Map<String, TripProgress> progressByTrip,
                                Map<String, StationCandidates> bestByStation, Counters counters) {}
 
     /** What a search did, for its log: where the time goes on large data. */
@@ -110,31 +111,26 @@ public class ReachabilitySearch {
     private static final class TripProgress {
 
         private final int[] durationMinutes;
-        private final ServiceDays[] fastestDays;
-        private final ServiceDays[] reachedDays;
+        private final long[] fastestDays;
+        private final long[] reachedDays;
 
         TripProgress(int stopCount) {
             durationMinutes = new int[stopCount];
             Arrays.fill(durationMinutes, Integer.MAX_VALUE);
-            fastestDays = new ServiceDays[stopCount];
-            reachedDays = new ServiceDays[stopCount];
+            fastestDays = new long[stopCount];
+            reachedDays = new long[stopCount];
         }
 
-        boolean reachedNoSlower(int stopIdx, int rideMinutes, ServiceDays rideDays) {
-            return durationMinutes[stopIdx] <= rideMinutes && reachedDays[stopIdx].covers(rideDays);
+        boolean reachedNoSlower(int stopIdx, int rideMinutes, long rideDays) {
+            return durationMinutes[stopIdx] <= rideMinutes && (rideDays & ~reachedDays[stopIdx]) == 0;
         }
 
-        boolean reachedFaster(int stopIdx, int rideMinutes, ServiceDays rideDays) {
-            return durationMinutes[stopIdx] < rideMinutes && fastestDays[stopIdx].covers(rideDays);
+        boolean reachedFaster(int stopIdx, int rideMinutes, long rideDays) {
+            return durationMinutes[stopIdx] < rideMinutes && (rideDays & ~fastestDays[stopIdx]) == 0;
         }
 
-        void record(int stopIdx, int rideMinutes, ServiceDays rideDays) {
-            ServiceDays reached = reachedDays[stopIdx];
-            if (reached == null) {
-                reachedDays[stopIdx] = rideDays;
-            } else if (!reached.covers(rideDays)) {
-                reachedDays[stopIdx] = reached.union(rideDays);
-            }
+        void record(int stopIdx, int rideMinutes, long rideDays) {
+            reachedDays[stopIdx] |= rideDays;
             if (rideMinutes >= durationMinutes[stopIdx]) return;
             durationMinutes[stopIdx] = rideMinutes;
             fastestDays[stopIdx] = rideDays;
@@ -180,13 +176,12 @@ public class ReachabilitySearch {
                                                  int minTransferMins, int maxTransferMins) {
         Counters counters = new Counters();
         SearchState state = new SearchState(startId, minTransferMins, maxTransferMins,
-                new HashMap<>(), new HashMap<>(), counters);
+                transitGraph.weekPeriodDays(), new HashMap<>(), new HashMap<>(), counters);
         long roundsStartNanos = System.nanoTime();
         List<Ride> arrivals = new ArrayList<>();
         for (TripTimetable.Departure departure : transitGraph.getDeparturesAt(startId)) {
-            TripTimetable trip = departure.trip();
-            ServiceDays days = transitGraph.upcomingDays(trip.serviceDays());
-            if (!days.isEmpty()) ride(state, departure, 0, 0, null, days, arrivals);
+            long days = state.weekPeriodDays().of(departure.trip().serviceDays());
+            if (days != 0) ride(state, departure, 0, 0, null, days, arrivals);
         }
         long arrivalCount = arrivals.size();
         logRound(0, arrivals.size(), state, roundsStartNanos);
@@ -271,17 +266,18 @@ public class ReachabilitySearch {
                        List<Ride> arrivals) {
         TripTimetable next = departure.trip();
         if (!transitGraph.getRegularDepartures(next)[departure.stopIdx()]) return;
-        ServiceDays served = null;
-        while (served == null || !served.covers(next.serviceDays())) {
-            ServiceDays servedSoFar = served;
+        long nextDays = state.weekPeriodDays().of(next.serviceDays());
+        long served = 0;
+        while ((nextDays & ~served) != 0) {
+            long servedSoFar = served;
             Ride sameDayFrom = station.at(station.sameDay().bestFor(departure.departureSeconds(),
-                    i -> addsDays(station.rides().get(i), next, SAME_DAY, servedSoFar)));
+                    i -> addsDays(station.rides().get(i), nextDays, SAME_DAY, servedSoFar)));
             Ride overnightFrom = station.at(station.overnight().bestFor(departure.departureSeconds(),
-                    i -> addsDays(station.rides().get(i), next, NEXT_DAY, servedSoFar)));
+                    i -> addsDays(station.rides().get(i), nextDays, NEXT_DAY, servedSoFar)));
             Ride from = faster(departure, sameDayFrom, overnightFrom);
             if (from == null) return;
-            ServiceDays days = next.serviceDays().after(from.days(), from == sameDayFrom ? SAME_DAY : NEXT_DAY);
-            served = served == null ? days : served.union(days);
+            long days = from.nextDays(nextDays, from == sameDayFrom ? SAME_DAY : NEXT_DAY);
+            served |= days;
             // Timetables are shared per trip. Staying on this trip beats changing onto it from any arrival.
             if (from.trip() != next) {
                 ride(state, departure, transfers, boardingMinutes(from, departure), from, days, arrivals);
@@ -289,10 +285,9 @@ public class ReachabilitySearch {
         }
     }
 
-    /** Whether next, running extraDays after the arrival, runs on a day of the journey that served lacks. */
-    private static boolean addsDays(Ride arrival, TripTimetable next, int extraDays, ServiceDays served) {
-        if (!arrival.continuesWith(next, extraDays)) return false;
-        return served == null || !served.coversAfter(next.serviceDays(), arrival.days(), extraDays);
+    /** Whether the next trip, running extraDays after the arrival, runs on a day of the journey that served lacks. */
+    private static boolean addsDays(Ride arrival, long nextDays, int extraDays, long served) {
+        return (arrival.nextDays(nextDays, extraDays) & ~served) != 0;
     }
 
     private static Ride faster(TripTimetable.Departure departure, Ride sameDay, Ride overnight) {
@@ -317,7 +312,7 @@ public class ReachabilitySearch {
      * days are the trip's days on which the journey works.
      */
     private void ride(SearchState state, TripTimetable.Departure departure, int transfers, int boardDurationMinutes,
-                      Ride previous, ServiceDays days, List<Ride> arrivals) {
+                      Ride previous, long days, List<Ride> arrivals) {
         TripTimetable trip = departure.trip();
         TripProgress progress = state.progressByTrip()
                 .computeIfAbsent(trip.tripId(), id -> new TripProgress(trip.stopCount()));
