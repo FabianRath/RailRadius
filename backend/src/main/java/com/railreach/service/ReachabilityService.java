@@ -76,10 +76,15 @@ public class ReachabilityService {
         try {
             // Stream only the finished result: the BFS improves paths as it goes, so emitting
             // during the search would send stations more than once and with non-final paths.
-            List<ReachableStation> stations = toStreamedStations(request, cache.getOrCompute(key));
+            Map<String, List<JourneyPath>> reachable = cache.getOrCompute(key);
+            long legsStartMs = System.currentTimeMillis();
+            List<ReachableStation> stations = toStreamedStations(request, reachable);
+            long sendStartMs = System.currentTimeMillis();
             for (int i = 0; i < stations.size(); i += STREAM_BATCH_SIZE) {
                 flushBatch(emitter, stations.subList(i, Math.min(i + STREAM_BATCH_SIZE, stations.size())));
             }
+            log.info("Streamed {} stations: search {} ms, legs {} ms, sending {} ms", stations.size(),
+                    legsStartMs - startMs, sendStartMs - legsStartMs, System.currentTimeMillis() - sendStartMs);
             // The raw cache now holds the authoritative result; a Caffeine entry may be older
             cache.evictResponse(key);
 

@@ -15,6 +15,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -85,7 +86,20 @@ public class ReachabilitySearch {
 
     private record SearchState(String startId, int minTransferMins, int maxTransferMins,
                                Map<String, TripProgress> progressByTrip,
-                               Map<String, StationCandidates> bestByStation) {}
+                               Map<String, StationCandidates> bestByStation, Counters counters) {}
+
+    /** What a search did, for its log: where the time goes on large data. */
+    private static final class Counters {
+
+        private long departuresScanned;
+        private long fallbackScans;
+        private long fallbackScannedArrivals;
+
+        void addFallbacks(TransferWindow window) {
+            fallbackScans += window.fallbackScanCount();
+            fallbackScannedArrivals += window.fallbackScannedArrivals();
+        }
+    }
 
     /**
      * Per stop of a trip: the shortest duration that reached it there, the days of that ride, and the days of every
@@ -164,8 +178,10 @@ public class ReachabilitySearch {
      */
     public Map<String, List<JourneyPath>> search(String startId, int maxTransfers,
                                                  int minTransferMins, int maxTransferMins) {
+        Counters counters = new Counters();
         SearchState state = new SearchState(startId, minTransferMins, maxTransferMins,
-                new HashMap<>(), new HashMap<>());
+                new HashMap<>(), new HashMap<>(), counters);
+        long roundsStartNanos = System.nanoTime();
         List<Ride> arrivals = new ArrayList<>();
         for (TripTimetable.Departure departure : transitGraph.getDeparturesAt(startId)) {
             TripTimetable trip = departure.trip();
@@ -173,16 +189,36 @@ public class ReachabilitySearch {
             if (!days.isEmpty()) ride(state, departure, 0, 0, null, days, arrivals);
         }
         long arrivalCount = arrivals.size();
+        logRound(0, arrivals.size(), state, roundsStartNanos);
         for (int transfers = 1; transfers <= maxTransfers && !arrivals.isEmpty(); transfers++) {
+            long roundStartNanos = System.nanoTime();
             arrivals = transferRound(state, arrivals, transfers);
             arrivalCount += arrivals.size();
-            log.debug("  Round {}: {} stop arrivals, {} stations", transfers, arrivals.size(),
-                    state.bestByStation().size());
+            logRound(transfers, arrivals.size(), state, roundStartNanos);
         }
+        long roundsMs = millisSince(roundsStartNanos);
 
-        log.info("  Search stats: {} stop arrivals on {} trips, {} stations",
-                arrivalCount, state.progressByTrip().size(), state.bestByStation().size() + 1);
-        return toJourneyPaths(state);
+        long pathsStartNanos = System.nanoTime();
+        Map<String, List<JourneyPath>> result = toJourneyPaths(state);
+        log.info("  Search stats: {} stop arrivals on {} trips, {} stations; rounds {} ms, paths {} ms; "
+                        + "{} departures scanned, {} fallback scans over {} arrivals",
+                arrivalCount, state.progressByTrip().size(), state.bestByStation().size() + 1, roundsMs,
+                millisSince(pathsStartNanos), counters.departuresScanned, counters.fallbackScans,
+                counters.fallbackScannedArrivals);
+        return result;
+    }
+
+    // Counters are cumulative, so a round's share is the difference to the previous log line
+    private static void logRound(int transfers, int arrivalCount, SearchState state, long startNanos) {
+        Counters counters = state.counters();
+        log.debug("  Round {}: {} stop arrivals, {} stations, {} ms; so far {} departures scanned, "
+                        + "{} fallback scans over {} arrivals", transfers, arrivalCount, state.bestByStation().size(),
+                millisSince(startNanos), counters.departuresScanned, counters.fallbackScans,
+                counters.fallbackScannedArrivals);
+    }
+
+    private static long millisSince(long startNanos) {
+        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
     }
 
     /** Boards each station's departures from the previous round's arrivals there; returns the new arrivals. */
@@ -216,9 +252,13 @@ public class ReachabilitySearch {
                 minWaitSeconds, Math.min(maxWaitSeconds, GtfsTime.MAX_OVERNIGHT_GAP_SECONDS));
         StationArrivals station = new StationArrivals(stationArrivals, sameDay, overnight);
 
-        for (TripTimetable.Departure departure : transitGraph.getDeparturesAt(stationId)) {
+        List<TripTimetable.Departure> departures = transitGraph.getDeparturesAt(stationId);
+        state.counters().departuresScanned += departures.size();
+        for (TripTimetable.Departure departure : departures) {
             board(state, departure, station, transfers, arrivals);
         }
+        state.counters().addFallbacks(sameDay);
+        state.counters().addFallbacks(overnight);
     }
 
     /**
