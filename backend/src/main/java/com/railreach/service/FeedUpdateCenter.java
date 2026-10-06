@@ -4,6 +4,7 @@ import com.railreach.dto.FeedDownloadResult;
 import com.railreach.dto.FeedDownloadResult.Outcome;
 import com.railreach.dto.FeedStatus;
 import com.railreach.dto.FeedStatus.State;
+import com.railreach.dto.FeedStorage;
 import com.railreach.service.FeedDownloader.Replacement;
 import com.railreach.service.FeedRegistry.FeedSource;
 import com.railreach.util.FeedFiles;
@@ -84,6 +85,17 @@ public class FeedUpdateCenter {
                 .toList();
     }
 
+    public FeedStorage storage() {
+        List<Path> inUse = feedZips();
+        List<Path> previous = zipsIn(directory().resolve(FeedDownloader.PREVIOUS_DIRECTORY));
+        return FeedStorage.builder()
+                .inUseCount(inUse.size())
+                .inUseBytes(totalBytes(inUse))
+                .previousCount(previous.size())
+                .previousBytes(totalBytes(previous))
+                .build();
+    }
+
     @Scheduled(fixedDelayString = "${railreach.feeds.check-interval:PT24H}")
     public void logOutdatedFeeds() {
         List<FeedStatus> statuses = statuses();
@@ -152,12 +164,28 @@ public class FeedUpdateCenter {
     }
 
     private List<Path> feedZips() {
-        if (!Files.isDirectory(directory())) return List.of();
-        try (Stream<Path> files = Files.list(directory())) {
+        return zipsIn(directory());
+    }
+
+    private static List<Path> zipsIn(Path directory) {
+        if (!Files.isDirectory(directory)) return List.of();
+        try (Stream<Path> files = Files.list(directory)) {
             return files.filter(path -> FeedFiles.isZip(path.getFileName().toString())).sorted().toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    private static long totalBytes(List<Path> zips) {
+        long bytes = 0;
+        for (Path zip : zips) {
+            try {
+                bytes += Files.size(zip);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        return bytes;
     }
 
     private FeedStatus missingStatus(String source) {

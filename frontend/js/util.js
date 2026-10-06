@@ -16,6 +16,15 @@ export function fmtGtfsClock(gtfsTime) {
     return days > 0 ? `${clock} +${days}` : clock;
 }
 
+const BYTES_PER_MB = 1024 * 1024;
+const MB_PER_GB = 1024;
+
+/** File sizes as "12.3 MB", or "1.23 GB" from a GB on. */
+export function fmtBytes(bytes) {
+    const mb = bytes / BYTES_PER_MB;
+    return mb < MB_PER_GB ? `${mb.toFixed(1)} MB` : `${(mb / MB_PER_GB).toFixed(2)} GB`;
+}
+
 const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
 /** GTFS names are untrusted text; escape them before they go into innerHTML. */

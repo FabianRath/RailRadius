@@ -4,7 +4,7 @@ import {
     clearDebugTrigger, deleteGtfsCache, fetchCacheStats, fetchGtfsLoadStatus, fetchGtfsStats, reloadGtfs,
     setDebugTrigger,
 } from './api.js';
-import { initFeeds, refreshFeeds } from './feeds.js';
+import { initFeeds, refreshFeedStorage, refreshFeeds } from './feeds.js';
 import { fmtSeconds } from './util.js';
 
 const JSON_INDENT = 2;
@@ -43,7 +43,10 @@ const progressBar = document.getElementById('adminProgressBar');
 const progressText = document.getElementById('adminProgressText');
 
 export function initAdminPanel() {
-    openButton.addEventListener('click', () => dialog.showModal());
+    openButton.addEventListener('click', () => {
+        dialog.showModal();
+        refreshFeedStorage();
+    });
     document.getElementById('adminClose').addEventListener('click', () => dialog.close());
     // A backdrop click targets the dialog itself. Checking where the press started keeps a text selection dragged
     // out of the JSON output from closing the panel.

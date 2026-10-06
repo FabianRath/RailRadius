@@ -1,8 +1,8 @@
 // Feeds tab of the admin panel: how long each GTFS zip runs, and downloads of new versions. Bulk downloads go one
 // feed at a time from here, so each row shows its progress and result.
-import { downloadFeed, fetchFeeds } from './api.js';
+import { downloadFeed, fetchFeedStorage, fetchFeeds } from './api.js';
 import { icon } from './icons.js';
-import { escapeHtml } from './util.js';
+import { escapeHtml, fmtBytes } from './util.js';
 
 const STATE_LABELS = {
     MISSING: 'Missing', OK: 'OK', EXPIRING: 'Expiring', EXPIRED: 'Expired', NOT_YET_VALID: 'Not yet valid', NO_CALENDAR: 'No calendar',
@@ -11,12 +11,12 @@ const STATE_LABELS = {
 const OUTDATED_STATES = ['EXPIRED', 'EXPIRING'];
 // A fresh checkout has no zips; "Download outdated" fetches them too
 const TO_DOWNLOAD_STATES = ['MISSING', ...OUTDATED_STATES];
-const BYTES_PER_MB = 1024 * 1024;
 const ISO_DATE_LENGTH = 10;
 const PENDING = { outcome: 'PENDING', message: 'Downloading…' };
 
 const rows = document.getElementById('feedRows');
 const summary = document.getElementById('feedSummary');
+const storage = document.getElementById('feedStorage');
 const toolbarButtons = document.querySelectorAll('#feedRefresh, #feedDownloadOutdated, #feedDownloadAll');
 
 let feeds = [];
@@ -38,12 +38,24 @@ export function initFeeds() {
 }
 
 export async function refreshFeeds() {
+    refreshFeedStorage();
     try {
         feeds = await fetchFeeds();
         render();
         if (!busy) showSummary(overview(), false);
     } catch (e) {
         showSummary(`Loading the feeds failed: ${e.message}`, true);
+    }
+}
+
+/** The label at the top of the admin panel; a download moves the replaced zip to previous/, so it changes. */
+export async function refreshFeedStorage() {
+    try {
+        const usage = await fetchFeedStorage();
+        storage.textContent = `Zips: ${fmtBytes(usage.inUseBytes)} in use (${usage.inUseCount}) · `
+            + `${fmtBytes(usage.previousBytes)} replaced, kept in previous/ (${usage.previousCount})`;
+    } catch (e) {
+        storage.textContent = `Zip storage unavailable: ${e.message}`;
     }
 }
 
@@ -103,7 +115,7 @@ function feedRowHtml(feed) {
     const runsUntil = feed.lastServiceDate
         ? `<span title="Runs from ${feed.firstServiceDate}">${feed.lastServiceDate}</span>` : '–';
     const stateClass = `feed-state-${feed.state.toLowerCase().replaceAll('_', '-')}`;
-    const size = feed.state === 'MISSING' ? '–' : `${(feed.sizeBytes / BYTES_PER_MB).toFixed(1)} MB`;
+    const size = feed.state === 'MISSING' ? '–' : fmtBytes(feed.sizeBytes);
     const downloaded = feed.downloadedAt?.slice(0, ISO_DATE_LENGTH) ?? '–';
     return `<tr><td>${escapeHtml(feed.source)}</td><td>${runsUntil}</td><td>${feed.daysLeft ?? '–'}</td>`
         + `<td class="feed-wrap"><span class="${stateClass}">${STATE_LABELS[feed.state]}</span></td><td>${size}</td>`

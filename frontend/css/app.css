@@ -961,6 +961,12 @@ input[type="range"]::-moz-range-thumb {
     color: var(--accent-warm);
 }
 
+.admin-storage {
+    margin: -12px 0 16px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
 .admin-close {
     background: none;
     border: none;
