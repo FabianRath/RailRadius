@@ -10,6 +10,7 @@ const FIT_PADDING_PX = 50;
 const FIT_MAX_ZOOM = 12;
 const RAILWAY_MIN_ZOOM = 8;
 const POPUP_MAX_WIDTH = '360px';
+const POPUP_SCREEN_MARGIN_PX = 10;
 const EMPTY_COLLECTION = { type: 'FeatureCollection', features: [] };
 
 let map;
@@ -136,6 +137,7 @@ export function bindPopup(layerId, buildHtml) {
             .setHTML(buildHtml(feature.properties))
             .addTo(map);
         snapToWholePixels(popup.getElement());
+        panIntoView(popup.getElement());
     });
     map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
@@ -151,6 +153,26 @@ function snapToWholePixels(popupElement) {
     const inner = content.getBoundingClientRect();
     content.style.width = `${inner.width + roundUpToEven(outer.width) - outer.width}px`;
     content.style.height = `${inner.height + roundUpToEven(outer.height) - outer.height}px`;
+}
+
+/**
+ * MapLibre only picks the side of the point with more room; it never moves the map. A long journey near the top
+ * edge is placed below the point and its bottom is cut off, so pan until the whole popup is visible.
+ */
+function panIntoView(popupElement) {
+    const popupRect = popupElement.getBoundingClientRect();
+    const mapRect = map.getContainer().getBoundingClientRect();
+    const dx = panToFit(popupRect.left, popupRect.right, mapRect.left, mapRect.right);
+    const dy = panToFit(popupRect.top, popupRect.bottom, mapRect.top, mapRect.bottom);
+    if (dx !== 0 || dy !== 0) map.panBy([dx, dy]);
+}
+
+/** Pixels to pan so [start, end] lies within [min, max] plus margin; if it cannot fit, its start stays visible. */
+function panToFit(start, end, min, max) {
+    const startOverflow = min + POPUP_SCREEN_MARGIN_PX - start;
+    if (startOverflow > 0) return -startOverflow;
+    const endOverflow = end - (max - POPUP_SCREEN_MARGIN_PX);
+    return Math.min(Math.max(endOverflow, 0), -startOverflow);
 }
 
 function roundUpToEven(px) {
