@@ -1,7 +1,38 @@
+// The selected station's journey, shown over the side panel so it never covers the route drawn on the map (F22).
 import { countryBadgeHtml, escapeHtml, fmtGtfsClock } from './util.js';
 import { icon } from './icons.js';
+import { clearJourney, showJourney } from './map.js';
+import { journeyRoute } from './journey.js';
+import { expandSidebar } from './sidebar.js';
 
-export function stationPopupHtml(station) {
+const panel = document.getElementById('stationDetails');
+const body = document.getElementById('stationDetailsBody');
+const closeButton = document.getElementById('stationDetailsClose');
+
+export function initStationDetails() {
+    closeButton.addEventListener('click', closeStationDetails);
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeStationDetails();
+    });
+}
+
+/** Lists the journey in the side panel and draws it on the map, hiding all stations not on it. */
+export function showStationDetails(station) {
+    body.innerHTML = stationDetailsHtml(station);
+    body.scrollTop = 0;
+    panel.hidden = false;
+    expandSidebar();
+    closeButton.focus();
+    showJourney(journeyRoute(station));
+}
+
+export function closeStationDetails() {
+    if (panel.hidden) return;
+    panel.hidden = true;
+    clearJourney();
+}
+
+function stationDetailsHtml(station) {
     return `<div class="popup-station">${escapeHtml(station.stopName)}${countryBadgeHtml(station.country)}</div>`
         + `<div class="popup-meta">Transfers: ${station.transfers}</div>`
         + runningDaysHtml(station)
