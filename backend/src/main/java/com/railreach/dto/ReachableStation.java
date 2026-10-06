@@ -25,4 +25,6 @@ public class ReachableStation {
     private List<JourneyLeg> legs;
     // When every train of the journey runs, e.g. "Runs Mon–Fri" or "Irregular: 2 days in the timetable"; null without calendar data
     private String runningDays;
+    // False if the trains share no date: the search compares days by weekday and 6-week period only (B33)
+    private Boolean hasCommonDay;
 }

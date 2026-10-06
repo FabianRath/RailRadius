@@ -10,28 +10,21 @@ class ServiceDaysTest {
 
     @Test
     void servicesRunningOnTheSameDayShareIt() {
-        assertThat(days(100, 101).sharesDayWith(days(101, 200), 0)).isTrue();
-        assertThat(days(100, 101).sharesDayWith(days(102, 200), 0)).isFalse();
+        assertThat(days(100, 101).intersect(days(101, 200), 0).isEmpty()).isFalse();
+        assertThat(days(100, 101).intersect(days(102, 200), 0).isEmpty()).isTrue();
     }
 
     @Test
     void nextDayShiftWorksAcrossAWordBoundary() {
         // Day 127 is the last bit of one word, day 128 the first of the next
-        assertThat(days(127).sharesDayWith(days(128), 1)).isTrue();
-        assertThat(days(127).sharesDayWith(days(128), 0)).isFalse();
-        assertThat(days(128).sharesDayWith(days(127), 1)).isFalse();
+        assertThat(days(127).intersect(days(128), 1).epochDays()).containsExactly(127);
+        assertThat(days(127).intersect(days(128), 0).isEmpty()).isTrue();
+        assertThat(days(128).intersect(days(127), 1).isEmpty()).isTrue();
     }
 
     @Test
     void negativeEpochDaysAreStored() {
-        assertThat(days(-1).sharesDayWith(days(0), 1)).isTrue();
-    }
-
-    @Test
-    void everyDaySharesADayWithAnyServiceThatRuns() {
-        assertThat(ServiceDays.EVERY_DAY.sharesDayWith(days(5), 1)).isTrue();
-        assertThat(days(5).sharesDayWith(ServiceDays.EVERY_DAY, 0)).isTrue();
-        assertThat(ServiceDays.EVERY_DAY.sharesDayWith(days(), 0)).isFalse();
+        assertThat(days(-1).intersect(days(0), 1).epochDays()).containsExactly(-1);
     }
 
     @Test
@@ -45,33 +38,6 @@ class ServiceDaysTest {
         assertThat(ServiceDays.EVERY_DAY.intersect(days(128), 1).epochDays()).containsExactly(127);
         assertThat(days(5).intersect(ServiceDays.EVERY_DAY, 1).epochDays()).containsExactly(5);
         assertThat(ServiceDays.EVERY_DAY.intersect(ServiceDays.EVERY_DAY, 0)).isSameAs(ServiceDays.EVERY_DAY);
-    }
-
-    @Test
-    void afterKeepsTheDaysThatComeShiftedDaysAfterTheEarlierService() {
-        assertThat(days(101, 102, 103).after(days(100, 102), 1).epochDays()).containsExactly(101, 103);
-        // Day 127 is the last bit of one word, day 128 the first of the next
-        assertThat(days(128).after(days(127), 1).epochDays()).containsExactly(128);
-        assertThat(ServiceDays.EVERY_DAY.after(days(127), 1).epochDays()).containsExactly(128);
-        assertThat(days(5).after(ServiceDays.EVERY_DAY, 1).epochDays()).containsExactly(5);
-    }
-
-    @Test
-    void serviceCoversAnotherWhenItRunsOnAllItsDays() {
-        assertThat(days(5, 6, 130).covers(days(5, 130))).isTrue();
-        assertThat(days(5, 130).covers(days(5, 6))).isFalse();
-        assertThat(ServiceDays.EVERY_DAY.covers(days(5))).isTrue();
-        assertThat(days(5).covers(ServiceDays.EVERY_DAY)).isFalse();
-    }
-
-    @Test
-    void coversAfterMatchesCoversOfTheBuiltDays() {
-        ServiceDays later = days(101, 102, 129);
-        ServiceDays earlier = days(100, 128);
-
-        assertThat(days(101, 129).coversAfter(later, earlier, 1)).isTrue();
-        assertThat(days(101).coversAfter(later, earlier, 1)).isFalse();
-        assertThat(days(101).coversAfter(later, ServiceDays.EVERY_DAY, 0)).isFalse();
     }
 
     @Test

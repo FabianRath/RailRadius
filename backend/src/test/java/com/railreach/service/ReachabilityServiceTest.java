@@ -189,12 +189,15 @@ class ReachabilityServiceTest {
                 .extracting(ReachableStation::getTotalDurationMinutes).isEqualTo(90); // ZT7 08:30, ZT2 09:30
     }
 
-    // B25: ZT6 runs only on 8 weekdays that calendar_dates.txt removes from ZT1's service
+    // B33: ZT6 runs only on 8 weekdays that calendar_dates.txt removes from ZT1's service. The search compares days
+    // by weekday and 6-week period, where they meet, so the journey is found but shows that no date fits.
     @Test
-    void trainsOnlySharingADayRemovedByCalendarDatesDoNotConnect(@TempDir Path dir) throws Exception {
+    void trainsOnlyRunningOnDaysRemovedFromTheOtherConnectWithAWarning(@TempDir Path dir) throws Exception {
         ReachabilityResponse response = query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 2, 0, 180);
 
-        assertThat(find(response, "zeta:Z6")).isEmpty();
+        ReachableStation holiday = find(response, "zeta:Z6").orElseThrow();
+        assertThat(holiday.getHasCommonDay()).isFalse();
+        assertThat(holiday.getRunningDays()).isNull();
     }
 
     // B25: Friday-only ZT4 arrives 23:30, Saturday-only ZT5 leaves 00:30, so they connect across midnight

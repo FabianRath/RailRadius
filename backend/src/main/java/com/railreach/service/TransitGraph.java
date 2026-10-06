@@ -52,6 +52,8 @@ public class TransitGraph {
     private final Map<String, Map<String, Connection>> connectionByTrip = new ConcurrentHashMap<>();
     // trip ID -> per stop index whether its departure there runs often enough, filled on first use
     private final Map<String, boolean[]> regularDeparturesByTrip = new ConcurrentHashMap<>();
+    // The services' WeekPeriodDays as of the day they were worked out on; replaced when the day changes
+    private volatile WeekPeriodDays.OfDay weekPeriodDays = noWeekPeriodDays();
     private final Clock clock;
 
     public TransitGraph() {
@@ -110,6 +112,20 @@ public class TransitGraph {
      */
     ServiceDays upcomingDays(ServiceDays days) {
         return days.from((int) LocalDate.now(clock).toEpochDay());
+    }
+
+    /** The search's coarse view of the services' days, as of today (B31, B33). */
+    WeekPeriodDays.OfDay weekPeriodDays() {
+        int today = (int) LocalDate.now(clock).toEpochDay();
+        WeekPeriodDays.OfDay current = weekPeriodDays;
+        if (current.epochDay() == today) return current;
+        current = new WeekPeriodDays.OfDay(today, new ConcurrentHashMap<>());
+        weekPeriodDays = current;
+        return current;
+    }
+
+    private static WeekPeriodDays.OfDay noWeekPeriodDays() {
+        return new WeekPeriodDays.OfDay(Integer.MIN_VALUE, new ConcurrentHashMap<>());
     }
 
     /** Per stop index of the trip: whether it may be ridden away from that stop ({@link RareTrainFilter}). */
@@ -188,6 +204,7 @@ public class TransitGraph {
         departuresByStop.clear();
         connectionByTrip.clear();
         regularDeparturesByTrip.clear();
+        weekPeriodDays = noWeekPeriodDays();
     }
 
     void addStationIfAbsent(Station station) {

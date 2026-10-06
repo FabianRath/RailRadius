@@ -6,7 +6,8 @@ import java.util.stream.IntStream;
 
 /**
  * The days a GTFS service runs, as a bitset over epoch days: bit j of {@code words[i]} is epoch day
- * {@code (firstWord + i) * 64 + j}. The search has no travel date; it only asks whether two trips share a day (B25).
+ * {@code (firstWord + i) * 64 + j}. The search compares days coarsely ({@link WeekPeriodDays}); these exact days are
+ * for the days shown for a journey and for the rare-train rule.
  */
 public record ServiceDays(int firstWord, long[] words) {
 
@@ -28,16 +29,6 @@ public record ServiceDays(int firstWord, long[] words) {
         return new ServiceDays(firstWord, words);
     }
 
-    /** True if {@code later} runs {@code dayShift} days (0 to 63) after a day this service runs. */
-    boolean sharesDayWith(ServiceDays later, int dayShift) {
-        if (this == EVERY_DAY) return later == EVERY_DAY || later.words.length > 0;
-        if (later == EVERY_DAY) return words.length > 0;
-        for (int i = 0; i < words.length; i++) {
-            if ((words[i] & later.wordMovedBack(firstWord + i, dayShift)) != 0) return true;
-        }
-        return false;
-    }
-
     /**
      * The days of this service on which {@code later} runs {@code dayShift} days (0 to 63) later. {@link #EVERY_DAY}
      * on either side keeps the other side's days.
@@ -50,45 +41,6 @@ public record ServiceDays(int firstWord, long[] words) {
             result[i] = words[i] & later.wordMovedBack(firstWord + i, dayShift);
         }
         return trimmed(firstWord, result);
-    }
-
-    /**
-     * The days of this service that come {@code dayShift} days (0 to 63) after a day {@code earlier} runs.
-     * {@link #EVERY_DAY} on either side keeps the other side's days.
-     */
-    ServiceDays after(ServiceDays earlier, int dayShift) {
-        if (earlier == EVERY_DAY) return this;
-        if (this == EVERY_DAY) return earlier.movedForward(dayShift);
-        long[] result = new long[words.length];
-        for (int i = 0; i < words.length; i++) {
-            result[i] = words[i] & earlier.wordMovedForward(firstWord + i, dayShift);
-        }
-        return trimmed(firstWord, result);
-    }
-
-    /** True if this service runs on every day {@code other} runs. */
-    boolean covers(ServiceDays other) {
-        if (this == EVERY_DAY) return true;
-        if (other == EVERY_DAY) return false;
-        for (int i = 0; i < other.words.length; i++) {
-            if ((other.words[i] & ~wordAt(other.firstWord + i)) != 0) return false;
-        }
-        return true;
-    }
-
-    /**
-     * {@code covers(later.after(earlier, dayShift))} without building it: the search checks this for many arrivals
-     * per departure.
-     */
-    boolean coversAfter(ServiceDays later, ServiceDays earlier, int dayShift) {
-        if (this == EVERY_DAY) return true;
-        if (later == EVERY_DAY || earlier == EVERY_DAY) return covers(later.after(earlier, dayShift));
-        for (int i = 0; i < later.words.length; i++) {
-            int word = later.firstWord + i;
-            long days = later.words[i] & earlier.wordMovedForward(word, dayShift);
-            if ((days & ~wordAt(word)) != 0) return false;
-        }
-        return true;
     }
 
     /** The days on which this service or {@code other} runs. */
@@ -142,16 +94,6 @@ public record ServiceDays(int firstWord, long[] words) {
         return trimmed(firstWord - 1, result);
     }
 
-    private ServiceDays movedForward(int dayShift) {
-        if (dayShift == 0) return this;
-        // Moving forward can reach into the word after the last one
-        long[] result = new long[words.length + 1];
-        for (int i = 0; i < result.length; i++) {
-            result[i] = wordMovedForward(firstWord + i, dayShift);
-        }
-        return trimmed(firstWord, result);
-    }
-
     private static ServiceDays trimmed(int firstWord, long[] words) {
         int start = 0;
         int end = words.length;
@@ -164,12 +106,6 @@ public record ServiceDays(int firstWord, long[] words) {
     private long wordMovedBack(int word, int dayShift) {
         long low = wordAt(word) >>> dayShift;
         return dayShift == 0 ? low : low | wordAt(word + 1) << (DAYS_PER_WORD - dayShift);
-    }
-
-    /** Word {@code word} as if every day ran dayShift days later: bit j is day {@code word * 64 + j - dayShift}. */
-    private long wordMovedForward(int word, int dayShift) {
-        long high = wordAt(word) << dayShift;
-        return dayShift == 0 ? high : high | wordAt(word - 1) >>> (DAYS_PER_WORD - dayShift);
     }
 
     private long wordAt(int word) {

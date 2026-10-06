@@ -39,7 +39,15 @@ function stationDetailsHtml(station) {
         + journeyHtml(station);
 }
 
+/**
+ * The search compares the trains' days by weekday and 6-week period only, so a journey can pass whose trains never all
+ * run on one date (B33).
+ */
 function runningDaysHtml(station) {
+    if (station.hasCommonDay === false) {
+        return `<div class="popup-meta popup-warning">${icon('triangle-alert')}`
+            + ' No single day on which all these trains run</div>';
+    }
     if (!station.runningDays) return '';
     return `<div class="popup-meta">${icon('calendar')} ${escapeHtml(station.runningDays)}</div>`;
 }

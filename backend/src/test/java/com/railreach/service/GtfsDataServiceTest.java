@@ -298,8 +298,8 @@ class GtfsDataServiceTest {
             assertThat(restored.getServiceDays(tripId)).usingRecursiveComparison()
                     .isEqualTo(parsed.getServiceDays(tripId));
         }
-        assertThat(restored.getServiceDays("zeta:ZT1").sharesDayWith(restored.getServiceDays("zeta:ZT3"), 0))
-                .isTrue();
+        assertThat(restored.getServiceDays("zeta:ZT1").intersect(restored.getServiceDays("zeta:ZT3"), 0).isEmpty())
+                .isFalse();
     }
 
     @Test
