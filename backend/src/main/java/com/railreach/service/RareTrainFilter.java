@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -77,11 +78,12 @@ final class RareTrainFilter {
      * stop and leave a later one at another time on a few days only (B33: Snälltåget NT from Berlin at 21:07 on 4
      * days, the regular ones at 20:53, 21:06 and 21:09); a ride must not continue from such a stop.
      */
-    static boolean[] regularDepartures(TripTimetable trip, TransitGraph graph) {
+    static boolean[] regularDepartures(TripTimetable trip,
+                                       Function<String, List<TripTimetable.Departure>> departuresAt) {
         boolean[] regular = new boolean[trip.stopCount()];
         for (int stopIdx = 0; stopIdx < trip.stopCount() - 1; stopIdx++) {
             if (!trip.hasLeg(stopIdx)) continue;
-            List<TripTimetable.Departure> departures = graph.getDeparturesAt(trip.stops().get(stopIdx));
+            List<TripTimetable.Departure> departures = departuresAt.apply(trip.stops().get(stopIdx));
             int departureSeconds = trip.legDepartureSeconds()[stopIdx];
             ServiceDays days = null;
             for (int i = TripTimetable.firstDepartureAt(departures, departureSeconds); i < departures.size()

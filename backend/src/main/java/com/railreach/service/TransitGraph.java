@@ -10,7 +10,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -45,15 +44,10 @@ public class TransitGraph {
     private final Map<String, ServiceDays> tripServiceDays = new ConcurrentHashMap<>();
     // stop ID -> IDs of the trips that serve it
     private final Map<String, Set<String>> stopTrips = new ConcurrentHashMap<>();
-    // Built lazily on first search access, so loading stays lean
-    private final Map<String, TripTimetable> timetables = new ConcurrentHashMap<>();
-    private final Map<String, List<TripTimetable.Departure>> departuresByStop = new ConcurrentHashMap<>();
     // Built lazily: "fromId->toId" -> (trip ID -> connection)
     private final Map<String, Map<String, Connection>> connectionByTrip = new ConcurrentHashMap<>();
-    // trip ID -> per stop index whether its departure there runs often enough, filled on first use
-    private final Map<String, boolean[]> regularDeparturesByTrip = new ConcurrentHashMap<>();
-    // The services' WeekPeriodDays as of the day they were worked out on; replaced when the day changes
-    private volatile WeekPeriodDays.OfDay weekPeriodDays = noWeekPeriodDays();
+    // Built in one pass on first use after a load; dropped when the graph is cleared
+    private volatile SearchTimetables searchTimetables;
     private final Clock clock;
 
     public TransitGraph() {
@@ -102,44 +96,42 @@ public class TransitGraph {
         return tripServiceDays.getOrDefault(tripId, ServiceDays.EVERY_DAY);
     }
 
-    TripTimetable getTimetable(String tripId) {
-        return timetables.computeIfAbsent(tripId, id -> TripTimetable.of(id, this));
-    }
-
     /**
      * The days from today on (B31). A journey's dates start with its first train's, so a train whose days are all
      * past, such as one of an expired feed, is not ridden until its feed is downloaded again.
      */
     ServiceDays upcomingDays(ServiceDays days) {
-        return days.from((int) LocalDate.now(clock).toEpochDay());
+        return days.from(todayEpochDay());
     }
 
-    /** The search's coarse view of the services' days, as of today (B31, B33). */
-    WeekPeriodDays.OfDay weekPeriodDays() {
-        int today = (int) LocalDate.now(clock).toEpochDay();
-        WeekPeriodDays.OfDay current = weekPeriodDays;
-        if (current.epochDay() == today) return current;
-        current = new WeekPeriodDays.OfDay(today, new ConcurrentHashMap<>());
-        weekPeriodDays = current;
-        return current;
+    /** Today by the graph's clock, which says which days are past (B31). */
+    int todayEpochDay() {
+        return (int) LocalDate.now(clock).toEpochDay();
     }
 
-    private static WeekPeriodDays.OfDay noWeekPeriodDays() {
-        return new WeekPeriodDays.OfDay(Integer.MIN_VALUE, new ConcurrentHashMap<>());
+    /** The trips laid out for the search; built on the first call after a load. */
+    SearchTimetables searchTimetables() {
+        SearchTimetables built = searchTimetables;
+        if (built != null) return built;
+        synchronized (this) {
+            if (searchTimetables == null) searchTimetables = SearchTimetables.build(this);
+            return searchTimetables;
+        }
     }
 
-    /** Per stop index of the trip: whether it may be ridden away from that stop ({@link RareTrainFilter}). */
-    boolean[] getRegularDepartures(TripTimetable trip) {
-        return regularDeparturesByTrip.computeIfAbsent(trip.tripId(),
-                id -> RareTrainFilter.regularDepartures(trip, this));
+    Set<String> tripIds() {
+        return Collections.unmodifiableSet(tripStops.keySet());
     }
 
-    /** Every trip that leaves the stop towards a next stop, by departure time. */
-    List<TripTimetable.Departure> getDeparturesAt(String stopId) {
-        return departuresByStop.computeIfAbsent(stopId, id -> getTripsAtStop(id).stream()
-                .flatMap(tripId -> getTimetable(tripId).departuresFrom(id).stream())
-                .sorted(Comparator.comparingInt(TripTimetable.Departure::departureSeconds))
-                .toList());
+    /** Trip ID -> its connections, in no particular order. */
+    Map<String, List<Connection>> connectionsByTrip() {
+        Map<String, List<Connection>> byTrip = new HashMap<>(tripStops.size() * 2);
+        for (List<Connection> edgeConnections : connections.values()) {
+            for (Connection c : edgeConnections) {
+                byTrip.computeIfAbsent(c.getTripId(), k -> new ArrayList<>()).add(c);
+            }
+        }
+        return byTrip;
     }
 
     /** The trip's connection between two adjacent stops, or null. O(1) via a lazy per-edge index. */
@@ -200,11 +192,8 @@ public class TransitGraph {
         services.clear();
         tripServiceDays.clear();
         stopTrips.clear();
-        timetables.clear();
-        departuresByStop.clear();
         connectionByTrip.clear();
-        regularDeparturesByTrip.clear();
-        weekPeriodDays = noWeekPeriodDays();
+        searchTimetables = null;
     }
 
     void addStationIfAbsent(Station station) {
@@ -237,12 +226,7 @@ public class TransitGraph {
     }
 
     GtfsCacheStore.GtfsCacheData snapshot() {
-        Map<String, List<Connection>> connectionsByTrip = new HashMap<>(tripStops.size() * 2);
-        for (List<Connection> edgeConnections : connections.values()) {
-            for (Connection c : edgeConnections) {
-                connectionsByTrip.computeIfAbsent(c.getTripId(), k -> new ArrayList<>()).add(c);
-            }
-        }
+        Map<String, List<Connection>> connectionsByTrip = connectionsByTrip();
         // Trips hold their service's shared ServiceDays, not its ID
         Map<ServiceDays, String> serviceIds = new IdentityHashMap<>(services.size() * 2);
         services.forEach((serviceId, days) -> serviceIds.put(days, serviceId));
@@ -275,6 +259,7 @@ public class TransitGraph {
      */
     void mergeStations(Map<String, String> aliasToCanonicalOrAlias) {
         Map<String, String> aliasToCanonical = resolveChains(aliasToCanonicalOrAlias);
+        searchTimetables = null;
         int merged = 0;
         for (Map.Entry<String, String> mapping : aliasToCanonical.entrySet()) {
             if (++merged % MERGE_PROGRESS_LOG_INTERVAL == 0) {

@@ -3,7 +3,6 @@ package com.railreach.service;
 import com.railreach.model.Connection;
 import com.railreach.util.GtfsTime;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -11,9 +10,11 @@ import java.util.List;
  * a connection has departure {@link CachedTrip#NO_LEG}, and no ride crosses it.
  * Offsets are minutes since the trip's first departure, counted like a ride adds them up: each leg's run time plus
  * the dwell before it, both clamped at 0.
+ * {@code index} is the trip's position in {@link SearchTimetables}, {@code stationIndexes} the stops' positions there.
  */
-record TripTimetable(String tripId, List<String> stops, ServiceDays serviceDays, int[] legDepartureSeconds,
-                     int[] legArrivalSeconds, int[] departureOffsetMinutes, int[] arrivalOffsetMinutes) {
+record TripTimetable(int index, String tripId, List<String> stops, int[] stationIndexes, ServiceDays serviceDays,
+                     Connection[] legConnections, int[] legDepartureSeconds, int[] legArrivalSeconds,
+                     int[] departureOffsetMinutes, int[] arrivalOffsetMinutes) {
 
     /** A trip leaving a stop; a trip that visits the stop twice has one per visit. */
     record Departure(TripTimetable trip, int stopIdx) {
@@ -23,16 +24,17 @@ record TripTimetable(String tripId, List<String> stops, ServiceDays serviceDays,
         }
     }
 
-    static TripTimetable of(String tripId, TransitGraph graph) {
-        List<String> stops = graph.getStopsOnTrip(tripId);
-        int legCount = Math.max(stops.size() - 1, 0);
+    /** legConnections[i] is leg i's connection, null where the trip has none. */
+    static TripTimetable of(int index, String tripId, List<String> stops, int[] stationIndexes, ServiceDays serviceDays,
+                            Connection[] legConnections) {
+        int legCount = legConnections.length;
         int[] departures = new int[legCount];
         int[] arrivals = new int[legCount];
         int[] departureOffsets = new int[stops.size()];
         int[] arrivalOffsets = new int[stops.size()];
         int offsetMinutes = 0;
         for (int leg = 0; leg < legCount; leg++) {
-            Connection c = graph.getConnectionByTrip(stops.get(leg), stops.get(leg + 1), tripId);
+            Connection c = legConnections[leg];
             departures[leg] = c != null ? c.getDepartureTimeSeconds() : CachedTrip.NO_LEG;
             if (c != null) {
                 arrivals[leg] = c.getArrivalTimeSeconds();
@@ -44,8 +46,8 @@ record TripTimetable(String tripId, List<String> stops, ServiceDays serviceDays,
             if (c != null) offsetMinutes += Math.max(0, GtfsTime.diffMinutes(departures[leg], arrivals[leg]));
             arrivalOffsets[leg + 1] = offsetMinutes;
         }
-        return new TripTimetable(tripId, stops, graph.getServiceDays(tripId), departures, arrivals, departureOffsets,
-                arrivalOffsets);
+        return new TripTimetable(index, tripId, stops, stationIndexes, serviceDays, legConnections, departures, arrivals,
+                departureOffsets, arrivalOffsets);
     }
 
     int stopCount() {
@@ -75,13 +77,5 @@ record TripTimetable(String tripId, List<String> stops, ServiceDays serviceDays,
             else high = mid;
         }
         return low;
-    }
-
-    List<Departure> departuresFrom(String stopId) {
-        List<Departure> result = new ArrayList<>(1);
-        for (int i = 0; i < legDepartureSeconds.length; i++) {
-            if (hasLeg(i) && stops.get(i).equals(stopId)) result.add(new Departure(this, i));
-        }
-        return result;
     }
 }

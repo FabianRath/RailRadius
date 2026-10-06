@@ -37,6 +37,8 @@ public class GtfsDataService {
         var cached = cacheStore.load();
         if (cached.isPresent()) {
             graph.restore(cached.get());
+            // Built now rather than by the first search, which would otherwise take twice as long
+            graph.searchTimetables();
             stationSearchIndex.rebuild();
             log.info("✓ GTFS data loaded from cache: {} stations, {} graph nodes, {} connections",
                     graph.stationCount(), graph.nodeCount(), graph.connectionCount());
@@ -82,6 +84,7 @@ public class GtfsDataService {
 
         loadProgress.enter(GtfsLoadProgress.Phase.SAVING);
         cacheStore.save(graph.snapshot());
+        graph.searchTimetables();
         stationSearchIndex.rebuild();
         reachabilityCache.clear();
     }

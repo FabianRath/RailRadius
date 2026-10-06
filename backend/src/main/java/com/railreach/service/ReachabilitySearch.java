@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -85,8 +86,12 @@ public class ReachabilitySearch {
         }
     }
 
-    private record SearchState(String startId, int minTransferMins, int maxTransferMins,
-                               WeekPeriodDays.OfDay weekPeriodDays, Map<String, TripProgress> progressByTrip,
+    /**
+     * tripDays are the trips' {@link WeekPeriodDays} and progressByTrip their progress, both by
+     * {@link TripTimetable#index()}; progress is null for a trip no ride reached yet.
+     */
+    private record SearchState(SearchTimetables timetables, String startId, int startIndex, int minTransferMins,
+                               int maxTransferMins, long[] tripDays, TripProgress[] progressByTrip,
                                Map<String, StationCandidates> bestByStation, Counters counters) {}
 
     /** What a search did, for its log: where the time goes on large data. */
@@ -175,12 +180,14 @@ public class ReachabilitySearch {
     public Map<String, List<JourneyPath>> search(String startId, int maxTransfers,
                                                  int minTransferMins, int maxTransferMins) {
         Counters counters = new Counters();
-        SearchState state = new SearchState(startId, minTransferMins, maxTransferMins,
-                transitGraph.weekPeriodDays(), new HashMap<>(), new HashMap<>(), counters);
+        SearchTimetables timetables = transitGraph.searchTimetables();
+        SearchState state = new SearchState(timetables, startId, timetables.stationIndex(startId), minTransferMins,
+                maxTransferMins, timetables.weekPeriodDays(transitGraph.todayEpochDay()),
+                new TripProgress[timetables.tripCount()], new HashMap<>(), counters);
         long roundsStartNanos = System.nanoTime();
         List<Ride> arrivals = new ArrayList<>();
-        for (TripTimetable.Departure departure : transitGraph.getDeparturesAt(startId)) {
-            long days = state.weekPeriodDays().of(departure.trip().serviceDays());
+        for (TripTimetable.Departure departure : timetables.departuresAt(startId)) {
+            long days = state.tripDays()[departure.trip().index()];
             if (days != 0) ride(state, departure, 0, 0, null, days, arrivals);
         }
         long arrivalCount = arrivals.size();
@@ -197,7 +204,7 @@ public class ReachabilitySearch {
         Map<String, List<JourneyPath>> result = toJourneyPaths(state);
         log.info("  Search stats: {} stop arrivals on {} trips, {} stations; rounds {} ms, paths {} ms; "
                         + "{} departures scanned, {} fallback scans over {} arrivals",
-                arrivalCount, state.progressByTrip().size(), state.bestByStation().size() + 1, roundsMs,
+                arrivalCount, reachedTripCount(state), state.bestByStation().size() + 1, roundsMs,
                 millisSince(pathsStartNanos), counters.departuresScanned, counters.fallbackScans,
                 counters.fallbackScannedArrivals);
         return result;
@@ -210,6 +217,10 @@ public class ReachabilitySearch {
                         + "{} fallback scans over {} arrivals", transfers, arrivalCount, state.bestByStation().size(),
                 millisSince(startNanos), counters.departuresScanned, counters.fallbackScans,
                 counters.fallbackScannedArrivals);
+    }
+
+    private static long reachedTripCount(SearchState state) {
+        return Arrays.stream(state.progressByTrip()).filter(Objects::nonNull).count();
     }
 
     private static long millisSince(long startNanos) {
@@ -247,7 +258,7 @@ public class ReachabilitySearch {
                 minWaitSeconds, Math.min(maxWaitSeconds, GtfsTime.MAX_OVERNIGHT_GAP_SECONDS));
         StationArrivals station = new StationArrivals(stationArrivals, sameDay, overnight);
 
-        List<TripTimetable.Departure> departures = transitGraph.getDeparturesAt(stationId);
+        List<TripTimetable.Departure> departures = state.timetables().departuresAt(stationId);
         state.counters().departuresScanned += departures.size();
         for (TripTimetable.Departure departure : departures) {
             board(state, departure, station, transfers, arrivals);
@@ -265,8 +276,8 @@ public class ReachabilitySearch {
     private void board(SearchState state, TripTimetable.Departure departure, StationArrivals station, int transfers,
                        List<Ride> arrivals) {
         TripTimetable next = departure.trip();
-        if (!transitGraph.getRegularDepartures(next)[departure.stopIdx()]) return;
-        long nextDays = state.weekPeriodDays().of(next.serviceDays());
+        if (!state.timetables().regularDepartures(next)[departure.stopIdx()]) return;
+        long nextDays = state.tripDays()[next.index()];
         long served = 0;
         while ((nextDays & ~served) != 0) {
             long servedSoFar = served;
@@ -302,7 +313,7 @@ public class ReachabilitySearch {
 
     /** A faster ride of the same round on all its days reached the same stop of the same trip later on. */
     private static boolean isOvertaken(SearchState state, Ride arrival) {
-        return state.progressByTrip().get(arrival.trip().tripId())
+        return state.progressByTrip()[arrival.trip().index()]
                 .reachedFaster(arrival.alightIdx(), arrival.durationMinutes(), arrival.days());
     }
 
@@ -314,16 +325,17 @@ public class ReachabilitySearch {
     private void ride(SearchState state, TripTimetable.Departure departure, int transfers, int boardDurationMinutes,
                       Ride previous, long days, List<Ride> arrivals) {
         TripTimetable trip = departure.trip();
-        TripProgress progress = state.progressByTrip()
-                .computeIfAbsent(trip.tripId(), id -> new TripProgress(trip.stopCount()));
-        boolean[] regularDepartures = transitGraph.getRegularDepartures(trip);
+        TripProgress[] progressByTrip = state.progressByTrip();
+        if (progressByTrip[trip.index()] == null) progressByTrip[trip.index()] = new TripProgress(trip.stopCount());
+        TripProgress progress = progressByTrip[trip.index()];
+        boolean[] regularDepartures = state.timetables().regularDepartures(trip);
         int boardIdx = departure.stopIdx();
         for (int alightIdx = boardIdx + 1; alightIdx < trip.stopCount() && trip.hasLeg(alightIdx - 1)
                 && regularDepartures[alightIdx - 1]; alightIdx++) {
             int durationMinutes = boardDurationMinutes + trip.rideMinutes(boardIdx, alightIdx);
             if (progress.reachedNoSlower(alightIdx, durationMinutes, days)) return;
             progress.record(alightIdx, durationMinutes, days);
-            if (trip.stops().get(alightIdx).equals(state.startId())) continue;
+            if (trip.stationIndexes()[alightIdx] == state.startIndex()) continue;
 
             Ride ride = new Ride(trip, boardIdx, alightIdx, transfers, durationMinutes, previous, days);
             arrivals.add(ride);
@@ -386,7 +398,7 @@ public class ReachabilitySearch {
         for (Ride ride : rides.reversed()) {
             List<String> stops = ride.trip().stops();
             for (int i = ride.boardIdx(); i < ride.alightIdx(); i++) {
-                connections.add(transitGraph.getConnectionByTrip(stops.get(i), stops.get(i + 1), ride.trip().tripId()));
+                connections.add(ride.trip().legConnections()[i]);
                 stationIds.add(stops.get(i + 1));
             }
         }
