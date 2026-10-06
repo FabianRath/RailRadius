@@ -51,6 +51,20 @@ class GtfsDataServiceTest {
         assertThat(gtfs.getStopsOnTrip("beta:U1")).containsExactly("beta:B1", "beta:B2");
     }
 
+    // B35: the ÖBB zip keeps its files in a folder GTFS_Fahrplan_2026/
+    @Test
+    void feedWithItsFilesInAFolderIsLoaded(@TempDir Path dir) throws Exception {
+        TransitGraph graph = new TransitGraph();
+        GtfsDataService service = GtfsTestFixtures.dataService(dir, graph,
+                GtfsTestFixtures.reachabilityCache(graph), new StationSearchIndex(graph), "zeta");
+        GtfsTestFixtures.zipFeedInFolder("zeta", dir.resolve("gtfs").resolve("gtfs_zeta.zip"), "zeta_feed");
+
+        service.loadFromFiles();
+
+        assertThat(graph.getStation("zeta:Z1").getName()).isEqualTo("Zeta Start");
+        assertThat(graph.getTripInfo("zeta:ZT1")).isPresent();
+    }
+
     // B6
     // F16: rules from train-categories.txt
     @Test

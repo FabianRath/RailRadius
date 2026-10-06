@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -23,13 +24,28 @@ final class GtfsCsvReader implements AutoCloseable {
     }
 
     static GtfsCsvReader open(ZipFile zipFile, String fileName) throws IOException {
-        ZipEntry entry = zipFile.getEntry(fileName);
-        if (entry == null) return new GtfsCsvReader(null, new String[0]);
+        Optional<ZipEntry> entry = findEntry(zipFile, fileName);
+        if (entry.isEmpty()) return new GtfsCsvReader(null, new String[0]);
         BufferedReader reader = new BufferedReader(
-                new InputStreamReader(zipFile.getInputStream(entry), StandardCharsets.UTF_8));
+                new InputStreamReader(zipFile.getInputStream(entry.get()), StandardCharsets.UTF_8));
         String headerLine = reader.readLine();
         if (headerLine == null) return new GtfsCsvReader(reader, new String[0]);
         return new GtfsCsvReader(reader, parseLine(stripByteOrderMark(headerLine)));
+    }
+
+    /** The feed file, at the top level of the zip or inside one top-level folder (the ÖBB zip has one, B35). */
+    static Optional<ZipEntry> findEntry(ZipFile zipFile, String fileName) {
+        ZipEntry topLevel = zipFile.getEntry(fileName);
+        if (topLevel != null) return Optional.of(topLevel);
+        return zipFile.stream()
+                .filter(entry -> isInTopLevelFolder(entry.getName(), fileName))
+                .map(ZipEntry.class::cast)
+                .findFirst();
+    }
+
+    private static boolean isInTopLevelFolder(String entryName, String fileName) {
+        int slash = entryName.indexOf('/');
+        return slash > 0 && slash == entryName.lastIndexOf('/') && entryName.substring(slash + 1).equals(fileName);
     }
 
     // Java's UTF-8 decoder keeps a leading BOM, which would make the first column name unmatchable

@@ -203,6 +203,19 @@ class FeedUpdateCenterTest {
         assertNoPartFileLeft();
     }
 
+    // B35
+    @Test
+    void downloadWithItsFilesInAFolderIsAccepted() throws IOException {
+        Path served = tempDir.resolve("in-folder.zip");
+        GtfsTestFixtures.zipFeedInFolder("zeta", served, "zeta_feed");
+        serve(HTTP_OK, Files.readAllBytes(served), false);
+
+        FeedDownloadResult result = center.download(feed(), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REPLACED);
+        assertThat(result.getAfter().getLastServiceDate()).isEqualTo(ZETA_LAST_DAY);
+    }
+
     @Test
     void storageCountsZipsInUseAndReplacedOnesSeparately() throws IOException {
         Path current = gtfsDir.resolve("gtfs_zeta.zip");
