@@ -97,6 +97,10 @@ export function fetchFeeds() {
     return adminJson('/api/admin/feeds');
 }
 
+export function fetchFeedStorage() {
+    return adminJson('/api/admin/feeds/storage');
+}
+
 export function downloadFeed(source) {
     return adminJson(`/api/admin/feeds/${encodeURIComponent(source)}/download`, 'POST');
 }

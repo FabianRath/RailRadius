@@ -2,6 +2,7 @@ package com.railreach.controller;
 
 import com.railreach.dto.FeedDownloadResult;
 import com.railreach.dto.FeedStatus;
+import com.railreach.dto.FeedStorage;
 import com.railreach.dto.GtfsLoadStatus;
 import com.railreach.model.Station;
 import com.railreach.service.FeedUpdateCenter;
@@ -109,6 +110,12 @@ public class AdminController {
     @GetMapping("/feeds")
     public List<FeedStatus> getFeeds() {
         return feedUpdateCenter.statuses();
+    }
+
+    /** Disk space of the zips in use and of the replaced ones kept in previous/. */
+    @GetMapping("/feeds/storage")
+    public FeedStorage getFeedStorage() {
+        return feedUpdateCenter.storage();
     }
 
     /** Downloads a new version of one feed (minutes for the big ones); 404 if it has no download URL. */

@@ -17,6 +17,7 @@ case "${1:-help}" in
   gtfs-stats)    admin "$BASE/api/admin/gtfs-stats" ;;
   # Feed update center: validity of every zip; downloads replace zips (old one kept in previous/), then reload-gtfs
   feeds)         admin "$BASE/api/admin/feeds" ;;
+  feeds-storage) admin "$BASE/api/admin/feeds/storage" ;;
   feed-download) admin -X POST "$BASE/api/admin/feeds/${2:?source}/download" ;;
   feeds-download-outdated) admin -X POST "$BASE/api/admin/feeds/download-outdated" ;;
   # Slow / destructive: full GTFS reparse (minutes), cache deletion

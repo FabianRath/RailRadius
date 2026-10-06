@@ -4,6 +4,7 @@ import com.railreach.dto.FeedDownloadResult;
 import com.railreach.dto.FeedDownloadResult.Outcome;
 import com.railreach.dto.FeedStatus;
 import com.railreach.dto.FeedStatus.State;
+import com.railreach.dto.FeedStorage;
 import com.railreach.service.FeedRegistry.FeedSource;
 import com.railreach.service.FeedRegistry.FeedUrl;
 import com.sun.net.httpserver.HttpServer;
@@ -200,6 +201,31 @@ class FeedUpdateCenterTest {
         assertThat(center.statuses(DURING_ZETA).getFirst().getLastServiceDate()).isEqualTo(LATER_ZETA_LAST_DAY);
         assertThat(gtfsDir.resolve(FeedDownloader.PREVIOUS_DIRECTORY).resolve("gtfs_zeta.zip")).exists();
         assertNoPartFileLeft();
+    }
+
+    @Test
+    void storageCountsZipsInUseAndReplacedOnesSeparately() throws IOException {
+        Path current = gtfsDir.resolve("gtfs_zeta.zip");
+        GtfsTestFixtures.zipFeed("zeta", current);
+        Path previous = Files.createDirectories(gtfsDir.resolve(FeedDownloader.PREVIOUS_DIRECTORY))
+                .resolve("gtfs_old.zip");
+        zipZetaEndingIn2027(previous);
+        Files.writeString(gtfsDir.resolve("list.txt"), "not a zip");
+
+        FeedStorage storage = center.storage();
+
+        assertThat(storage.getInUseCount()).isEqualTo(1);
+        assertThat(storage.getInUseBytes()).isEqualTo(Files.size(current));
+        assertThat(storage.getPreviousCount()).isEqualTo(1);
+        assertThat(storage.getPreviousBytes()).isEqualTo(Files.size(previous));
+    }
+
+    @Test
+    void storageWithoutPreviousDirectoryIsZero() {
+        FeedStorage storage = center.storage();
+
+        assertThat(storage.getInUseCount()).isZero();
+        assertThat(storage.getPreviousBytes()).isZero();
     }
 
     @Test
