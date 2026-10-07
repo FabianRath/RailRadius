@@ -8,12 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -21,7 +18,8 @@ import java.util.stream.Collectors;
  * stations the earlier ones left:
  * <ol>
  *   <li>exact-name duplicates within one feed;</li>
- *   <li>stations of different feeds near each other with similar names;</li>
+ *   <li>stations of different feeds near each other with similar names ({@link StationNameMatcher}), or very near
+ *       each other where one name has all the other's words;</li>
  *   <li>stations of different feeds near each other that share trains ({@link SharedTrainMatcher}): needs rule 2
  *       first, as it compares neighbouring stations;</li>
  *   <li>a feed's stops abroad folded into the local feed's station ({@link ForeignStopSnapper}).</li>
@@ -41,8 +39,12 @@ public class StationDeduplicator {
     private static final double CROSS_BORDER_CELL_SIZE_DEG = 0.01;
     // 0.4 still accepts "Paris Gare du Nord" vs "Paris Nord (FR)"
     private static final double CROSS_BORDER_MIN_NAME_SIMILARITY = 0.4;
+    // ~100 m. "Split" and "Split željeznički kolodvor" are one station, but Cotral's "Viterbo" and Trenitalia's
+    // "Viterbo Porta Fiorentina", 126 m apart, are two
+    private static final double CONTAINED_NAME_RADIUS_DEG = 0.001;
 
     private final CountryLocator countryLocator;
+    private final StationNameMatcher nameMatcher = new StationNameMatcher();
 
     void deduplicate(TransitGraph graph) {
         log.info("=== Station deduplication ===");
@@ -117,10 +119,17 @@ public class StationDeduplicator {
         int merges = 0;
         for (StationPair pair : candidates) {
             if (pair.eitherMerged(aliasToCanonical)) continue;
-            double similarity = tokenSimilarity(pair.s1().getName(), pair.s2().getName());
-            if (similarity < CROSS_BORDER_MIN_NAME_SIMILARITY) continue;
-            mergeIntoBetterConnected(graph, pair, aliasToCanonical, String.format("sim=%.2f", similarity));
-            merges++;
+            String name1 = pair.s1().getName();
+            String name2 = pair.s2().getName();
+            double similarity = nameMatcher.similarity(name1, name2);
+            if (similarity >= CROSS_BORDER_MIN_NAME_SIMILARITY) {
+                mergeIntoBetterConnected(graph, pair, aliasToCanonical, String.format("sim=%.2f", similarity));
+                merges++;
+            } else if (areNear(pair.s1(), pair.s2(), CONTAINED_NAME_RADIUS_DEG)
+                    && nameMatcher.oneContainsTheOther(name1, name2)) {
+                mergeIntoBetterConnected(graph, pair, aliasToCanonical, "name contained");
+                merges++;
+            }
         }
         log.info("  Cross-border stations merged by name: {}", merges);
     }
@@ -162,25 +171,6 @@ public class StationDeduplicator {
     private static boolean areNear(Station s1, Station s2, double radiusDeg) {
         return Coordinates.areNear(s1.getLatitude(), s1.getLongitude(), s2.getLatitude(), s2.getLongitude(),
                 radiusDeg);
-    }
-
-    /** Jaccard similarity of the word sets, ignoring case and accents. */
-    private static double tokenSimilarity(String name1, String name2) {
-        if (name1 == null || name2 == null) return 0.0;
-        Set<String> tokens1 = tokenize(name1);
-        Set<String> tokens2 = tokenize(name2);
-        if (tokens1.isEmpty() || tokens2.isEmpty()) return 0.0;
-        Set<String> intersection = new HashSet<>(tokens1);
-        intersection.retainAll(tokens2);
-        Set<String> union = new HashSet<>(tokens1);
-        union.addAll(tokens2);
-        return (double) intersection.size() / union.size();
-    }
-
-    private static Set<String> tokenize(String name) {
-        return Arrays.stream(StationNameVariants.fold(name).split("[\\s\\p{Punct}]+"))
-                .filter(token -> !token.isEmpty())
-                .collect(Collectors.toSet());
     }
 
     private record StationPair(Station s1, Station s2) {

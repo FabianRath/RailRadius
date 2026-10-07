@@ -214,6 +214,24 @@ class GtfsDataServiceTest {
         assertThat(Stream.of("gamma:G8", "delta:D7").filter(id -> graph.getStation(id) != null)).hasSize(1);
     }
 
+    // B29
+    @Test
+    void crossFeedStationWhoseNameIsPartOfTheOtherIsMergedWhenVeryNear(@TempDir Path dir) throws Exception {
+        // gamma's G9 "Lake" and delta's D8 "Lake Upper Pier Road" are ~55 m apart and share no train
+        TransitGraph graph = GtfsTestFixtures.load(dir, "gamma", "delta");
+
+        assertThat(Stream.of("gamma:G9", "delta:D8").filter(id -> graph.getStation(id) != null)).hasSize(1);
+    }
+
+    @Test
+    void crossFeedStationWhoseNameIsPartOfTheOtherStaysSeparateBeyond100Metres(@TempDir Path dir) throws Exception {
+        // gamma's G10 "Hill" and delta's D9 "Hill Upper Park Road" are ~130 m apart
+        TransitGraph graph = GtfsTestFixtures.load(dir, "gamma", "delta");
+
+        assertThat(graph.getStation("gamma:G10")).isNotNull();
+        assertThat(graph.getStation("delta:D9")).isNotNull();
+    }
+
     @Test
     void chainedMergesEndAtTheLastStation(@TempDir Path dir) throws Exception {
         // G2 merges into GX within gamma, then GX merges into delta's D1 across the border

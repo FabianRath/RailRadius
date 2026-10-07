@@ -83,6 +83,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `GtfsCsvReader` | service | Row-by-row reader for one CSV file inside a GTFS zip, at the top level or inside one top-level folder (ÖBB); strips a UTF-8 BOM from the header |
 | `StationSearchIndex` | service | Station name search over the name variants of each station's name and translated names: trigram → station positions, in degree order; rebuilt after each load |
 | `StationNameVariants` | service | Searchable forms of a station name: folded (lowercase, no accents), German umlaut spelling (`koeln`), and the local city name replaced by its translations from `station-aliases.txt` (`cologne`) |
+| `StationNameMatcher` | service | Cross-border rule: name similarity and name containment of two nearby stations (see Data pipeline → cross-border dedup) |
 | `StationDeduplicator` | service | Within-country and cross-border station merging after all feeds are loaded; runs the merge rules in order |
 | `StationGrid` | service | Stations bucketed into square degree cells; `near` = the 3×3 cells around a station |
 | `SharedTrainMatcher` | service | Cross-border rule: two stops are one station if ≥ 3 trains serve both at the same minute with the same neighbour station |
@@ -148,7 +149,7 @@ A feed that adds no connections at all (e.g. unreadable headers) is logged as a 
 After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStations`), every station first gets its `country` from `CountryLocator`; a merge keeps the canonical station's country.
 5. **Within-country dedup**: same exact name, same source, within ~200 m.
 6. **Cross-border dedup**, on pairs of stations of different sources within ~500 m (found via a ~1 km `StationGrid`), in two passes:
-   - **by name**: token Jaccard similarity ≥ 0.4, ignoring case and accents (`StationNameVariants.fold`);
+   - **by name** (`StationNameMatcher`): word-set Jaccard similarity ≥ 0.4; or, within ~100 m, every word of one name is in the other ("Split" / "Split željeznički kolodvor"). Words are compared folded (`StationNameVariants.fold`), Cyrillic transliterated (Bulgarian system), without words for "station" and link words (stazione, kolodvor, di, …), with "C.LE" → centrale, "Hbf"/"…bf" → (haupt)bahnhof, airport words as one, and oe/ae/ue as o/a/u ("Koebenhavn"); two words also match one edit apart from 5 letters on and two edits apart from 8, if they start with the same letter. The best score over the names' city translations (`StationNameVariants.variants`: Padua / Padova) counts. The ~100 m limit keeps nearby separate stations apart (Cotral's "Viterbo" / "Viterbo Porta Fiorentina", 126 m);
    - **by shared trains** (`SharedTrainMatcher`): at least 3 trains leave both at the same clock minute towards the same next station (or arrive from the same previous one), neighbours compared after the merges so far. Catches translated names ("Aachen, West Bf" / "Aix-la-Chapelle Ouest"). Repeated until a pass merges nothing.
 
    In both, the station with more connections becomes canonical.
