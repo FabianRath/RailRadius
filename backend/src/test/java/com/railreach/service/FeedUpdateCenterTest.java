@@ -12,6 +12,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.ByteArrayOutputStream;
@@ -43,6 +44,9 @@ class FeedUpdateCenterTest {
     private static final String MIRROR_PATH = "/mirror.zip";
     private static final int HTTP_OK = 200;
     private static final int HTTP_NOT_FOUND = 404;
+    private static final int HTTP_UNAUTHORIZED = 401;
+    private static final String AUTH_SETTING = "railreach.feeds.auth.zeta";
+    private static final String AUTH_HEADER = "Basic ${" + AUTH_SETTING + "}";
     // Random bytes don't compress, so the padded zip is several times the size of plain zeta
     private static final int PADDING_BYTES = 200_000;
 
@@ -51,6 +55,7 @@ class FeedUpdateCenterTest {
 
     private Path gtfsDir;
     private GtfsLoadProgress loadProgress;
+    private MockEnvironment environment;
     private FeedUpdateCenter center;
     private HttpServer server;
 
@@ -58,7 +63,8 @@ class FeedUpdateCenterTest {
     void setUp() throws IOException {
         gtfsDir = Files.createDirectories(tempDir.resolve("gtfs"));
         loadProgress = new GtfsLoadProgress();
-        center = new FeedUpdateCenter(new FeedRegistry(), new FeedDownloader(), loadProgress);
+        environment = new MockEnvironment();
+        center = new FeedUpdateCenter(new FeedRegistry(), new FeedDownloader(environment), loadProgress);
         ReflectionTestUtils.setField(center, "gtfsDirectory", gtfsDir.toString());
         ReflectionTestUtils.setField(center, "expiringDays", EXPIRING_DAYS);
         expectSources("zeta");
@@ -395,6 +401,34 @@ class FeedUpdateCenterTest {
     }
 
     @Test
+    void headerSettingIsFilledInFromTheEnvironment() throws IOException {
+        environment.setProperty(AUTH_SETTING, "c2VjcmV0");
+        byte[] zip = Files.readAllBytes(zipZetaEndingIn2027(tempDir.resolve("new.zip")));
+        server.createContext(FEED_PATH, exchange -> {
+            boolean authorized = "Basic c2VjcmV0".equals(exchange.getRequestHeaders().getFirst("Authorization"));
+            byte[] content = authorized ? zip : new byte[0];
+            exchange.sendResponseHeaders(authorized ? HTTP_OK : HTTP_UNAUTHORIZED, content.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(content);
+            }
+        });
+
+        FeedDownloadResult result = center.download(feedWithAuthHeader(), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REPLACED);
+    }
+
+    @Test
+    void headerWithAnUnsetSettingIsRejectedAndNamesIt() throws IOException {
+        serve(HTTP_OK, Files.readAllBytes(zipZetaEndingIn2027(tempDir.resolve("new.zip"))), false);
+
+        FeedDownloadResult result = center.download(feedWithAuthHeader(), DURING_ZETA);
+
+        assertThat(result.getOutcome()).isEqualTo(Outcome.REJECTED);
+        assertThat(result.getMessage()).contains(AUTH_SETTING);
+    }
+
+    @Test
     void downloadDuringAGtfsReloadIsRefused() {
         loadProgress.start();
 
@@ -412,6 +446,11 @@ class FeedUpdateCenterTest {
     private FeedSource feed(String... paths) {
         String base = "http://localhost:" + server.getAddress().getPort();
         return new FeedSource("zeta", Stream.of(paths).map(path -> new FeedUrl(base + path, Map.of())).toList());
+    }
+
+    private FeedSource feedWithAuthHeader() {
+        String url = "http://localhost:" + server.getAddress().getPort() + FEED_PATH;
+        return new FeedSource("zeta", List.of(new FeedUrl(url, Map.of("Authorization", AUTH_HEADER))));
     }
 
     private void serve(int statusCode, byte[] body, boolean gzip) {

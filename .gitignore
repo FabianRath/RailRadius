@@ -4,6 +4,9 @@ data/
 *.hprof
 dump.*
 
+# Local settings with secrets, e.g. feed credentials (Spring Boot reads config/ in the working directory)
+/backend/config/
+
 # Build output
 target/
 !**/src/main/**/target/
