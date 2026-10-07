@@ -57,3 +57,6 @@ Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the 
   - S1 S7: E4 09:40 → E7 09:50. E7 is served only by the S-Bahn (B6 test)
 - **omega** (loaded alone, by the station search tests; `translations.txt` in the current format: O1 by `record_id` → "Cologne Main Station" and → "Köln Hbf" (its own name, dropped), O3 by `field_value` → "Lodz Factory Station", O2 a `stop_desc` translation that search ignores): O1 Köln Hbf (umlaut and a city in `station-aliases.txt`), O2 Wiener Neustadt Hbf ("wien" only inside a longer word, so no "vienna" variant), O3 Łódź Fabryczna (letters NFD does not split)
   - OT1 RE8: O1 08:00 → O2 08:30 → O3 09:00; OT2 RE8: O3 10:00 → O1 11:00 (every station has an outgoing edge, so all are searchable)
+- **iota** (loaded alone, by the round-trip test of F24): I1 Iota Start, I2 Iota Hub, I3 Iota Loop, I4 Iota End
+  - IT1: I1 08:00 → I2 09:00; IT4: I2 11:30 → I4 12:00 (a 150 min wait at I2)
+  - IT2: I2 09:30 → I3 10:00; IT3: I3 10:30 → I2 11:00. With waits of at most 60 min, I4 is reached only by riding I2 → I3 → I2

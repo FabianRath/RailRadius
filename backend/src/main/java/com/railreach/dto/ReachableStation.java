@@ -27,4 +27,6 @@ public class ReachableStation {
     private String runningDays;
     // False if the trains share no date: the search compares days by weekday and 6-week period only (B33)
     private Boolean hasCommonDay;
+    // Name of a station the journey passes twice, or null: a round trip that bridges a wait longer than the limit (F24)
+    private String roundTripStation;
 }

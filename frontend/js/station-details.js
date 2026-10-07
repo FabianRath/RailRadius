@@ -36,6 +36,7 @@ function stationDetailsHtml(station) {
     return `<div class="popup-station">${escapeHtml(station.stopName)}${countryBadgeHtml(station.country)}</div>`
         + `<div class="popup-meta">Transfers: ${station.transfers}</div>`
         + runningDaysHtml(station)
+        + roundTripHtml(station)
         + journeyHtml(station);
 }
 
@@ -50,6 +51,16 @@ function runningDaysHtml(station) {
     }
     if (!station.runningDays) return '';
     return `<div class="popup-meta">${icon('calendar')} ${escapeHtml(station.runningDays)}</div>`;
+}
+
+/**
+ * The wait limit applies to each transfer, so the search can bridge a longer wait by riding away and back (F24).
+ * Such a journey arrives no earlier than waiting would.
+ */
+function roundTripHtml(station) {
+    if (!station.roundTripStation) return '';
+    return `<div class="popup-meta popup-warning">${icon('triangle-alert')}`
+        + ` Contains a round trip: passes ${escapeHtml(station.roundTripStation)} twice</div>`;
 }
 
 function journeyHtml(station) {

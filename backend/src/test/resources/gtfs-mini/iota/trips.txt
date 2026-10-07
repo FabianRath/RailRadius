@@ -1,0 +1,5 @@
+route_id,service_id,trip_id
+IR,ALL,IT1
+IR,ALL,IT2
+IR,ALL,IT3
+IR,ALL,IT4

@@ -310,6 +310,25 @@ class ReachabilityServiceTest {
         assertThat(b2.getRunningDays()).isNull();
     }
 
+    // F24: waiting 150 min at I2 exceeds the 60 min limit, so the search rides I2 → I3 → I2 instead
+    @Test
+    void journeyThatPassesAStationTwiceNamesIt(@TempDir Path dir) throws Exception {
+        ReachableStation end = find(query(GtfsTestFixtures.load(dir, "iota"), "iota:I1", 3, 0, 60), "iota:I4")
+                .orElseThrow();
+
+        assertThat(end.getPathNames()).containsExactly("Iota Start", "Iota Hub", "Iota Loop", "Iota Hub", "Iota End");
+        assertThat(end.getRoundTripStation()).isEqualTo("Iota Hub");
+    }
+
+    @Test
+    void journeyThatPassesEveryStationOnceHasNoRoundTrip(@TempDir Path dir) throws Exception {
+        ReachableStation end = find(query(GtfsTestFixtures.load(dir, "iota"), "iota:I1", 3, 0, 180), "iota:I4")
+                .orElseThrow();
+
+        assertThat(end.getTransfers()).isEqualTo(1);
+        assertThat(end.getRoundTripStation()).isNull();
+    }
+
     @Test
     void doneEventCountsOnlyStationsWithinMaxJourneyTime() {
         // A2 (30 min) and A3/B1 (60 min) fit into 1 h, B2 (120 min) does not

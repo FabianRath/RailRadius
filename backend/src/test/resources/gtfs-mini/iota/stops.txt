@@ -1,0 +1,5 @@
+stop_id,stop_name,stop_lat,stop_lon,parent_station
+I1,Iota Start,52.0000,25.0000,
+I2,Iota Hub,52.1000,25.1000,
+I3,Iota Loop,52.2000,25.2000,
+I4,Iota End,52.1000,25.3000,
