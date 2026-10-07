@@ -83,6 +83,20 @@ class StationNameMatcherTest {
         assertThat(matcher.oneContainsTheOther("Avignon Centre", "Avignon-TGV")).isFalse();
     }
 
+    // B30
+    @Test
+    void sameNameIgnoresTheCountryOfAStopAbroad() {
+        assertThat(matcher.sameName("Apach(fr)", "Apach")).isTrue();
+        assertThat(matcher.sameName("Vise(fr)", "Visé")).isTrue();
+        assertThat(matcher.sameName("Croix Wasquehal (FR)", "Croix - Wasquehal")).isTrue();
+    }
+
+    @Test
+    void sameNameNeedsEveryWordOfBothNames() {
+        assertThat(matcher.sameName("Interlaken West", "Interlaken Ost")).isFalse();
+        assertThat(matcher.sameName("La Chaux-de-Fonds Les Forges", "La Chaux-de-Fonds")).isFalse();
+    }
+
     private void assertSimilar(String name1, String name2) {
         assertThat(matcher.similarity(name1, name2)).as(name1 + " / " + name2).isGreaterThanOrEqualTo(MIN_SIMILARITY);
     }

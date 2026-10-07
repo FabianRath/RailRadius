@@ -21,9 +21,9 @@ Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the 
   - W6/W7/W8 IC9: D5 14:05/15:05/16:05 → D6, 5 min off V6–V8, so G6 and D5 stay apart
   - V9 R7: G8 17:00 → G7; W9 IC9: D7 17:30 → D6 (no shared train)
   - V10 R7: G9 18:00 → G7; W10 IC9: D8 18:30 → D6; V11 R7: G10 19:00 → G7; W11 IC9: D9 19:30 → D6 (no shared trains)
-- **kappa** + **lambda** (only loaded together, by the foreign-stop tests). `borders.geojson` puts made-up country KA at lon 30–31 and LA at lon 31–32 (lat 50–51); every other feed lies outside both. kappa: K1 Kappa Central, K2 Kappa East, K5 Kappa North (in KA, so kappa's home is KA), K3 Lambda Gate and K4 Lambda Field (in LA); lambda: L1 Lambdastadt Ost (~700 m from K3), L2 Lambdastadt. K3 merges into L1; K4 has no lambda station within 1 km and stays.
-  - KT1 RE2: K1 08:00 → K2 08:30 → K3 09:00; KT2 RE2: K5 10:00 → K4 11:00
-  - LT1 R3: L1 09:30 → L2 10:00
+- **kappa** + **lambda** (only loaded together, by the foreign-stop tests). `borders.geojson` puts made-up country KA at lon 30–31 and LA at lon 31–32 (lat 50–51); every other feed lies outside both. kappa: K1 Kappa Central, K2 Kappa East, K5 Kappa North, K7 Kappa West (in KA, so kappa's home is KA), K3 Lambda Gate, K4 Lambda Field and K6 Lambda Dorf (LA) (in LA); lambda: L1 Lambdastadt Ost (~700 m from K3), L2 Lambdastadt, L3 Lambda Dorf (~2 km from K6), L4 Lambda Field Ost (~2 km from K4). K3 merges into L1; K6 merges into L3, the same name once "(LA)" is dropped (B30); K4 has no lambda station within 1 km nor one of the same name and stays.
+  - KT1 RE2: K1 08:00 → K2 08:30 → K3 09:00; KT2 RE2: K5 10:00 → K4 11:00; KT3 RE2: K7 12:00 → K6 13:00
+  - LT1 R3: L1 09:30 → L2 10:00; LT2 R3: L3 12:30 → L4 13:00
 - **france** + **switzerland** (only loaded together, by the station code tests of B30; `station-codes.txt` has rules for both sources, no other place lies near lon 40): france `StopArea:OCE87146217` Saint-Nabord, `StopArea:OCE87146100` Remiremont, `StopArea:OCE87999995` Far Halt; switzerland `8714621` Saint-Nabord (~1.1 km east of france's, beyond every distance rule, merged by the shared UIC code 8714621 into france's, which is better connected), `8500010` Swiss Start, `8799999` Far Halt (~11 km from france's Far Halt, same code 8799999, too far, so both stay)
   - FT1 TER: Saint-Nabord 08:00 → Remiremont 08:10; FT2 TER: Remiremont 09:00 → Far Halt 09:30
   - ST1 IR: Swiss Start 07:00 → Saint-Nabord 07:40; ST2 IR: Swiss Start 10:00 → Far Halt 10:50

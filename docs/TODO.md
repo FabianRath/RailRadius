@@ -5,7 +5,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 **Next free IDs:** B37 · F26 · S12
 
 ## Bugs (data loading)
-- [ ] **B30** (Low priority) A few duplicated stations are 400 m – 2 km apart, mostly because one feed's coordinates are off, and share no station code, so no rule merges them (the same-code rule merges the rest). Remaining examples: Apach and Lauterbourg (the German feed gives these French stations DB numbers, `germany:000008000591` / `000008003597`, the French feed UIC codes `OCE87191643` / `OCE87212464`), Hergenrath (`belgien:…S8844644` vs `germany:be:63000:4312`), Tende, Albertville (Eurostar: its stop IDs are names, the UIC code is only in `stop_code`). Possible fix: a code from `stop_code` for feeds like Eurostar; for the rest, a table of known pairs.
 - [ ] **B36** Bosnia has no current rail feed, and Northern Ireland's can't be refreshed. State on 2026-10-07 (`gtfs-sources.md` has the details). Bosnia: the only source ends on 2025-12-13, so no Bosnian trains. Northern Ireland: the zip on disk (GTFS.pro copy from transitpdf, 2026-07-27) has NI Railways until mid-2027, but transitpdf is gone and Translink publishes only TransXChange, so no download URL is left in `gtfs-feeds.txt`. Check for a new GTFS source before mid-2027.
 
 ## Bugs (algorithm)

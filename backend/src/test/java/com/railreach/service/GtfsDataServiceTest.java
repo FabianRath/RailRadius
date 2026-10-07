@@ -277,11 +277,22 @@ class GtfsDataServiceTest {
 
     @Test
     void stopsAbroadWithoutALocalStationNearbyStay(@TempDir Path dir) throws Exception {
-        // kappa's K4 "Lambda Field" lies in lambda's country, but ~13 km from any lambda station
+        // kappa's K4 "Lambda Field" lies in lambda's country, but ~2 km from lambda's nearest station, L4 "Lambda
+        // Field Ost", whose name is only similar
         TransitGraph graph = GtfsTestFixtures.load(dir, "kappa", "lambda");
 
         assertThat(graph.getStation("kappa:K4")).isNotNull();
         assertThat(graph.getStation("kappa:K2")).as("stop at home").isNotNull();
+    }
+
+    // B30
+    @Test
+    void stopsAbroadAreMergedIntoALocalStationOfTheSameNameAFewKilometresAway(@TempDir Path dir) throws Exception {
+        // kappa's K6 "Lambda Dorf (LA)" lies in lambda's country, ~2 km from lambda's L3 "Lambda Dorf"
+        TransitGraph graph = GtfsTestFixtures.load(dir, "kappa", "lambda");
+
+        assertThat(graph.getStation("kappa:K6")).isNull();
+        assertThat(graph.getStopsOnTrip("kappa:KT3")).containsExactly("kappa:K7", "lambda:L3");
     }
 
     // B30
