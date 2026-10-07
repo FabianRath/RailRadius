@@ -1,0 +1,4 @@
+stop_id,stop_name,stop_lat,stop_lon,parent_station
+8714621,Saint-Nabord,47.0000,40.0150,
+8500010,Swiss Start,47.0000,40.3000,
+8799999,Far Halt,47.4000,40.0000,

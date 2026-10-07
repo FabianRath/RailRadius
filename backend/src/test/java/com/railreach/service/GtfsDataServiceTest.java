@@ -284,6 +284,26 @@ class GtfsDataServiceTest {
         assertThat(graph.getStation("kappa:K2")).as("stop at home").isNotNull();
     }
 
+    // B30
+    @Test
+    void stationsWithTheSameStationCodeMergeThoughOverAKilometreApart(@TempDir Path dir) throws Exception {
+        // UIC 8714621 in both feeds, the Swiss feed's stop ~1.1 km off
+        TransitGraph graph = GtfsTestFixtures.load(dir, "france", "switzerland");
+
+        assertThat(graph.getStation("switzerland:8714621")).isNull();
+        assertThat(graph.getStopsOnTrip("switzerland:ST1"))
+                .containsExactly("switzerland:8500010", "france:StopArea:OCE87146217");
+    }
+
+    @Test
+    void stationsWithTheSameStationCodeFarApartStaySeparate(@TempDir Path dir) throws Exception {
+        // UIC 8799999 in both feeds, ~11 km apart
+        TransitGraph graph = GtfsTestFixtures.load(dir, "france", "switzerland");
+
+        assertThat(graph.getStation("switzerland:8799999")).isNotNull();
+        assertThat(graph.getStation("france:StopArea:OCE87999995")).isNotNull();
+    }
+
     @Test
     void stationsCarryTheCountryTheirCoordinatesLieIn(@TempDir Path dir) throws Exception {
         TransitGraph graph = GtfsTestFixtures.load(dir, "kappa", "lambda");

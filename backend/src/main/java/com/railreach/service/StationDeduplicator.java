@@ -18,13 +18,15 @@ import java.util.stream.Collectors;
  * stations the earlier ones left:
  * <ol>
  *   <li>exact-name duplicates within one feed;</li>
+ *   <li>stations of different feeds with the same station code ({@link StationCodes}) up to a few km apart, as one
+ *       feed's coordinates can be that far off;</li>
  *   <li>stations of different feeds near each other with similar names ({@link StationNameMatcher}), or very near
  *       each other where one name has all the other's words;</li>
- *   <li>stations of different feeds near each other that share trains ({@link SharedTrainMatcher}): needs rule 2
- *       first, as it compares neighbouring stations;</li>
+ *   <li>stations of different feeds near each other that share trains ({@link SharedTrainMatcher}): needs rules 2
+ *       and 3 first, as it compares neighbouring stations;</li>
  *   <li>a feed's stops abroad folded into the local feed's station ({@link ForeignStopSnapper}).</li>
  * </ol>
- * In rules 1 to 3 the better connected station survives; in rule 4 the local one.
+ * In rules 1 to 4 the better connected station survives; in rule 5 the local one.
  */
 @Component
 @Slf4j
@@ -42,14 +44,19 @@ public class StationDeduplicator {
     // ~100 m. "Split" and "Split željeznički kolodvor" are one station, but Cotral's "Viterbo" and Trenitalia's
     // "Viterbo Porta Fiorentina", 126 m apart, are two
     private static final double CONTAINED_NAME_RADIUS_DEG = 0.001;
+    // The farthest true match on the full data is 3.8 km (Cavaria, Trenord / Swiss feed); a false one, the
+    // Austrian numbers that repeat per state, is 160 km and more
+    private static final double SAME_CODE_MAX_DISTANCE_METERS = 5000;
 
     private final CountryLocator countryLocator;
     private final StationNameMatcher nameMatcher = new StationNameMatcher();
+    private final StationCodes stationCodes = new StationCodes();
 
     void deduplicate(TransitGraph graph) {
         log.info("=== Station deduplication ===");
         assignCountries(graph);
         Map<String, String> aliasToCanonical = findWithinFeedDuplicates(graph);
+        mergeSameStationCodes(graph, aliasToCanonical);
         List<StationPair> candidates = crossBorderCandidates(graph);
         mergeSimilarNames(graph, candidates, aliasToCanonical);
         mergeSharedTrains(graph, candidates, aliasToCanonical);
@@ -98,6 +105,36 @@ public class StationDeduplicator {
                 aliasToCanonical.put((canonical == s1 ? s2 : s1).getId(), canonical.getId());
             }
         }
+    }
+
+    private void mergeSameStationCodes(TransitGraph graph, Map<String, String> aliasToCanonical) {
+        Map<String, List<Station>> byCode = new HashMap<>();
+        for (Station station : graph.stations()) {
+            if (aliasToCanonical.containsKey(station.getId())) continue;
+            stationCodes.of(station.getId())
+                    .ifPresent(code -> byCode.computeIfAbsent(code, k -> new ArrayList<>()).add(station));
+        }
+        int merges = 0;
+        for (Map.Entry<String, List<Station>> sameCode : byCode.entrySet()) {
+            merges += mergeSameCodePairs(graph, sameCode.getKey(), sameCode.getValue(), aliasToCanonical);
+        }
+        log.info("  Cross-border stations merged by station code: {}", merges);
+    }
+
+    /** Returns the number of merges. */
+    private static int mergeSameCodePairs(TransitGraph graph, String code, List<Station> sameCode,
+                                          Map<String, String> aliasToCanonical) {
+        int merges = 0;
+        for (int i = 0; i < sameCode.size(); i++) {
+            for (int j = i + 1; j < sameCode.size(); j++) {
+                StationPair pair = new StationPair(sameCode.get(i), sameCode.get(j));
+                if (pair.eitherMerged(aliasToCanonical) || pair.sameSource()) continue;
+                if (pair.distanceMeters() > SAME_CODE_MAX_DISTANCE_METERS) continue;
+                mergeIntoBetterConnected(graph, pair, aliasToCanonical, "station code " + code);
+                merges++;
+            }
+        }
+        return merges;
     }
 
     /** Pairs of stations of different feeds within the cross-border radius, each pair once. */
@@ -177,6 +214,14 @@ public class StationDeduplicator {
 
         boolean eitherMerged(Map<String, String> aliasToCanonical) {
             return aliasToCanonical.containsKey(s1.getId()) || aliasToCanonical.containsKey(s2.getId());
+        }
+
+        boolean sameSource() {
+            return StopIds.source(s1.getId()).equals(StopIds.source(s2.getId()));
+        }
+
+        double distanceMeters() {
+            return Coordinates.distanceMeters(s1.getLatitude(), s1.getLongitude(), s2.getLatitude(), s2.getLongitude());
         }
     }
 }

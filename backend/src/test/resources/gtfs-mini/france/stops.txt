@@ -1,0 +1,4 @@
+stop_id,stop_name,stop_lat,stop_lon,parent_station
+StopArea:OCE87146217,Saint-Nabord,47.0000,40.0000,
+StopArea:OCE87146100,Remiremont,47.1000,40.0000,
+StopArea:OCE87999995,Far Halt,47.3000,40.0000,
