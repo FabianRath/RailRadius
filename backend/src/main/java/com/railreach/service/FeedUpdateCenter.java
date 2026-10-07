@@ -5,6 +5,7 @@ import com.railreach.dto.FeedDownloadResult.Outcome;
 import com.railreach.dto.FeedStatus;
 import com.railreach.dto.FeedStatus.State;
 import com.railreach.dto.FeedStorage;
+import com.railreach.dto.OperatorEnd;
 import com.railreach.service.FeedDownloader.Replacement;
 import com.railreach.service.FeedRegistry.FeedSource;
 import com.railreach.util.FeedFiles;
@@ -61,12 +62,13 @@ public class FeedUpdateCenter {
     @Value("${railreach.feeds.sources:}")
     private List<String> sources;
 
-    // Reading the calendar of a big feed takes seconds, so it is redone only when the zip changes
+    // Reading the calendar and trips of a big feed takes seconds, so it is redone only when the zip changes
     private final Map<Path, ReadValidity> validityByZip = new ConcurrentHashMap<>();
     private final ReentrantLock downloadLock = new ReentrantLock();
 
     /** {@code validity} is null for a feed without a calendar. */
-    private record ReadValidity(long lastModifiedMs, long sizeBytes, FeedValidity validity) {}
+    private record ReadValidity(long lastModifiedMs, long sizeBytes, FeedValidity validity,
+                                List<OperatorEnd> earlyEndingOperators) {}
 
     public List<FeedStatus> statuses() {
         return statuses(LocalDate.now());
@@ -100,8 +102,9 @@ public class FeedUpdateCenter {
     public void logOutdatedFeeds() {
         List<FeedStatus> statuses = statuses();
         List<FeedStatus> outdated = statuses.stream().filter(status -> OUTDATED.contains(status.getState())).toList();
-        outdated.forEach(status -> log.warn("Feed {} {}: last service day {} ({} days left)", status.getSource(),
-                status.getState(), status.getLastServiceDate(), status.getDaysLeft()));
+        outdated.forEach(status -> log.warn("Feed {} {}: last service day {} ({} days left), ending early: {}",
+                status.getSource(), status.getState(), status.getLastServiceDate(), status.getDaysLeft(),
+                status.getEarlyEndingOperators()));
         List<String> missing = statuses.stream()
                 .filter(status -> status.getState() == State.MISSING)
                 .map(FeedStatus::getSource)
@@ -199,12 +202,14 @@ public class FeedUpdateCenter {
             long sizeBytes = Files.size(zip);
             long lastModifiedMs = Files.getLastModifiedTime(zip).toMillis();
             status.sizeBytes(sizeBytes).downloadedAt(Instant.ofEpochMilli(lastModifiedMs));
-            FeedValidity validity = validity(zip, lastModifiedMs, sizeBytes);
+            ReadValidity read = validity(zip, lastModifiedMs, sizeBytes);
+            FeedValidity validity = read.validity();
             if (validity == null) return status.state(State.NO_CALENDAR).build();
             return status.firstServiceDate(validity.firstDay())
                     .lastServiceDate(validity.lastDay())
                     .daysLeft(ChronoUnit.DAYS.between(today, validity.lastDay()))
-                    .state(state(validity, today))
+                    .earlyEndingOperators(read.earlyEndingOperators())
+                    .state(state(validity, read.earlyEndingOperators(), today))
                     .build();
         } catch (IOException e) {
             log.warn("Cannot read feed {}", fileName, e);
@@ -216,25 +221,31 @@ public class FeedUpdateCenter {
         return FeedStatus.builder()
                 .source(source)
                 .fileName(fileName)
+                .earlyEndingOperators(List.of())
                 .downloadUrl(registry.of(source).map(feed -> feed.urls().getFirst().url()).orElse(null));
     }
 
-    private State state(FeedValidity validity, LocalDate today) {
+    /** A main operator that stops early makes the feed expiring, though its calendar runs on (B34). */
+    private State state(FeedValidity validity, List<OperatorEnd> earlyEndingOperators, LocalDate today) {
         if (validity.lastDay().isBefore(today)) return State.EXPIRED;
         if (validity.firstDay().isAfter(today)) return State.NOT_YET_VALID;
-        if (!validity.lastDay().isAfter(today.plusDays(expiringDays))) return State.EXPIRING;
+        LocalDate trainsEnd = earlyEndingOperators.isEmpty()
+                ? validity.lastDay() : earlyEndingOperators.getFirst().getLastServiceDate();
+        if (!trainsEnd.isAfter(today.plusDays(expiringDays))) return State.EXPIRING;
         return State.OK;
     }
 
-    private FeedValidity validity(Path zip, long lastModifiedMs, long sizeBytes) throws IOException {
+    private ReadValidity validity(Path zip, long lastModifiedMs, long sizeBytes) throws IOException {
         ReadValidity known = validityByZip.get(zip);
-        if (known != null && known.lastModifiedMs() == lastModifiedMs && known.sizeBytes() == sizeBytes) {
-            return known.validity();
-        }
+        if (known != null && known.lastModifiedMs() == lastModifiedMs && known.sizeBytes() == sizeBytes) return known;
         try (ZipFile zipFile = new ZipFile(zip.toFile())) {
-            FeedValidity validity = FeedValidity.read(zipFile).orElse(null);
-            validityByZip.put(zip, new ReadValidity(lastModifiedMs, sizeBytes, validity));
-            return validity;
+            Map<String, ServiceDays> calendar = ServiceCalendarReader.load(zipFile);
+            FeedValidity validity = FeedValidity.of(calendar).orElse(null);
+            List<OperatorEnd> earlyEndingOperators = validity == null ? List.of() : EarlyEndingOperators.read(
+                    zipFile, FeedFiles.source(zip.getFileName().toString()), calendar, validity.lastDay());
+            ReadValidity read = new ReadValidity(lastModifiedMs, sizeBytes, validity, earlyEndingOperators);
+            validityByZip.put(zip, read);
+            return read;
         }
     }
 

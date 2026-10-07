@@ -29,7 +29,8 @@ railreach:
     trip-batch-size: 100000
 
   feeds:
-    # Update center: a feed whose last service day is at most this many days away counts as expiring
+    # Update center: a feed whose last service day, or the last day of one of its main rail operators, is at most
+    # this many days away counts as expiring
     expiring-days: 30
     # How often the update center logs missing, expired and expiring feeds (first check right after startup)
     check-interval: PT24H

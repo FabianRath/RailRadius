@@ -78,6 +78,12 @@ public record ServiceDays(int firstWord, long[] words) {
         return Arrays.stream(words).mapToInt(Long::bitCount).sum();
     }
 
+    /** The last day it runs; not defined for an empty service or {@link #EVERY_DAY}. */
+    int lastEpochDay() {
+        int lastWord = words.length - 1;
+        return (firstWord + lastWord) * DAYS_PER_WORD + DAYS_PER_WORD - 1 - Long.numberOfLeadingZeros(words[lastWord]);
+    }
+
     /** The epoch days, ascending. Empty for {@link #EVERY_DAY}. */
     IntStream epochDays() {
         return IntStream.range(0, words.length).flatMap(i -> BitSet.valueOf(new long[] {words[i]}).stream()

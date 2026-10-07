@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 
 /** One GTFS zip in the feed directory (or an expected one without a zip) and how long its timetable runs; returned by {@code GET /api/admin/feeds}. */
 @Data
@@ -31,6 +32,11 @@ public class FeedStatus {
     private LocalDate lastServiceDate;
     /** Days from today to {@code lastServiceDate}, negative once expired; null without a calendar. */
     private Long daysLeft;
+    /**
+     * Rail operators with at least 5 % of the feed's rail trips whose last train runs before {@code lastServiceDate},
+     * earliest first. The first one decides {@link State#EXPIRING}, as its trains are gone before the calendar ends.
+     */
+    private List<OperatorEnd> earlyEndingOperators;
     private State state;
     /** From {@code gtfs-feeds.txt}; null for feeds that are downloaded by hand. */
     private String downloadUrl;
