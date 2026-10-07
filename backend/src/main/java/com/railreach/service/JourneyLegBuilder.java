@@ -12,7 +12,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Turns a search path into the API's {@link ReachableStation}, with the rides and transfers as legs, or into its
@@ -48,6 +50,7 @@ public class JourneyLegBuilder {
                 .legs(buildLegs(path.getConnections()))
                 .runningDays(JourneyRunningDays.describe(runningDays).orElse(null))
                 .hasCommonDay(!runningDays.isEmpty())
+                .roundTripStation(roundTripStation(path.getStationIds()).map(this::stationName).orElse(null))
                 .build());
     }
 
@@ -132,6 +135,15 @@ public class JourneyLegBuilder {
         boolean sameName = prev.getRouteName() != null && prev.getRouteName().equals(next.getRouteName());
         return sameName && GtfsTime.diffMinutes(prev.getArrivalTimeSeconds(), next.getDepartureTimeSeconds())
                 <= SAME_RIDE_MAX_GAP_MINUTES;
+    }
+
+    /**
+     * The first station the path passes more than once (F24). The outermost one, so for a ride out and back on the
+     * same line it is where the loop starts, not a stop on the way.
+     */
+    private static Optional<String> roundTripStation(List<String> stationIds) {
+        Map<String, Long> visits = stationIds.stream().collect(Collectors.groupingBy(id -> id, Collectors.counting()));
+        return stationIds.stream().filter(id -> visits.get(id) > 1).findFirst();
     }
 
     /** Falls back to the raw stop ID when the station is unknown (see F2). */
