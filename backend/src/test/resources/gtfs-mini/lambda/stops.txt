@@ -1,3 +1,5 @@
 stop_id,stop_name,stop_lat,stop_lon,parent_station
 L1,Lambdastadt Ost,50.5000,31.1100,
 L2,Lambdastadt,50.5000,31.5000,
+L3,Lambda Dorf,50.7000,31.3300,
+L4,Lambda Field Ost,50.5000,31.3300,

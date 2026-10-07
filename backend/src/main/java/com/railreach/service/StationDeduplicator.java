@@ -60,7 +60,7 @@ public class StationDeduplicator {
         List<StationPair> candidates = crossBorderCandidates(graph);
         mergeSimilarNames(graph, candidates, aliasToCanonical);
         mergeSharedTrains(graph, candidates, aliasToCanonical);
-        int snapped = ForeignStopSnapper.snap(graph.stations(), aliasToCanonical);
+        int snapped = ForeignStopSnapper.snap(graph.stations(), nameMatcher, aliasToCanonical);
         log.info("  Foreign stops merged into the local station: {}", snapped);
         if (!aliasToCanonical.isEmpty()) graph.mergeStations(aliasToCanonical);
         log.info("  Deduplication complete: {} total stations merged", aliasToCanonical.size());

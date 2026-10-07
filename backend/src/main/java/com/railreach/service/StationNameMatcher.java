@@ -16,6 +16,8 @@ import java.util.stream.Collectors;
 final class StationNameMatcher {
 
     private static final Pattern WORD_SEPARATORS = Pattern.compile("[\\s\\p{Punct}]+");
+    // Feeds mark their stops abroad with the country: "Apach(fr)", "Croix Wasquehal (FR)"
+    private static final Pattern COUNTRY_SUFFIX = Pattern.compile("\\s*\\(\\p{Alpha}{2}\\)\\s*$");
     // Italian feeds abbreviate "Centrale"; the dot would otherwise split it into two words
     private static final Pattern CENTRALE_ABBREVIATION = Pattern.compile("(?<![a-z])c\\.le(?![a-z])");
     /**
@@ -76,6 +78,19 @@ final class StationNameMatcher {
                 Set<String> fewer = words1.size() <= words2.size() ? words1 : words2;
                 Set<String> more = fewer == words1 ? words2 : words1;
                 if (wordsWithMatch(fewer, more) == fewer.size()) return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether every word of each name matches a word of the other, ignoring a country in brackets at the end. */
+    boolean sameName(String name1, String name2) {
+        if (name1 == null || name2 == null) return false;
+        for (Set<String> words1 : wordSets(COUNTRY_SUFFIX.matcher(name1).replaceFirst(""))) {
+            for (Set<String> words2 : wordSets(COUNTRY_SUFFIX.matcher(name2).replaceFirst(""))) {
+                if (words1.isEmpty() || words2.isEmpty()) continue;
+                boolean allMatch1 = wordsWithMatch(words1, words2) == words1.size();
+                if (allMatch1 && wordsWithMatch(words2, words1) == words2.size()) return true;
             }
         }
         return false;
