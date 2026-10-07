@@ -2,7 +2,9 @@ package com.railreach.service;
 
 import com.railreach.service.FeedRegistry.FeedSource;
 import com.railreach.service.FeedRegistry.FeedUrl;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -29,6 +31,7 @@ import java.util.zip.ZipFile;
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class FeedDownloader {
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(30);
@@ -43,9 +46,12 @@ public class FeedDownloader {
     private static final String PART_SUFFIX = ".part";
     static final String PREVIOUS_DIRECTORY = "previous";
 
+    // Fills in ${...} settings in feed headers, so credentials stay out of gtfs-feeds.txt
+    private final Environment environment;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NORMAL)
             .connectTimeout(CONNECT_TIMEOUT)
+            .sslContext(FeedTrust.sslContext())
             .build();
 
     /** {@code detail} is the host the new zip came from, or why every URL was rejected. */
@@ -86,6 +92,9 @@ public class FeedDownloader {
         } catch (IOException e) {
             log.warn("Download of feed {} from {} failed", source, url.url(), e);
             return Optional.of("Download failed: " + e);
+        } catch (IllegalArgumentException e) {
+            // A header names a setting that isn't configured on this machine, e.g. the feed's credentials
+            return Optional.of(e.getMessage());
         }
     }
 
@@ -100,7 +109,7 @@ public class FeedDownloader {
     private Optional<String> download(String source, FeedUrl url, Path part) throws IOException, InterruptedException {
         log.info("Downloading feed {} from {}", source, url.url());
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url.url())).timeout(DOWNLOAD_TIMEOUT);
-        url.headers().forEach(request::header);
+        url.headers().forEach((name, value) -> request.header(name, environment.resolveRequiredPlaceholders(value)));
         HttpResponse<InputStream> response =
                 httpClient.send(request.build(), HttpResponse.BodyHandlers.ofInputStream());
         // Some servers only answer when asked for gzip (Finland), and the client doesn't unpack it

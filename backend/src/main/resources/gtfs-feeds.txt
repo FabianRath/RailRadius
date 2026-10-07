@@ -3,6 +3,7 @@
 # listed and are updated by hand; docs/gtfs-sources.md has notes on every source.
 # Format: source;url[;Header: value|Header: value]
 # A source on several lines has fallbacks: a download that fails or is rejected tries the next line.
+# A header value may name a ${setting} (env var or backend/config/application.yml), so credentials stay out of git.
 austria;https://static.web.oebb.at/open-data/soll-fahrplan-gtfs/GTFS_Fahrplan_2026.zip
 belgien;https://sncb-opendata.hafas.de/gtfs/static/c21ac6758dd25af84cca5b707f3cb3de
 belgien;https://gtfs.irail.be/nmbs/gtfs/latest.zip
@@ -29,6 +30,7 @@ germany;https://data.public-transport.earth/gtfs/de
 great-britain;https://beta.aubin.app/gtfs/great_britain_gtfs.zip
 greece;https://jbb.ghsq.de/gtfs/gr-hellenic-train.gtfs.zip
 greece;https://jbb.ghsq.de/gtfs/gr-railway-gov.gtfs.zip
+hungary;https://www.mavcsoport.hu/gtfs/gtfsMavMenetrend.zip;Authorization: Basic ${railreach.feeds.auth.hungary}
 ireland;https://www.transportforireland.ie/transitData/Data/GTFS_Irish_Rail.zip
 ireland;https://files.mobilitydatabase.org/mdb-2637/latest.zip
 italy;https://github.com/deryclem/trenitalia-gtfs/raw/main/gtfs-trenitalia.zip

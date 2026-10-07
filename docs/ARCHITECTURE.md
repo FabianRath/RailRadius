@@ -26,7 +26,7 @@ Run from `backend/`; the cache paths are relative to the working directory. The 
   - `data/gtfs-cache.json` is ~360 MB (3.6 GB before the trip-based format, S9); it loads in ~17 s.
 - **Dev data:** `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev`
   - Austria + Hungary + Slovakia from `data/gtfs-dev/`, cache in `data/gtfs-dev-cache.json`.
-- **Fresh checkout:** `backend/data/` is not in git, so there are no zips. Start the app (it starts empty), open the admin panel → Feeds, click "Download outdated" (it includes the `MISSING` feeds), then Tools → reload. Or with `scripts/api.sh`: `feeds-download-outdated`, then `reload-gtfs`. Which feeds are expected comes from `feeds.sources` (dev: austria, hungary, slovakia; default: every feed in `gtfs-feeds.txt`).
+- **Fresh checkout:** `backend/data/` is not in git, so there are no zips. Start the app (it starts empty), open the admin panel → Feeds, click "Download outdated" (it includes the `MISSING` feeds), then Tools → reload. Or with `scripts/api.sh`: `feeds-download-outdated`, then `reload-gtfs`. Which feeds are expected comes from `feeds.sources` (dev: austria, hungary, slovakia; default: every feed in `gtfs-feeds.txt`). `hungary` downloads only with MÁV credentials in `feeds.auth.hungary` (see Configuration).
 
 **Startup flow:**
 1. `GtfsDataService` loads the GTFS cache file if present. Otherwise it parses the zips only if `auto-load-from-files` is true (true for dev, false for default) and the GTFS directory has a zip; with none (fresh checkout) it logs a WARN and starts empty. With no data, use `POST /api/admin/reload-gtfs`.
@@ -48,7 +48,8 @@ RailReach/
     ├── src/main/java/com/railreach/{controller,service,dto,model,config}/
     ├── src/main/resources/application.yml (+ application-dev.yml), borders/europe.geojson (country borders),
     │                                          #   station-aliases.txt, train-categories.txt, train-category-columns.txt,
-    │                                          #   gtfs-feeds.txt (download URLs per feed)
+    │                                          #   gtfs-feeds.txt (download URLs per feed), feed-roots.pem (extra TLS roots)
+    ├── config/application.yml                 # GITIGNORED local secrets (feed credentials), optional
     ├── src/test/java/com/railreach/           # service/ (GtfsDataService, Reachability*, GtfsTestFixtures), util/, config/ tests
     ├── src/test/resources/gtfs-mini/          # hand-written fixture feeds (see its README)
     └── data/                                  # GITIGNORED
@@ -88,8 +89,9 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `ForeignStopSnapper` | service | Cross-border rule: a feed's stop outside its home country is merged into the nearest station of that country's feed (≤ 1 km) |
 | `FeedUpdateCenter` | service | Update center for the GTFS zips: status of each zip (`FeedStatus`, validity memoized per file and modification time) plus a `MISSING` status for each expected feed (`railreach.feeds.sources`) without a zip, a scheduled log check (`railreach.feeds.check-interval`, first run at startup) that WARNs about missing, expired and expiring feeds, disk space of the zips in use and in `previous/` (`FeedStorage`), and downloads of registered feeds. A download is refused (`BUSY`) during a GTFS load or another download |
 | `FeedValidity` | service | First and last day any service of a feed runs, from `ServiceCalendarReader` over the whole feed (not only rail) |
-| `FeedRegistry` | service | Download URLs (with request headers) per source, from `gtfs-feeds.txt`; a source on several lines gets fallback URLs in line order |
-| `FeedDownloader` | service | Downloads a feed, trying its URLs in order until one passes the checks below (JDK `HttpClient`, unpacks `Content-Encoding: gzip`) to `gtfs_<source>.zip.part` (creating the GTFS directory if needed), checks it (a zip with stops/stop_times/trips/routes.txt, at least one rail route, service days in the calendar, at least half the size of the current zip, running today, not ending before the current zip), moves the old zip to `previous/` and moves the new one in. If every URL fails or is rejected, the zip is unchanged and the result lists each URL's reason |
+| `FeedRegistry` | service | Download URLs (with request headers) per source, from `gtfs-feeds.txt`; a source on several lines gets fallback URLs in line order. A header value may contain `${setting}` placeholders, kept unresolved here |
+| `FeedTrust` | service | TLS trust for feed downloads only: the JDK's root certificates plus `feed-roots.pem` (roots the JDK lacks: Microsec e-Szigno Root CA 2009, used by MÁV) |
+| `FeedDownloader` | service | Downloads a feed, trying its URLs in order until one passes the checks below (JDK `HttpClient` with `FeedTrust`'s TLS roots, unpacks `Content-Encoding: gzip`; fills in `${setting}` placeholders in headers from the Spring environment at download time, and rejects the URL if a setting is not configured) to `gtfs_<source>.zip.part` (creating the GTFS directory if needed), checks it (a zip with stops/stop_times/trips/routes.txt, at least one rail route, service days in the calendar, at least half the size of the current zip, running today, not ending before the current zip), moves the old zip to `previous/` and moves the new one in. If every URL fails or is rejected, the zip is unchanged and the result lists each URL's reason |
 | `CountryLocator` | service | Point → ISO country code, from `borders/europe.geojson` (Natural Earth 1:10m, Europe) |
 | `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`: format version, stations, translated names, services, trips); a file with another version is ignored |
 | `CachedTrip` | service | One trip in the cache file: route name, `TripInfo`, service ID, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
@@ -217,7 +219,7 @@ Overnight wrap: a time difference below −60 min gets +24 h added.
 ## Configuration (`application.yml`, prefix `railreach.`)
 
 - `gtfs.directory` (`./data/gtfs`, env `GTFS_DIRECTORY`), `gtfs.auto-load-from-files` (false), `gtfs.cache-file`
-- `feeds.expiring-days` (30): feeds that end within this many days are `EXPIRING`; `feeds.check-interval` (`PT24H`): how often the missing/expired/expiring feeds are logged; `feeds.sources` (empty = every feed in `gtfs-feeds.txt`): comma-separated feeds expected in the GTFS directory, listed as `MISSING` without a zip
+- `feeds.expiring-days` (30): feeds that end within this many days are `EXPIRING`; `feeds.check-interval` (`PT24H`): how often the missing/expired/expiring feeds are logged; `feeds.sources` (empty = every feed in `gtfs-feeds.txt`): comma-separated feeds expected in the GTFS directory, listed as `MISSING` without a zip; `feeds.auth.<source>` (no default, never in git): credentials that `gtfs-feeds.txt` headers refer to, e.g. `feeds.auth.hungary` = base64 of `user:password` for MÁV's Basic auth. Set it in `backend/config/application.yml` (gitignored; Spring Boot reads `config/` in the working directory on top of the bundled file) or as env var `RAILREACH_FEEDS_AUTH_HUNGARY`
 - `algorithm.max-transfer-time-minutes` (180), `algorithm.cache-size` (10000), `algorithm.cache-ttl-minutes` (60)
 - `cache.predictive-enabled` (true), `cache.predictive-max-transfers` (5), `cache.raw-max-entries` (30)
 - `admin.token` (empty, env `RAILREACH_ADMIN_TOKEN`): shared secret for the admin API; empty disables it

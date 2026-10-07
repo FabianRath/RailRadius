@@ -36,6 +36,9 @@ railreach:
     # Comma-separated sources that belong in the GTFS directory; one without a zip is listed as MISSING in the
     # update center, ready to download. Empty = every feed in gtfs-feeds.txt
     sources:
+    # Credentials that header placeholders in gtfs-feeds.txt refer to, e.g. auth.hungary (base64 of "user:password").
+    # Never set them here: use the gitignored backend/config/application.yml or env vars (RAILREACH_FEEDS_AUTH_HUNGARY).
+    # A feed whose setting is missing is rejected when downloaded.
 
   algorithm:
     max-transfer-time-minutes: 180
