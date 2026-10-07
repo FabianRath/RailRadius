@@ -1,0 +1,19 @@
+# Station codes in stop IDs (StationCodes), to merge stations of different feeds that are the same station but lie
+# too far apart for the distance-based rules, as one feed's coordinates are off (B30). The code is the 7-digit UIC
+# station code: 2 digits for the country, 5 for the station. Stations of different feeds with the same code merge
+# when they are at most 5 km apart; some codes repeat far away (the Austrian numbers are unique per state only).
+# Only formats checked against the other feeds are listed.
+# Format: source;regex for the stop ID without the source prefix (whole ID);code ($1, $2 are the regex's groups)
+switzerland;(\d{7});$1
+# StopArea:OCE87146217: the code plus a check digit
+france;StopArea:OCE(\d{7})\d;$1
+# IT::StopPlace:railTRENITALIA:830002084: the country, two zeros, the station
+italy;IT::StopPlace:(?:rail|other)TRENITALIA:(\d{2})00(\d{5});$1$2
+# S02084: the station only, Italian (Trenord's codes for Swiss stations differ, but those are far from any match)
+italy-trenord;S(\d{5});83$1
+# Pat:47:3877: the station only, Austrian, without the leading zero
+austria;Pat:\d+:(\d{4});810$1
+slovakia;(\d{7});$1
+czechia;czptt:stop:SK:(\d{5});56$1
+spain;(\d{5});71$1
+spain-ouigo;00(\d{7});$1

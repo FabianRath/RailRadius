@@ -47,7 +47,7 @@ RailReach/
     ├── pom.xml
     ├── src/main/java/com/railreach/{controller,service,dto,model,config}/
     ├── src/main/resources/application.yml (+ application-dev.yml), borders/europe.geojson (country borders),
-    │                                          #   station-aliases.txt, train-categories.txt, train-category-columns.txt,
+    │                                          #   station-aliases.txt, station-codes.txt, train-categories.txt, train-category-columns.txt,
     │                                          #   gtfs-feeds.txt (download URLs per feed), feed-roots.pem (extra TLS roots)
     ├── config/application.yml                 # GITIGNORED local secrets (feed credentials), optional
     ├── src/test/java/com/railreach/           # service/ (GtfsDataService, Reachability*, GtfsTestFixtures), util/, config/ tests
@@ -83,6 +83,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `GtfsCsvReader` | service | Row-by-row reader for one CSV file inside a GTFS zip, at the top level or inside one top-level folder (ÖBB); strips a UTF-8 BOM from the header |
 | `StationSearchIndex` | service | Station name search over the name variants of each station's name and translated names: trigram → station positions, in degree order; rebuilt after each load |
 | `StationNameVariants` | service | Searchable forms of a station name: folded (lowercase, no accents), German umlaut spelling (`koeln`), and the local city name replaced by its translations from `station-aliases.txt` (`cologne`) |
+| `StationCodes` | service | Cross-border rule: the UIC station code in a stop ID, by per-source formats from `station-codes.txt` (`france:StopArea:OCE87146217` and `switzerland:8714621` → `8714621`) |
 | `StationNameMatcher` | service | Cross-border rule: name similarity and name containment of two nearby stations (see Data pipeline → cross-border dedup) |
 | `StationDeduplicator` | service | Within-country and cross-border station merging after all feeds are loaded; runs the merge rules in order |
 | `StationGrid` | service | Stations bucketed into square degree cells; `near` = the 3×3 cells around a station |
@@ -149,6 +150,7 @@ A feed that adds no connections at all (e.g. unreadable headers) is logged as a 
 
 After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStations`), every station first gets its `country` from `CountryLocator`; a merge keeps the canonical station's country.
 5. **Within-country dedup**: same exact name, same source, within ~200 m.
+   **By station code** (`StationCodes`, B30): stations of different sources with the same UIC code (from the stop ID, formats in `station-codes.txt`) merge when at most 5 km apart (`SAME_CODE_MAX_DISTANCE_METERS`), the better connected one canonical. Catches stations where one feed's coordinates are 1–4 km off (the Swiss feed's French stations, Trenord vs Trenitalia, Austria vs Italy). The limit keeps codes that repeat far away apart (the Austrian numbers repeat per state).
 6. **Cross-border dedup**, on pairs of stations of different sources within ~500 m (found via a ~1 km `StationGrid`), in two passes:
    - **by name** (`StationNameMatcher`): word-set Jaccard similarity ≥ 0.4; or, within ~100 m, every word of one name is in the other ("Split" / "Split željeznički kolodvor"). Words are compared folded (`StationNameVariants.fold`), Cyrillic transliterated (Bulgarian system), without words for "station" and link words (stazione, kolodvor, di, …), with "C.LE" → centrale, "Hbf"/"…bf" → (haupt)bahnhof, airport words as one, and oe/ae/ue as o/a/u ("Koebenhavn"); two words also match one edit apart from 5 letters on and two edits apart from 8, if they start with the same letter. The best score over the names' city translations (`StationNameVariants.variants`: Padua / Padova) counts. The ~100 m limit keeps nearby separate stations apart (Cotral's "Viterbo" / "Viterbo Porta Fiorentina", 126 m);
    - **by shared trains** (`SharedTrainMatcher`): at least 3 trains leave both at the same clock minute towards the same next station (or arrive from the same previous one), neighbours compared after the merges so far. Catches translated names ("Aachen, West Bf" / "Aix-la-Chapelle Ouest"). Repeated until a pass merges nothing.

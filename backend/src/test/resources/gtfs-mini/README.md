@@ -24,6 +24,9 @@ Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the 
 - **kappa** + **lambda** (only loaded together, by the foreign-stop tests). `borders.geojson` puts made-up country KA at lon 30–31 and LA at lon 31–32 (lat 50–51); every other feed lies outside both. kappa: K1 Kappa Central, K2 Kappa East, K5 Kappa North (in KA, so kappa's home is KA), K3 Lambda Gate and K4 Lambda Field (in LA); lambda: L1 Lambdastadt Ost (~700 m from K3), L2 Lambdastadt. K3 merges into L1; K4 has no lambda station within 1 km and stays.
   - KT1 RE2: K1 08:00 → K2 08:30 → K3 09:00; KT2 RE2: K5 10:00 → K4 11:00
   - LT1 R3: L1 09:30 → L2 10:00
+- **france** + **switzerland** (only loaded together, by the station code tests of B30; `station-codes.txt` has rules for both sources, no other place lies near lon 40): france `StopArea:OCE87146217` Saint-Nabord, `StopArea:OCE87146100` Remiremont, `StopArea:OCE87999995` Far Halt; switzerland `8714621` Saint-Nabord (~1.1 km east of france's, beyond every distance rule, merged by the shared UIC code 8714621 into france's, which is better connected), `8500010` Swiss Start, `8799999` Far Halt (~11 km from france's Far Halt, same code 8799999, too far, so both stay)
+  - FT1 TER: Saint-Nabord 08:00 → Remiremont 08:10; FT2 TER: Remiremont 09:00 → Far Halt 09:30
+  - ST1 IR: Swiss Start 07:00 → Saint-Nabord 07:40; ST2 IR: Swiss Start 10:00 → Far Halt 10:50
 - **germany** (loaded alone, by the train category test; mimics DELFI: routes named by line only, zero-padded train numbers): GK Germany Cologne, GH Germany Hamburg, GW Germany Westerland. Agencies FV "DB Fernverkehr AG" and RV "DB Regio AG", which `train-categories.txt` matches for source `germany`
   - GT1 line 33, type 101, "002310": GK 08:00 → GW 12:00 (→ "ICE 2310")
   - GT2 line 33, type 102, "002214": GK 09:00 → GW 13:00 (→ "IC 2214")
