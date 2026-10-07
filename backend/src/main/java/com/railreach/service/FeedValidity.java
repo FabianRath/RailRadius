@@ -3,6 +3,7 @@ package com.railreach.service;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.IntSummaryStatistics;
+import java.util.Map;
 import java.util.Optional;
 import java.util.zip.ZipFile;
 
@@ -14,7 +15,12 @@ record FeedValidity(LocalDate firstDay, LocalDate lastDay) {
 
     /** Empty if the feed has no calendar or no service runs on any day. */
     static Optional<FeedValidity> read(ZipFile zipFile) throws IOException {
-        IntSummaryStatistics days = ServiceCalendarReader.load(zipFile).values().stream()
+        return of(ServiceCalendarReader.load(zipFile));
+    }
+
+    /** {@code calendar} as read by {@link ServiceCalendarReader#load}. */
+    static Optional<FeedValidity> of(Map<String, ServiceDays> calendar) {
+        IntSummaryStatistics days = calendar.values().stream()
                 .flatMapToInt(ServiceDays::epochDays)
                 .summaryStatistics();
         if (days.getCount() == 0) return Optional.empty();

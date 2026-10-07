@@ -118,9 +118,16 @@ function feedRowHtml(feed) {
     const size = feed.state === 'MISSING' ? '–' : fmtBytes(feed.sizeBytes);
     const downloaded = feed.downloadedAt?.slice(0, ISO_DATE_LENGTH) ?? '–';
     return `<tr><td>${escapeHtml(feed.source)}</td><td>${runsUntil}</td><td>${feed.daysLeft ?? '–'}</td>`
-        + `<td class="feed-wrap"><span class="${stateClass}">${STATE_LABELS[feed.state]}</span></td><td>${size}</td>`
+        + `<td class="feed-wrap"><span class="${stateClass}">${STATE_LABELS[feed.state]}</span>`
+        + `${feed.earlyEndingOperators.map(operatorEndHtml).join('')}</td><td>${size}</td>`
         + `<td>${downloaded}</td><td class="feed-wrap">${sourceHtml(feed)}</td><td>${downloadButtonHtml(feed)}</td>`
         + `<td class="feed-wrap">${resultHtml(results.get(feed.source))}</td></tr>`;
+}
+
+// A main operator whose trains stop before the calendar ends (B34)
+function operatorEndHtml(end) {
+    return `<div class="feed-muted" title="Main operator whose trains stop before the feed's last day">`
+        + `${escapeHtml(end.operator)} ends ${end.lastServiceDate}</div>`;
 }
 
 function sourceHtml(feed) {

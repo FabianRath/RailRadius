@@ -5,6 +5,7 @@ import com.railreach.dto.FeedDownloadResult.Outcome;
 import com.railreach.dto.FeedStatus;
 import com.railreach.dto.FeedStatus.State;
 import com.railreach.dto.FeedStorage;
+import com.railreach.dto.OperatorEnd;
 import com.railreach.service.FeedRegistry.FeedSource;
 import com.railreach.service.FeedRegistry.FeedUrl;
 import com.sun.net.httpserver.HttpServer;
@@ -21,6 +22,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +32,7 @@ import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 class FeedUpdateCenterTest {
 
@@ -40,6 +43,7 @@ class FeedUpdateCenterTest {
     private static final LocalDate AFTER_ZETA = LocalDate.of(2026, 10, 5);
     private static final LocalDate LATER_ZETA_LAST_DAY = LocalDate.of(2027, 3, 29);
     private static final int EXPIRING_DAYS = 30;
+    private static final String EARLY_OPERATOR = "Early Rail";
     private static final String FEED_PATH = "/feed.zip";
     private static final String MIRROR_PATH = "/mirror.zip";
     private static final int HTTP_OK = 200;
@@ -98,6 +102,30 @@ class FeedUpdateCenterTest {
 
         assertThat(status.getState()).isEqualTo(State.EXPIRING);
         assertThat(status.getDaysLeft()).isEqualTo(21);
+    }
+
+    @Test
+    void mainOperatorStoppingLongBeforeTheCalendarEndsMakesTheFeedExpiring() throws IOException {
+        zipZetaWithSecondOperator(gtfsDir.resolve("gtfs_zeta.zip"), "20260320");
+
+        FeedStatus status = center.statuses(DURING_ZETA).getFirst();
+
+        assertThat(status.getState()).isEqualTo(State.EXPIRING);
+        assertThat(status.getLastServiceDate()).isEqualTo(LATER_ZETA_LAST_DAY);
+        assertThat(status.getEarlyEndingOperators())
+                .extracting(OperatorEnd::getOperator, OperatorEnd::getLastServiceDate)
+                .containsExactly(tuple(EARLY_OPERATOR, LocalDate.of(2026, 3, 20)));
+    }
+
+    @Test
+    void mainOperatorStoppingEarlyButAfterTheWarningWindowLeavesTheFeedOk() throws IOException {
+        zipZetaWithSecondOperator(gtfsDir.resolve("gtfs_zeta.zip"), "20261220");
+
+        FeedStatus status = center.statuses(DURING_ZETA).getFirst();
+
+        assertThat(status.getState()).isEqualTo(State.OK);
+        assertThat(status.getEarlyEndingOperators()).extracting(OperatorEnd::getOperator)
+                .containsExactly(EARLY_OPERATOR);
     }
 
     @Test
@@ -485,14 +513,29 @@ class FeedUpdateCenterTest {
         return zipZeta(zipFile, edit, 0);
     }
 
+    /**
+     * zeta running until 2027, operated by "Zeta Rail", plus one trip of {@link #EARLY_OPERATOR} running daily until
+     * {@code lastDay} (YYYYMMDD). One trip of twelve is enough to count as a main operator.
+     */
+    private void zipZetaWithSecondOperator(Path zipFile, String lastDay) throws IOException {
+        Path folder = zetaFolder(text -> text.replace("20260329", "20270329"));
+        Files.writeString(folder.resolve("agency.txt"),
+                "agency_id,agency_name\nZ,Zeta Rail\nE," + EARLY_OPERATOR + "\n");
+        Files.writeString(folder.resolve("routes.txt"),
+                "route_id,agency_id,route_short_name,route_long_name,route_type\n"
+                + "ZR,Z,R9,Zeta Regional,2\nER,E,E1,Early Regional,2\n");
+        appendLine(folder.resolve("trips.txt"), "ER,EARLY,ET1");
+        appendLine(folder.resolve("calendar.txt"), "EARLY,1,1,1,1,1,1,1,20260105," + lastDay);
+        GtfsTestFixtures.zipFolder(folder, zipFile);
+    }
+
+    private static void appendLine(Path file, String line) throws IOException {
+        Files.writeString(file, line + "\n", StandardOpenOption.APPEND);
+    }
+
     /** zeta with {@code edit} applied to every file, plus {@code paddingBytes} of random data as shapes.txt. */
     private Path zipZeta(Path zipFile, UnaryOperator<String> edit, int paddingBytes) throws IOException {
-        Path folder = Files.createTempDirectory(tempDir, "zeta");
-        try (Stream<Path> files = Files.list(GtfsTestFixtures.resource("gtfs-mini/zeta"))) {
-            for (Path file : files.toList()) {
-                Files.writeString(folder.resolve(file.getFileName()), edit.apply(Files.readString(file)));
-            }
-        }
+        Path folder = zetaFolder(edit);
         if (paddingBytes > 0) {
             byte[] padding = new byte[paddingBytes];
             new Random(0).nextBytes(padding);
@@ -500,6 +543,17 @@ class FeedUpdateCenterTest {
         }
         GtfsTestFixtures.zipFolder(folder, zipFile);
         return zipFile;
+    }
+
+    /** A copy of zeta's files with {@code edit} applied to each. */
+    private Path zetaFolder(UnaryOperator<String> edit) throws IOException {
+        Path folder = Files.createTempDirectory(tempDir, "zeta");
+        try (Stream<Path> files = Files.list(GtfsTestFixtures.resource("gtfs-mini/zeta"))) {
+            for (Path file : files.toList()) {
+                Files.writeString(folder.resolve(file.getFileName()), edit.apply(Files.readString(file)));
+            }
+        }
+        return folder;
     }
 
     private void assertNoPartFileLeft() throws IOException {
