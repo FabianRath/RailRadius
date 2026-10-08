@@ -11,7 +11,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
   - `dto/`, `model/`, `config/`
 - `backend/src/test/`: unit tests on the `gtfs-mini` fixture (see `src/test/resources/gtfs-mini/README.md`)
 - `frontend/`: `index.html` (markup), `css/app.css`, `js/*.js` (one ES module per concern, entry `main.js`). See guidelines §8.
-- `docs/TODO.md` (backlog + known bugs), `docs/decisions.md` (why things are the way they are)
+- `docs/TODO.md` (backlog + known bugs), `docs/decisions.md` (why things are the way they are), `docs/HOSTING.md` (server size, memory measurements)
 - `scripts/api.sh`: curl shortcuts (`scripts/api.sh help`)
 
 ## Environment: Windows, not Linux
