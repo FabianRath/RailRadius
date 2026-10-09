@@ -37,4 +37,17 @@ class ReachabilitySearchTest {
         result.remove(START_ID);
         assertThat(handedOut).isEqualTo(result);
     }
+
+    // OT2 runs back into O1, but the start is no arrival to transfer from or to hand out
+    @Test
+    void startStationKeepsOnlyItsEmptyPathThoughATrainReturnsToIt(@TempDir Path tempDir) throws IOException {
+        ReachabilitySearch search = new ReachabilitySearch(GtfsTestFixtures.load(tempDir, "omega"));
+        List<Map<String, List<JourneyPath>>> rounds = new ArrayList<>();
+
+        Map<String, List<JourneyPath>> result = search.search("omega:O1", 2, 0, 180, rounds::add);
+
+        assertThat(rounds).noneMatch(round -> round.containsKey("omega:O1"));
+        assertThat(result.get("omega:O1")).singleElement()
+                .satisfies(path -> assertThat(path.getConnections()).isEmpty());
+    }
 }

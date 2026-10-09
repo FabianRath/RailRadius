@@ -11,8 +11,8 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * The days on which a whole journey runs, and their weekday summary for the popup. The search only checks
- * consecutive trains (B25), so this is computed afterwards, and only for the journeys that are returned.
+ * The days on which a whole journey runs, and their weekday summary for the popup. The search compares days by
+ * weekday and period only (B33), so the exact dates are computed here, and only for the journeys it chooses from.
  */
 final class JourneyRunningDays {
 
