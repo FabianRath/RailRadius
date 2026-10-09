@@ -17,8 +17,8 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Turns a search path into the API's {@link ReachableStation}, with the rides and transfers as legs, or into its
- * summary.
+ * Turns a search's journey into the API's {@link ReachableStation}, with the rides and transfers as legs, or a path's
+ * summary into a {@link ReachableStationSummary}.
  */
 @Component
 @RequiredArgsConstructor
@@ -32,10 +32,11 @@ public class JourneyLegBuilder {
     private final TransitGraph transitGraph;
 
     /** Empty if the destination station is unknown. */
-    public Optional<ReachableStation> toReachableStation(String stopId, JourneyPath path) {
+    public Optional<ReachableStation> toReachableStation(String stopId, SearchResult.Journey journey) {
         Station station = transitGraph.getStation(stopId);
         if (station == null) return Optional.empty();
-        ServiceDays runningDays = JourneyRunningDays.of(path.getConnections(), transitGraph);
+        JourneyPath path = journey.path();
+        ServiceDays runningDays = journey.runningDays();
         return Optional.of(ReachableStation.builder()
                 .stopId(stopId)
                 .stopName(station.getName())
@@ -55,7 +56,7 @@ public class JourneyLegBuilder {
     }
 
     /** The station and the path's transfers and duration, without the journey; empty if the station is unknown. */
-    public Optional<ReachableStationSummary> toSummary(String stopId, JourneyPath path) {
+    public Optional<ReachableStationSummary> toSummary(String stopId, SearchResult.PathSummary path) {
         Station station = transitGraph.getStation(stopId);
         if (station == null) return Optional.empty();
         return Optional.of(ReachableStationSummary.builder()
@@ -64,9 +65,9 @@ public class JourneyLegBuilder {
                 .country(station.getCountry())
                 .latitude(station.getLatitude())
                 .longitude(station.getLongitude())
-                .transfers(path.getTransfers())
-                .totalDuration(GtfsTime.formatDuration(path.getTotalDurationMinutes()))
-                .totalDurationMinutes(path.getTotalDurationMinutes())
+                .transfers(path.transfers())
+                .totalDuration(GtfsTime.formatDuration(path.durationMinutes()))
+                .totalDurationMinutes(path.durationMinutes())
                 .build());
     }
 

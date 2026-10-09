@@ -1,5 +1,6 @@
 package com.railreach.service;
 
+import com.railreach.model.JourneyPath;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -9,6 +10,9 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -21,6 +25,9 @@ import java.util.zip.ZipOutputStream;
 final class GtfsTestFixtures {
 
     private GtfsTestFixtures() {}
+
+    /** A journey by value: {@link ServiceDays} compares its words by identity. */
+    record JourneyValue(JourneyPath path, boolean everyDay, List<Integer> epochDays) {}
 
     private static final int RAW_CACHE_MAX_ENTRIES = 100;
     private static final int SEARCH_PERMITS = 2;
@@ -51,6 +58,17 @@ final class GtfsTestFixtures {
         dataService(tempDir, graph, reachabilityCache(graph), new StationSearchIndex(graph), tripBatchSize,
                 feedFolders).loadFromFiles();
         return graph;
+    }
+
+    /** Per station of the result, the journey of each of its paths in order. */
+    static Map<String, List<JourneyValue>> journeys(SearchResult result) {
+        Map<String, List<JourneyValue>> journeys = new HashMap<>();
+        result.forEachStation((stationId, paths) -> journeys.put(stationId, paths.stream()
+                .map(path -> result.journey(stationId, path.transfers()))
+                .map(journey -> new JourneyValue(journey.path(), journey.runningDays() == ServiceDays.EVERY_DAY,
+                        journey.runningDays().epochDays().boxed().toList()))
+                .toList()));
+        return journeys;
     }
 
     /** A GtfsDataService that loads the given feeds into the graph; nothing is loaded yet. */

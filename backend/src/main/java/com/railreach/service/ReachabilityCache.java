@@ -3,16 +3,13 @@ package com.railreach.service;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
-import com.railreach.model.JourneyPath;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -30,7 +27,7 @@ public class ReachabilityCache {
     private final SearchGate gate;
     private final CacheManager cacheManager;
     // One full-data result holds paths to every reachable station, so the count must stay small
-    private final Cache<SearchKey, Map<String, List<JourneyPath>>> rawPaths;
+    private final Cache<SearchKey, SearchResult> rawPaths;
 
     public ReachabilityCache(SearchEngine search, SearchGate gate, CacheManager cacheManager,
                              @Value("${railreach.cache.raw-max-entries:30}") int rawMaxEntries) {
@@ -60,23 +57,23 @@ public class ReachabilityCache {
         /** Runs about every second while the search waits for a {@link SearchGate} permit; may throw to give up. */
         default void queued() {}
 
-        /** Each round's new paths, per station, as the search goes. */
-        default void roundPaths(Map<String, List<JourneyPath>> paths) {}
+        /** Each round's new path per station, as the search goes. */
+        default void roundPaths(Map<String, SearchResult.PathSummary> paths) {}
     }
 
     /**
-     * Per station, its paths by ascending transfers (see {@link SearchEngine#search}). Taken from the stored
+     * The search's result (see {@link SearchEngine#search}). Taken from the stored
      * result, else cut down from a stored result with more transfers, else searched and stored.
      *
      * @throws SearchGate.BusyException if it would have to search and too many searches wait already
      */
-    public Map<String, List<JourneyPath>> getOrCompute(SearchKey key) {
+    public SearchResult getOrCompute(SearchKey key) {
         return getOrCompute(key, SearchListener.NONE);
     }
 
     /** Like {@link #getOrCompute(SearchKey)}, telling the listener about the queue and the rounds of a search. */
-    public Map<String, List<JourneyPath>> getOrCompute(SearchKey key, SearchListener listener) {
-        Optional<Map<String, List<JourneyPath>>> stored = stored(key);
+    public SearchResult getOrCompute(SearchKey key, SearchListener listener) {
+        Optional<SearchResult> stored = stored(key);
         if (stored.isPresent()) return stored.get();
         return gate.run(() -> storedOrSearched(key, listener), listener::queued);
     }
@@ -87,27 +84,29 @@ public class ReachabilityCache {
     }
 
     // Checked again with the permit: an equal search may have finished while this one waited
-    private Map<String, List<JourneyPath>> storedOrSearched(SearchKey key, SearchListener listener) {
+    private SearchResult storedOrSearched(SearchKey key, SearchListener listener) {
         return stored(key).orElseGet(() -> {
             log.info("  Search: {} x{}", key.startId(), key.maxTransfers());
-            Map<String, List<JourneyPath>> result = search.search(key.startId(), key.maxTransfers(),
+            SearchResult result = search.search(key.startId(), key.maxTransfers(),
                     key.minTransferMins(), key.maxTransferMins(), listener::roundPaths);
             rawPaths.put(key, result);
-            log.info("  Cached raw result: {} x{} ({} stations)", key.startId(), key.maxTransfers(), result.size());
+            log.info("  Cached raw result: {} x{} ({} stations)", key.startId(), key.maxTransfers(),
+                    result.stationCount());
             return result;
         });
     }
 
-    private Optional<Map<String, List<JourneyPath>>> stored(SearchKey key) {
-        Map<String, List<JourneyPath>> cached = rawPaths.getIfPresent(key);
+    private Optional<SearchResult> stored(SearchKey key) {
+        SearchResult cached = rawPaths.getIfPresent(key);
         if (cached != null) {
-            log.info("  Raw cache HIT: {} x{} ({} stations)", key.startId(), key.maxTransfers(), cached.size());
+            log.info("  Raw cache HIT: {} x{} ({} stations)", key.startId(), key.maxTransfers(),
+                    cached.stationCount());
             return Optional.of(cached);
         }
         return storedWithMoreTransfers(key).map(higher -> {
             log.info("  Raw cache HIT: {} x{} cut down from x{}",
                     key.startId(), key.maxTransfers(), higher.getKey().maxTransfers());
-            return limitTransfers(higher.getValue(), key.maxTransfers());
+            return higher.getValue().withMaxTransfers(key.maxTransfers());
         });
     }
 
@@ -116,23 +115,11 @@ public class ReachabilityCache {
         return rawPaths.getIfPresent(key) != null || storedWithMoreTransfers(key).isPresent();
     }
 
-    private Optional<Map.Entry<SearchKey, Map<String, List<JourneyPath>>>> storedWithMoreTransfers(SearchKey key) {
+    private Optional<Map.Entry<SearchKey, SearchResult>> storedWithMoreTransfers(SearchKey key) {
         return rawPaths.asMap().entrySet().stream()
                 .filter(entry -> entry.getKey().maxTransfers() > key.maxTransfers()
                         && entry.getKey().withMaxTransfers(key.maxTransfers()).equals(key))
                 .findAny();
-    }
-
-    // Rounds of the search never depend on later rounds, so the paths with at most N transfers of a search with
-    // more transfers are exactly the result of a search with N
-    private static Map<String, List<JourneyPath>> limitTransfers(Map<String, List<JourneyPath>> result,
-                                                                 int maxTransfers) {
-        Map<String, List<JourneyPath>> limited = new HashMap<>(result.size() * 2);
-        result.forEach((stopId, paths) -> {
-            List<JourneyPath> within = paths.stream().filter(path -> path.getTransfers() <= maxTransfers).toList();
-            if (!within.isEmpty()) limited.put(stopId, within);
-        });
-        return limited;
     }
 
     /** Drops every stored result and response; they describe a graph that no longer exists. */

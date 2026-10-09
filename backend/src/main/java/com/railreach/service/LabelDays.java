@@ -66,9 +66,7 @@ final class LabelDays {
                 : new JourneyRunningDays.SoFar(days(previous), labels.dayShift(previous),
                         store.arrivalSeconds(alightEvent(previous, store)));
         int boardEvent = store.firstEvent(labels.trip(label)) + labels.boardIdx(label);
-        int alightEvent = alightEvent(label, store);
-        return JourneyRunningDays.withRide(before, store.rideDays(boardEvent, alightEvent),
-                store.departureSeconds(boardEvent), store.arrivalSeconds(alightEvent), graph);
+        return JourneyRunningDays.withRide(before, store, boardEvent, alightEvent(label, store), graph);
     }
 
     private int alightEvent(int label, TimetableStore store) {

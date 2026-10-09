@@ -19,11 +19,19 @@ final class IntList {
         return values[index];
     }
 
+    void set(int index, int value) {
+        values[index] = value;
+    }
+
     int size() {
         return size;
     }
 
     void clear() {
         size = 0;
+    }
+
+    long sizeBytes() {
+        return (long) values.length * Integer.BYTES;
     }
 }

@@ -45,6 +45,16 @@ Full data, `-Xmx9g`, G1, warmer on, gate at 2 permits and 6 queued. 5 clients at
 | Live heap after the run (`bench.sh memory`) | 3,243 MB, with 22 stored results in the raw cache |
 | Peak working set | 9.5 GB: G1 grows the heap towards `-Xmx` |
 
+## Journeys and result cache on the store (S19, 2026-10-10)
+Full data, compact engine (`--railreach.search.engine=compact`), `-Xmx3g`, compact object headers, warmer off. Results are byte-identical to S18 (`SearchSnapshot`, gtfs-mini, dev and full).
+| Measure | How | Result |
+|---|---|---|
+| Startup | log `Started … in` | 38–39 s at `-Xmx3g`: only the timetable store (13 s) is built, no `SearchTimetables` |
+| Idle live heap | `bench.sh memory` | **1,542 MB** (S18: 1,880 MB) |
+| One stored result | `bench.sh entry 5`, after a first search grew the scratch | **2 MB** (Wien, Basel, München; S16: 32 MB). The `Search stats (compact)` line logs 1.5–1.96 MB for the 20 full starts. On a fresh app the first `entry` reads 152 MB per result: that is the one ~444 MB scratch, kept for the next search |
+| 4 concurrent 5-transfer searches, 4 permits | 4 streams at once (Stockholm, Bruxelles-Midi, København, Roma) | **OutOfMemoryError** in all four: 4 scratches of ~444 MB don't fit next to 1.54 GB. The streams then hang (B38). Target moved to S22 |
+| The same 4 streams, 2 permits (default) | as above | All `done` in 8.7–13.2 s (2 of them queued), no OOM; live heap afterwards 2,334 MB (2 scratches, 4 results) |
+
 ## Compact search engine (S18, 2026-10-09)
 
 The compact engine against the S16 baselines below, measured the same way with `--railreach.search.engine=compact` (warmer off, `-Xmx12g`, compact object headers). Results are byte-identical to the legacy engine (`SearchSnapshot`, gtfs-mini, dev and full), so the average station counts per transfer count match S16 exactly.
