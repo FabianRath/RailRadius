@@ -1,14 +1,20 @@
 package com.railreach.service;
 
+import com.railreach.model.Connection;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.util.BitSet;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JourneyRunningDaysTest {
+
+    private static final TripInfo NO_INFO = new TripInfo(null, null, null);
+    private static final LocalDate DAY_ONE = LocalDate.of(2026, 1, 1);
 
     @Test
     void weekdayPatternIgnoresAHoliday() {
@@ -61,6 +67,37 @@ class JourneyRunningDaysTest {
     void noCalendarDataOrNoDaysGiveNoDescription() {
         assertThat(JourneyRunningDays.describe(ServiceDays.EVERY_DAY)).isEmpty();
         assertThat(JourneyRunningDays.describe(ServiceDays.of(new BitSet(), 0))).isEmpty();
+    }
+
+    // A ride to the second visit of a station: the ridden trip's first visit there arrives at another time, so it is
+    // not one of its own twins (B37)
+    @Test
+    void aRideToALoopTripsSecondVisitRunsOnTheDaysOfEveryTripMergedIntoIt() {
+        TransitGraph graph = TransitGraph.withToday(DAY_ONE);
+        graph.addServices(Map.of("x:S1", days(DAY_ONE, DAY_ONE, date -> true),
+                "x:S2", days(DAY_ONE.plusDays(1), DAY_ONE.plusDays(1), date -> true)));
+        List<Connection> ride = addLoopTrip(graph, "x:T1", "x:S1");
+        addLoopTrip(graph, "x:T2", "x:S2");
+
+        ServiceDays days = JourneyRunningDays.of(ride, graph);
+
+        assertThat(days.epochDays()).containsExactly((int) DAY_ONE.toEpochDay(), (int) DAY_ONE.toEpochDay() + 1);
+    }
+
+    /** A → B → C → B; returns its connections. */
+    private static List<Connection> addLoopTrip(TransitGraph graph, String tripId, String serviceId) {
+        List<String> stops = List.of("x:A", "x:B", "x:C", "x:B");
+        graph.addTrip(tripId, stops, NO_INFO, serviceId);
+        List<Connection> connections = List.of(connection(tripId, stops, 0), connection(tripId, stops, 1),
+                connection(tripId, stops, 2));
+        connections.forEach(graph::addConnection);
+        return connections;
+    }
+
+    private static Connection connection(String tripId, List<String> stops, int leg) {
+        return Connection.builder().tripId(tripId).routeName("R").fromStopId(stops.get(leg))
+                .toStopId(stops.get(leg + 1)).departureTimeSeconds(100 * (2 * leg + 1))
+                .arrivalTimeSeconds(100 * (2 * leg + 2)).build();
     }
 
     private static ServiceDays days(LocalDate first, LocalDate last, Predicate<LocalDate> runs) {

@@ -79,7 +79,7 @@ final class JourneyRunningDays {
      * The days of the ridden trip and of every trip with the same times between the same two stations. Feeds publish
      * one train as several trips with different days (NS: train 9535 as 7 trips, one stop ID apart). The search
      * timetables already merge trips with the same times at every stop, including the ridden one, so their days
-     * count too.
+     * count too. The ridden trip counts even if it passes the alight station earlier at another time (B37).
      */
     private static ServiceDays rideDays(RideTimes ride, TransitGraph graph) {
         List<TripTimetable.Departure> departures = graph.searchTimetables().departuresAt(ride.fromStopId());
@@ -87,7 +87,9 @@ final class JourneyRunningDays {
         for (int i = TripTimetable.firstDepartureAt(departures, ride.departureSeconds()); i < departures.size()
                 && departures.get(i).departureSeconds() == ride.departureSeconds(); i++) {
             TripTimetable.Departure twin = departures.get(i);
-            if (arrivesLikeRide(twin, ride)) days = days.union(twin.trip().serviceDays());
+            if (twin.trip().tripId().equals(ride.tripId()) || arrivesLikeRide(twin, ride)) {
+                days = days.union(twin.trip().serviceDays());
+            }
         }
         return days;
     }
