@@ -140,6 +140,13 @@ final class LabelArena {
         return keptBefore[word] + Long.bitCount(kept[word] & ((1L << label) - 1));
     }
 
+    /** The labels' columns that a {@link CompactResult} keeps. */
+    CompactResult.Labels resultLabels() {
+        return new CompactResult.Labels(Arrays.copyOf(trip, size), Arrays.copyOf(previous, size),
+                Arrays.copyOf(durationMinutes, size), Arrays.copyOf(boardIdx, size), Arrays.copyOf(alightIdx, size),
+                Arrays.copyOf(transfers, size));
+    }
+
     /** Bytes of the arrays, for the search's log. */
     long sizeBytes() {
         return (long) trip.length * (4 * Integer.BYTES + 2 * Short.BYTES + 2 * Byte.BYTES + Long.BYTES)

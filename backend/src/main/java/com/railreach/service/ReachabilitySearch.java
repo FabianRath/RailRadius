@@ -106,9 +106,8 @@ public class ReachabilitySearch implements SearchEngine {
     }
 
     @Override
-    public Map<String, List<JourneyPath>> search(String startId, int maxTransfers, int minTransferMins,
-                                                 int maxTransferMins,
-                                                 Consumer<Map<String, List<JourneyPath>>> roundPaths) {
+    public SearchResult search(String startId, int maxTransfers, int minTransferMins, int maxTransferMins,
+                               Consumer<Map<String, SearchResult.PathSummary>> roundPaths) {
         SearchCounters counters = new SearchCounters();
         SearchTimetables timetables = transitGraph.searchTimetables();
         SearchState state = new SearchState(timetables, startId, timetables.stationIndex(startId), minTransferMins,
@@ -144,26 +143,27 @@ public class ReachabilitySearch implements SearchEngine {
                 .transfers(0)
                 .totalDurationMinutes(0)
                 .build()));
-        return result;
+        return new LegacySearchResult(result, transitGraph);
     }
 
     /**
      * Chooses the path with this many transfers of each station the round reached, among its candidates. A path that
      * is not faster than the chosen one with fewer transfers is left out: choosing a slower candidate can make it so.
      */
-    private void finishRound(SearchState state, int transfers, Consumer<Map<String, List<JourneyPath>>> roundPaths) {
+    private void finishRound(SearchState state, int transfers,
+                             Consumer<Map<String, SearchResult.PathSummary>> roundPaths) {
         long startNanos = System.nanoTime();
         // Choosing only reads the round's candidates and earlier paths, so stations do it in parallel
         List<StationCandidates> stations = state.roundStations();
         List<Optional<JourneyPath>> newPaths = IntStream.range(0, stations.size()).parallel()
                 .mapToObj(i -> newPath(state, stations.get(i), transfers))
                 .toList();
-        Map<String, List<JourneyPath>> added = new HashMap<>();
+        Map<String, SearchResult.PathSummary> added = new HashMap<>();
         for (int i = 0; i < stations.size(); i++) {
             String stationId = stations.get(i).stationId;
             newPaths.get(i).ifPresent(path -> {
                 state.paths().computeIfAbsent(stationId, id -> new ArrayList<>()).add(path);
-                added.put(stationId, List.of(path));
+                added.put(stationId, LegacySearchResult.summary(path));
             });
         }
         stations.clear();

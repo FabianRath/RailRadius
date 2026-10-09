@@ -1,5 +1,6 @@
 package com.railreach.service;
 
+import com.railreach.model.Connection;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Arrays;
@@ -139,6 +140,22 @@ final class TimetableStore {
     Optional<String> routeName(int trip) {
         int name = tripRouteName[trip];
         return name == NO_ROUTE_NAME ? Optional.empty() : Optional.of(routeNames.get(name));
+    }
+
+    /**
+     * The connection from event to the next one, which has a leg there: the same as the graph's connection of the
+     * kept trip, built on demand so that a stored search result needs none.
+     */
+    Connection legConnection(int event) {
+        int trip = tripOf(event);
+        return Connection.builder()
+                .tripId(tripId(trip))
+                .routeName(routeName(trip).orElse(null))
+                .fromStopId(stations.id(evStation[event]))
+                .toStopId(stations.id(evStation[event + 1]))
+                .departureTimeSeconds(evDepSec[event])
+                .arrivalTimeSeconds(evArrSec[event + 1])
+                .build();
     }
 
     /** First position of the station's departures. */

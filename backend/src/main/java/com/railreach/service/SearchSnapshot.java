@@ -60,19 +60,22 @@ final class SearchSnapshot {
         for (String startId : startIds) {
             for (int maxTransfers = 0; maxTransfers <= MAX_TRANSFERS; maxTransfers++) {
                 out.write("## " + startId + " maxTransfers " + maxTransfers + "\n");
-                Map<String, List<JourneyPath>> pathsByStation = new TreeMap<>(search.search(startId, maxTransfers,
-                        MIN_TRANSFER_MINUTES, MAX_TRANSFER_MINUTES, roundPaths -> {}));
-                for (Map.Entry<String, List<JourneyPath>> station : pathsByStation.entrySet()) {
-                    for (JourneyPath path : station.getValue()) {
-                        out.write(line(station.getKey(), path) + "\n");
+                SearchResult result = search.search(startId, maxTransfers, MIN_TRANSFER_MINUTES,
+                        MAX_TRANSFER_MINUTES, roundPaths -> {});
+                Map<String, List<SearchResult.PathSummary>> pathsByStation = new TreeMap<>();
+                result.forEachStation(pathsByStation::put);
+                for (Map.Entry<String, List<SearchResult.PathSummary>> station : pathsByStation.entrySet()) {
+                    for (SearchResult.PathSummary path : station.getValue()) {
+                        out.write(line(station.getKey(), result.journey(station.getKey(), path.transfers())) + "\n");
                     }
                 }
             }
         }
     }
 
-    private String line(String stationId, JourneyPath path) {
-        ServiceDays days = JourneyRunningDays.of(path.getConnections(), graph);
+    private static String line(String stationId, SearchResult.Journey journey) {
+        JourneyPath path = journey.path();
+        ServiceDays days = journey.runningDays();
         StringJoiner rides = new StringJoiner(RIDE_SEPARATOR);
         for (JourneyRunningDays.RideTimes ride : JourneyRunningDays.rides(path.getConnections())) {
             rides.add(String.join(" ", ride.tripId(), ride.fromStopId(), String.valueOf(ride.departureSeconds()),

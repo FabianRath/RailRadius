@@ -1,8 +1,5 @@
 package com.railreach.service;
 
-import com.railreach.model.JourneyPath;
-
-import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -19,11 +16,11 @@ public interface SearchEngine {
     /**
      * Per station: the fastest path for each transfer count that is faster than every path with fewer transfers,
      * ordered by ascending transfers. So the first path has the fewest transfers and the last one is the fastest.
-     * The start station maps to an empty path. After each round, roundPaths gets the paths that round added, per
-     * station (never the start station).
+     * The start station has an empty path. After each round, roundPaths gets the path that round added to each
+     * station it added one to (never the start station).
      */
-    Map<String, List<JourneyPath>> search(String startId, int maxTransfers, int minTransferMins, int maxTransferMins,
-                                          Consumer<Map<String, List<JourneyPath>>> roundPaths);
+    SearchResult search(String startId, int maxTransfers, int minTransferMins, int maxTransferMins,
+                        Consumer<Map<String, SearchResult.PathSummary>> roundPaths);
 
     /** Builds what the engine searches on after a load, so the first search is as fast as later ones. */
     void prepare();
