@@ -5,11 +5,13 @@ import com.railreach.dto.ReachabilityRequest;
 import com.railreach.dto.ReachabilityResponse;
 import com.railreach.dto.ReachableStation;
 import com.railreach.dto.ReachableStationSummary;
+import com.railreach.service.ReachabilityCache.SearchKey;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -417,6 +419,33 @@ class ReachabilityServiceTest {
     }
 
     @Test
+    void streamStopsSearchingWhenTheClientIsGone() {
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
+        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs, cache);
+        GoneClientEmitter emitter = new GoneClientEmitter();
+
+        service.calculateReachabilityStreaming(streamRequest("alpha:A1", 3), emitter);
+
+        assertThat(emitter.sendAttempts).isEqualTo(1);
+        assertThat(cache.contains(new SearchKey("alpha:A1", 3, 0, 180))).isFalse();
+    }
+
+    @Test
+    void streamIsTurnedAwayWhenTheSearchQueueIsFull() throws Exception {
+        SearchGate gate = new SearchGate(1, 0);
+        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs,
+                GtfsTestFixtures.reachabilityCache(gtfs, gate));
+        RecordingEmitter emitter = new RecordingEmitter();
+
+        try (HeldPermit ignored = new HeldPermit(gate)) {
+            service.calculateReachabilityStreaming(streamRequest("alpha:A1", 1), emitter);
+        }
+
+        assertThat(emitter.error).isInstanceOf(SearchGate.BusyException.class);
+        assertThat(emitter.streamedStations()).isEmpty();
+    }
+
+    @Test
     void journeyOfAStationIsItsStationInTheResponse() {
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs);
         ReachabilityRequest request = ReachabilityRequest.builder()
@@ -449,12 +478,18 @@ class ReachabilityServiceTest {
     /** Captures the data objects of every sent SSE event instead of writing them to a response. */
     private static class RecordingEmitter extends SseEmitter {
         final List<Object> payloads = new ArrayList<>();
+        Throwable error;
 
         @Override
         public void send(SseEventBuilder event) {
             event.build().stream().map(DataWithMediaType::getData)
                     .filter(data -> !(data instanceof String))
                     .forEach(payloads::add);
+        }
+
+        @Override
+        public void completeWithError(Throwable ex) {
+            error = ex;
         }
 
         List<ReachableStationSummary> streamedStations() {
@@ -474,6 +509,26 @@ class ReachabilityServiceTest {
                     .filter(Map.class::isInstance).map(Map.class::cast)
                     .findFirst().orElseThrow();
         }
+    }
+
+    /** A client that closed the page: every send fails. */
+    private static class GoneClientEmitter extends SseEmitter {
+        int sendAttempts;
+
+        @Override
+        public void send(SseEventBuilder event) throws IOException {
+            sendAttempts++;
+            throw new IOException("Broken pipe");
+        }
+    }
+
+    private static ReachabilityRequest streamRequest(String start, int maxTransfers) {
+        return ReachabilityRequest.builder()
+                .startStationId(start)
+                .maxTransfers(maxTransfers)
+                .minTransferTimeMinutes(0)
+                .maxTransferTimeMinutes(180)
+                .build();
     }
 
     private static ReachabilityResponse query(TransitGraph data, String start, int maxTransfers,

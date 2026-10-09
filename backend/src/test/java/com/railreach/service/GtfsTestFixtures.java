@@ -23,6 +23,8 @@ final class GtfsTestFixtures {
     private GtfsTestFixtures() {}
 
     private static final int RAW_CACHE_MAX_ENTRIES = 100;
+    private static final int SEARCH_PERMITS = 2;
+    private static final int MAX_QUEUED_SEARCHES = 6;
     private static final int TRIP_BATCH_SIZE = 100_000;
     // Made-up countries KA and LA around the kappa and lambda feeds; every other feed lies outside them
     private static final String BORDERS_FILE = "gtfs-mini/borders.geojson";
@@ -83,7 +85,10 @@ final class GtfsTestFixtures {
 
     /** A ReachabilityService wired like in the app, without warming or a Caffeine cache. */
     static ReachabilityService reachabilityService(TransitGraph graph) {
-        ReachabilityCache cache = reachabilityCache(graph);
+        return reachabilityService(graph, reachabilityCache(graph));
+    }
+
+    static ReachabilityService reachabilityService(TransitGraph graph, ReachabilityCache cache) {
         ReachabilityService service = new ReachabilityService(graph, cache, new ReachabilityWarmer(cache),
                 new JourneyLegBuilder(graph));
         ReflectionTestUtils.setField(service, "maxTransferTimeMinutes", 180);
@@ -95,7 +100,16 @@ final class GtfsTestFixtures {
     }
 
     static ReachabilityCache reachabilityCache(TransitGraph graph, int rawMaxEntries) {
-        return new ReachabilityCache(new ReachabilitySearch(graph), new ConcurrentMapCacheManager(), rawMaxEntries);
+        return reachabilityCache(graph, new SearchGate(SEARCH_PERMITS, MAX_QUEUED_SEARCHES), rawMaxEntries);
+    }
+
+    static ReachabilityCache reachabilityCache(TransitGraph graph, SearchGate gate) {
+        return reachabilityCache(graph, gate, RAW_CACHE_MAX_ENTRIES);
+    }
+
+    private static ReachabilityCache reachabilityCache(TransitGraph graph, SearchGate gate, int rawMaxEntries) {
+        return new ReachabilityCache(new ReachabilitySearch(graph), gate, new ConcurrentMapCacheManager(),
+                rawMaxEntries);
     }
 
     /** Zips the gtfs-mini feed folder to {@code zipFile}. */

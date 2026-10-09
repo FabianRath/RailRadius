@@ -116,6 +116,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `TransferWindow` | service | Sliding window over a station's arrivals: the arrival that boards a departure with the shortest journey, among those passing a filter (the day check); scans the wait range when the window's best fails it |
 | `ReachabilityCache` | service | Raw search results per `SearchKey`; get-or-compute (stored, cut down from a stored higher transfer count, or searched, optionally passing each round's new paths on); Caffeine eviction and stats. A stored result keeps the days it was searched with, so it can include a day that has passed since (B31) |
 | `ReachabilityWarmer` | service | `@Async` predictive warming of the maximum transfer count (own bean so the proxy applies) |
+| `SearchGate` | service | Limits searches running at once (fair semaphore, `search.gate.permits`) with a capped queue (`search.gate.max-queued`); `run` waits, `runIfFree` (warmer) never queues |
 | `JourneyLegBuilder` | service | Search path → `ReachableStation` with TRAIN/TRANSFER legs |
 | `JourneyRunningDays` | service | Days on which every train of a returned journey runs, and their summary ("Runs Mon–Fri", "Irregular: 2 days in the timetable") |
 | `RegularJourneyChooser` | service | Picks a station's journey among the search's candidates with the same transfer count: the fastest that runs on at least half as many days as the most frequent one (B26) |
@@ -174,7 +175,7 @@ After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStati
 `ReachabilityCache.getOrCompute` is the central dispatcher. It is keyed by `SearchKey(start, maxTransfers, minTransfer, maxTransfer)`:
 1. **Raw cache hit** → return the stored result immediately.
 2. **Cut down**: if a result with more transfers (same start and window) is stored, keep only its paths with ≤ N transfers. A round never depends on later rounds, so this equals a search with N.
-3. **Search** (`ReachabilitySearch.search`), stored afterwards.
+3. **Search** (`ReachabilitySearch.search`), stored afterwards. It runs inside a `SearchGate` permit, so every search (stream, POST, `/journey` after an eviction, warmer) counts against the same limit. A search beyond `search.gate.permits` (2) waits in a fair queue and checks the stored results again once it has a permit, since an equal search may have finished meanwhile. When `search.gate.max-queued` (6) searches already wait, it is turned away with `SearchGate.BusyException` (HTTP 503; an SSE `error` event on the stream). A full-data 5-transfer search holds about 1 GB while it runs, so the permits bound the heap a burst of visitors can take (`docs/HOSTING.md`).
 
 The search has no start time: every trip leaving the start station can begin a journey, and duration counts from its departure. It runs one round per transfer count (like RAPTOR):
 - Round 0 rides every trip from the start station. Round k boards trips from the arrivals of round k−1. Riding a trip forward records each stop as an arrival.
@@ -197,9 +198,9 @@ The wait limit applies to each transfer, so a journey can bridge a longer wait b
 **Caching layers:**
 - `ReachabilityCache` (Caffeine, max `cache.raw-max-entries` (30) results) holds raw results (station → paths). A stored result also answers every lower transfer count.
 - Caffeine `"reachability"` cache holds full `ReachabilityResponse`s from `POST /api/reachability` (max 10k entries, 60 min TTL).
-- **Predictive warming**: after a streaming request with N < `predictive-max-transfers` (5), `ReachabilityWarmer` searches that maximum with the same transfer window on a background thread, into the raw cache only (the stream never reads Caffeine). Every count from N+1 up is then cut down from it.
+- **Predictive warming**: after a streaming request with N < `predictive-max-transfers` (5), `ReachabilityWarmer` searches that maximum with the same transfer window on a background thread, into the raw cache only (the stream never reads Caffeine). Every count from N+1 up is then cut down from it. It only searches if a gate permit is free and no search is queued (`SearchGate.runIfFree`), otherwise it skips, so it never delays a visitor.
 
-**Streaming** (`calculateReachabilityStreaming`): a search sends each round's stations as soon as the round ends; a stored result is sent at once. A station is sent once, with its first path within `maxJourneyHours`; paths come by ascending transfers, so that is the path the response picks too (B4), and a later round never changes a sent station. Stations go out as `ReachableStationSummary`s (no path, legs or running days: on the full data those made the stream about 100 MB) in SSE `stations` events in batches of 30, followed by a `done` event (`{total, calculationTimeMs}`), or an `error` event on failure.
+**Streaming** (`calculateReachabilityStreaming`): a search sends each round's stations as soon as the round ends; a stored result is sent at once. A station is sent once, with its first path within `maxJourneyHours`; paths come by ascending transfers, so that is the path the response picks too (B4), and a later round never changes a sent station. Stations go out as `ReachableStationSummary`s (no path, legs or running days: on the full data those made the stream about 100 MB) in SSE `stations` events in batches of 30, followed by a `done` event (`{total, calculationTimeMs}`), or an `error` event on failure (also when the gate's queue is full). While the search waits for a gate permit, the stream sends an SSE comment (`:queued`, ignored by `EventSource`) about every second. A failed send means the client is gone: the search stops at the next round's send (or while queued), stores nothing and frees its permit.
 
 ## Search semantics contract
 
@@ -260,6 +261,7 @@ What every search engine must keep, so a rewrite (S17–S21) gives the same resu
 - `feeds.expiring-days` (30): feeds that end, or whose first early-ending main operator stops, within this many days are `EXPIRING`; `feeds.check-interval` (`PT24H`): how often the missing/expired/expiring feeds are logged; `feeds.sources` (empty = every feed in `gtfs-feeds.txt`): comma-separated feeds expected in the GTFS directory, listed as `MISSING` without a zip; `feeds.auth.<source>` (no default, never in git): credentials that `gtfs-feeds.txt` headers refer to, e.g. `feeds.auth.hungary` = base64 of `user:password` for MÁV's Basic auth. Set it in `backend/config/application.yml` (gitignored; Spring Boot reads `config/` in the working directory on top of the bundled file) or as env var `RAILREACH_FEEDS_AUTH_HUNGARY`
 - `algorithm.max-transfer-time-minutes` (180), `algorithm.cache-size` (10000), `algorithm.cache-ttl-minutes` (60)
 - `cache.predictive-enabled` (true), `cache.predictive-max-transfers` (5), `cache.raw-max-entries` (30)
+- `search.gate.permits` (2): searches that run at once; `search.gate.max-queued` (6): searches that may wait for a permit before the next one is turned away
 - `admin.token` (empty, env `RAILREACH_ADMIN_TOKEN`): shared secret for the admin API; empty disables it
 
 `application-dev.yml` overrides the GTFS directory and cache file, sets `auto-load-from-files: true` and `feeds.sources: austria,hungary,slovakia`, turns predictive warming off and defaults `admin.token` to `dev`.

@@ -14,6 +14,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 
 /** Answers reachability requests: resolves defaults, gets the (cached) search result and maps it to DTOs. */
 @Service
@@ -84,7 +86,8 @@ public class ReachabilityService {
     /**
      * Resolves the request and sends the stations to the emitter in batches, then a "done" event. A search sends
      * each round's stations when the round ends; a stored result is sent at once. Runs on a worker thread; the HTTP
-     * response stays open until it completes.
+     * response stays open until it completes. A search that waits for a {@link SearchGate} permit sends SSE comments
+     * meanwhile, and the search stops when a send fails because the client is gone, which frees its permit.
      */
     public void calculateReachabilityStreaming(ReachabilityRequest request, SseEmitter emitter) {
         long startMs = System.currentTimeMillis();
@@ -93,7 +96,7 @@ public class ReachabilityService {
             StreamedStations streamed = new StreamedStations(request, emitter, startMs);
             // A station is sent once, with its first path within the time limit. Rounds add paths by ascending
             // transfers, so that is the path the response picks too (B4).
-            streamed.sendNew(cache.getOrCompute(key, streamed::sendNew));
+            streamed.sendNew(cache.getOrCompute(key, streamed));
             log.info("Streamed {} stations in {} ms, the first after {} ms", streamed.sent.size(),
                     System.currentTimeMillis() - startMs, streamed.firstSentMs);
             // The raw cache now holds the authoritative result; a Caffeine entry may be older
@@ -110,15 +113,24 @@ public class ReachabilityService {
             if (predictiveEnabled) {
                 warmer.warmHigherTransferCounts(key);
             }
+        } catch (CancellationException e) {
+            log.info("Stream stopped after {} ms: {}", System.currentTimeMillis() - startMs, e.getMessage());
+            emitter.complete();
+        } catch (SearchGate.BusyException e) {
+            sendError(emitter, e);
         } catch (Exception e) {
             log.error("Streaming BFS error", e);
-            try {
-                emitter.send(SseEmitter.event().name("error").data(e.getMessage()));
-            } catch (Exception sendError) {
-                log.debug("Could not send the error event, the client is gone", sendError);
-            }
-            emitter.completeWithError(e);
+            sendError(emitter, e);
         }
+    }
+
+    private static void sendError(SseEmitter emitter, Exception e) {
+        try {
+            emitter.send(SseEmitter.event().name("error").data(e.getMessage()));
+        } catch (Exception sendError) {
+            log.debug("Could not send the error event, the client is gone", sendError);
+        }
+        emitter.completeWithError(e);
     }
 
     public Map<String, Object> getCacheStats() {
@@ -144,7 +156,7 @@ public class ReachabilityService {
     }
 
     /** The stations a stream has sent so far. The start station is not a destination, so it is never sent. */
-    private final class StreamedStations {
+    private final class StreamedStations implements ReachabilityCache.SearchListener {
 
         private final ReachabilityRequest request;
         private final SseEmitter emitter;
@@ -158,6 +170,16 @@ public class ReachabilityService {
             this.emitter = emitter;
             this.startMs = startMs;
             this.maxJourneyMins = maxJourneyMinutes(request);
+        }
+
+        @Override
+        public void queued() {
+            send(SseEmitter.event().comment("queued"));
+        }
+
+        @Override
+        public void roundPaths(Map<String, List<JourneyPath>> paths) {
+            sendNew(paths);
         }
 
         /**
@@ -177,7 +199,19 @@ public class ReachabilityService {
             });
             if (!stations.isEmpty() && firstSentMs < 0) firstSentMs = System.currentTimeMillis() - startMs;
             for (int i = 0; i < stations.size(); i += STREAM_BATCH_SIZE) {
-                flushBatch(emitter, stations.subList(i, Math.min(i + STREAM_BATCH_SIZE, stations.size())));
+                send(SseEmitter.event().name("stations")
+                        .data(stations.subList(i, Math.min(i + STREAM_BATCH_SIZE, stations.size()))));
+            }
+        }
+
+        // A failed send means the client is gone: stop instead of searching for nobody
+        private void send(SseEmitter.SseEventBuilder event) {
+            try {
+                emitter.send(event);
+            } catch (IOException | IllegalStateException e) {
+                CancellationException gone = new CancellationException("the client is gone");
+                gone.initCause(e);
+                throw gone;
             }
         }
     }
@@ -186,13 +220,5 @@ public class ReachabilityService {
     // up with a faster path that has more transfers (B4)
     private static Optional<JourneyPath> fewestTransfersWithin(List<JourneyPath> paths, int maxJourneyMins) {
         return paths.stream().filter(path -> path.getTotalDurationMinutes() <= maxJourneyMins).findFirst();
-    }
-
-    private void flushBatch(SseEmitter emitter, List<ReachableStationSummary> stations) {
-        try {
-            emitter.send(SseEmitter.event().name("stations").data(stations));
-        } catch (Exception e) {
-            log.warn("SSE flush failed", e);
-        }
     }
 }

@@ -54,6 +54,14 @@ railreach:
     # One full-data result maps every reachable station to its paths, so keep this small
     raw-max-entries: 30
 
+  search:
+    gate:
+      # Searches that run at once. A 5-transfer search on the full data holds about 1 GB while it runs, so this bounds
+      # the heap a burst of visitors can take. The predictive warmer only runs when a permit is free
+      permits: 2
+      # Searches that wait for a permit; the next one is turned away as busy (SSE error event, 503 otherwise)
+      max-queued: 6
+
   admin:
     # Shared secret for /api/admin/** (sent as X-Admin-Token). Empty = admin API disabled (403), so a deployment
     # without RAILREACH_ADMIN_TOKEN never exposes it. Use a long random value, e.g. 32+ random bytes in hex

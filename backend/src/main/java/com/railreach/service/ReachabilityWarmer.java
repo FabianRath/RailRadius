@@ -13,7 +13,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Precomputes the configured maximum transfer count after a query. The cache answers every lower count from it,
- * so moving the transfer slider up is instant.
+ * so moving the transfer slider up is instant. Warming only uses a free search permit and never queues, so it never
+ * delays a visitor's search.
  * A separate bean so that {@code @Async} goes through Spring's proxy and runs off the caller's thread.
  */
 @Component
@@ -37,9 +38,12 @@ public class ReachabilityWarmer {
             return;
         }
         try {
-            log.info("  Predictive cache warming: {} x{} transfers", key.startId(), key.maxTransfers());
             long startMs = System.currentTimeMillis();
-            cache.getOrCompute(key);
+            if (!cache.computeIfPermitFree(key)) {
+                log.info("  Predictive cache: {} x{} skipped, no free search permit",
+                        key.startId(), key.maxTransfers());
+                return;
+            }
             log.info("  Predictive cache warmed: {} x{} transfers in {}ms",
                     key.startId(), key.maxTransfers(), System.currentTimeMillis() - startMs);
         } catch (Exception e) {
