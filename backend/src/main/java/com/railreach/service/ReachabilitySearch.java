@@ -5,7 +5,6 @@ import com.railreach.model.JourneyPath;
 import com.railreach.util.GtfsTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -49,10 +48,9 @@ import java.util.stream.IntStream;
  * same as on one thread. The work is CPU-bound, so it uses the common fork-join pool (one thread per core), not the
  * virtual threads Spring runs requests on.
  */
-@Component
 @Slf4j
 @RequiredArgsConstructor
-public class ReachabilitySearch {
+public class ReachabilitySearch implements SearchEngine {
 
     private static final int SAME_DAY = 0;
     private static final int NEXT_DAY = 1;
@@ -102,12 +100,12 @@ public class ReachabilitySearch {
         }
     }
 
-    /**
-     * Every station reachable from startId with at most maxTransfers. Per station: the fastest path for each
-     * transfer count that is faster than every path with fewer transfers, ordered by ascending transfers. So the
-     * first path has the fewest transfers and the last one is the fastest. The start station maps to an empty path.
-     * After each round, roundPaths gets the paths that round added, per station (never the start station).
-     */
+    @Override
+    public void prepare() {
+        transitGraph.searchTimetables();
+    }
+
+    @Override
     public Map<String, List<JourneyPath>> search(String startId, int maxTransfers, int minTransferMins,
                                                  int maxTransferMins,
                                                  Consumer<Map<String, List<JourneyPath>>> roundPaths) {

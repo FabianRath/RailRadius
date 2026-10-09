@@ -73,7 +73,8 @@ final class GtfsTestFixtures {
         ReflectionTestUtils.setField(feedLoader, "tripBatchSize", tripBatchSize);
         GtfsDataService service = new GtfsDataService(graph, feedLoader,
                 new StationDeduplicator(new CountryLocator(Files.newInputStream(resource(BORDERS_FILE)))),
-                cacheStore(tempDir), reachabilityCache, stationSearchIndex, new GtfsLoadProgress());
+                cacheStore(tempDir), reachabilityCache, SearchEngine.named(SearchEngine.LEGACY, graph),
+                stationSearchIndex, new GtfsLoadProgress());
         ReflectionTestUtils.setField(service, "gtfsDirectory", gtfsDir.toString());
         return service;
     }
@@ -88,6 +89,11 @@ final class GtfsTestFixtures {
         return reachabilityService(graph, reachabilityCache(graph));
     }
 
+    /** Like {@link #reachabilityService(TransitGraph)}, on the given search engine. */
+    static ReachabilityService reachabilityService(TransitGraph graph, String engine) {
+        return reachabilityService(graph, reachabilityCache(graph, engine));
+    }
+
     static ReachabilityService reachabilityService(TransitGraph graph, ReachabilityCache cache) {
         ReachabilityService service = new ReachabilityService(graph, cache, new ReachabilityWarmer(cache),
                 new JourneyLegBuilder(graph));
@@ -96,19 +102,32 @@ final class GtfsTestFixtures {
     }
 
     static ReachabilityCache reachabilityCache(TransitGraph graph) {
-        return reachabilityCache(graph, RAW_CACHE_MAX_ENTRIES);
+        return reachabilityCache(graph, SearchEngine.LEGACY);
+    }
+
+    static ReachabilityCache reachabilityCache(TransitGraph graph, String engine) {
+        return reachabilityCache(graph, newGate(), RAW_CACHE_MAX_ENTRIES, engine);
     }
 
     static ReachabilityCache reachabilityCache(TransitGraph graph, int rawMaxEntries) {
-        return reachabilityCache(graph, new SearchGate(SEARCH_PERMITS, MAX_QUEUED_SEARCHES), rawMaxEntries);
+        return reachabilityCache(graph, newGate(), rawMaxEntries, SearchEngine.LEGACY);
     }
 
     static ReachabilityCache reachabilityCache(TransitGraph graph, SearchGate gate) {
-        return reachabilityCache(graph, gate, RAW_CACHE_MAX_ENTRIES);
+        return reachabilityCache(graph, gate, SearchEngine.LEGACY);
     }
 
-    private static ReachabilityCache reachabilityCache(TransitGraph graph, SearchGate gate, int rawMaxEntries) {
-        return new ReachabilityCache(new ReachabilitySearch(graph), gate, new ConcurrentMapCacheManager(),
+    static ReachabilityCache reachabilityCache(TransitGraph graph, SearchGate gate, String engine) {
+        return reachabilityCache(graph, gate, RAW_CACHE_MAX_ENTRIES, engine);
+    }
+
+    private static SearchGate newGate() {
+        return new SearchGate(SEARCH_PERMITS, MAX_QUEUED_SEARCHES);
+    }
+
+    private static ReachabilityCache reachabilityCache(TransitGraph graph, SearchGate gate, int rawMaxEntries,
+                                                       String engine) {
+        return new ReachabilityCache(SearchEngine.named(engine, graph), gate, new ConcurrentMapCacheManager(),
                 rawMaxEntries);
     }
 

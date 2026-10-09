@@ -26,13 +26,13 @@ public class ReachabilityCache {
 
     static final String RESPONSE_CACHE_NAME = "reachability";
 
-    private final ReachabilitySearch search;
+    private final SearchEngine search;
     private final SearchGate gate;
     private final CacheManager cacheManager;
     // One full-data result holds paths to every reachable station, so the count must stay small
     private final Cache<SearchKey, Map<String, List<JourneyPath>>> rawPaths;
 
-    public ReachabilityCache(ReachabilitySearch search, SearchGate gate, CacheManager cacheManager,
+    public ReachabilityCache(SearchEngine search, SearchGate gate, CacheManager cacheManager,
                              @Value("${railreach.cache.raw-max-entries:30}") int rawMaxEntries) {
         this.search = search;
         this.gate = gate;
@@ -65,7 +65,7 @@ public class ReachabilityCache {
     }
 
     /**
-     * Per station, its paths by ascending transfers (see {@link ReachabilitySearch#search}). Taken from the stored
+     * Per station, its paths by ascending transfers (see {@link SearchEngine#search}). Taken from the stored
      * result, else cut down from a stored result with more transfers, else searched and stored.
      *
      * @throws SearchGate.BusyException if it would have to search and too many searches wait already

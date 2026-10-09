@@ -3,6 +3,7 @@ package com.railreach.service;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
@@ -10,13 +11,15 @@ import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The search oracle on gtfs-mini (S12): searches from every station of every feed combination the tests load must
- * match the committed dumps in search-snapshots/. After an intended change of the results, rewrite them with
- * {@code -Dsnapshot.update=true}, explain every changed line, and commit them with the change.
+ * match the committed dumps in search-snapshots/, on both search engines. After an intended change of the results,
+ * rewrite them with {@code -Dsnapshot.update=true} (from the legacy engine), explain every changed line, and commit
+ * them with the change.
  */
 class SearchSnapshotTest {
 
@@ -42,12 +45,18 @@ class SearchSnapshotTest {
                 List.of("zeta"));
     }
 
+    static Stream<Arguments> feedCombinationsOnEachEngine() {
+        return feedCombinations().stream().flatMap(feeds -> Stream.of(
+                Arguments.of(feeds, SearchEngine.LEGACY), Arguments.of(feeds, SearchEngine.COMPACT)));
+    }
+
     @ParameterizedTest
-    @MethodSource("feedCombinations")
-    void searchesFromEveryStationMatchTheGoldenDump(List<String> feeds) throws IOException {
-        String dump = dump(GtfsTestFixtures.load(tempDir, feeds.toArray(String[]::new)));
+    @MethodSource("feedCombinationsOnEachEngine")
+    void searchesFromEveryStationMatchTheGoldenDump(List<String> feeds, String engine) throws IOException {
+        String dump = dump(GtfsTestFixtures.load(tempDir, feeds.toArray(String[]::new)), engine);
         Path golden = GOLDEN_DIR.resolve(String.join("+", feeds) + ".txt");
         if (UPDATE_GOLDENS) {
+            if (engine.equals(SearchEngine.COMPACT)) return;
             Files.writeString(golden, dump);
             return;
         }
@@ -62,9 +71,9 @@ class SearchSnapshotTest {
         assertThat(SearchSnapshot.benchStarts(lines, "dev")).containsExactly("austria:1", "hungary:267");
     }
 
-    private static String dump(TransitGraph graph) throws IOException {
+    private static String dump(TransitGraph graph, String engine) throws IOException {
         StringWriter out = new StringWriter();
-        new SearchSnapshot(graph).write(graph.getAllStations().keySet().stream().sorted().toList(), out);
+        new SearchSnapshot(graph, engine).write(graph.getAllStations().keySet().stream().sorted().toList(), out);
         return out.toString();
     }
 }

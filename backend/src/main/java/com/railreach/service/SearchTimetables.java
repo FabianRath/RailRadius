@@ -59,6 +59,10 @@ final class SearchTimetables {
         return trips.length;
     }
 
+    TripTimetable trip(int index) {
+        return trips[index];
+    }
+
     int stationCount() {
         return stationIndexes.size();
     }

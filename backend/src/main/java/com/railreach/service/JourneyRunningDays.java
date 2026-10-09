@@ -68,11 +68,16 @@ final class JourneyRunningDays {
      * runs a day later: that is the search's overnight transfer.
      */
     static SoFar withRide(SoFar before, RideTimes ride, TransitGraph graph) {
-        int dayShift = ride.departureSeconds() < before.arrivalSeconds() ? before.dayShift() + 1 : before.dayShift();
-        ServiceDays rideDays = rideDays(ride, graph);
+        return withRide(before, rideDays(ride, graph), ride.departureSeconds(), ride.arrivalSeconds(), graph);
+    }
+
+    /** Like {@link #withRide(SoFar, RideTimes, TransitGraph)}, with the ride's days already worked out. */
+    static SoFar withRide(SoFar before, ServiceDays rideDays, int departureSeconds, int arrivalSeconds,
+                          TransitGraph graph) {
+        int dayShift = departureSeconds < before.arrivalSeconds() ? before.dayShift() + 1 : before.dayShift();
         // The first train's days from today on set the journey's dates (B31)
-        if (before == SoFar.START) rideDays = graph.upcomingDays(rideDays);
-        return new SoFar(before.days().intersect(rideDays, dayShift), dayShift, ride.arrivalSeconds());
+        ServiceDays days = before == SoFar.START ? graph.upcomingDays(rideDays) : rideDays;
+        return new SoFar(before.days().intersect(days, dayShift), dayShift, arrivalSeconds);
     }
 
     /**

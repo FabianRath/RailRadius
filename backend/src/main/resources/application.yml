@@ -55,6 +55,9 @@ railreach:
     raw-max-entries: 30
 
   search:
+    # legacy (ReachabilitySearch) or compact (CompactReachabilitySearch on the flat timetable store, S18). Both give
+    # the same results; the switch goes away once the compact engine replaces the legacy one (S21)
+    engine: legacy
     gate:
       # Searches that run at once. A 5-transfer search on the full data holds about 1 GB while it runs, so this bounds
       # the heap a burst of visitors can take. The predictive warmer only runs when a permit is free
