@@ -5,7 +5,7 @@ How much server RailReach needs, measured on the full data. Re-measure when the 
 ## Plan
 
 - The server only answers searches. GTFS zips are parsed on the dev machine, and only `data/gtfs-cache.json` is uploaded.
-- Updating data: parse locally, upload the cache, restart the app. The cache is read only at startup, so each update means ~20–30 s of downtime.
+- Updating data: parse locally, upload the cache, restart the app. The cache is read only at startup, so each update means ~50 s of downtime.
 - The server needs the jar, `frontend/` and `data/gtfs-cache.json` (~650 MB). No zips, so a small disk is enough.
 - Leave `RAILREACH_ADMIN_TOKEN` unset, so `/api/admin/**` answers 403 (no reload, cache delete or feed download from outside).
 - Without zips, the feed update center logs all feeds as missing at startup and once a day. That is expected.
@@ -22,7 +22,7 @@ Full data: 49 feeds, 34,081 stations, cache 649 MB. Windows 10 dev machine, 12 c
 
 | Test | Result |
 |---|---|
-| Startup from cache | 18 s. Live heap after a full GC: **2.85 GB** |
+| Startup from cache | 48 s (re-measured 2026-10-09: reading the cache ~25 s, search timetables 21 s). Live heap after a full GC: **2.85 GB** |
 | Raw result cache | ~25 MB per 5-transfer result, at most 30 entries (`raw-max-entries`), so ≤ ~0.75 GB |
 | Full parse of all zips (only on the dev machine) | 6¼ min, peak working set 4.5 GB, at most 3.6 GB live after a GC |
 | 15 hubs × 5 transfers, 3 at a time, `-Xmx12g` | OK, 106 s |
@@ -31,3 +31,31 @@ Full data: 49 feeds, 34,081 stations, cache 649 MB. Windows 10 dev machine, 12 c
 | same, `-Xmx4g` | OutOfMemoryError, app stuck in GC |
 
 Rule of thumb: ~3 GB for the data plus ~1 GB per 5-transfer search running at the same time. Nothing limits concurrent searches, so enough of them at once can run out of heap on any size.
+
+## Baselines (S13, 2026-10-09)
+
+The numbers the compact search store (S16–S21) is measured against. Full data as above, same machine, `-Xmx12g`, G1, no compact object headers, warmer off (`--railreach.cache.predictive-enabled=false`), one search at a time. Repeat with `scripts/bench.sh` (its header has the start command):
+
+| Measure | How | Result |
+|---|---|---|
+| Startup | log `Started … in` | 48–49 s: reading the cache ~25 s, building the search timetables 21 s |
+| Startup peak | `gc.log` (largest heap before a GC), `bench.sh memory` (peak working set) | heap 5.4 GB used, 5.9 GB committed; working set 5.9 GB |
+| Idle live heap | `bench.sh memory` (`GC.run` + `GC.heap_info`) | **2,770 MB** (class histogram: 2,685 MB in 74.8 M objects) |
+| Largest idle classes | `GC.class_histogram` | `byte[]` 659 MB, `Connection` 438 MB (11.5 M), `String` 393 MB (17.2 M), `HashMap$Node` 385 MB, `Object[]` 158 MB, `int[]` 147 MB, `TripTimetable$Departure` 123 MB |
+| Allocated per search | `bench.sh alloc` (JFR `settings=profile`, thread allocation totals) | 5 transfers: 6.6 GB Wien, 4.9 GB Bruxelles-Midi; 3 transfers: 0.76 GB Brennero |
+| Held during a search | `bench.sh held` (class histogram every ~2 s, peak minus before) | 5 transfers: 585 MB München, 707 MB Basel, 689 MB Stockholm. The samples are seconds apart, so the true peak can be higher |
+| One stored result | `bench.sh entry` (live heap growth per raw cache entry) | 5 transfers: **29 MB** (average of Paris, Zürich, Praha) |
+| Working set after searches | `bench.sh memory` after 7 searches | 9.6 GB: G1 grows the heap towards `-Xmx` |
+
+Search time per transfer count (`bench.sh times full`: the 20 starts of `bench-stations.txt`, each 0 → 5 transfers, after a warm-up search). "Stream" is the time to the `done` event of a fresh search; it includes sending each round's stations. "Output" is the same stream again from the result cache, so only building the summaries and writing the SSE events:
+
+| Transfers | Stream p50 | Stream p95 | Output p50 | Output p95 | Output share | Stations (avg) |
+|---|---|---|---|---|---|---|
+| 0 | 12 ms | 46 ms | 2 ms | 4 ms | 16 % | 244 |
+| 1 | 93 ms | 436 ms | 11 ms | 35 ms | 13 % | 3,085 |
+| 2 | 465 ms | 1.5 s | 50 ms | 102 ms | 12 % | 9,902 |
+| 3 | 1.7 s | 5.2 s | 82 ms | 116 ms | 4 % | 16,663 |
+| 4 | 4.0 s | 7.7 s | 107 ms | 137 ms | 3 % | 21,317 |
+| 5 | 6.5 s | 10.3 s | 119 ms | 188 ms | 2 % | 24,476 |
+
+Output share is the sum of output times over the sum of stream times. It stays far under 30 %, so the SSE output needs no separate work; the search is the cost.

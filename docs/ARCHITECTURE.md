@@ -23,7 +23,7 @@ It loads GTFS timetable feeds for ~25 European countries, keeps only **rail** ro
 Run from `backend/`; the cache paths are relative to the working directory. The commands below are for Git Bash; in PowerShell use `.\mvnw.cmd` instead of `./mvnw`.
 
 - **Full data:** `./mvnw package -DskipTests && java -Xmx12g -jar target/railreach-backend-0.0.1-SNAPSHOT.jar`
-  - `data/gtfs-cache.json` is ~650 MB (3.6 GB before the trip-based format, S9); it loads in ~18 s.
+  - `data/gtfs-cache.json` is ~650 MB (3.6 GB before the trip-based format, S9); reading it takes ~25 s, and with the search timetables startup takes ~48 s.
   - Server size and memory measurements: `docs/HOSTING.md`.
 - **Dev data:** `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev`
   - Austria + Hungary + Slovakia from `data/gtfs-dev/`, cache in `data/gtfs-dev-cache.json`.
@@ -40,7 +40,7 @@ Run from `backend/`; the cache paths are relative to the working directory. The 
 
 ```
 RailReach/
-├── CLAUDE.md, docs/ (ARCHITECTURE, TODO, decisions, bench-stations.txt), scripts/api.sh
+├── CLAUDE.md, docs/ (ARCHITECTURE, TODO, decisions, HOSTING, bench-stations.txt), scripts/ (api.sh, bench.sh)
 ├── frontend/index.html               # markup; served at / by Spring (static-locations: file:../frontend/)
 ├── frontend/css/app.css              # all styles and the map palette (CSS variables)
 ├── frontend/js/                      # ES modules: main (entry), api, map (only MapLibre user), search, query-form,
@@ -167,7 +167,7 @@ After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStati
 7. **Foreign stops** (`ForeignStopSnapper`): a source's home country is where more than half of its located stations lie. A stop outside its source's home country is merged into the nearest station within 1 km of a source at home in the stop's country, which stays canonical. With none that close, it is merged into the nearest one within 5 km whose name has the same words, ignoring a country in brackets at the end (`StationNameMatcher.sameName`: "Apach(fr)" / "Apach"; B30), as some feeds place their stops abroad 1–4 km off. Every map is remapped. A canonical station can itself be merged later (A→B, then B→C); `mergeStations` first resolves such chains so every alias maps straight to the last station. The alias's translated names move to the canonical station.
 8. `GtfsCacheStore` saves stations, translated names, services and trips (`CachedTrip`) to the GTFS cache file (format version 8). On load, `TransitGraph.restore` rebuilds `neighbors`, `connections`, `tripStops`, `tripInfos`, `tripServiceDays` and `stopTrips` from the trips.
 
-`StationSearchIndex.rebuild` then indexes the variants of each station's name and translated names. `GtfsDataService` then has `TransitGraph` build its `SearchTimetables` in one pass (about 18 s on the full data, most of it the rare-departure check per trip and stop; clearing or merging the graph drops them, and the next search rebuilds them), so the first search is as fast as later ones. `connectionByTrip` (edge → tripId → Connection) is still built lazily, but the search no longer uses it.
+`StationSearchIndex.rebuild` then indexes the variants of each station's name and translated names. `GtfsDataService` then has `TransitGraph` build its `SearchTimetables` in one pass (about 21 s on the full data, most of it the rare-departure check per trip and stop; clearing or merging the graph drops them, and the next search rebuilds them), so the first search is as fast as later ones. `connectionByTrip` (edge → tripId → Connection) is still built lazily, but the search no longer uses it.
 
 ## Reachability algorithm (`ReachabilityCache`, `ReachabilitySearch`)
 
