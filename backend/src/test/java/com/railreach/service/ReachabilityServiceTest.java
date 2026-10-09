@@ -22,6 +22,9 @@ import static org.assertj.core.api.Assertions.tuple;
 
 class ReachabilityServiceTest {
 
+    private static final int A_DAY_MINUTES = 24 * 60;
+    private static final int LONGEST_MIN_WAIT_MINUTES = 1300;
+
     @TempDir
     static Path tempDir;
 
@@ -134,6 +137,17 @@ class ReachabilityServiceTest {
         assertThat(b2.getTotalDurationMinutes()).isEqualTo(140); // 40 ride + 40 wait + 60 ride
         assertThat(b2.getLegs()).extracting(JourneyLeg::getTrainName)
                 .containsExactly("NJ", null, "EN");
+    }
+
+    // V1 reaches D1 at 08:30, W1 leaves it at 08:00: under an hour earlier is no 23.5 h wait past midnight. The
+    // minimum wait rules out V2 (10:30) → W1 (21.5 h) but not V2 → W2 at 09:00 (22.5 h).
+    @Test
+    void trainLeavingLessThanAnHourBeforeTheArrivalIsNotCaughtTheNextDay(@TempDir Path dir) throws Exception {
+        ReachabilityResponse response = query(GtfsTestFixtures.load(dir, "gamma", "delta"), "gamma:G3", 1,
+                LONGEST_MIN_WAIT_MINUTES, A_DAY_MINUTES);
+
+        assertThat(find(response, "delta:D3")).isPresent();
+        assertThat(find(response, "delta:D2")).isEmpty();
     }
 
     // B2: the faster T6 evening train must not hide the T1 -> U1 connection

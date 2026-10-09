@@ -201,6 +201,30 @@ The wait limit applies to each transfer, so a journey can bridge a longer wait b
 
 **Streaming** (`calculateReachabilityStreaming`): a search sends each round's stations as soon as the round ends; a stored result is sent at once. A station is sent once, with its first path within `maxJourneyHours`; paths come by ascending transfers, so that is the path the response picks too (B4), and a later round never changes a sent station. Stations go out as `ReachableStationSummary`s (no path, legs or running days: on the full data those made the stream about 100 MB) in SSE `stations` events in batches of 30, followed by a `done` event (`{total, calculationTimeMs}`), or an `error` event on failure.
 
+## Search semantics contract
+
+What every search engine must keep, so a rewrite (S17–S21) gives the same result as `SearchSnapshotTest`'s goldens. One rule, one test (`ReachabilityServiceTest` unless named otherwise):
+- **Slower arrival kept (B2):** a slower arrival at a station is kept when it catches a train the fastest arrival misses. `slowerEarlierArrivalIsKeptWhenItEnablesAFasterTransfer`
+- **Past midnight (B25):** a transfer whose wait crosses midnight boards a train running the day after a day of the journey so far. `transferPastMidnightBoardsATrainRunningTheNextDay`
+- **From today (B31):** a journey's days start with its first train's days from today on, so a train whose days are all past is never boarded. `trainsWhoseDaysAreAllPastAreNotRidden`
+- **Whole journey (B33):** a transfer needs a `WeekPeriodDays` day on which every train of the journey so far runs together with the next one, and a faster ride does not cut off a slower one on days it lacks. `journeyWhoseTrainsShareNoDayGivesWayToOneThatRuns`
+- **Regular journey (B26):** a station shows, among its candidates with the same transfer count (the fastest and those at most 30 min slower), the fastest that runs on at least half as many exact days as the most frequent one. A train over 30 min slower is no candidate, so a much faster rare train beats it. `rareTrainMoreThanHalfAnHourFasterStillWins`
+- **Merged trips:** trips with the same stations and leg times are one search trip that runs on the union of their days and keeps the smallest trip ID. `SearchTimetablesTest.tripsWithTheSameStationsAndTimesBecomeOneThatRunsOnAllTheirDays`
+- **Twin trips:** a ride's exact days are its trip's days united with those of every trip leaving the boarding station at the same time and reaching the alighting station at the same time (`JourneyRunningDays.rideDays`). The test covers twins that are also merged; twins differing elsewhere on the trip have no test yet. `rideRunsOnTheDaysOfEveryTripWithTheSameTimes`
+- **Rare departures:** a ride ends at a stop where its trip leaves at a time that, over all trips leaving there then, runs on fewer than 8 days. `rideEndsWhereItsTripLeavesAtATimeThatRunsOnFewDays`
+- **Overnight window:** a wait past midnight lies within the min/max wait and is at most 24 h − 61 min (`GtfsTime.MAX_OVERNIGHT_GAP_SECONDS`), so a train leaving up to an hour before the arrival's clock time is not caught the next day. `trainLeavingLessThanAnHourBeforeTheArrivalIsNotCaughtTheNextDay` (the wrap itself: `transferAcrossMidnightWrapsToNextDay`)
+- **Start excluded:** a ride through the start station records no arrival there, so no journey transfers at or ends at the start; its result is the one empty path. `ReachabilitySearchTest.startStationKeepsOnlyItsEmptyPathThoughATrainReturnsToIt`
+
+**Processing order.** Ties are decided by who comes first, so the result depends on this order:
+- **Numbering:** trips are walked in trip ID order (string order). Station indexes follow the first appearance of each stop on that walk. Merged trips get indexes in the order of their smallest trip ID.
+- **Departures at a station:** by departure seconds, equal times in trip index order (a stable sort).
+- **Round 0:** the start's departures in that order. Each trip is ridden stop by stop.
+- **Round k:** the previous round's arrivals, minus those a faster ride of their own round overtook on all their days, grouped by station index ascending. Within a station they keep the order they arrived in, then are sorted stably by arrival seconds. Departures are matched in departure order. Each one boards first from the arrival with the shortest journey so far, then from slower ones for days no faster one covers. Overnight beats same-day only when it is strictly shorter. Boarded trips are then ridden station by station in that order.
+- **Tie-breaks that depend on that order:**
+  - `TripProgress` keeps the first ride's duration and days when a later one is equally fast.
+  - `TransferWindow`'s queue prefers the later arrival when two give the same journey start. Its fallback scan prefers the earlier one.
+  - `StationCandidates` keeps rides in the order they were offered. `RegularJourneyChooser` takes the first of equally fast candidates.
+
 ## REST API
 
 **Public (`/api`)**, CORS `*`:
