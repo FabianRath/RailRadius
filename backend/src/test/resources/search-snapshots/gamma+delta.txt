@@ -1,0 +1,234 @@
+# today 2026-01-01
+## delta:D1 maxTransfers 0
+delta:D1	0	0	delta:D1		every day	-
+delta:D2	0	40	delta:D1 delta:D2	delta:W1 delta:D1 28800 delta:D2 31200	every day	-
+delta:D3	0	40	delta:D1 delta:D3	delta:W2 delta:D1 32400 delta:D3 34800	every day	-
+gamma:G4	0	30	delta:D1 gamma:G4	gamma:V1 delta:D1 30600 gamma:G4 32400	every day	-
+## delta:D1 maxTransfers 1
+delta:D1	0	0	delta:D1		every day	-
+delta:D2	0	40	delta:D1 delta:D2	delta:W1 delta:D1 28800 delta:D2 31200	every day	-
+delta:D3	0	40	delta:D1 delta:D3	delta:W2 delta:D1 32400 delta:D3 34800	every day	-
+gamma:G4	0	30	delta:D1 gamma:G4	gamma:V1 delta:D1 30600 gamma:G4 32400	every day	-
+## delta:D1 maxTransfers 2
+delta:D1	0	0	delta:D1		every day	-
+delta:D2	0	40	delta:D1 delta:D2	delta:W1 delta:D1 28800 delta:D2 31200	every day	-
+delta:D3	0	40	delta:D1 delta:D3	delta:W2 delta:D1 32400 delta:D3 34800	every day	-
+gamma:G4	0	30	delta:D1 gamma:G4	gamma:V1 delta:D1 30600 gamma:G4 32400	every day	-
+## delta:D1 maxTransfers 3
+delta:D1	0	0	delta:D1		every day	-
+delta:D2	0	40	delta:D1 delta:D2	delta:W1 delta:D1 28800 delta:D2 31200	every day	-
+delta:D3	0	40	delta:D1 delta:D3	delta:W2 delta:D1 32400 delta:D3 34800	every day	-
+gamma:G4	0	30	delta:D1 gamma:G4	gamma:V1 delta:D1 30600 gamma:G4 32400	every day	-
+## delta:D1 maxTransfers 4
+delta:D1	0	0	delta:D1		every day	-
+delta:D2	0	40	delta:D1 delta:D2	delta:W1 delta:D1 28800 delta:D2 31200	every day	-
+delta:D3	0	40	delta:D1 delta:D3	delta:W2 delta:D1 32400 delta:D3 34800	every day	-
+gamma:G4	0	30	delta:D1 gamma:G4	gamma:V1 delta:D1 30600 gamma:G4 32400	every day	-
+## delta:D1 maxTransfers 5
+delta:D1	0	0	delta:D1		every day	-
+delta:D2	0	40	delta:D1 delta:D2	delta:W1 delta:D1 28800 delta:D2 31200	every day	-
+delta:D3	0	40	delta:D1 delta:D3	delta:W2 delta:D1 32400 delta:D3 34800	every day	-
+gamma:G4	0	30	delta:D1 gamma:G4	gamma:V1 delta:D1 30600 gamma:G4 32400	every day	-
+## delta:D2 maxTransfers 0
+delta:D2	0	0	delta:D2		every day	-
+## delta:D2 maxTransfers 1
+delta:D2	0	0	delta:D2		every day	-
+## delta:D2 maxTransfers 2
+delta:D2	0	0	delta:D2		every day	-
+## delta:D2 maxTransfers 3
+delta:D2	0	0	delta:D2		every day	-
+## delta:D2 maxTransfers 4
+delta:D2	0	0	delta:D2		every day	-
+## delta:D2 maxTransfers 5
+delta:D2	0	0	delta:D2		every day	-
+## delta:D3 maxTransfers 0
+delta:D3	0	0	delta:D3		every day	-
+## delta:D3 maxTransfers 1
+delta:D3	0	0	delta:D3		every day	-
+## delta:D3 maxTransfers 2
+delta:D3	0	0	delta:D3		every day	-
+## delta:D3 maxTransfers 3
+delta:D3	0	0	delta:D3		every day	-
+## delta:D3 maxTransfers 4
+delta:D3	0	0	delta:D3		every day	-
+## delta:D3 maxTransfers 5
+delta:D3	0	0	delta:D3		every day	-
+## delta:D4 maxTransfers 0
+delta:D4	0	0	delta:D4		every day	-
+delta:D6	0	10	delta:D4 delta:D6	delta:W3 delta:D4 39600 delta:D6 40200	every day	-
+## delta:D4 maxTransfers 1
+delta:D4	0	0	delta:D4		every day	-
+delta:D6	0	10	delta:D4 delta:D6	delta:W3 delta:D4 39600 delta:D6 40200	every day	-
+## delta:D4 maxTransfers 2
+delta:D4	0	0	delta:D4		every day	-
+delta:D6	0	10	delta:D4 delta:D6	delta:W3 delta:D4 39600 delta:D6 40200	every day	-
+## delta:D4 maxTransfers 3
+delta:D4	0	0	delta:D4		every day	-
+delta:D6	0	10	delta:D4 delta:D6	delta:W3 delta:D4 39600 delta:D6 40200	every day	-
+## delta:D4 maxTransfers 4
+delta:D4	0	0	delta:D4		every day	-
+delta:D6	0	10	delta:D4 delta:D6	delta:W3 delta:D4 39600 delta:D6 40200	every day	-
+## delta:D4 maxTransfers 5
+delta:D4	0	0	delta:D4		every day	-
+delta:D6	0	10	delta:D4 delta:D6	delta:W3 delta:D4 39600 delta:D6 40200	every day	-
+## delta:D5 maxTransfers 0
+delta:D5	0	0	delta:D5		every day	-
+delta:D6	0	10	delta:D5 delta:D6	delta:W6 delta:D5 50700 delta:D6 51300	every day	-
+## delta:D5 maxTransfers 1
+delta:D5	0	0	delta:D5		every day	-
+delta:D6	0	10	delta:D5 delta:D6	delta:W6 delta:D5 50700 delta:D6 51300	every day	-
+## delta:D5 maxTransfers 2
+delta:D5	0	0	delta:D5		every day	-
+delta:D6	0	10	delta:D5 delta:D6	delta:W6 delta:D5 50700 delta:D6 51300	every day	-
+## delta:D5 maxTransfers 3
+delta:D5	0	0	delta:D5		every day	-
+delta:D6	0	10	delta:D5 delta:D6	delta:W6 delta:D5 50700 delta:D6 51300	every day	-
+## delta:D5 maxTransfers 4
+delta:D5	0	0	delta:D5		every day	-
+delta:D6	0	10	delta:D5 delta:D6	delta:W6 delta:D5 50700 delta:D6 51300	every day	-
+## delta:D5 maxTransfers 5
+delta:D5	0	0	delta:D5		every day	-
+delta:D6	0	10	delta:D5 delta:D6	delta:W6 delta:D5 50700 delta:D6 51300	every day	-
+## delta:D6 maxTransfers 0
+delta:D6	0	0	delta:D6		every day	-
+## delta:D6 maxTransfers 1
+delta:D6	0	0	delta:D6		every day	-
+## delta:D6 maxTransfers 2
+delta:D6	0	0	delta:D6		every day	-
+## delta:D6 maxTransfers 3
+delta:D6	0	0	delta:D6		every day	-
+## delta:D6 maxTransfers 4
+delta:D6	0	0	delta:D6		every day	-
+## delta:D6 maxTransfers 5
+delta:D6	0	0	delta:D6		every day	-
+## delta:D7 maxTransfers 0
+delta:D6	0	10	delta:D7 delta:D6	gamma:V9 delta:D7 61200 delta:D6 61800	every day	-
+delta:D7	0	0	delta:D7		every day	-
+## delta:D7 maxTransfers 1
+delta:D6	0	10	delta:D7 delta:D6	gamma:V9 delta:D7 61200 delta:D6 61800	every day	-
+delta:D7	0	0	delta:D7		every day	-
+## delta:D7 maxTransfers 2
+delta:D6	0	10	delta:D7 delta:D6	gamma:V9 delta:D7 61200 delta:D6 61800	every day	-
+delta:D7	0	0	delta:D7		every day	-
+## delta:D7 maxTransfers 3
+delta:D6	0	10	delta:D7 delta:D6	gamma:V9 delta:D7 61200 delta:D6 61800	every day	-
+delta:D7	0	0	delta:D7		every day	-
+## delta:D7 maxTransfers 4
+delta:D6	0	10	delta:D7 delta:D6	gamma:V9 delta:D7 61200 delta:D6 61800	every day	-
+delta:D7	0	0	delta:D7		every day	-
+## delta:D7 maxTransfers 5
+delta:D6	0	10	delta:D7 delta:D6	gamma:V9 delta:D7 61200 delta:D6 61800	every day	-
+delta:D7	0	0	delta:D7		every day	-
+## delta:D8 maxTransfers 0
+delta:D6	0	10	delta:D8 delta:D6	gamma:V10 delta:D8 64800 delta:D6 65400	every day	-
+delta:D8	0	0	delta:D8		every day	-
+## delta:D8 maxTransfers 1
+delta:D6	0	10	delta:D8 delta:D6	gamma:V10 delta:D8 64800 delta:D6 65400	every day	-
+delta:D8	0	0	delta:D8		every day	-
+## delta:D8 maxTransfers 2
+delta:D6	0	10	delta:D8 delta:D6	gamma:V10 delta:D8 64800 delta:D6 65400	every day	-
+delta:D8	0	0	delta:D8		every day	-
+## delta:D8 maxTransfers 3
+delta:D6	0	10	delta:D8 delta:D6	gamma:V10 delta:D8 64800 delta:D6 65400	every day	-
+delta:D8	0	0	delta:D8		every day	-
+## delta:D8 maxTransfers 4
+delta:D6	0	10	delta:D8 delta:D6	gamma:V10 delta:D8 64800 delta:D6 65400	every day	-
+delta:D8	0	0	delta:D8		every day	-
+## delta:D8 maxTransfers 5
+delta:D6	0	10	delta:D8 delta:D6	gamma:V10 delta:D8 64800 delta:D6 65400	every day	-
+delta:D8	0	0	delta:D8		every day	-
+## delta:D9 maxTransfers 0
+delta:D6	0	10	delta:D9 delta:D6	delta:W11 delta:D9 70200 delta:D6 70800	every day	-
+delta:D9	0	0	delta:D9		every day	-
+## delta:D9 maxTransfers 1
+delta:D6	0	10	delta:D9 delta:D6	delta:W11 delta:D9 70200 delta:D6 70800	every day	-
+delta:D9	0	0	delta:D9		every day	-
+## delta:D9 maxTransfers 2
+delta:D6	0	10	delta:D9 delta:D6	delta:W11 delta:D9 70200 delta:D6 70800	every day	-
+delta:D9	0	0	delta:D9		every day	-
+## delta:D9 maxTransfers 3
+delta:D6	0	10	delta:D9 delta:D6	delta:W11 delta:D9 70200 delta:D6 70800	every day	-
+delta:D9	0	0	delta:D9		every day	-
+## delta:D9 maxTransfers 4
+delta:D6	0	10	delta:D9 delta:D6	delta:W11 delta:D9 70200 delta:D6 70800	every day	-
+delta:D9	0	0	delta:D9		every day	-
+## delta:D9 maxTransfers 5
+delta:D6	0	10	delta:D9 delta:D6	delta:W11 delta:D9 70200 delta:D6 70800	every day	-
+delta:D9	0	0	delta:D9		every day	-
+## gamma:G10 maxTransfers 0
+delta:D6	0	10	gamma:G10 delta:D6	gamma:V11 gamma:G10 68400 delta:D6 69000	every day	-
+gamma:G10	0	0	gamma:G10		every day	-
+## gamma:G10 maxTransfers 1
+delta:D6	0	10	gamma:G10 delta:D6	gamma:V11 gamma:G10 68400 delta:D6 69000	every day	-
+gamma:G10	0	0	gamma:G10		every day	-
+## gamma:G10 maxTransfers 2
+delta:D6	0	10	gamma:G10 delta:D6	gamma:V11 gamma:G10 68400 delta:D6 69000	every day	-
+gamma:G10	0	0	gamma:G10		every day	-
+## gamma:G10 maxTransfers 3
+delta:D6	0	10	gamma:G10 delta:D6	gamma:V11 gamma:G10 68400 delta:D6 69000	every day	-
+gamma:G10	0	0	gamma:G10		every day	-
+## gamma:G10 maxTransfers 4
+delta:D6	0	10	gamma:G10 delta:D6	gamma:V11 gamma:G10 68400 delta:D6 69000	every day	-
+gamma:G10	0	0	gamma:G10		every day	-
+## gamma:G10 maxTransfers 5
+delta:D6	0	10	gamma:G10 delta:D6	gamma:V11 gamma:G10 68400 delta:D6 69000	every day	-
+gamma:G10	0	0	gamma:G10		every day	-
+## gamma:G3 maxTransfers 0
+delta:D1	0	30	gamma:G3 delta:D1	gamma:V1 gamma:G3 28800 delta:D1 30600	every day	-
+gamma:G3	0	0	gamma:G3		every day	-
+gamma:G4	0	60	gamma:G3 delta:D1 gamma:G4	gamma:V1 gamma:G3 28800 gamma:G4 32400	every day	-
+## gamma:G3 maxTransfers 1
+delta:D1	0	30	gamma:G3 delta:D1	gamma:V1 gamma:G3 28800 delta:D1 30600	every day	-
+delta:D3	1	100	gamma:G3 delta:D1 delta:D3	gamma:V1 gamma:G3 28800 delta:D1 30600 | delta:W2 delta:D1 32400 delta:D3 34800	every day	-
+gamma:G3	0	0	gamma:G3		every day	-
+gamma:G4	0	60	gamma:G3 delta:D1 gamma:G4	gamma:V1 gamma:G3 28800 gamma:G4 32400	every day	-
+## gamma:G3 maxTransfers 2
+delta:D1	0	30	gamma:G3 delta:D1	gamma:V1 gamma:G3 28800 delta:D1 30600	every day	-
+delta:D3	1	100	gamma:G3 delta:D1 delta:D3	gamma:V1 gamma:G3 28800 delta:D1 30600 | delta:W2 delta:D1 32400 delta:D3 34800	every day	-
+gamma:G3	0	0	gamma:G3		every day	-
+gamma:G4	0	60	gamma:G3 delta:D1 gamma:G4	gamma:V1 gamma:G3 28800 gamma:G4 32400	every day	-
+## gamma:G3 maxTransfers 3
+delta:D1	0	30	gamma:G3 delta:D1	gamma:V1 gamma:G3 28800 delta:D1 30600	every day	-
+delta:D3	1	100	gamma:G3 delta:D1 delta:D3	gamma:V1 gamma:G3 28800 delta:D1 30600 | delta:W2 delta:D1 32400 delta:D3 34800	every day	-
+gamma:G3	0	0	gamma:G3		every day	-
+gamma:G4	0	60	gamma:G3 delta:D1 gamma:G4	gamma:V1 gamma:G3 28800 gamma:G4 32400	every day	-
+## gamma:G3 maxTransfers 4
+delta:D1	0	30	gamma:G3 delta:D1	gamma:V1 gamma:G3 28800 delta:D1 30600	every day	-
+delta:D3	1	100	gamma:G3 delta:D1 delta:D3	gamma:V1 gamma:G3 28800 delta:D1 30600 | delta:W2 delta:D1 32400 delta:D3 34800	every day	-
+gamma:G3	0	0	gamma:G3		every day	-
+gamma:G4	0	60	gamma:G3 delta:D1 gamma:G4	gamma:V1 gamma:G3 28800 gamma:G4 32400	every day	-
+## gamma:G3 maxTransfers 5
+delta:D1	0	30	gamma:G3 delta:D1	gamma:V1 gamma:G3 28800 delta:D1 30600	every day	-
+delta:D3	1	100	gamma:G3 delta:D1 delta:D3	gamma:V1 gamma:G3 28800 delta:D1 30600 | delta:W2 delta:D1 32400 delta:D3 34800	every day	-
+gamma:G3	0	0	gamma:G3		every day	-
+gamma:G4	0	60	gamma:G3 delta:D1 gamma:G4	gamma:V1 gamma:G3 28800 gamma:G4 32400	every day	-
+## gamma:G4 maxTransfers 0
+gamma:G4	0	0	gamma:G4		every day	-
+## gamma:G4 maxTransfers 1
+gamma:G4	0	0	gamma:G4		every day	-
+## gamma:G4 maxTransfers 2
+gamma:G4	0	0	gamma:G4		every day	-
+## gamma:G4 maxTransfers 3
+gamma:G4	0	0	gamma:G4		every day	-
+## gamma:G4 maxTransfers 4
+gamma:G4	0	0	gamma:G4		every day	-
+## gamma:G4 maxTransfers 5
+gamma:G4	0	0	gamma:G4		every day	-
+## gamma:G6 maxTransfers 0
+delta:D6	0	10	gamma:G6 delta:D6	gamma:V6 gamma:G6 50400 delta:D6 51000	every day	-
+gamma:G6	0	0	gamma:G6		every day	-
+## gamma:G6 maxTransfers 1
+delta:D6	0	10	gamma:G6 delta:D6	gamma:V6 gamma:G6 50400 delta:D6 51000	every day	-
+gamma:G6	0	0	gamma:G6		every day	-
+## gamma:G6 maxTransfers 2
+delta:D6	0	10	gamma:G6 delta:D6	gamma:V6 gamma:G6 50400 delta:D6 51000	every day	-
+gamma:G6	0	0	gamma:G6		every day	-
+## gamma:G6 maxTransfers 3
+delta:D6	0	10	gamma:G6 delta:D6	gamma:V6 gamma:G6 50400 delta:D6 51000	every day	-
+gamma:G6	0	0	gamma:G6		every day	-
+## gamma:G6 maxTransfers 4
+delta:D6	0	10	gamma:G6 delta:D6	gamma:V6 gamma:G6 50400 delta:D6 51000	every day	-
+gamma:G6	0	0	gamma:G6		every day	-
+## gamma:G6 maxTransfers 5
+delta:D6	0	10	gamma:G6 delta:D6	gamma:V6 gamma:G6 50400 delta:D6 51000	every day	-
+gamma:G6	0	0	gamma:G6		every day	-

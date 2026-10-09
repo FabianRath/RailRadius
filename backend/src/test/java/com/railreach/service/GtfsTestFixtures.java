@@ -8,9 +8,7 @@ import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -47,8 +45,7 @@ final class GtfsTestFixtures {
 
     private static TransitGraph load(Path tempDir, int tripBatchSize, LocalDate today, String... feedFolders)
             throws IOException {
-        TransitGraph graph = new TransitGraph(Clock.fixed(today.atStartOfDay(ZoneOffset.UTC).toInstant(),
-                ZoneOffset.UTC));
+        TransitGraph graph = TransitGraph.withToday(today);
         dataService(tempDir, graph, reachabilityCache(graph), new StationSearchIndex(graph), tripBatchSize,
                 feedFolders).loadFromFiles();
         return graph;
@@ -81,9 +78,7 @@ final class GtfsTestFixtures {
 
     /** The cache store that {@link #load} writes to. */
     static GtfsCacheStore cacheStore(Path tempDir) {
-        GtfsCacheStore cacheStore = new GtfsCacheStore();
-        ReflectionTestUtils.setField(cacheStore, "cacheFile", tempDir.resolve("gtfs-cache.json").toString());
-        return cacheStore;
+        return new GtfsCacheStore(tempDir.resolve("gtfs-cache.json").toString());
     }
 
     /** A ReachabilityService wired like in the app, without warming or a Caffeine cache. */

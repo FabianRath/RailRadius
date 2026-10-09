@@ -29,6 +29,10 @@ Run from `backend/`; the cache paths are relative to the working directory. The 
   - Austria + Hungary + Slovakia from `data/gtfs-dev/`, cache in `data/gtfs-dev-cache.json`.
 - **Fresh checkout:** `backend/data/` is not in git, so there are no zips. Start the app (it starts empty), open the admin panel → Feeds, click "Download outdated" (it includes the `MISSING` feeds), then Tools → reload. Or with `scripts/api.sh`: `feeds-download-outdated`, then `reload-gtfs`. Which feeds are expected comes from `feeds.sources` (dev: austria, hungary, slovakia; default: every feed in `gtfs-feeds.txt`). `hungary` downloads only with MÁV credentials in `feeds.auth.hungary` (see Configuration).
 
+- **Search oracle (S12):** `SearchSnapshot` dumps every path a search returns, one sorted line each: station, transfers, minutes, the path's stations, each ride as `tripId from departureSeconds to arrivalSeconds`, the exact running days as epoch-day ranges and their label. One section per start and transfer limit 0–5, with today pinned, because it decides the days (B31). Two runs must give the same bytes.
+  - gtfs-mini: `SearchSnapshotTest` compares a search from every station of each feed combination with `src/test/resources/search-snapshots/`. After an intended change, rewrite them with `./mvnw -q test -Dtest=SearchSnapshotTest -Dsnapshot.update=true` and explain every changed line.
+  - Dev and full data: the starts of one set in `docs/bench-stations.txt`, written to the gitignored `data/snapshots/` (gzipped if the name ends in `.gz`; a full-data dump is several GB as text): `./mvnw spring-boot:run -Dspring-boot.run.main-class=com.railreach.service.SearchSnapshot -Dspring-boot.run.jvmArguments=-Xmx3g "-Dspring-boot.run.arguments=data/gtfs-dev-cache.json dev 2026-10-09 data/snapshots/dev-2026-10-09.txt.gz"`. For full data use `data/gtfs-cache.json full` and `-Xmx12g` (about 9 min; 2.7 M lines, 136 MB gzipped). Compare two dumps with `cmp`, and list the differing lines with `diff <(gzip -dc a.txt.gz) <(gzip -dc b.txt.gz)`.
+
 **Startup flow:**
 1. `GtfsDataService` loads the GTFS cache file if present. Otherwise it parses the zips only if `auto-load-from-files` is true (true for dev, false for default) and the GTFS directory has a zip; with none (fresh checkout) it logs a WARN and starts empty. With no data, use `POST /api/admin/reload-gtfs`.
 
@@ -36,7 +40,7 @@ Run from `backend/`; the cache paths are relative to the working directory. The 
 
 ```
 RailReach/
-├── CLAUDE.md, docs/ (ARCHITECTURE, TODO, decisions), scripts/api.sh
+├── CLAUDE.md, docs/ (ARCHITECTURE, TODO, decisions, bench-stations.txt), scripts/api.sh
 ├── frontend/index.html               # markup; served at / by Spring (static-locations: file:../frontend/)
 ├── frontend/css/app.css              # all styles and the map palette (CSS variables)
 ├── frontend/js/                      # ES modules: main (entry), api, map (only MapLibre user), search, query-form,
@@ -53,9 +57,11 @@ RailReach/
     ├── config/application.yml                 # GITIGNORED local secrets (feed credentials), optional
     ├── src/test/java/com/railreach/           # service/ (GtfsDataService, Reachability*, GtfsTestFixtures), util/, config/ tests
     ├── src/test/resources/gtfs-mini/          # hand-written fixture feeds (see its README)
+    ├── src/test/resources/search-snapshots/   # search oracle dumps of gtfs-mini, one per feed combination
     └── data/                                  # GITIGNORED
         ├── gtfs/            # gtfs_<country>.zip, previous/ (zips replaced by the update center), broken/, list.txt (old download list), maps
         ├── gtfs-dev/        # 3 small feeds for the dev profile
+        ├── snapshots/       # search oracle dumps of dev and full data
         └── gtfs-cache.json  # processed graph: stations + trips (generated)
 ```
 
@@ -113,6 +119,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `JourneyLegBuilder` | service | Search path → `ReachableStation` with TRAIN/TRANSFER legs |
 | `JourneyRunningDays` | service | Days on which every train of a returned journey runs, and their summary ("Runs Mon–Fri", "Irregular: 2 days in the timetable") |
 | `RegularJourneyChooser` | service | Picks a station's journey among the search's candidates with the same transfer count: the fastest that runs on at least half as many days as the most frequent one (B26) |
+| `SearchSnapshot` | service | Search oracle: every path of a search as one sorted text line, for each start and transfer limit 0–5; `main` dumps a set of `docs/bench-stations.txt` from a cache file |
 | `CacheConfig` | config | Caffeine `CacheManager` ("reachability" cache), `@EnableAsync` |
 | `AdminTokenInterceptor` | config | Guards `/api/admin/**`: `X-Admin-Token` must equal `railreach.admin.token` (constant-time); 401 if wrong or missing, 403 for every call when no token is configured; CORS preflights pass |
 | `WebConfig` | config | Registers `AdminTokenInterceptor` on `/api/admin/**` (same path matching as the controllers) |
@@ -131,7 +138,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `GtfsTime` | util | Parse/format GTFS times, minute diffs with overnight wrap, clock minute of a time, duration text |
 | `StopIds` | util | Canonical `<source>:<rawId>` stop IDs |
 | `FeedFiles` | util | Feed zip names: `gtfs_<source>.zip` ↔ source |
-| `ResourceLines` | util | Lines of a classpath `.txt` config file without blanks and `#` comments |
+| `ResourceLines` | util | Lines of a classpath `.txt` config file, or of a file, without blanks and `#` comments |
 | `Coordinates` | util | Degree-box proximity check, distance in metres |
 
 ## Data pipeline (`GtfsDataService.loadFromFiles`)

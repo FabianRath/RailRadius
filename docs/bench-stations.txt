@@ -1,0 +1,30 @@
+# Search starts for the oracle (SearchSnapshot) and benchmarks: <set> <stationId> <name>
+# dev = the dev dataset (gtfs-dev-cache.json), full = every feed (gtfs-cache.json). gtfs-mini uses every station.
+# IDs change when a feed's stop IDs change: SearchSnapshot fails on a start that is not in the cache file.
+
+dev austria:Pat:49:1349 Wien Hauptbahnhof
+dev hungary:267 Budapest-Keleti
+dev slovakia:5613206 Bratislava hl.st.
+dev austria:Phu:17905:27000493 Hegyeshalom pályaudvar (border)
+dev slovakia:5613850 Pribeník (rural halt)
+
+full austria:Pat:49:1349 Wien Hauptbahnhof (hub, many night trains)
+full france:StopArea:OCE87271007 Paris Gare du Nord
+full slovakia:5613850 Pribeník (rural halt)
+full austria:Phu:17905:27000493 Hegyeshalom pályaudvar (border)
+full netherlands:stoparea:17843 Utrecht Centraal (NS, split trips)
+full germany:de:09162:100 München Hbf
+full switzerland:8503000 Zürich HB
+full switzerland:8500010 Basel SBB (border)
+full austria:Pat:45:50002 Salzburg Hauptbahnhof (border)
+full austria:Pit:22021:1389 Brennero (border)
+full belgien:gs:nmbssncb:S8814001 Bruxelles-Midi
+full great-britain:2-910GSTPADOM London St Pancras International
+full denmark:000008600626 København H
+full sweden:740000001 Stockholm Centralstation (night trains)
+full finland:HKI Helsinki
+full finland:KLI Kolari (rural terminus, night train)
+full spain:60000 Madrid-Puerta de Atocha
+full italy:IT::StopPlace:otherTRENITALIA:830008409 Roma Termini
+full czechia:czptt:stop:CZ:57076 Praha hlavní nádraží
+full romania:10017 Bucureşti Nord (night trains)

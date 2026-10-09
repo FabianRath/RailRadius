@@ -38,6 +38,15 @@ final class JourneyRunningDays {
     /** The days, counted from the first train's service day, on which every ride of the journey runs. */
     static ServiceDays of(List<Connection> connections, TransitGraph graph) {
         SoFar soFar = SoFar.START;
+        for (RideTimes ride : rides(connections)) {
+            soFar = withRide(soFar, ride, graph);
+        }
+        return soFar.days();
+    }
+
+    /** The journey's rides: consecutive connections on the same trip are one ride. */
+    static List<RideTimes> rides(List<Connection> connections) {
+        List<RideTimes> rides = new ArrayList<>();
         int rideStart = 0;
         while (rideStart < connections.size()) {
             int rideEnd = rideStart;
@@ -47,11 +56,11 @@ final class JourneyRunningDays {
             }
             Connection board = connections.get(rideStart);
             Connection alight = connections.get(rideEnd);
-            soFar = withRide(soFar, new RideTimes(board.getTripId(), board.getFromStopId(),
-                    board.getDepartureTimeSeconds(), alight.getToStopId(), alight.getArrivalTimeSeconds()), graph);
+            rides.add(new RideTimes(board.getTripId(), board.getFromStopId(), board.getDepartureTimeSeconds(),
+                    alight.getToStopId(), alight.getArrivalTimeSeconds()));
             rideStart = rideEnd + 1;
         }
-        return soFar.days();
+        return rides;
     }
 
     /**
