@@ -253,10 +253,20 @@ public class TransitGraph {
     /** Edges, connections and the stop→trips index are not stored; they are rebuilt from the trips. */
     void restore(GtfsCacheStore.GtfsCacheData data) {
         clear();
-        stations.putAll(data.stations());
-        translatedNames.putAll(data.translatedNames());
+        data.stations().values().forEach(station -> stations.put(station.getId(), station));
+        data.translatedNames().forEach((stopId, names) -> translatedNames.put(sharedStopId(stopId), names));
         services.putAll(data.services());
-        data.trips().forEach((tripId, trip) -> trip.addTo(tripId, this));
+        data.trips().forEach((tripId, trip) -> {
+            trip.stops().replaceAll(this::sharedStopId);
+            trip.addTo(tripId, this);
+        });
+    }
+
+    // The JSON reader makes a new String for every stop of every trip; on the full data those copies were a quarter
+    // of the heap (S16). Everything built from the trips then holds the station's own ID instead.
+    private String sharedStopId(String stopId) {
+        Station station = stations.get(stopId);
+        return station != null ? station.getId() : stopId;
     }
 
     /**

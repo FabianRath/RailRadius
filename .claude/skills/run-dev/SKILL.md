@@ -9,7 +9,7 @@ description: Start the RailReach backend with the small dev dataset (Austria/Hun
    - If you changed Java code since it started, stop the old process first (see the end of this file).
 2. Start it in the background (Bash `run_in_background: true`) from the repo root. Run `mkdir -p` on the scratchpad first, because the redirect fails if the folder doesn't exist.
    ```
-   mvn -q -f backend/pom.xml spring-boot:run -Dspring-boot.run.profiles=dev -Dspring-boot.run.jvmArguments=-Xmx2g > <scratchpad>/dev-run.log 2>&1
+   mvn -q -f backend/pom.xml spring-boot:run -Dspring-boot.run.profiles=dev "-Dspring-boot.run.jvmArguments=-Xmx2g -XX:+UseCompactObjectHeaders" > <scratchpad>/dev-run.log 2>&1
    ```
    - Maven runs the app with `backend/` as its working directory, so the relative `data/...` paths resolve.
    - The first start parses the zips and writes `backend/data/gtfs-dev-cache.json`. Either way, startup takes about 5–10 s.

@@ -12,7 +12,7 @@ How much server RailReach needs, measured on the full data. Re-measure when the 
 
 ## Size
 
-- **16 GB RAM, run with `-Xmx9g`.** The process then uses ~10 GB, which leaves room for the OS. 32 GB is only needed for many searches at the same time.
+- **16 GB RAM, run with `-Xmx9g -XX:+UseCompactObjectHeaders`.** The process then uses ~10 GB, which leaves room for the OS. 32 GB is only needed for many searches at the same time.
 - CPU: one 5-transfer search keeps a core busy for ~3–15 s. 8 shared vCores are fine for a small audience.
 - Candidate (2026-10-08): netcup VPS Lite 3 (8 vCores, 16 GB, 320 GB SSD, €16.66/month incl. VAT, cancellable monthly). Hetzner's cheap cloud lines (CX, CAX) were sold out and its 32 GB plans had become much more expensive after 2026 DRAM price increases. Hetzner's Server Auction was the alternative for dedicated hardware.
 
@@ -30,7 +30,7 @@ Full data: 49 feeds, 34,081 stations, cache 649 MB. Windows 10 dev machine, 12 c
 | same, `-Xmx5g` | OutOfMemoryError |
 | same, `-Xmx4g` | OutOfMemoryError, app stuck in GC |
 
-Rule of thumb: ~3 GB for the data plus ~1 GB per 5-transfer search running at the same time. Since S15 the search gate runs at most `search.gate.permits` (2) searches at once and queues up to 6 more, so peak heap is about the data plus 2 GB plus the result cache.
+Rule of thumb: ~3 GB for the data (~1.7 GB since S16) plus ~1 GB per 5-transfer search running at the same time. Since S15 the search gate runs at most `search.gate.permits` (2) searches at once and queues up to 6 more, so peak heap is about the data plus 2 GB plus the result cache.
 
 ## Search gate test (S15, 2026-10-09)
 
@@ -45,9 +45,34 @@ Full data, `-Xmx9g`, G1, warmer on, gate at 2 permits and 6 queued. 5 clients at
 | Live heap after the run (`bench.sh memory`) | 3,243 MB, with 22 stored results in the raw cache |
 | Peak working set | 9.5 GB: G1 grows the heap towards `-Xmx` |
 
+## Baselines (S16, 2026-10-09)
+
+The numbers the later items of the compact search store (S17–S21) are measured against. Taken like the S13 baselines below, but with one String per station ID (S16) and `-XX:+UseCompactObjectHeaders`. Results are byte-identical to S13 (`SearchSnapshot`, dev and full).
+
+| Measure | How | Result |
+|---|---|---|
+| Startup | log `Started … in` | 45–49 s: search timetables 19 s |
+| Startup peak | `gc.log` (largest heap before a GC), `bench.sh memory` (peak working set) | heap 5.0 GB used, 5.4 GB committed; working set 5.1 GB |
+| Idle live heap | `bench.sh memory` | **1,693–1,699 MB** (−39 % from 2,770; class histogram: 1,689 MB in 49.8 M objects) |
+| Largest idle classes | `GC.class_histogram` | `Connection` 368 MB (11.5 M), `HashMap$Node` 302 MB, `Object[]` 162 MB, `byte[]` 155 MB, `int[]` 145 MB, `String` 113 MB (4.7 M), `HashMap$Node[]` 99 MB, `TripTimetable$Departure` 86 MB |
+| Allocated per search | `bench.sh alloc` | 5 transfers: 5.4–6.3 GB Wien, 7.5–7.7 GB Bruxelles-Midi (S13: 4.9 GB, not explained); 3 transfers: 0.74 GB Brennero |
+| Held during a search | `bench.sh held` | 5 transfers: 329 MB München, 610 MB Basel, 896 MB Stockholm. Sampled seconds apart, so it varies a lot between runs |
+| One stored result | `bench.sh entry` on a fresh start | 5 transfers: **32 MB** (Paris, Zürich, Praha). After other searches the same command gave 2–27 MB: the live heap before it still held something of the earlier searches |
+
+Search time per transfer count, measured as in S13:
+
+| Transfers | Stream p50 | Stream p95 | Output p50 | Output p95 | Output share | Stations (avg) |
+|---|---|---|---|---|---|---|
+| 0 | 11 ms | 38 ms | 1 ms | 3 ms | 10 % | 244 |
+| 1 | 87 ms | 327 ms | 9 ms | 38 ms | 13 % | 3,085 |
+| 2 | 468 ms | 1.2 s | 50 ms | 76 ms | 9 % | 9,902 |
+| 3 | 1.4 s | 3.0 s | 84 ms | 110 ms | 5 % | 16,663 |
+| 4 | 3.6 s | 5.8 s | 108 ms | 128 ms | 3 % | 21,317 |
+| 5 | 5.8 s | 9.0 s | 109 ms | 125 ms | 2 % | 24,476 |
+
 ## Baselines (S13, 2026-10-09)
 
-The numbers the compact search store (S16–S21) is measured against. Full data as above, same machine, `-Xmx12g`, G1, no compact object headers, warmer off (`--railreach.cache.predictive-enabled=false`), one search at a time. Repeat with `scripts/bench.sh` (its header has the start command):
+The numbers before the compact search store; S16 replaces them as the reference. Full data as above, same machine, `-Xmx12g`, G1, no compact object headers, warmer off (`--railreach.cache.predictive-enabled=false`), one search at a time. Repeat with `scripts/bench.sh` (its header has the start command):
 
 | Measure | How | Result |
 |---|---|---|

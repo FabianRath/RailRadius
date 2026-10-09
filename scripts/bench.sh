@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Memory and speed baselines against a running backend (docs/HOSTING.md -> Baselines). Run from the repo root.
 # Start the app with the warmer off, or its background searches skew every number:
-#   mvn -q -f backend/pom.xml spring-boot:run -Dspring-boot.run.jvmArguments="-Xmx12g -Xlog:gc*:file=<log>" \
+#   mvn -q -f backend/pom.xml spring-boot:run -Dspring-boot.run.jvmArguments="-Xmx12g -XX:+UseCompactObjectHeaders -Xlog:gc*:file=<log>" \
 #       -Dspring-boot.run.arguments=--railreach.cache.predictive-enabled=false
 # <log> must be relative (to backend/): -Xlog splits at the colon of "C:". jcmd/jfr come from $JAVA_HOME/bin, else PATH;
 # alloc and held write their files to $BENCH_OUT (default: the current directory).
