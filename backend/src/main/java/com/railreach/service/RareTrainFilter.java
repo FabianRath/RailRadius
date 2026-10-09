@@ -96,7 +96,7 @@ final class RareTrainFilter {
         return regular;
     }
 
-    private static boolean runsOftenEnough(ServiceDays days) {
+    static boolean runsOftenEnough(ServiceDays days) {
         return days == ServiceDays.EVERY_DAY || days.dayCount() >= MIN_RUNNING_DAYS;
     }
 
