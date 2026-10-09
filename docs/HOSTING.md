@@ -45,6 +45,32 @@ Full data, `-Xmx9g`, G1, warmer on, gate at 2 permits and 6 queued. 5 clients at
 | Live heap after the run (`bench.sh memory`) | 3,243 MB, with 22 stored results in the raw cache |
 | Peak working set | 9.5 GB: G1 grows the heap towards `-Xmx` |
 
+## Compact search engine (S18, 2026-10-09)
+
+The compact engine against the S16 baselines below, measured the same way with `--railreach.search.engine=compact` (warmer off, `-Xmx12g`, compact object headers). Results are byte-identical to the legacy engine (`SearchSnapshot`, gtfs-mini, dev and full), so the average station counts per transfer count match S16 exactly.
+
+| Measure | How | Result |
+|---|---|---|
+| Startup | log `Started … in` | 57–58 s: the timetable store (14 s) is built next to the search timetables (18 s) |
+| Idle live heap | `bench.sh memory` | 1,880 MB: S16 plus the 184 MB store |
+| Held during a search | `bench.sh held`, 5 transfers | Stockholm on a fresh app: **646 MB** (legacy 896 MB). With a scratch that an earlier search already grew: 130 MB München, 133 MB Basel |
+| Scratch per search | the `Search stats (compact)` log line | Up to ~445 MB on the largest searches (15–17 M stop arrivals): labels 274 MB, trip progress 118 MB. Kept for the next search, one per gate permit |
+
+The gate of ≤ 200 MB per search is not met. Rounds 3–5 of a large search each make 5–6 M arrivals, and the next round boards from all of them; with up to 22 M boardings per search on top, the round structure the semantics contract fixes keeps the peak above ~300 MB even with smaller labels. See `decisions.md`.
+
+Search time (`bench.sh times full`; the second run after riding started from the parallel remap, and after midnight, so its station counts are a day later):
+
+| Transfers | Stream p50 | Stream p95 | S16 p95 | Share of S16 p95 |
+|---|---|---|---|---|
+| 0 | 7–8 ms | 26–27 ms | 38 ms | 70 % |
+| 1 | 50–64 ms | 117–121 ms | 327 ms | 37 % |
+| 2 | 183–246 ms | 565–571 ms | 1.2 s | 47 % |
+| 3 | 625–755 ms | 1.43–1.47 s | 3.0 s | 48–49 % |
+| 4 | 1.68–1.71 s | 2.91–3.02 s | 5.8 s | 50–52 % |
+| 5 | 2.71–2.91 s | 4.14–4.50 s | 9.0 s | 46–50 % |
+
+Output (the cached replay) is unchanged at ~100–130 ms for 4–5 transfers.
+
 ## Baselines (S16, 2026-10-09)
 
 The numbers the later items of the compact search store (S17–S21) are measured against. Taken like the S13 baselines below, but with one String per station ID (S16) and `-XX:+UseCompactObjectHeaders`. Results are byte-identical to S13 (`SearchSnapshot`, dev and full).

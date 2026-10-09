@@ -26,8 +26,8 @@ import java.util.zip.GZIPOutputStream;
  * duration, the path's stations, each ride's trip with departure and arrival seconds, and the exact running days
  * with their label. Running days depend on today (B31), so the dump pins it.
  * <p>
- * The gtfs-mini dumps are checked by SearchSnapshotTest. For dev and full data, {@link #main} dumps the starts of
- * one set in {@code docs/bench-stations.txt}.
+ * The gtfs-mini dumps are checked by SearchSnapshotTest, on both search engines. For dev and full data, {@link #main}
+ * dumps the starts of one set in {@code docs/bench-stations.txt}.
  */
 @Slf4j
 final class SearchSnapshot {
@@ -46,11 +46,12 @@ final class SearchSnapshot {
     private static final String NO_LABEL = "-";
 
     private final TransitGraph graph;
-    private final ReachabilitySearch search;
+    private final SearchEngine search;
 
-    SearchSnapshot(TransitGraph graph) {
+    /** engine is {@link SearchEngine#LEGACY} or {@link SearchEngine#COMPACT}. */
+    SearchSnapshot(TransitGraph graph, String engine) {
         this.graph = graph;
-        this.search = new ReachabilitySearch(graph);
+        this.search = SearchEngine.named(engine, graph);
     }
 
     /** Today first, then one section per start and transfer limit 0 to {@link #MAX_TRANSFERS}. */
@@ -114,11 +115,16 @@ final class SearchSnapshot {
         return new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8));
     }
 
-    /** Args: cache file, bench set, today (yyyy-mm-dd), output file. Paths are relative to backend/. */
+    /**
+     * Args: cache file, bench set, today (yyyy-mm-dd), output file, optionally the search engine (default legacy).
+     * Paths are relative to backend/.
+     */
     public static void main(String[] args) throws IOException {
-        if (args.length != 4) {
-            throw new IllegalArgumentException("Usage: SearchSnapshot <cache-file> <bench-set> <today> <out-file>");
+        if (args.length != 4 && args.length != 5) {
+            throw new IllegalArgumentException(
+                    "Usage: SearchSnapshot <cache-file> <bench-set> <today> <out-file> [legacy|compact]");
         }
+        String engine = args.length == 5 ? args[4] : SearchEngine.LEGACY;
         long startMs = System.currentTimeMillis();
         TransitGraph graph = TransitGraph.withToday(LocalDate.parse(args[2]));
         graph.restore(new GtfsCacheStore(args[0]).load()
@@ -128,9 +134,9 @@ final class SearchSnapshot {
         List<String> unknown = startIds.stream().filter(id -> graph.getStation(id) == null).toList();
         if (!unknown.isEmpty()) throw new IllegalArgumentException("Not in the cache file: " + unknown);
         try (Writer out = writer(Path.of(args[3]))) {
-            new SearchSnapshot(graph).write(startIds, out);
+            new SearchSnapshot(graph, engine).write(startIds, out);
         }
-        log.info("Wrote the snapshot of {} starts to {} in {} s", startIds.size(), args[3],
+        log.info("Wrote the {} snapshot of {} starts to {} in {} s", engine, startIds.size(), args[3],
                 TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - startMs));
     }
 }

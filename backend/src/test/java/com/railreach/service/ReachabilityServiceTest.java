@@ -177,7 +177,7 @@ class ReachabilityServiceTest {
     @Test
     void stationOverTheTimeLimitWithFewestTransfersShowsTheFasterPathWithMoreTransfers(@TempDir Path dir)
             throws Exception {
-        ReachabilityService service = GtfsTestFixtures.reachabilityService(GtfsTestFixtures.load(dir, "epsilon"));
+        ReachabilityService service = service(GtfsTestFixtures.load(dir, "epsilon"));
         ReachabilityRequest.ReachabilityRequestBuilder unlimitedWait = ReachabilityRequest.builder()
                 .startStationId("epsilon:E1")
                 .maxTransfers(2)
@@ -349,7 +349,7 @@ class ReachabilityServiceTest {
     void doneEventCountsOnlyStationsWithinMaxJourneyTime() {
         // A2 (30 min) and A3/B1 (60 min) fit into 1 h, B2 (120 min) does not
         RecordingEmitter emitter = new RecordingEmitter();
-        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs);
+        ReachabilityService service = service(gtfs);
         service.calculateReachabilityStreaming(ReachabilityRequest.builder()
                 .startStationId("alpha:A1")
                 .maxTransfers(1)
@@ -371,7 +371,7 @@ class ReachabilityServiceTest {
 
     @Test
     void uncachedStreamSendsEachStationOnceAndMatchesTheCachedRepeat() {
-        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs);
+        ReachabilityService service = service(gtfs);
         ReachabilityRequest request = ReachabilityRequest.builder()
                 .startStationId("alpha:A1")
                 .maxTransfers(1)
@@ -393,7 +393,7 @@ class ReachabilityServiceTest {
     // B4 while streaming by round: E6 is first reached in round 1, but only round 2 brings it within the time limit
     @Test
     void streamWithATimeLimitSendsTheSameStationsAsTheResponse(@TempDir Path dir) throws Exception {
-        ReachabilityService service = GtfsTestFixtures.reachabilityService(GtfsTestFixtures.load(dir, "epsilon"));
+        ReachabilityService service = service(GtfsTestFixtures.load(dir, "epsilon"));
         ReachabilityRequest request = ReachabilityRequest.builder()
                 .startStationId("epsilon:E1")
                 .maxTransfers(2)
@@ -420,7 +420,7 @@ class ReachabilityServiceTest {
 
     @Test
     void streamStopsSearchingWhenTheClientIsGone() {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs, engine());
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs, cache);
         GoneClientEmitter emitter = new GoneClientEmitter();
 
@@ -434,7 +434,7 @@ class ReachabilityServiceTest {
     void streamIsTurnedAwayWhenTheSearchQueueIsFull() throws Exception {
         SearchGate gate = new SearchGate(1, 0);
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs,
-                GtfsTestFixtures.reachabilityCache(gtfs, gate));
+                GtfsTestFixtures.reachabilityCache(gtfs, gate, engine()));
         RecordingEmitter emitter = new RecordingEmitter();
 
         try (HeldPermit ignored = new HeldPermit(gate)) {
@@ -447,7 +447,7 @@ class ReachabilityServiceTest {
 
     @Test
     void journeyOfAStationIsItsStationInTheResponse() {
-        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs);
+        ReachabilityService service = service(gtfs);
         ReachabilityRequest request = ReachabilityRequest.builder()
                 .startStationId("alpha:A1")
                 .maxTransfers(1)
@@ -463,7 +463,7 @@ class ReachabilityServiceTest {
 
     @Test
     void journeyToAStationOutOfReachOrToTheStartIsEmpty() {
-        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs);
+        ReachabilityService service = service(gtfs);
         ReachabilityRequest request = ReachabilityRequest.builder()
                 .startStationId("alpha:A1")
                 .maxTransfers(0)
@@ -531,9 +531,18 @@ class ReachabilityServiceTest {
                 .build();
     }
 
-    private static ReachabilityResponse query(TransitGraph data, String start, int maxTransfers,
+    /** The search engine these tests run on; {@link CompactReachabilityServiceTest} runs them on the other one. */
+    String engine() {
+        return SearchEngine.LEGACY;
+    }
+
+    private ReachabilityService service(TransitGraph graph) {
+        return GtfsTestFixtures.reachabilityService(graph, engine());
+    }
+
+    private ReachabilityResponse query(TransitGraph data, String start, int maxTransfers,
                                               int minTransferMins, int maxTransferMins) {
-        return GtfsTestFixtures.reachabilityService(data).calculateReachability(ReachabilityRequest.builder()
+        return service(data).calculateReachability(ReachabilityRequest.builder()
                 .startStationId(start)
                 .maxTransfers(maxTransfers)
                 .minTransferTimeMinutes(minTransferMins)

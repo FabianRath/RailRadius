@@ -49,6 +49,8 @@ public class TransitGraph {
     private final Map<String, Map<String, Connection>> connectionByTrip = new ConcurrentHashMap<>();
     // Built in one pass on first use after a load; dropped when the graph is cleared
     private volatile SearchTimetables searchTimetables;
+    // The same in flat arrays for the compact search engine (S18), built on its first search after a load
+    private volatile TimetableStore timetableStore;
     private final Clock clock;
 
     public TransitGraph() {
@@ -122,6 +124,16 @@ public class TransitGraph {
         synchronized (this) {
             if (searchTimetables == null) searchTimetables = SearchTimetables.build(this);
             return searchTimetables;
+        }
+    }
+
+    /** The trips in flat arrays for the compact search; built on the first call after a load. */
+    TimetableStore timetableStore() {
+        TimetableStore built = timetableStore;
+        if (built != null) return built;
+        synchronized (this) {
+            if (timetableStore == null) timetableStore = TimetableStore.build(this);
+            return timetableStore;
         }
     }
 
@@ -200,6 +212,7 @@ public class TransitGraph {
         stopTrips.clear();
         connectionByTrip.clear();
         searchTimetables = null;
+        timetableStore = null;
     }
 
     void addStationIfAbsent(Station station) {
@@ -276,6 +289,7 @@ public class TransitGraph {
     void mergeStations(Map<String, String> aliasToCanonicalOrAlias) {
         Map<String, String> aliasToCanonical = resolveChains(aliasToCanonicalOrAlias);
         searchTimetables = null;
+        timetableStore = null;
         int merged = 0;
         for (Map.Entry<String, String> mapping : aliasToCanonical.entrySet()) {
             if (++merged % MERGE_PROGRESS_LOG_INTERVAL == 0) {

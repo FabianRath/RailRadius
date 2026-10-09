@@ -20,6 +20,7 @@ public class GtfsDataService {
     private final StationDeduplicator deduplicator;
     private final GtfsCacheStore cacheStore;
     private final ReachabilityCache reachabilityCache;
+    private final SearchEngine searchEngine;
     private final StationSearchIndex stationSearchIndex;
     private final GtfsLoadProgress loadProgress;
 
@@ -38,7 +39,7 @@ public class GtfsDataService {
         if (cached.isPresent()) {
             graph.restore(cached.get());
             // Built now rather than by the first search, which would otherwise take twice as long
-            graph.searchTimetables();
+            searchEngine.prepare();
             stationSearchIndex.rebuild();
             log.info("✓ GTFS data loaded from cache: {} stations, {} graph nodes, {} connections",
                     graph.stationCount(), graph.nodeCount(), graph.connectionCount());
@@ -89,7 +90,7 @@ public class GtfsDataService {
 
         loadProgress.enter(GtfsLoadProgress.Phase.SAVING);
         cacheStore.save(graph.snapshot());
-        graph.searchTimetables();
+        searchEngine.prepare();
         stationSearchIndex.rebuild();
         reachabilityCache.clear();
     }

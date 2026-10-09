@@ -39,6 +39,11 @@ final class DayPatterns {
             });
         }
 
+        /** The first days interned with this index. */
+        ServiceDays days(int pattern) {
+            return patterns.get(pattern);
+        }
+
         DayPatterns build() {
             return new DayPatterns(patterns.toArray(ServiceDays[]::new));
         }

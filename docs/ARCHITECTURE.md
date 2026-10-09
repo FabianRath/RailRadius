@@ -31,7 +31,7 @@ Run from `backend/`; the cache paths are relative to the working directory. The 
 
 - **Search oracle (S12):** `SearchSnapshot` dumps every path a search returns, one sorted line each: station, transfers, minutes, the path's stations, each ride as `tripId from departureSeconds to arrivalSeconds`, the exact running days as epoch-day ranges and their label. One section per start and transfer limit 0–5, with today pinned, because it decides the days (B31). Two runs must give the same bytes.
   - gtfs-mini: `SearchSnapshotTest` compares a search from every station of each feed combination with `src/test/resources/search-snapshots/`. After an intended change, rewrite them with `./mvnw -q test -Dtest=SearchSnapshotTest -Dsnapshot.update=true` and explain every changed line.
-  - Dev and full data: the starts of one set in `docs/bench-stations.txt`, written to the gitignored `data/snapshots/` (gzipped if the name ends in `.gz`; a full-data dump is several GB as text): `./mvnw spring-boot:run -Dspring-boot.run.main-class=com.railreach.service.SearchSnapshot "-Dspring-boot.run.jvmArguments=-Xmx3g -XX:+UseCompactObjectHeaders" "-Dspring-boot.run.arguments=data/gtfs-dev-cache.json dev 2026-10-09 data/snapshots/dev-2026-10-09.txt.gz"`. For full data use `data/gtfs-cache.json full` and `-Xmx12g` (about 9 min; 2.7 M lines, 136 MB gzipped). Compare two dumps with `cmp`, and list the differing lines with `diff <(gzip -dc a.txt.gz) <(gzip -dc b.txt.gz)`.
+  - Dev and full data: the starts of one set in `docs/bench-stations.txt`, written to the gitignored `data/snapshots/` (gzipped if the name ends in `.gz`; a full-data dump is several GB as text): `./mvnw spring-boot:run -Dspring-boot.run.main-class=com.railreach.service.SearchSnapshot "-Dspring-boot.run.jvmArguments=-Xmx3g -XX:+UseCompactObjectHeaders" "-Dspring-boot.run.arguments=data/gtfs-dev-cache.json dev 2026-10-09 data/snapshots/dev-2026-10-09.txt.gz"`. For full data use `data/gtfs-cache.json full` and `-Xmx12g` (about 7 min; 2.7 M lines, 136 MB gzipped). A fifth argument `compact` dumps the compact search engine instead of the legacy one (S18); both must give the same bytes. Compare two dumps with `cmp`, and list the differing lines with `diff <(gzip -dc a.txt.gz) <(gzip -dc b.txt.gz)`.
 
 - **Store check (S17):** `TimetableStoreTest` compares `TimetableStore` with `SearchTimetables` on every gtfs-mini feed combination. On a cache file: `./mvnw test -Dtest=TimetableStoreTest -Dstore.cache=data/gtfs-dev-cache.json`; for full data add `-DargLine=-Xmx12g`. The build logs the store's size.
 
@@ -76,8 +76,8 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `RailReachBackendApplication` | root | Spring Boot entry point |
 | `RailReachController` | controller | Public API under `/api` |
 | `AdminController` | controller | Admin/debug API under `/api/admin` |
-| `GtfsDataService` | service | Fills the `TransitGraph` at startup (cache file, else zips) and on `reload-gtfs`, then rebuilds the station search index and (on reload) clears the reachability caches |
-| `TransitGraph` | service | The merged network: stations, their translated names, edges, connections, trip indexes, `TripInfo`s and each trip's `ServiceDays`; `upcomingDays` and `todayEpochDay` (by its `Clock`), and its `SearchTimetables`, built on first use after a load. Everything that reads GTFS data injects this |
+| `GtfsDataService` | service | Fills the `TransitGraph` at startup (cache file, else zips) and on `reload-gtfs`, then has the search engine build what it searches on (`SearchEngine.prepare`), rebuilds the station search index and (on reload) clears the reachability caches |
+| `TransitGraph` | service | The merged network: stations, their translated names, edges, connections, trip indexes, `TripInfo`s and each trip's `ServiceDays`; `upcomingDays` and `todayEpochDay` (by its `Clock`), and its `SearchTimetables` and `TimetableStore`, each built on first use after a load. Everything that reads GTFS data injects this |
 | `GtfsFeedLoader` | service | Parses the rail part of each zip into the graph, with per-feed stop dedup |
 | `RailTripReader` | service | A feed's rail routes (name, operator from `agency.txt`) and rail trips (route, service ID, `TripInfo`) from routes/agency/trips.txt |
 | `RareTrainFilter` | service | Drops a feed's trains that run on fewer than 8 days, all their trips together, before the graph is built (B26). A train is route + train number (if any, B32) + first stop + departure time (B33). `regularDepartures`: per stop of a trip, whether all trips leaving there at that time run on 8 days or more; the search doesn't ride a trip away from a stop where they don't (B33) |
@@ -108,15 +108,25 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `GtfsCacheStore` | service | Reads/writes the graph as the JSON cache file (`GtfsCacheData`: format version, stations, translated names, services, trips); a file with another version is ignored |
 | `CachedTrip` | service | One trip in the cache file: route name, `TripInfo`, service ID, stop IDs, per-leg dep/arr seconds. Rebuilds the trip's edges and connections on load. Connections matching no leg (B19) are left out |
 | `ReachabilityService` | service | Thin orchestrator: request defaults, POST response (`@Cacheable`), SSE streaming, triggers warming |
-| `ReachabilitySearch` | service | Round-based search, one round per transfer; best path per station and transfer count, chosen at the end of each round and handed to a listener |
+| `SearchEngine` | service | The search: `search` (paths per station, each round's new ones handed to a listener) and `prepare`. Two engines with the same result, chosen by `search.engine` (`SearchEngineConfig`) until S21 removes the legacy one |
+| `ReachabilitySearch` | service | Legacy engine: round-based search, one round per transfer; best path per station and transfer count, chosen at the end of each round and handed to a listener |
+| `CompactReachabilitySearch` | service | Compact engine (S18): the same rounds and processing order on the `TimetableStore`, with rides as labels; paths are still built as `JourneyPath`s from `SearchTimetables`' connections (S19 moves them to the store). Keeps one `SearchScratch` per search running at once |
+| `SearchScratch` | service | What a compact search writes, sized for one store and reused by the next search: `LabelArena`, `TripProgressFlat`, `StationCandidatesFlat`, `LabelDays`, `CompactTransferRound`, the round's stations and each station's last path duration |
+| `LabelArena` | service | A compact search's rides as parallel arrays (trip, previous label, duration, board/alight stop as shorts, transfers, `WeekPeriodDays`, memoized exact days); grows by half, never shrinks. `trim` drops every label no later round reaches |
+| `TripProgressFlat` | service | `TripProgress` for all trips by stop event; a trip is reset when a search first reaches it (generation stamp) |
+| `StationCandidatesFlat` | service | `StationCandidates` for all stations: a list through the labels per station, only of its newest transfer count |
+| `CompactTransferRound` | service | Groups a round's arrivals by station and chooses each station's boardings in parallel, like the legacy `transferRound`/`board` |
+| `TransferWindowInts` | service | `TransferWindow` on one station's sorted arrival arrays, with the day check built in; its fallback scan skips blocks of 32 arrivals that cannot hold the answer |
+| `LabelDays` | service | Exact running days per label for `RegularJourneyChooser`, worked out by ascending transfers (each count's labels in parallel) and interned per search |
+| `IntList` | service | Growable `int` list |
 | `TripProgress` | service | Per stop of one trip during a search: the shortest duration that reached it, the days of that ride and of every ride recorded there (the B33 pruning) |
 | `Ride` | service | One ride of a search: trip, board and alight stop, transfers, duration, its journey's days (`WeekPeriodDays`) and the ride before its transfer |
 | `StationCandidates` | service | A station's candidate rides per transfer count during a search (the fastest and those at most `MAX_SLOWER_MINUTES` slower) |
-| `SearchCounters` | service | What one search did, for its timing log |
+| `SearchCounters` | service | What one search did, for its timing log (stop arrivals and boardings: compact engine only) |
 | `TripTimetable` | service | One trip as arrays for the search: its index, stops and their station indexes, service days, each leg's connection, leg times, minute offsets; `Departure` = trip leaving a stop |
 | `MergedTrips` | service | The graph's trips as the search sees them: numbered in trip ID order, trips with the same stations and leg times merged into the first one (running on all their days, members kept in trip ID order), each leg's connection, stations numbered in order of first appearance. Input of `SearchTimetables` and `TimetableStore` |
 | `SearchTimetables` | service | Every `MergedTrips` trip as a `TripTimetable`, every stop's departures by time (equal times in trip order) and per trip which departures may be ridden (`RareTrainFilter.regularDepartures`), built in one pass; the trips' `WeekPeriodDays`, worked out once per day |
-| `TimetableStore` | service | The same data in flat arrays (S17), side by side with `SearchTimetables` and numbered the same; not built by the app yet (S18). Trips as CSR over stop events (`tripFirstEvent`; per event `evStation`, `evDepSec`, `evArrSec`, `NO_LEG` where there is none), `tripDayPattern`, `tripRouteName`, members (`tripMemberStart` into packed trip IDs, the kept trip first), each station's departures as CSR (`depStart`, `depSec`, `depEvent`; by time, equal times in event order), a `regularDeparture` bitset (checked once per station and departure time). `rideDays(boardEvent, alightEvent)`: the twin-trip day union of `JourneyRunningDays`. `TimetableStoreTest` rebuilds every `TripTimetable` from it. Full data: 160.7 MB for 5.8 M stop events, built in 7 s |
+| `TimetableStore` | service | The same data in flat arrays (S17), side by side with `SearchTimetables` and numbered the same; what the compact engine searches. Trips as CSR over stop events (`tripFirstEvent`; per event `evTrip`, `evStation`, `evDepSec`, `evArrSec`, `NO_LEG` where there is none), `tripDayPattern`, `tripRouteName`, members (`tripMemberStart` into packed trip IDs, the kept trip first), each station's departures as CSR (`depStart`, `depSec`, `depEvent`; by time, equal times in event order), a `regularDeparture` bitset (checked once per station and departure time). `rideDays(boardEvent, alightEvent)`: the twin-trip day union of `JourneyRunningDays`. `TimetableStoreTest` rebuilds every `TripTimetable` from it. Full data: 183.8 MB for 5.8 M stop events, built in 7–14 s |
 | `TimetableStoreBuilder` | service | Lays out `MergedTrips` as the store's arrays |
 | `StationTable` | service | Station IDs by dense index (`PackedStrings`) and an open-addressing `int[]` hash from ID to index |
 | `PackedStrings` | service | A list of strings as one UTF-8 `byte[]` plus offsets |
@@ -128,8 +138,9 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `JourneyLegBuilder` | service | Search path → `ReachableStation` with TRAIN/TRANSFER legs |
 | `JourneyRunningDays` | service | Days on which every train of a returned journey runs, and their summary ("Runs Mon–Fri", "Irregular: 2 days in the timetable") |
 | `RegularJourneyChooser` | service | Picks a station's journey among the search's candidates with the same transfer count: the fastest that runs on at least half as many days as the most frequent one (B26) |
-| `SearchSnapshot` | service | Search oracle: every path of a search as one sorted text line, for each start and transfer limit 0–5; `main` dumps a set of `docs/bench-stations.txt` from a cache file |
+| `SearchSnapshot` | service | Search oracle: every path of a search as one sorted text line, for each start and transfer limit 0–5, on either engine; `main` dumps a set of `docs/bench-stations.txt` from a cache file |
 | `CacheConfig` | config | Caffeine `CacheManager` ("reachability" cache), `@EnableAsync` |
+| `SearchEngineConfig` | config | The `SearchEngine` bean, by `search.engine` |
 | `AdminTokenInterceptor` | config | Guards `/api/admin/**`: `X-Admin-Token` must equal `railreach.admin.token` (constant-time); 401 if wrong or missing, 403 for every call when no token is configured; CORS preflights pass |
 | `WebConfig` | config | Registers `AdminTokenInterceptor` on `/api/admin/**` (same path matching as the controllers) |
 | `Station` | model | id, name, latitude, longitude, parentStation, country (ISO code from the coordinates, null if outside every border) |
@@ -178,7 +189,9 @@ After all feeds are loaded (`StationDeduplicator`, then `TransitGraph.mergeStati
 
 `StationSearchIndex.rebuild` then indexes the variants of each station's name and translated names. `GtfsDataService` then has `TransitGraph` build its `SearchTimetables` in one pass (about 21 s on the full data, most of it the rare-departure check per trip and stop; clearing or merging the graph drops them, and the next search rebuilds them), so the first search is as fast as later ones. `connectionByTrip` (edge → tripId → Connection) is still built lazily, but the search no longer uses it.
 
-## Reachability algorithm (`ReachabilityCache`, `ReachabilitySearch`)
+## Reachability algorithm (`ReachabilityCache`, `SearchEngine`)
+
+**Two engines (S18–S21).** `search.engine` picks `legacy` (`ReachabilitySearch`, the default) or `compact` (`CompactReachabilitySearch` on the `TimetableStore`). Both follow the rules below and the Search semantics contract, and give byte-identical oracle dumps. The compact engine differs only in how it stores the search: rides are labels in a `LabelArena`, per-trip and per-station state are flat arrays reused from search to search (one `SearchScratch` per search running at once, so up to `search.gate.permits` of them stay allocated), and after each round's boardings are chosen the arena keeps only the labels later rounds reach (those boarded from and the rides before them). The last round stores only rides that become candidates. Exact days for the chooser are worked out once per label, by ascending transfers. On the full data it is about twice as fast; it holds less memory than the legacy engine but up to ~450 MB on the largest searches (`docs/HOSTING.md`).
 
 `ReachabilityCache.getOrCompute` is the central dispatcher. It is keyed by `SearchKey(start, maxTransfers, minTransfer, maxTransfer)`:
 1. **Raw cache hit** → return the stored result immediately.
@@ -212,7 +225,7 @@ The wait limit applies to each transfer, so a journey can bridge a longer wait b
 
 ## Search semantics contract
 
-What every search engine must keep, so a rewrite (S17–S21) gives the same result as `SearchSnapshotTest`'s goldens. One rule, one test (`ReachabilityServiceTest` unless named otherwise):
+What every search engine must keep, so a rewrite (S17–S21) gives the same result as `SearchSnapshotTest`'s goldens. One rule, one test (`ReachabilityServiceTest` unless named otherwise). `CompactReachabilityServiceTest` runs every `ReachabilityServiceTest` test on the compact engine, and `SearchSnapshotTest` and `ReachabilitySearchTest` run on both:
 - **Slower arrival kept (B2):** a slower arrival at a station is kept when it catches a train the fastest arrival misses. `slowerEarlierArrivalIsKeptWhenItEnablesAFasterTransfer`
 - **Past midnight (B25):** a transfer whose wait crosses midnight boards a train running the day after a day of the journey so far. `transferPastMidnightBoardsATrainRunningTheNextDay`
 - **From today (B31):** a journey's days start with its first train's days from today on, so a train whose days are all past is never boarded. `trainsWhoseDaysAreAllPastAreNotRidden`
@@ -269,6 +282,7 @@ What every search engine must keep, so a rewrite (S17–S21) gives the same resu
 - `feeds.expiring-days` (30): feeds that end, or whose first early-ending main operator stops, within this many days are `EXPIRING`; `feeds.check-interval` (`PT24H`): how often the missing/expired/expiring feeds are logged; `feeds.sources` (empty = every feed in `gtfs-feeds.txt`): comma-separated feeds expected in the GTFS directory, listed as `MISSING` without a zip; `feeds.auth.<source>` (no default, never in git): credentials that `gtfs-feeds.txt` headers refer to, e.g. `feeds.auth.hungary` = base64 of `user:password` for MÁV's Basic auth. Set it in `backend/config/application.yml` (gitignored; Spring Boot reads `config/` in the working directory on top of the bundled file) or as env var `RAILREACH_FEEDS_AUTH_HUNGARY`
 - `algorithm.max-transfer-time-minutes` (180), `algorithm.cache-size` (10000), `algorithm.cache-ttl-minutes` (60)
 - `cache.predictive-enabled` (true), `cache.predictive-max-transfers` (5), `cache.raw-max-entries` (30)
+- `search.engine` (`legacy`): `legacy` or `compact` (S18); removed with the legacy engine in S21
 - `search.gate.permits` (2): searches that run at once; `search.gate.max-queued` (6): searches that may wait for a permit before the next one is turned away
 - `admin.token` (empty, env `RAILREACH_ADMIN_TOKEN`): shared secret for the admin API; empty disables it
 

@@ -2,6 +2,7 @@ package com.railreach.service;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.IntStream;
@@ -26,6 +27,8 @@ final class TimetableStore {
 
     private final StationTable stations;
     private final int[] tripFirstEvent;
+    // Derived from tripFirstEvent: the search looks up the trip of every departure it scans
+    private final int[] evTrip;
     private final int[] evStation;
     private final int[] evDepSec;
     private final int[] evArrSec;
@@ -43,6 +46,7 @@ final class TimetableStore {
     private TimetableStore(TimetableStoreBuilder.Parts parts) {
         this.stations = parts.stations();
         this.tripFirstEvent = parts.tripFirstEvent();
+        this.evTrip = eventTrips(parts.tripFirstEvent());
         this.evStation = parts.evStation();
         this.evDepSec = parts.evDepSec();
         this.evArrSec = parts.evArrSec();
@@ -92,16 +96,8 @@ final class TimetableStore {
         return tripFirstEvent[trip + 1];
     }
 
-    /** The trip the event belongs to, by binary search over the trips' first events. */
     int tripOf(int event) {
-        int low = 0;
-        int high = tripCount() - 1;
-        while (low < high) {
-            int mid = (low + high + 1) >>> 1;
-            if (tripFirstEvent[mid] <= event) low = mid;
-            else high = mid - 1;
-        }
-        return low;
+        return evTrip[event];
     }
 
     int station(int event) {
@@ -197,11 +193,19 @@ final class TimetableStore {
 
     /** Estimated bytes of the store's arrays and strings. */
     long sizeBytes() {
-        long intArrays = (long) tripFirstEvent.length + evStation.length + evDepSec.length + evArrSec.length
-                + tripDayPattern.length + tripRouteName.length + tripMemberStart.length + depStart.length
-                + depSec.length + depEvent.length;
+        long intArrays = (long) tripFirstEvent.length + evTrip.length + evStation.length + evDepSec.length
+                + evArrSec.length + tripDayPattern.length + tripRouteName.length + tripMemberStart.length
+                + depStart.length + depSec.length + depEvent.length;
         return intArrays * Integer.BYTES + (long) regularDeparture.length * Long.BYTES + stations.sizeBytes()
                 + dayPatterns.sizeBytes() + routeNames.sizeBytes() + memberTripIds.sizeBytes();
+    }
+
+    private static int[] eventTrips(int[] tripFirstEvent) {
+        int[] trips = new int[tripFirstEvent[tripFirstEvent.length - 1]];
+        for (int trip = 0; trip + 1 < tripFirstEvent.length; trip++) {
+            Arrays.fill(trips, tripFirstEvent[trip], tripFirstEvent[trip + 1], trip);
+        }
+        return trips;
     }
 
     private boolean arrivesLike(int departureEvent, int station, int arrivalSeconds) {
