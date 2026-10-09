@@ -52,4 +52,20 @@ class ReachabilityWarmerTest {
 
         assertThat(cache.contains(queried.withMaxTransfers(1))).isTrue();
     }
+
+    @Test
+    void warmingIsSkippedWhileNoSearchPermitIsFree(@TempDir Path dir) throws Exception {
+        SearchGate gate = new SearchGate(1, 1);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(GtfsTestFixtures.load(dir, "alpha", "beta"), gate);
+        ReachabilityWarmer warmer = new ReachabilityWarmer(cache);
+        ReflectionTestUtils.setField(warmer, "predictiveMaxTransfers", 1);
+        SearchKey queried = new SearchKey("alpha:A1", 0, 0, 180);
+
+        try (HeldPermit ignored = new HeldPermit(gate)) {
+            warmer.warmHigherTransferCounts(queried);
+        }
+
+        assertThat(cache.contains(queried.withMaxTransfers(1))).isFalse();
+        assertThat(warmer.getWarmingInProgress()).isEmpty();
+    }
 }

@@ -15,7 +15,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Consumer;
 
 /**
  * Raw search results per search, computed on demand. Kept apart from the Caffeine response cache because a stored
@@ -28,13 +27,15 @@ public class ReachabilityCache {
     static final String RESPONSE_CACHE_NAME = "reachability";
 
     private final ReachabilitySearch search;
+    private final SearchGate gate;
     private final CacheManager cacheManager;
     // One full-data result holds paths to every reachable station, so the count must stay small
     private final Cache<SearchKey, Map<String, List<JourneyPath>>> rawPaths;
 
-    public ReachabilityCache(ReachabilitySearch search, CacheManager cacheManager,
+    public ReachabilityCache(ReachabilitySearch search, SearchGate gate, CacheManager cacheManager,
                              @Value("${railreach.cache.raw-max-entries:30}") int rawMaxEntries) {
         this.search = search;
+        this.gate = gate;
         this.cacheManager = cacheManager;
         this.rawPaths = Caffeine.newBuilder().maximumSize(rawMaxEntries).build();
     }
@@ -51,35 +52,63 @@ public class ReachabilityCache {
         }
     }
 
+    /** What a caller hears of a search it waits for. */
+    public interface SearchListener {
+
+        SearchListener NONE = new SearchListener() {};
+
+        /** Runs about every second while the search waits for a {@link SearchGate} permit; may throw to give up. */
+        default void queued() {}
+
+        /** Each round's new paths, per station, as the search goes. */
+        default void roundPaths(Map<String, List<JourneyPath>> paths) {}
+    }
+
     /**
      * Per station, its paths by ascending transfers (see {@link ReachabilitySearch#search}). Taken from the stored
      * result, else cut down from a stored result with more transfers, else searched and stored.
+     *
+     * @throws SearchGate.BusyException if it would have to search and too many searches wait already
      */
     public Map<String, List<JourneyPath>> getOrCompute(SearchKey key) {
-        return getOrCompute(key, roundPaths -> {});
+        return getOrCompute(key, SearchListener.NONE);
     }
 
-    /** Like {@link #getOrCompute(SearchKey)}; a search hands roundPaths each round's new paths as it goes. */
-    public Map<String, List<JourneyPath>> getOrCompute(SearchKey key,
-                                                       Consumer<Map<String, List<JourneyPath>>> roundPaths) {
+    /** Like {@link #getOrCompute(SearchKey)}, telling the listener about the queue and the rounds of a search. */
+    public Map<String, List<JourneyPath>> getOrCompute(SearchKey key, SearchListener listener) {
+        Optional<Map<String, List<JourneyPath>>> stored = stored(key);
+        if (stored.isPresent()) return stored.get();
+        return gate.run(() -> storedOrSearched(key, listener), listener::queued);
+    }
+
+    /** Searches and stores the result only if a search permit is free right now; true if the result is stored. */
+    public boolean computeIfPermitFree(SearchKey key) {
+        return gate.runIfFree(() -> storedOrSearched(key, SearchListener.NONE)).isPresent();
+    }
+
+    // Checked again with the permit: an equal search may have finished while this one waited
+    private Map<String, List<JourneyPath>> storedOrSearched(SearchKey key, SearchListener listener) {
+        return stored(key).orElseGet(() -> {
+            log.info("  Search: {} x{}", key.startId(), key.maxTransfers());
+            Map<String, List<JourneyPath>> result = search.search(key.startId(), key.maxTransfers(),
+                    key.minTransferMins(), key.maxTransferMins(), listener::roundPaths);
+            rawPaths.put(key, result);
+            log.info("  Cached raw result: {} x{} ({} stations)", key.startId(), key.maxTransfers(), result.size());
+            return result;
+        });
+    }
+
+    private Optional<Map<String, List<JourneyPath>>> stored(SearchKey key) {
         Map<String, List<JourneyPath>> cached = rawPaths.getIfPresent(key);
         if (cached != null) {
             log.info("  Raw cache HIT: {} x{} ({} stations)", key.startId(), key.maxTransfers(), cached.size());
-            return cached;
+            return Optional.of(cached);
         }
-        Optional<Map.Entry<SearchKey, Map<String, List<JourneyPath>>>> higher = storedWithMoreTransfers(key);
-        if (higher.isPresent()) {
+        return storedWithMoreTransfers(key).map(higher -> {
             log.info("  Raw cache HIT: {} x{} cut down from x{}",
-                    key.startId(), key.maxTransfers(), higher.get().getKey().maxTransfers());
-            return limitTransfers(higher.get().getValue(), key.maxTransfers());
-        }
-
-        log.info("  Search: {} x{}", key.startId(), key.maxTransfers());
-        Map<String, List<JourneyPath>> result = search.search(key.startId(), key.maxTransfers(),
-                key.minTransferMins(), key.maxTransferMins(), roundPaths);
-        rawPaths.put(key, result);
-        log.info("  Cached raw result: {} x{} ({} stations)", key.startId(), key.maxTransfers(), result.size());
-        return result;
+                    key.startId(), key.maxTransfers(), higher.getKey().maxTransfers());
+            return limitTransfers(higher.getValue(), key.maxTransfers());
+        });
     }
 
     /** True if {@link #getOrCompute} would not have to search. */

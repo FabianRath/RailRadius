@@ -30,7 +30,20 @@ Full data: 49 feeds, 34,081 stations, cache 649 MB. Windows 10 dev machine, 12 c
 | same, `-Xmx5g` | OutOfMemoryError |
 | same, `-Xmx4g` | OutOfMemoryError, app stuck in GC |
 
-Rule of thumb: ~3 GB for the data plus ~1 GB per 5-transfer search running at the same time. Nothing limits concurrent searches, so enough of them at once can run out of heap on any size.
+Rule of thumb: ~3 GB for the data plus ~1 GB per 5-transfer search running at the same time. Since S15 the search gate runs at most `search.gate.permits` (2) searches at once and queues up to 6 more, so peak heap is about the data plus 2 GB plus the result cache.
+
+## Search gate test (S15, 2026-10-09)
+
+Full data, `-Xmx9g`, G1, warmer on, gate at 2 permits and 6 queued. 5 clients at the same time, each streaming 6 searches over the 20 starts of `bench-stations.txt` (alternating 4 and 5 transfers), plus one client that closes its 5-transfer stream after 4 s.
+
+| Measure | Result |
+|---|---|
+| Outcome | No OutOfMemoryError, all 30 streams ended with `done`, none turned away. 1.5 min in all |
+| Searches | 22 by visitors, never more than 2 at once. Queue waits 0.5–44 s (median ~9 s); a stream's time includes its wait, up to 50 s |
+| Warmer | 2 warmed with a free permit, 13 skipped because none was free |
+| Closed client | Its stream stopped 1 s after the client left; nothing stored |
+| Live heap after the run (`bench.sh memory`) | 3,243 MB, with 22 stored results in the raw cache |
+| Peak working set | 9.5 GB: G1 grows the heap towards `-Xmx` |
 
 ## Baselines (S13, 2026-10-09)
 
