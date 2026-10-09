@@ -224,10 +224,9 @@ public class GtfsFeedLoader {
         Map<String, String> rawToCanonical = new HashMap<>();
         for (GtfsStop stop : validStops.values()) {
             String representativeId = rawToRepresentative.getOrDefault(stop.stopId(), stop.stopId());
-            String canonical = canonicaliseStopId(representativeId, source);
-            rawToCanonical.put(stop.stopId(), canonical);
             GtfsStop representative = validStops.getOrDefault(representativeId, stop);
-            stations.computeIfAbsent(canonical, id -> Station.builder()
+            String canonical = canonicaliseStopId(representativeId, source);
+            Station station = stations.computeIfAbsent(canonical, id -> Station.builder()
                     .id(id)
                     .name(representative.name() != null ? representative.name() : id)
                     .latitude(representative.lat())
@@ -235,6 +234,8 @@ public class GtfsFeedLoader {
                     .parentStation(representative.parentStation() != null
                             ? canonicaliseStopId(representative.parentStation(), source) : null)
                     .build());
+            // The station's own ID, so the stops merged into it don't each hold a copy (S16)
+            rawToCanonical.put(stop.stopId(), station.getId());
         }
         log.info("  Stops: {} valid, {} unique after dedup, {} skipped (no coords)",
                 validStops.size(), rawToRepresentative.values().stream().distinct().count(),

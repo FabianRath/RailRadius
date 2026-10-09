@@ -7,6 +7,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -363,6 +364,20 @@ class GtfsDataServiceTest {
             for (String tripId : gtfs.getTripsAtStop(stopId)) {
                 assertThat(restored.getStopsOnTrip(tripId)).isEqualTo(gtfs.getStopsOnTrip(tripId));
                 assertThat(restored.getTripInfo(tripId)).isEqualTo(gtfs.getTripInfo(tripId));
+            }
+        }
+    }
+
+    @Test
+    void parsedAndRestoredTripsShareTheStationsIdStrings() {
+        TransitGraph restored = new TransitGraph();
+        restored.restore(GtfsTestFixtures.cacheStore(tempDir).load().orElseThrow());
+
+        for (TransitGraph graph : List.of(gtfs, restored)) {
+            for (String tripId : graph.tripIds()) {
+                for (String stopId : graph.getStopsOnTrip(tripId)) {
+                    assertThat(stopId).isSameAs(graph.getStation(stopId).getId());
+                }
             }
         }
     }
