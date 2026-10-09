@@ -1,0 +1,99 @@
+# today 2026-01-01
+## france:StopArea:OCE87146100 maxTransfers 0
+france:StopArea:OCE87146100	0	0	france:StopArea:OCE87146100		every day	-
+france:StopArea:OCE87999995	0	30	france:StopArea:OCE87146100 france:StopArea:OCE87999995	france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+## france:StopArea:OCE87146100 maxTransfers 1
+france:StopArea:OCE87146100	0	0	france:StopArea:OCE87146100		every day	-
+france:StopArea:OCE87999995	0	30	france:StopArea:OCE87146100 france:StopArea:OCE87999995	france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+## france:StopArea:OCE87146100 maxTransfers 2
+france:StopArea:OCE87146100	0	0	france:StopArea:OCE87146100		every day	-
+france:StopArea:OCE87999995	0	30	france:StopArea:OCE87146100 france:StopArea:OCE87999995	france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+## france:StopArea:OCE87146100 maxTransfers 3
+france:StopArea:OCE87146100	0	0	france:StopArea:OCE87146100		every day	-
+france:StopArea:OCE87999995	0	30	france:StopArea:OCE87146100 france:StopArea:OCE87999995	france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+## france:StopArea:OCE87146100 maxTransfers 4
+france:StopArea:OCE87146100	0	0	france:StopArea:OCE87146100		every day	-
+france:StopArea:OCE87999995	0	30	france:StopArea:OCE87146100 france:StopArea:OCE87999995	france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+## france:StopArea:OCE87146100 maxTransfers 5
+france:StopArea:OCE87146100	0	0	france:StopArea:OCE87146100		every day	-
+france:StopArea:OCE87999995	0	30	france:StopArea:OCE87146100 france:StopArea:OCE87999995	france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+## france:StopArea:OCE87146217 maxTransfers 0
+france:StopArea:OCE87146100	0	10	france:StopArea:OCE87146217 france:StopArea:OCE87146100	france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400	every day	-
+france:StopArea:OCE87146217	0	0	france:StopArea:OCE87146217		every day	-
+## france:StopArea:OCE87146217 maxTransfers 1
+france:StopArea:OCE87146100	0	10	france:StopArea:OCE87146217 france:StopArea:OCE87146100	france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400	every day	-
+france:StopArea:OCE87146217	0	0	france:StopArea:OCE87146217		every day	-
+france:StopArea:OCE87999995	1	90	france:StopArea:OCE87146217 france:StopArea:OCE87146100 france:StopArea:OCE87999995	france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400 | france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+## france:StopArea:OCE87146217 maxTransfers 2
+france:StopArea:OCE87146100	0	10	france:StopArea:OCE87146217 france:StopArea:OCE87146100	france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400	every day	-
+france:StopArea:OCE87146217	0	0	france:StopArea:OCE87146217		every day	-
+france:StopArea:OCE87999995	1	90	france:StopArea:OCE87146217 france:StopArea:OCE87146100 france:StopArea:OCE87999995	france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400 | france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+## france:StopArea:OCE87146217 maxTransfers 3
+france:StopArea:OCE87146100	0	10	france:StopArea:OCE87146217 france:StopArea:OCE87146100	france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400	every day	-
+france:StopArea:OCE87146217	0	0	france:StopArea:OCE87146217		every day	-
+france:StopArea:OCE87999995	1	90	france:StopArea:OCE87146217 france:StopArea:OCE87146100 france:StopArea:OCE87999995	france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400 | france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+## france:StopArea:OCE87146217 maxTransfers 4
+france:StopArea:OCE87146100	0	10	france:StopArea:OCE87146217 france:StopArea:OCE87146100	france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400	every day	-
+france:StopArea:OCE87146217	0	0	france:StopArea:OCE87146217		every day	-
+france:StopArea:OCE87999995	1	90	france:StopArea:OCE87146217 france:StopArea:OCE87146100 france:StopArea:OCE87999995	france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400 | france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+## france:StopArea:OCE87146217 maxTransfers 5
+france:StopArea:OCE87146100	0	10	france:StopArea:OCE87146217 france:StopArea:OCE87146100	france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400	every day	-
+france:StopArea:OCE87146217	0	0	france:StopArea:OCE87146217		every day	-
+france:StopArea:OCE87999995	1	90	france:StopArea:OCE87146217 france:StopArea:OCE87146100 france:StopArea:OCE87999995	france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400 | france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+## france:StopArea:OCE87999995 maxTransfers 0
+france:StopArea:OCE87999995	0	0	france:StopArea:OCE87999995		every day	-
+## france:StopArea:OCE87999995 maxTransfers 1
+france:StopArea:OCE87999995	0	0	france:StopArea:OCE87999995		every day	-
+## france:StopArea:OCE87999995 maxTransfers 2
+france:StopArea:OCE87999995	0	0	france:StopArea:OCE87999995		every day	-
+## france:StopArea:OCE87999995 maxTransfers 3
+france:StopArea:OCE87999995	0	0	france:StopArea:OCE87999995		every day	-
+## france:StopArea:OCE87999995 maxTransfers 4
+france:StopArea:OCE87999995	0	0	france:StopArea:OCE87999995		every day	-
+## france:StopArea:OCE87999995 maxTransfers 5
+france:StopArea:OCE87999995	0	0	france:StopArea:OCE87999995		every day	-
+## switzerland:8500010 maxTransfers 0
+france:StopArea:OCE87146217	0	40	switzerland:8500010 france:StopArea:OCE87146217	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600	every day	-
+switzerland:8500010	0	0	switzerland:8500010		every day	-
+switzerland:8799999	0	50	switzerland:8500010 switzerland:8799999	switzerland:ST2 switzerland:8500010 36000 switzerland:8799999 39000	every day	-
+## switzerland:8500010 maxTransfers 1
+france:StopArea:OCE87146100	1	70	switzerland:8500010 france:StopArea:OCE87146217 france:StopArea:OCE87146100	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600 | france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400	every day	-
+france:StopArea:OCE87146217	0	40	switzerland:8500010 france:StopArea:OCE87146217	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600	every day	-
+switzerland:8500010	0	0	switzerland:8500010		every day	-
+switzerland:8799999	0	50	switzerland:8500010 switzerland:8799999	switzerland:ST2 switzerland:8500010 36000 switzerland:8799999 39000	every day	-
+## switzerland:8500010 maxTransfers 2
+france:StopArea:OCE87146100	1	70	switzerland:8500010 france:StopArea:OCE87146217 france:StopArea:OCE87146100	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600 | france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400	every day	-
+france:StopArea:OCE87146217	0	40	switzerland:8500010 france:StopArea:OCE87146217	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600	every day	-
+france:StopArea:OCE87999995	2	150	switzerland:8500010 france:StopArea:OCE87146217 france:StopArea:OCE87146100 france:StopArea:OCE87999995	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600 | france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400 | france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+switzerland:8500010	0	0	switzerland:8500010		every day	-
+switzerland:8799999	0	50	switzerland:8500010 switzerland:8799999	switzerland:ST2 switzerland:8500010 36000 switzerland:8799999 39000	every day	-
+## switzerland:8500010 maxTransfers 3
+france:StopArea:OCE87146100	1	70	switzerland:8500010 france:StopArea:OCE87146217 france:StopArea:OCE87146100	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600 | france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400	every day	-
+france:StopArea:OCE87146217	0	40	switzerland:8500010 france:StopArea:OCE87146217	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600	every day	-
+france:StopArea:OCE87999995	2	150	switzerland:8500010 france:StopArea:OCE87146217 france:StopArea:OCE87146100 france:StopArea:OCE87999995	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600 | france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400 | france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+switzerland:8500010	0	0	switzerland:8500010		every day	-
+switzerland:8799999	0	50	switzerland:8500010 switzerland:8799999	switzerland:ST2 switzerland:8500010 36000 switzerland:8799999 39000	every day	-
+## switzerland:8500010 maxTransfers 4
+france:StopArea:OCE87146100	1	70	switzerland:8500010 france:StopArea:OCE87146217 france:StopArea:OCE87146100	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600 | france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400	every day	-
+france:StopArea:OCE87146217	0	40	switzerland:8500010 france:StopArea:OCE87146217	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600	every day	-
+france:StopArea:OCE87999995	2	150	switzerland:8500010 france:StopArea:OCE87146217 france:StopArea:OCE87146100 france:StopArea:OCE87999995	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600 | france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400 | france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+switzerland:8500010	0	0	switzerland:8500010		every day	-
+switzerland:8799999	0	50	switzerland:8500010 switzerland:8799999	switzerland:ST2 switzerland:8500010 36000 switzerland:8799999 39000	every day	-
+## switzerland:8500010 maxTransfers 5
+france:StopArea:OCE87146100	1	70	switzerland:8500010 france:StopArea:OCE87146217 france:StopArea:OCE87146100	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600 | france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400	every day	-
+france:StopArea:OCE87146217	0	40	switzerland:8500010 france:StopArea:OCE87146217	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600	every day	-
+france:StopArea:OCE87999995	2	150	switzerland:8500010 france:StopArea:OCE87146217 france:StopArea:OCE87146100 france:StopArea:OCE87999995	switzerland:ST1 switzerland:8500010 25200 france:StopArea:OCE87146217 27600 | france:FT1 france:StopArea:OCE87146217 28800 france:StopArea:OCE87146100 29400 | france:FT2 france:StopArea:OCE87146100 32400 france:StopArea:OCE87999995 34200	every day	-
+switzerland:8500010	0	0	switzerland:8500010		every day	-
+switzerland:8799999	0	50	switzerland:8500010 switzerland:8799999	switzerland:ST2 switzerland:8500010 36000 switzerland:8799999 39000	every day	-
+## switzerland:8799999 maxTransfers 0
+switzerland:8799999	0	0	switzerland:8799999		every day	-
+## switzerland:8799999 maxTransfers 1
+switzerland:8799999	0	0	switzerland:8799999		every day	-
+## switzerland:8799999 maxTransfers 2
+switzerland:8799999	0	0	switzerland:8799999		every day	-
+## switzerland:8799999 maxTransfers 3
+switzerland:8799999	0	0	switzerland:8799999		every day	-
+## switzerland:8799999 maxTransfers 4
+switzerland:8799999	0	0	switzerland:8799999		every day	-
+## switzerland:8799999 maxTransfers 5
+switzerland:8799999	0	0	switzerland:8799999		every day	-

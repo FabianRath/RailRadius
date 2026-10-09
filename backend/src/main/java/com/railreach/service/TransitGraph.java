@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -55,8 +56,13 @@ public class TransitGraph {
     }
 
     /** {@code clock} says which days are past (B31). */
-    TransitGraph(Clock clock) {
+    private TransitGraph(Clock clock) {
         this.clock = clock;
+    }
+
+    /** A graph whose today is fixed, so a search gives the same result on every day it runs. */
+    static TransitGraph withToday(LocalDate today) {
+        return new TransitGraph(Clock.fixed(today.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
     }
 
     public Station getStation(String stopId) {

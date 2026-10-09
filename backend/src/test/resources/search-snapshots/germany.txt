@@ -1,0 +1,49 @@
+# today 2026-01-01
+## germany:GH maxTransfers 0
+germany:GH	0	0	germany:GH		every day	-
+## germany:GH maxTransfers 1
+germany:GH	0	0	germany:GH		every day	-
+## germany:GH maxTransfers 2
+germany:GH	0	0	germany:GH		every day	-
+## germany:GH maxTransfers 3
+germany:GH	0	0	germany:GH		every day	-
+## germany:GH maxTransfers 4
+germany:GH	0	0	germany:GH		every day	-
+## germany:GH maxTransfers 5
+germany:GH	0	0	germany:GH		every day	-
+## germany:GK maxTransfers 0
+germany:GH	0	240	germany:GK germany:GH	germany:GT3 germany:GK 36000 germany:GH 50400	every day	-
+germany:GK	0	0	germany:GK		every day	-
+germany:GW	0	240	germany:GK germany:GW	germany:GT1 germany:GK 28800 germany:GW 43200	every day	-
+## germany:GK maxTransfers 1
+germany:GH	0	240	germany:GK germany:GH	germany:GT3 germany:GK 36000 germany:GH 50400	every day	-
+germany:GK	0	0	germany:GK		every day	-
+germany:GW	0	240	germany:GK germany:GW	germany:GT1 germany:GK 28800 germany:GW 43200	every day	-
+## germany:GK maxTransfers 2
+germany:GH	0	240	germany:GK germany:GH	germany:GT3 germany:GK 36000 germany:GH 50400	every day	-
+germany:GK	0	0	germany:GK		every day	-
+germany:GW	0	240	germany:GK germany:GW	germany:GT1 germany:GK 28800 germany:GW 43200	every day	-
+## germany:GK maxTransfers 3
+germany:GH	0	240	germany:GK germany:GH	germany:GT3 germany:GK 36000 germany:GH 50400	every day	-
+germany:GK	0	0	germany:GK		every day	-
+germany:GW	0	240	germany:GK germany:GW	germany:GT1 germany:GK 28800 germany:GW 43200	every day	-
+## germany:GK maxTransfers 4
+germany:GH	0	240	germany:GK germany:GH	germany:GT3 germany:GK 36000 germany:GH 50400	every day	-
+germany:GK	0	0	germany:GK		every day	-
+germany:GW	0	240	germany:GK germany:GW	germany:GT1 germany:GK 28800 germany:GW 43200	every day	-
+## germany:GK maxTransfers 5
+germany:GH	0	240	germany:GK germany:GH	germany:GT3 germany:GK 36000 germany:GH 50400	every day	-
+germany:GK	0	0	germany:GK		every day	-
+germany:GW	0	240	germany:GK germany:GW	germany:GT1 germany:GK 28800 germany:GW 43200	every day	-
+## germany:GW maxTransfers 0
+germany:GW	0	0	germany:GW		every day	-
+## germany:GW maxTransfers 1
+germany:GW	0	0	germany:GW		every day	-
+## germany:GW maxTransfers 2
+germany:GW	0	0	germany:GW		every day	-
+## germany:GW maxTransfers 3
+germany:GW	0	0	germany:GW		every day	-
+## germany:GW maxTransfers 4
+germany:GW	0	0	germany:GW		every day	-
+## germany:GW maxTransfers 5
+germany:GW	0	0	germany:GW		every day	-

@@ -19,10 +19,13 @@ public class GtfsCacheStore {
 
     private static final long BYTES_PER_MB = 1024 * 1024;
 
-    @Value("${railreach.gtfs.cache-file:gtfs-cache.json}")
-    private String cacheFile;
+    private final String cacheFile;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    GtfsCacheStore(@Value("${railreach.gtfs.cache-file:gtfs-cache.json}") String cacheFile) {
+        this.cacheFile = cacheFile;
+    }
 
     /** Bump on every format change: a cache file with another version is ignored and the zips are re-parsed. */
     static final int FORMAT_VERSION = 8;

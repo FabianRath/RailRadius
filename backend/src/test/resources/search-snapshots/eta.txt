@@ -1,0 +1,97 @@
+# today 2026-01-01
+## eta:H1 maxTransfers 0
+eta:H1	0	0	eta:H1		every day	-
+eta:H2	0	120	eta:H1 eta:H2	eta:HT1 eta:H1 28800 eta:H2 36000	20458-20484	Runs daily
+eta:H3	0	110	eta:H1 eta:H3	eta:HT4 eta:H1 30600 eta:H3 37200	20463-20464,20470-20471,20477-20478,20483-20484	Runs Sat, Sun
+eta:H5	0	60	eta:H1 eta:H5	eta:HT6 eta:H1 43200 eta:H5 46800	20458-20461,20465-20468	Runs Mon–Thu
+eta:H7	0	30	eta:H1 eta:H7	eta:HT12 eta:H1 25200 eta:H7 27000	20458-20484	Runs daily
+## eta:H1 maxTransfers 1
+eta:H1	0	0	eta:H1		every day	-
+eta:H2	0	120	eta:H1 eta:H2	eta:HT1 eta:H1 28800 eta:H2 36000	20458-20484	Runs daily
+eta:H3	0	110	eta:H1 eta:H3	eta:HT4 eta:H1 30600 eta:H3 37200	20463-20464,20470-20471,20477-20478,20483-20484	Runs Sat, Sun
+eta:H5	0	60	eta:H1 eta:H5	eta:HT6 eta:H1 43200 eta:H5 46800	20458-20461,20465-20468	Runs Mon–Thu
+eta:H7	0	30	eta:H1 eta:H7	eta:HT12 eta:H1 25200 eta:H7 27000	20458-20484	Runs daily
+## eta:H1 maxTransfers 2
+eta:H1	0	0	eta:H1		every day	-
+eta:H2	0	120	eta:H1 eta:H2	eta:HT1 eta:H1 28800 eta:H2 36000	20458-20484	Runs daily
+eta:H3	0	110	eta:H1 eta:H3	eta:HT4 eta:H1 30600 eta:H3 37200	20463-20464,20470-20471,20477-20478,20483-20484	Runs Sat, Sun
+eta:H5	0	60	eta:H1 eta:H5	eta:HT6 eta:H1 43200 eta:H5 46800	20458-20461,20465-20468	Runs Mon–Thu
+eta:H7	0	30	eta:H1 eta:H7	eta:HT12 eta:H1 25200 eta:H7 27000	20458-20484	Runs daily
+## eta:H1 maxTransfers 3
+eta:H1	0	0	eta:H1		every day	-
+eta:H2	0	120	eta:H1 eta:H2	eta:HT1 eta:H1 28800 eta:H2 36000	20458-20484	Runs daily
+eta:H3	0	110	eta:H1 eta:H3	eta:HT4 eta:H1 30600 eta:H3 37200	20463-20464,20470-20471,20477-20478,20483-20484	Runs Sat, Sun
+eta:H5	0	60	eta:H1 eta:H5	eta:HT6 eta:H1 43200 eta:H5 46800	20458-20461,20465-20468	Runs Mon–Thu
+eta:H7	0	30	eta:H1 eta:H7	eta:HT12 eta:H1 25200 eta:H7 27000	20458-20484	Runs daily
+## eta:H1 maxTransfers 4
+eta:H1	0	0	eta:H1		every day	-
+eta:H2	0	120	eta:H1 eta:H2	eta:HT1 eta:H1 28800 eta:H2 36000	20458-20484	Runs daily
+eta:H3	0	110	eta:H1 eta:H3	eta:HT4 eta:H1 30600 eta:H3 37200	20463-20464,20470-20471,20477-20478,20483-20484	Runs Sat, Sun
+eta:H5	0	60	eta:H1 eta:H5	eta:HT6 eta:H1 43200 eta:H5 46800	20458-20461,20465-20468	Runs Mon–Thu
+eta:H7	0	30	eta:H1 eta:H7	eta:HT12 eta:H1 25200 eta:H7 27000	20458-20484	Runs daily
+## eta:H1 maxTransfers 5
+eta:H1	0	0	eta:H1		every day	-
+eta:H2	0	120	eta:H1 eta:H2	eta:HT1 eta:H1 28800 eta:H2 36000	20458-20484	Runs daily
+eta:H3	0	110	eta:H1 eta:H3	eta:HT4 eta:H1 30600 eta:H3 37200	20463-20464,20470-20471,20477-20478,20483-20484	Runs Sat, Sun
+eta:H5	0	60	eta:H1 eta:H5	eta:HT6 eta:H1 43200 eta:H5 46800	20458-20461,20465-20468	Runs Mon–Thu
+eta:H7	0	30	eta:H1 eta:H7	eta:HT12 eta:H1 25200 eta:H7 27000	20458-20484	Runs daily
+## eta:H2 maxTransfers 0
+eta:H2	0	0	eta:H2		every day	-
+## eta:H2 maxTransfers 1
+eta:H2	0	0	eta:H2		every day	-
+## eta:H2 maxTransfers 2
+eta:H2	0	0	eta:H2		every day	-
+## eta:H2 maxTransfers 3
+eta:H2	0	0	eta:H2		every day	-
+## eta:H2 maxTransfers 4
+eta:H2	0	0	eta:H2		every day	-
+## eta:H2 maxTransfers 5
+eta:H2	0	0	eta:H2		every day	-
+## eta:H3 maxTransfers 0
+eta:H3	0	0	eta:H3		every day	-
+## eta:H3 maxTransfers 1
+eta:H3	0	0	eta:H3		every day	-
+## eta:H3 maxTransfers 2
+eta:H3	0	0	eta:H3		every day	-
+## eta:H3 maxTransfers 3
+eta:H3	0	0	eta:H3		every day	-
+## eta:H3 maxTransfers 4
+eta:H3	0	0	eta:H3		every day	-
+## eta:H3 maxTransfers 5
+eta:H3	0	0	eta:H3		every day	-
+## eta:H5 maxTransfers 0
+eta:H5	0	0	eta:H5		every day	-
+## eta:H5 maxTransfers 1
+eta:H5	0	0	eta:H5		every day	-
+## eta:H5 maxTransfers 2
+eta:H5	0	0	eta:H5		every day	-
+## eta:H5 maxTransfers 3
+eta:H5	0	0	eta:H5		every day	-
+## eta:H5 maxTransfers 4
+eta:H5	0	0	eta:H5		every day	-
+## eta:H5 maxTransfers 5
+eta:H5	0	0	eta:H5		every day	-
+## eta:H7 maxTransfers 0
+eta:H7	0	0	eta:H7		every day	-
+## eta:H7 maxTransfers 1
+eta:H7	0	0	eta:H7		every day	-
+## eta:H7 maxTransfers 2
+eta:H7	0	0	eta:H7		every day	-
+## eta:H7 maxTransfers 3
+eta:H7	0	0	eta:H7		every day	-
+## eta:H7 maxTransfers 4
+eta:H7	0	0	eta:H7		every day	-
+## eta:H7 maxTransfers 5
+eta:H7	0	0	eta:H7		every day	-
+## eta:H8 maxTransfers 0
+eta:H8	0	0	eta:H8		every day	-
+## eta:H8 maxTransfers 1
+eta:H8	0	0	eta:H8		every day	-
+## eta:H8 maxTransfers 2
+eta:H8	0	0	eta:H8		every day	-
+## eta:H8 maxTransfers 3
+eta:H8	0	0	eta:H8		every day	-
+## eta:H8 maxTransfers 4
+eta:H8	0	0	eta:H8		every day	-
+## eta:H8 maxTransfers 5
+eta:H8	0	0	eta:H8		every day	-
