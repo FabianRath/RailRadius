@@ -56,9 +56,14 @@ public class CompactReachabilitySearch implements SearchEngine {
                     new CompactTransferRound.Parameters(patternDays, minTransferMins * GtfsTime.SECONDS_PER_MINUTE,
                             maxTransferMins * GtfsTime.SECONDS_PER_MINUTE),
                     new SearchCounters());
-            return search(run, roundPaths);
-        } finally {
+            CompactResult result = search(run, roundPaths);
             idleScratches.offer(scratch);
+            return result;
+        } catch (RuntimeException e) {
+            // A stopped search leaves its scratch fit for the next one. An Error such as OutOfMemoryError can strike
+            // while the arena grows its columns one by one, so that scratch is dropped (B38)
+            idleScratches.offer(scratch);
+            throw e;
         }
     }
 
@@ -144,8 +149,9 @@ public class CompactReachabilitySearch implements SearchEngine {
     private int transferRound(Run run, int firstArrival, int endArrival, int transfers) {
         TimetableStore store = run.store();
         SearchCounters counters = run.counters();
-        List<CompactTransferRound.StationBoardings> stations = run.scratch().transferRound()
-                .boardings(firstArrival, endArrival, run.parameters());
+        CompactTransferRound round = run.scratch().transferRound();
+        List<CompactTransferRound.StationBoardings> stations = round.boardings(firstArrival, endArrival,
+                run.parameters());
         trimArena(run.scratch(), arena -> {
             for (CompactTransferRound.StationBoardings station : stations) {
                 for (int i = 0; i < station.count; i++) {
@@ -167,9 +173,10 @@ public class CompactReachabilitySearch implements SearchEngine {
             counters.fallbackScans += station.fallbackScans;
             counters.fallbackScannedArrivals += station.fallbackScannedArrivals;
             for (int i = 0; i < station.count; i++) {
-                int trip = store.tripOf(station.departureEvents[i]);
-                ride(run, trip, station.departureEvents[i] - store.firstEvent(trip), transfers,
-                        station.boardMinutes[i], station.fromLabels[i], station.days[i]);
+                int event = station.departureEvent(i);
+                int trip = store.tripOf(event);
+                ride(run, trip, event - store.firstEvent(trip), transfers, station.boardMinutes[i],
+                        station.fromLabels[i], round.boardDays(station, i, trip, run.patternDays()));
             }
         }
         return roundStart;
@@ -187,7 +194,7 @@ public class CompactReachabilitySearch implements SearchEngine {
         SearchScratch scratch = run.scratch();
         int firstEvent = store.firstEvent(trip);
         int endEvent = store.endEvent(trip);
-        scratch.progress().reach(trip, firstEvent, endEvent);
+        int slotBase = scratch.progress().reach(trip, firstEvent, endEvent);
         int durationMinutes = boardDurationMinutes;
         for (int event = firstEvent + boardIdx + 1; event < endEvent; event++) {
             int legEvent = event - 1;
@@ -198,8 +205,8 @@ public class CompactReachabilitySearch implements SearchEngine {
             }
             durationMinutes += Math.max(0, GtfsTime.diffMinutes(store.departureSeconds(legEvent),
                     store.arrivalSeconds(event)));
-            if (scratch.progress().reachedNoSlower(event, durationMinutes, days)) return;
-            scratch.progress().record(event, durationMinutes, days);
+            if (scratch.progress().reachedNoSlower(slotBase + event, durationMinutes, days)) return;
+            scratch.progress().record(slotBase + event, durationMinutes, days);
             int station = store.station(event);
             if (station == run.startIndex()) continue;
 
@@ -209,8 +216,7 @@ public class CompactReachabilitySearch implements SearchEngine {
             boolean candidate = candidates.accepts(station, durationMinutes);
             // Nothing boards from the last round's arrivals, so only its candidates need a label
             if (!candidate && transfers == run.maxTransfers()) continue;
-            int label = scratch.labels().add(trip, boardIdx, event - firstEvent, transfers, durationMinutes,
-                    previous, days);
+            int label = scratch.labels().add(trip, boardIdx, event - firstEvent, durationMinutes, previous, days);
             if (candidate) candidates.add(station, label, scratch.labels());
         }
     }
@@ -240,6 +246,7 @@ public class CompactReachabilitySearch implements SearchEngine {
             added.put(run.store().stations().id(station), new SearchResult.PathSummary(transfers, minutes));
         }
         stations.clear();
+        scratch.candidates().endRound();
         run.counters().pathsNanos += System.nanoTime() - startNanos;
         if (!added.isEmpty()) roundPaths.accept(added);
     }
@@ -251,8 +258,9 @@ public class CompactReachabilitySearch implements SearchEngine {
         for (int i = 0; i < stations.size(); i++) {
             int station = stations.get(i);
             if (candidates.count(station) < 2) continue;
-            for (int label = candidates.first(station); label != LabelArena.NONE; label = candidates.next(label)) {
-                scratch.days().request(label);
+            for (int slot = candidates.first(station); slot != StationCandidatesFlat.NONE;
+                 slot = candidates.next(slot)) {
+                scratch.days().request(candidates.label(slot));
             }
         }
     }
@@ -262,8 +270,8 @@ public class CompactReachabilitySearch implements SearchEngine {
         SearchScratch scratch = run.scratch();
         StationCandidatesFlat candidates = scratch.candidates();
         List<Integer> rides = new ArrayList<>();
-        for (int label = candidates.first(station); label != LabelArena.NONE; label = candidates.next(label)) {
-            rides.add(label);
+        for (int slot = candidates.first(station); slot != StationCandidatesFlat.NONE; slot = candidates.next(slot)) {
+            rides.add(candidates.label(slot));
         }
         if (rides.isEmpty()) return LabelArena.NONE;
         LabelArena labels = scratch.labels();

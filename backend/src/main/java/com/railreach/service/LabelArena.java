@@ -7,8 +7,8 @@ import java.util.Arrays;
  * an object per ride. Labels are numbered in the order they are made, so a round's arrivals are one range. An arena
  * serves one search at a time and is reused by the next; it grows by half its size and is never shrunk.
  * <p>
- * Stop indexes are shorts, so a trip with more than 32,767 stops fails fast. exactDays and dayShift memoize the
- * journey's exact running days ({@link LabelDays}).
+ * Stop indexes are shorts, so a trip with more than 32,767 stops fails fast. A label's transfers are the rides
+ * before it, so they need no column. daysMemo is {@link LabelDays}' memo of the journey's exact running days.
  */
 final class LabelArena {
 
@@ -23,10 +23,8 @@ final class LabelArena {
     private int[] durationMinutes = new int[INITIAL_CAPACITY];
     private short[] boardIdx = new short[INITIAL_CAPACITY];
     private short[] alightIdx = new short[INITIAL_CAPACITY];
-    private byte[] transfers = new byte[INITIAL_CAPACITY];
     private long[] weekPeriodDays = new long[INITIAL_CAPACITY];
-    private int[] exactDays = new int[INITIAL_CAPACITY];
-    private byte[] dayShift = new byte[INITIAL_CAPACITY];
+    private int[] daysMemo = new int[INITIAL_CAPACITY];
     private int size;
     // A trim's bitset of kept labels, and per word of it how many labels the words before keep
     private long[] kept = new long[0];
@@ -41,7 +39,7 @@ final class LabelArena {
     }
 
     /** previous is the label boarded from, {@link #NONE} for a first ride; days are its {@link WeekPeriodDays}. */
-    int add(int tripIndex, int board, int alight, int transferCount, int minutes, int previousLabel, long days) {
+    int add(int tripIndex, int board, int alight, int minutes, int previousLabel, long days) {
         if (alight > Short.MAX_VALUE) throw new IllegalStateException("Trip " + tripIndex + " has too many stops");
         if (size == trip.length) grow();
         trip[size] = tripIndex;
@@ -49,9 +47,8 @@ final class LabelArena {
         durationMinutes[size] = minutes;
         boardIdx[size] = (short) board;
         alightIdx[size] = (short) alight;
-        transfers[size] = (byte) transferCount;
         weekPeriodDays[size] = days;
-        exactDays[size] = UNKNOWN_DAYS;
+        daysMemo[size] = UNKNOWN_DAYS;
         return size++;
     }
 
@@ -75,25 +72,25 @@ final class LabelArena {
         return alightIdx[label];
     }
 
+    /** One per ride before the label's: each round boards from the one before. */
     int transfers(int label) {
-        return transfers[label];
+        int count = 0;
+        for (int ride = previous[label]; ride != NONE; ride = previous[ride]) {
+            count++;
+        }
+        return count;
     }
 
     long weekPeriodDays(int label) {
         return weekPeriodDays[label];
     }
 
-    int exactDays(int label) {
-        return exactDays[label];
+    int daysMemo(int label) {
+        return daysMemo[label];
     }
 
-    int dayShift(int label) {
-        return dayShift[label];
-    }
-
-    void setExactDays(int label, int daysId, int shift) {
-        exactDays[label] = daysId;
-        dayShift[label] = (byte) shift;
+    void setDaysMemo(int label, int memo) {
+        daysMemo[label] = memo;
     }
 
     /** Starts marking the labels the next {@link #trim} keeps: none so far. */
@@ -142,14 +139,19 @@ final class LabelArena {
 
     /** The labels' columns that a {@link CompactResult} keeps. */
     CompactResult.Labels resultLabels() {
+        // A label comes after the one it boarded from
+        byte[] transfers = new byte[size];
+        for (int label = 0; label < size; label++) {
+            if (previous[label] != NONE) transfers[label] = (byte) (transfers[previous[label]] + 1);
+        }
         return new CompactResult.Labels(Arrays.copyOf(trip, size), Arrays.copyOf(previous, size),
                 Arrays.copyOf(durationMinutes, size), Arrays.copyOf(boardIdx, size), Arrays.copyOf(alightIdx, size),
-                Arrays.copyOf(transfers, size));
+                transfers);
     }
 
     /** Bytes of the arrays, for the search's log. */
     long sizeBytes() {
-        return (long) trip.length * (4 * Integer.BYTES + 2 * Short.BYTES + 2 * Byte.BYTES + Long.BYTES)
+        return (long) trip.length * (4 * Integer.BYTES + 2 * Short.BYTES + Long.BYTES)
                 + (long) kept.length * (Long.BYTES + Integer.BYTES);
     }
 
@@ -160,10 +162,8 @@ final class LabelArena {
         durationMinutes[to] = durationMinutes[label];
         boardIdx[to] = boardIdx[label];
         alightIdx[to] = alightIdx[label];
-        transfers[to] = transfers[label];
         weekPeriodDays[to] = weekPeriodDays[label];
-        exactDays[to] = exactDays[label];
-        dayShift[to] = dayShift[label];
+        daysMemo[to] = daysMemo[label];
     }
 
     private static int wordCount(int labelCount) {
@@ -177,9 +177,7 @@ final class LabelArena {
         durationMinutes = Arrays.copyOf(durationMinutes, capacity);
         boardIdx = Arrays.copyOf(boardIdx, capacity);
         alightIdx = Arrays.copyOf(alightIdx, capacity);
-        transfers = Arrays.copyOf(transfers, capacity);
         weekPeriodDays = Arrays.copyOf(weekPeriodDays, capacity);
-        exactDays = Arrays.copyOf(exactDays, capacity);
-        dayShift = Arrays.copyOf(dayShift, capacity);
+        daysMemo = Arrays.copyOf(daysMemo, capacity);
     }
 }

@@ -45,6 +45,30 @@ Full data, `-Xmx9g`, G1, warmer on, gate at 2 permits and 6 queued. 5 clients at
 | Live heap after the run (`bench.sh memory`) | 3,243 MB, with 22 stored results in the raw cache |
 | Peak working set | 9.5 GB: G1 grows the heap towards `-Xmx` |
 
+## Compact engine memory (S22, 2026-10-10)
+Full data, compact engine, compact object headers, warmer off, started from `data/gtfs-store.bin`, against the S20 jar on the same machine. Results are byte-identical to S20 (`SearchSnapshot`, dev and full).
+| Measure | How | Result |
+|---|---|---|
+| Scratch per search | the `Search stats (compact)` log line | Stockholm **360 MB** (S20: 447 MB), the other large starts 268–274 MB (338–352 MB). Labels 28 instead of 30 bytes and no `next` link per label, trip progress only for reached trips (~3.4 M of 5.8 M events at most) |
+| Boardings held during a round | 3 ints instead of 20 bytes each | Up to 9.8 M per round (Stockholm, round 5): ~118 MB instead of ~197 MB, outside the scratch |
+| Held during a search | `bench.sh held`, 5 transfers, fresh app (`-Xmx6g`), twice | Stockholm **331 MB** (S20: 492–580 MB), München **327 MB** (427 MB) |
+| 4 concurrent 5-transfer searches, 4 permits, `-Xmx3g` | Stockholm, Bruxelles-Midi, København, Roma at once | All `done` in 4.3–5.9 s, no full GC, largest heap before a GC 2,839 MB; live heap afterwards **1,577 MB** (4 scratches, 4 results). S20: all `done` too (its idle heap is 294 MB), but with a full GC at 3,072 MB |
+| The same at `-Xmx2g` | as above | All `done` in 4.7–6.4 s, one full GC. S20: one search ran out of memory and its stream hung (B38) |
+| The same at `-Xmx1400m` (24-byte labels, see `decisions.md`) | as above | Stockholm ran out of memory and its stream got the `error` event; the other three `done`; live heap afterwards 1,170 MB (3 scratches: the failed one is dropped) |
+
+Search time (`bench.sh times full`, S22 and S20 alternating, two runs each, ms):
+
+| Transfers | p50 S22 | p50 S20 | p95 S22 | p95 S20 |
+|---|---|---|---|---|
+| 0 | 4, 4 | 5, 4 | 15, 11 | 12, 12 |
+| 1 | 37, 36 | 38, 37 | 72, 77 | 78, 81 |
+| 2 | 142, 140 | 141, 143 | 310, 312 | 281, 292 |
+| 3 | 456, 405 | 402, 425 | 917, 884 | 886, 888 |
+| 4 | 1,058, 1,070 | 1,075, 1,147 | 1,600, 1,639 | 1,625, 1,690 |
+| 5 | 1,767, 1,628 | 1,660, 1,817 | 2,643, 2,673 | 2,522, 2,754 |
+
+The same within the noise between runs (up to ~5 %). 120 searches at 2 and 3 transfers with other wait windows (two runs each): 8.0–8.1 s and 23.1–23.4 s in all, S20 8.1–8.3 s and 23.7–24.1 s.
+
 ## Binary cache (S20, 2026-10-10)
 Full data, compact engine, `-Xmx3g`, compact object headers, warmer off, started from `data/gtfs-store.bin` (written by the first start from the JSON cache: 5.3 s, most of it hashing the 650 MB JSON). Results are byte-identical to S19 (`SearchSnapshot` on dev and full data from the binary cache; the API's station search, station, `/stats`, POST and `/journey` answers equal those of a JSON start).
 | Measure | How | Result |

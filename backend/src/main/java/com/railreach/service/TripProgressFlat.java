@@ -3,26 +3,36 @@ package com.railreach.service;
 import java.util.Arrays;
 
 /**
- * {@link TripProgress} of every trip at once, by stop event of the {@link TimetableStore}, reused from search to
- * search. A trip's events are reset when a search first reaches it, marked by stamping the trip with the search's
- * generation, so starting a search costs nothing.
+ * {@link TripProgress} of every trip a search reaches, reused from search to search. A trip's stop events get slots
+ * when the search first reaches it, marked by stamping the trip with the search's generation, so starting a search
+ * costs nothing. A large search reaches about half the store's events, so slots are only made for reached trips.
  */
 final class TripProgressFlat {
 
-    private final int[] durationMinutes;
-    private final long[] fastestDays;
-    private final long[] reachedDays;
+    private static final int INITIAL_CAPACITY = 1 << 16;
+
+    private final int eventCount;
+    // Per trip: the slot of its first event minus that event, valid while the trip carries this search's generation
+    private final int[] tripBase;
     private final int[] tripGeneration;
     private int generation;
+    private int[] durationMinutes;
+    private long[] fastestDays;
+    private long[] reachedDays;
+    private int usedSlots;
 
     TripProgressFlat(TimetableStore store) {
-        durationMinutes = new int[store.eventCount()];
-        fastestDays = new long[store.eventCount()];
-        reachedDays = new long[store.eventCount()];
+        eventCount = store.eventCount();
+        tripBase = new int[store.tripCount()];
         tripGeneration = new int[store.tripCount()];
+        int capacity = Math.min(INITIAL_CAPACITY, eventCount);
+        durationMinutes = new int[capacity];
+        fastestDays = new long[capacity];
+        reachedDays = new long[capacity];
     }
 
     void startSearch() {
+        usedSlots = 0;
         generation++;
         // After 2^32 searches a stamp could match again
         if (generation == 0) {
@@ -31,37 +41,59 @@ final class TripProgressFlat {
         }
     }
 
-    /** Makes the trip's events, firstEvent up to endEvent, unreached if this search has not reached the trip yet. */
-    void reach(int trip, int firstEvent, int endEvent) {
-        if (tripGeneration[trip] == generation) return;
+    /**
+     * Gives the trip's events, firstEvent up to endEvent, unreached slots if this search has not reached the trip yet.
+     * Returns what to add to one of its events to get the event's slot.
+     */
+    int reach(int trip, int firstEvent, int endEvent) {
+        if (tripGeneration[trip] == generation) return tripBase[trip];
         tripGeneration[trip] = generation;
-        Arrays.fill(durationMinutes, firstEvent, endEvent, Integer.MAX_VALUE);
-        Arrays.fill(fastestDays, firstEvent, endEvent, 0L);
-        Arrays.fill(reachedDays, firstEvent, endEvent, 0L);
+        int end = usedSlots + endEvent - firstEvent;
+        if (end > durationMinutes.length) grow(end);
+        Arrays.fill(durationMinutes, usedSlots, end, Integer.MAX_VALUE);
+        Arrays.fill(fastestDays, usedSlots, end, 0L);
+        Arrays.fill(reachedDays, usedSlots, end, 0L);
+        tripBase[trip] = usedSlots - firstEvent;
+        usedSlots = end;
+        return tripBase[trip];
     }
 
-    boolean reachedNoSlower(int event, int rideMinutes, long rideDays) {
-        return durationMinutes[event] <= rideMinutes && (rideDays & ~reachedDays[event]) == 0;
+    /** The slot of an event of a trip this search reached. */
+    int slot(int trip, int event) {
+        return tripBase[trip] + event;
     }
 
-    boolean reachedFaster(int event, int rideMinutes, long rideDays) {
-        return durationMinutes[event] < rideMinutes && (rideDays & ~fastestDays[event]) == 0;
+    boolean reachedNoSlower(int slot, int rideMinutes, long rideDays) {
+        return durationMinutes[slot] <= rideMinutes && (rideDays & ~reachedDays[slot]) == 0;
     }
 
-    void record(int event, int rideMinutes, long rideDays) {
-        reachedDays[event] |= rideDays;
-        if (rideMinutes >= durationMinutes[event]) return;
-        durationMinutes[event] = rideMinutes;
-        fastestDays[event] = rideDays;
+    boolean reachedFaster(int slot, int rideMinutes, long rideDays) {
+        return durationMinutes[slot] < rideMinutes && (rideDays & ~fastestDays[slot]) == 0;
+    }
+
+    void record(int slot, int rideMinutes, long rideDays) {
+        reachedDays[slot] |= rideDays;
+        if (rideMinutes >= durationMinutes[slot]) return;
+        durationMinutes[slot] = rideMinutes;
+        fastestDays[slot] = rideDays;
     }
 
     long sizeBytes() {
         return (long) durationMinutes.length * (Integer.BYTES + 2 * Long.BYTES)
-                + (long) tripGeneration.length * Integer.BYTES;
+                + (long) tripGeneration.length * 2 * Integer.BYTES;
     }
 
     /** Trips this search reached, for its log. */
     long reachedTripCount() {
         return Arrays.stream(tripGeneration).filter(stamp -> stamp == generation).count();
+    }
+
+    // Grows by half, but never past every event of the store
+    private void grow(int minCapacity) {
+        int grown = durationMinutes.length + (durationMinutes.length >> 1);
+        int capacity = Math.min(eventCount, Math.max(minCapacity, grown));
+        durationMinutes = Arrays.copyOf(durationMinutes, capacity);
+        fastestDays = Arrays.copyOf(fastestDays, capacity);
+        reachedDays = Arrays.copyOf(reachedDays, capacity);
     }
 }

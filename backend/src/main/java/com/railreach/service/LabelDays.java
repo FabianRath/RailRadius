@@ -8,6 +8,9 @@ import java.util.stream.IntStream;
  * The exact running days of the journeys a compact search chooses among: per label its journey's
  * {@link JourneyRunningDays.SoFar}, like the legacy search's runningDays. Each label's days are worked out once and
  * interned per search, since a station's candidates share their earlier rides and many journeys run on the same days.
+ * The memo is one int per label in the arena: the interned days' index and the day shift, packed. A side table by
+ * label would be smaller, since only a few percent of the labels need it, but its lookups made choosing paths ~40 %
+ * slower.
  * <p>
  * Candidates ask first ({@link #request}), which also queues every earlier ride of theirs with unknown days.
  * {@link #resolve} then works them out by ascending transfers, each transfer count's labels in parallel: a label needs
@@ -17,6 +20,11 @@ import java.util.stream.IntStream;
 final class LabelDays {
 
     private static final int QUEUED = -2;
+    // A memo is the interned days' index << DAY_SHIFT_BITS | the day shift: at most one per transfer, and a search
+    // has fewer than 128
+    private static final int DAY_SHIFT_BITS = Byte.SIZE - 1;
+    private static final int DAY_SHIFT_MASK = (1 << DAY_SHIFT_BITS) - 1;
+    private static final int MAX_DAYS_INDEX = Integer.MAX_VALUE >> DAY_SHIFT_BITS;
 
     private final LabelArena labels;
     private final List<IntList> queuedByTransfers = new ArrayList<>();
@@ -33,9 +41,9 @@ final class LabelDays {
 
     /** Queues the label's days, and those of every earlier ride of its journey that are not known yet. */
     void request(int label) {
-        for (int ride = label; ride != LabelArena.NONE && labels.exactDays(ride) == LabelArena.UNKNOWN_DAYS;
+        for (int ride = label; ride != LabelArena.NONE && labels.daysMemo(ride) == LabelArena.UNKNOWN_DAYS;
              ride = labels.previous(ride)) {
-            labels.setExactDays(ride, QUEUED, 0);
+            labels.setDaysMemo(ride, QUEUED);
             int transfers = labels.transfers(ride);
             while (queuedByTransfers.size() <= transfers) queuedByTransfers.add(new IntList());
             queuedByTransfers.get(transfers).add(ride);
@@ -49,7 +57,9 @@ final class LabelDays {
             IntStream.range(0, queued.size()).parallel()
                     .forEach(i -> soFar[i] = soFar(queued.get(i), store, graph));
             for (int i = 0; i < soFar.length; i++) {
-                labels.setExactDays(queued.get(i), interned.intern(soFar[i].days()), soFar[i].dayShift());
+                int daysIndex = interned.intern(soFar[i].days());
+                if (daysIndex > MAX_DAYS_INDEX) throw new IllegalStateException("Too many distinct journey days");
+                labels.setDaysMemo(queued.get(i), daysIndex << DAY_SHIFT_BITS | soFar[i].dayShift());
             }
             queued.clear();
         }
@@ -57,13 +67,13 @@ final class LabelDays {
 
     /** The days of a resolved label's journey. */
     ServiceDays days(int label) {
-        return interned.days(labels.exactDays(label));
+        return interned.days(labels.daysMemo(label) >> DAY_SHIFT_BITS);
     }
 
     private JourneyRunningDays.SoFar soFar(int label, TimetableStore store, TransitGraph graph) {
         int previous = labels.previous(label);
         JourneyRunningDays.SoFar before = previous == LabelArena.NONE ? JourneyRunningDays.SoFar.START
-                : new JourneyRunningDays.SoFar(days(previous), labels.dayShift(previous),
+                : new JourneyRunningDays.SoFar(days(previous), labels.daysMemo(previous) & DAY_SHIFT_MASK,
                         store.arrivalSeconds(alightEvent(previous, store)));
         int boardEvent = store.firstEvent(labels.trip(label)) + labels.boardIdx(label);
         return JourneyRunningDays.withRide(before, store, boardEvent, alightEvent(label, store), graph);
