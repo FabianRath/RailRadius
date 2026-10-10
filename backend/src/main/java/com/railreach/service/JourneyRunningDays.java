@@ -1,7 +1,5 @@
 package com.railreach.service;
 
-import com.railreach.model.Connection;
-
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.TextStyle;
@@ -20,9 +18,6 @@ final class JourneyRunningDays {
     private static final int MIN_PATTERN_DAYS = 4;
     private static final int MIN_RANGE_LENGTH = 3;
 
-    /** One ride of a journey: boarded on trip tripId at fromStopId, left at toStopId. */
-    record RideTimes(String tripId, String fromStopId, int departureSeconds, String toStopId, int arrivalSeconds) {}
-
     /**
      * The days, counted from the first train's service day, on which every ride so far runs; dayShift is how many
      * days after the first train the last ride runs, arrivalSeconds when it arrives.
@@ -35,84 +30,18 @@ final class JourneyRunningDays {
     private JourneyRunningDays() {
     }
 
-    /** The days, counted from the first train's service day, on which every ride of the journey runs. */
-    static ServiceDays of(List<Connection> connections, TransitGraph graph) {
-        SoFar soFar = SoFar.START;
-        for (RideTimes ride : rides(connections)) {
-            soFar = withRide(soFar, ride, graph);
-        }
-        return soFar.days();
-    }
-
-    /** The journey's rides: consecutive connections on the same trip are one ride. */
-    static List<RideTimes> rides(List<Connection> connections) {
-        List<RideTimes> rides = new ArrayList<>();
-        int rideStart = 0;
-        while (rideStart < connections.size()) {
-            int rideEnd = rideStart;
-            while (rideEnd + 1 < connections.size()
-                    && connections.get(rideEnd + 1).getTripId().equals(connections.get(rideStart).getTripId())) {
-                rideEnd++;
-            }
-            Connection board = connections.get(rideStart);
-            Connection alight = connections.get(rideEnd);
-            rides.add(new RideTimes(board.getTripId(), board.getFromStopId(), board.getDepartureTimeSeconds(),
-                    alight.getToStopId(), alight.getArrivalTimeSeconds()));
-            rideStart = rideEnd + 1;
-        }
-        return rides;
-    }
-
     /**
-     * The journey's days after one more ride. A ride boarded at an earlier clock time than the previous one arrived
-     * runs a day later: that is the search's overnight transfer.
+     * The journey's days after one more ride, from boardEvent to alightEvent of a trip. A ride boarded at an earlier
+     * clock time than the previous one arrived runs a day later: that is the search's overnight transfer. The ride's
+     * days are {@link TimetableStore#rideDays}: those of its trip and its twins.
      */
-    static SoFar withRide(SoFar before, RideTimes ride, TransitGraph graph) {
-        return withRide(before, rideDays(ride, graph), ride.departureSeconds(), ride.arrivalSeconds(), graph);
-    }
-
-    /** Like {@link #withRide(SoFar, RideTimes, TransitGraph)}, for a ride from boardEvent to alightEvent of a trip. */
     static SoFar withRide(SoFar before, TimetableStore store, int boardEvent, int alightEvent, TransitGraph graph) {
-        return withRide(before, store.rideDays(boardEvent, alightEvent), store.departureSeconds(boardEvent),
-                store.arrivalSeconds(alightEvent), graph);
-    }
-
-    private static SoFar withRide(SoFar before, ServiceDays rideDays, int departureSeconds, int arrivalSeconds,
-                                  TransitGraph graph) {
-        int dayShift = departureSeconds < before.arrivalSeconds() ? before.dayShift() + 1 : before.dayShift();
+        int dayShift = store.departureSeconds(boardEvent) < before.arrivalSeconds()
+                ? before.dayShift() + 1 : before.dayShift();
+        ServiceDays rideDays = store.rideDays(boardEvent, alightEvent);
         // The first train's days from today on set the journey's dates (B31)
         ServiceDays days = before == SoFar.START ? graph.upcomingDays(rideDays) : rideDays;
-        return new SoFar(before.days().intersect(days, dayShift), dayShift, arrivalSeconds);
-    }
-
-    /**
-     * The days of the ridden trip and of every trip with the same times between the same two stations. Feeds publish
-     * one train as several trips with different days (NS: train 9535 as 7 trips, one stop ID apart). The search
-     * timetables already merge trips with the same times at every stop, including the ridden one, so their days
-     * count too. The ridden trip counts even if it passes the alight station earlier at another time (B37).
-     */
-    private static ServiceDays rideDays(RideTimes ride, TransitGraph graph) {
-        List<TripTimetable.Departure> departures = graph.searchTimetables().departuresAt(ride.fromStopId());
-        ServiceDays days = graph.getServiceDays(ride.tripId());
-        for (int i = TripTimetable.firstDepartureAt(departures, ride.departureSeconds()); i < departures.size()
-                && departures.get(i).departureSeconds() == ride.departureSeconds(); i++) {
-            TripTimetable.Departure twin = departures.get(i);
-            if (twin.trip().tripId().equals(ride.tripId()) || arrivesLikeRide(twin, ride)) {
-                days = days.union(twin.trip().serviceDays());
-            }
-        }
-        return days;
-    }
-
-    private static boolean arrivesLikeRide(TripTimetable.Departure departure, RideTimes ride) {
-        TripTimetable trip = departure.trip();
-        for (int stopIdx = departure.stopIdx() + 1; stopIdx < trip.stopCount() && trip.hasLeg(stopIdx - 1);
-             stopIdx++) {
-            if (trip.stops().get(stopIdx).equals(ride.toStopId())) {
-                return trip.arrivalSeconds(stopIdx) == ride.arrivalSeconds();
-            }
-        }
-        return false;
+        return new SoFar(before.days().intersect(days, dayShift), dayShift, store.arrivalSeconds(alightEvent));
     }
 
     /**

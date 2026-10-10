@@ -3,13 +3,17 @@ package com.railreach.service;
 import java.util.Arrays;
 
 /**
- * {@link StationCandidates} of every station at once, reused from search to search. A station's candidates are a
- * list through slots of a pool, in the order they were offered, and removing slower ones keeps that order like
+ * The candidate rides of every station's result, reused from search to search: per station and transfer count the
+ * fastest one and those at most {@link #MAX_SLOWER_MINUTES} slower, all faster than every ride with fewer transfers.
+ * Rounds run by ascending transfers, so rides arrive in that order. A station's candidates are a list through slots
+ * of a pool, in the order they were offered, and removing slower ones keeps that order like
  * {@code removeIf} does. Only the newest transfer count's candidates are ever read, so the list starts empty when the
  * count goes up, and the pool is emptied after each round: a round has far fewer candidates than labels.
  */
 final class StationCandidatesFlat {
 
+    // A journey this much slower than the fastest can still be shown for a station, if it runs more often
+    static final int MAX_SLOWER_MINUTES = 30;
     private static final int NEVER_REACHED = -1;
     static final int NONE = -1;
 
@@ -69,7 +73,7 @@ final class StationCandidatesFlat {
     /** Whether a ride this long becomes a candidate of the station. */
     boolean accepts(int station, int minutes) {
         return minutes < fastestWithFewerMinutes[station]
-                && minutes - StationCandidates.MAX_SLOWER_MINUTES <= fastestMinutes[station];
+                && minutes - MAX_SLOWER_MINUTES <= fastestMinutes[station];
     }
 
     /** Adds an accepted ride, dropping the candidates it makes too slow. */
@@ -77,7 +81,7 @@ final class StationCandidatesFlat {
         int minutes = labels.durationMinutes(label);
         if (minutes < fastestMinutes[station]) {
             fastestMinutes[station] = minutes;
-            removeSlowerThan(station, minutes + StationCandidates.MAX_SLOWER_MINUTES, labels);
+            removeSlowerThan(station, minutes + MAX_SLOWER_MINUTES, labels);
         }
         append(station, label);
     }

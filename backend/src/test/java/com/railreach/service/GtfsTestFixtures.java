@@ -18,8 +18,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 /**
- * Builds a TransitGraph from the hand-written feeds in src/test/resources/gtfs-mini.
- * Each feed folder is zipped to gtfs_<source>.zip, where source is the folder name up to
+ * Builds a TransitGraph, or the RailNetwork it is built from, from the hand-written feeds in
+ * src/test/resources/gtfs-mini. Each feed folder is zipped to gtfs_<source>.zip, where source is the folder name up to
  * the first '-' (so "alpha-fast-train" still loads as source "alpha").
  */
 final class GtfsTestFixtures {
@@ -42,7 +42,7 @@ final class GtfsTestFixtures {
         return load(tempDir, TRIP_BATCH_SIZE, TODAY, feedFolders);
     }
 
-    /** Like {@link #load(Path, String...)}, with stop_times handed to the graph in batches of this many trips. */
+    /** Like {@link #load(Path, String...)}, with stop_times handed to the loader in batches of this many trips. */
     static TransitGraph load(Path tempDir, int tripBatchSize, String... feedFolders) throws IOException {
         return load(tempDir, tripBatchSize, TODAY, feedFolders);
     }
@@ -56,12 +56,26 @@ final class GtfsTestFixtures {
             throws IOException {
         TransitGraph graph = TransitGraph.withToday(today);
         dataService(tempDir, graph, reachabilityCache(graph), new StationSearchIndex(graph), tripBatchSize,
-                SearchEngine.LEGACY, feedFolders).loadFromFiles();
+                feedFolders).loadFromFiles();
         return graph;
     }
 
+    /** The feeds loaded and their stations merged, as a load of the app does before it builds the store. */
+    static RailNetwork network(Path tempDir, String... feedFolders) throws IOException {
+        return network(tempDir, TRIP_BATCH_SIZE, feedFolders);
+    }
+
+    /** Like {@link #network(Path, String...)}, with stop_times handed over in batches of this many trips. */
+    static RailNetwork network(Path tempDir, int tripBatchSize, String... feedFolders) throws IOException {
+        RailNetwork network = new RailNetwork();
+        feedLoader(tripBatchSize).loadDirectory(zipFeeds(tempDir, feedFolders).toString(), network,
+                new GtfsLoadProgress());
+        deduplicator().deduplicate(network);
+        return network;
+    }
+
     /** Per station of the result, the journey of each of its paths in order. */
-    static Map<String, List<JourneyValue>> journeys(SearchResult result) {
+    static Map<String, List<JourneyValue>> journeys(CompactResult result) {
         Map<String, List<JourneyValue>> journeys = new HashMap<>();
         result.forEachStation((stationId, paths) -> journeys.put(stationId, paths.stream()
                 .map(path -> result.journey(stationId, path.transfers()))
@@ -75,42 +89,45 @@ final class GtfsTestFixtures {
     static GtfsDataService dataService(Path tempDir, TransitGraph graph, ReachabilityCache reachabilityCache,
                                        StationSearchIndex stationSearchIndex, String... feedFolders)
             throws IOException {
-        return dataService(tempDir, graph, reachabilityCache, stationSearchIndex, TRIP_BATCH_SIZE,
-                SearchEngine.LEGACY, feedFolders);
+        return dataService(tempDir, graph, reachabilityCache, stationSearchIndex, TRIP_BATCH_SIZE, feedFolders);
     }
 
-    /** Like {@link #dataService(Path, TransitGraph, ReachabilityCache, StationSearchIndex, String...)}, on engine. */
-    static GtfsDataService dataService(Path tempDir, TransitGraph graph, String engine, String... feedFolders)
-            throws IOException {
-        return dataService(tempDir, graph, reachabilityCache(graph, engine), new StationSearchIndex(graph),
-                TRIP_BATCH_SIZE, engine, feedFolders);
+    /** Like {@link #dataService(Path, TransitGraph, ReachabilityCache, StationSearchIndex, String...)}. */
+    static GtfsDataService dataService(Path tempDir, TransitGraph graph, String... feedFolders) throws IOException {
+        return dataService(tempDir, graph, reachabilityCache(graph), new StationSearchIndex(graph), feedFolders);
     }
 
     private static GtfsDataService dataService(Path tempDir, TransitGraph graph, ReachabilityCache reachabilityCache,
                                                StationSearchIndex stationSearchIndex, int tripBatchSize,
-                                               String engine, String... feedFolders) throws IOException {
+                                               String... feedFolders) throws IOException {
+        Path gtfsDir = zipFeeds(tempDir, feedFolders);
+        GtfsDataService service = new GtfsDataService(graph, feedLoader(tripBatchSize), deduplicator(),
+                binaryCacheStore(tempDir), reachabilityCache, stationSearchIndex, new GtfsLoadProgress());
+        ReflectionTestUtils.setField(service, "gtfsDirectory", gtfsDir.toString());
+        return service;
+    }
+
+    /** Zips the feed folders into tempDir/gtfs and returns that directory. */
+    private static Path zipFeeds(Path tempDir, String... feedFolders) throws IOException {
         Path gtfsDir = Files.createDirectories(tempDir.resolve("gtfs"));
         for (String folder : feedFolders) {
             String source = folder.split("-")[0];
             zipFeed(folder, gtfsDir.resolve("gtfs_" + source + ".zip"));
         }
+        return gtfsDir;
+    }
 
+    private static GtfsFeedLoader feedLoader(int tripBatchSize) {
         GtfsFeedLoader feedLoader = new GtfsFeedLoader();
         ReflectionTestUtils.setField(feedLoader, "tripBatchSize", tripBatchSize);
-        GtfsDataService service = new GtfsDataService(graph, feedLoader,
-                new StationDeduplicator(new CountryLocator(Files.newInputStream(resource(BORDERS_FILE)))),
-                cacheStore(tempDir), binaryCacheStore(tempDir), reachabilityCache, SearchEngine.named(engine, graph),
-                stationSearchIndex, new GtfsLoadProgress());
-        ReflectionTestUtils.setField(service, "gtfsDirectory", gtfsDir.toString());
-        return service;
+        return feedLoader;
     }
 
-    /** The cache store that {@link #load} writes to. */
-    static GtfsCacheStore cacheStore(Path tempDir) {
-        return new GtfsCacheStore(tempDir.resolve("gtfs-cache.json").toString());
+    private static StationDeduplicator deduplicator() throws IOException {
+        return new StationDeduplicator(new CountryLocator(Files.newInputStream(resource(BORDERS_FILE))));
     }
 
-    /** The binary cache store of a {@link #dataService} in tempDir; only the compact engine writes it. */
+    /** The binary cache store that a {@link #dataService} in tempDir writes to. */
     static BinaryCacheStore binaryCacheStore(Path tempDir) {
         return new BinaryCacheStore(tempDir.resolve("gtfs-store.bin").toString());
     }
@@ -118,11 +135,6 @@ final class GtfsTestFixtures {
     /** A ReachabilityService wired like in the app, without warming or a Caffeine cache. */
     static ReachabilityService reachabilityService(TransitGraph graph) {
         return reachabilityService(graph, reachabilityCache(graph));
-    }
-
-    /** Like {@link #reachabilityService(TransitGraph)}, on the given search engine. */
-    static ReachabilityService reachabilityService(TransitGraph graph, String engine) {
-        return reachabilityService(graph, reachabilityCache(graph, engine));
     }
 
     static ReachabilityService reachabilityService(TransitGraph graph, ReachabilityCache cache) {
@@ -133,32 +145,23 @@ final class GtfsTestFixtures {
     }
 
     static ReachabilityCache reachabilityCache(TransitGraph graph) {
-        return reachabilityCache(graph, SearchEngine.LEGACY);
-    }
-
-    static ReachabilityCache reachabilityCache(TransitGraph graph, String engine) {
-        return reachabilityCache(graph, newGate(), RAW_CACHE_MAX_ENTRIES, engine);
+        return reachabilityCache(graph, newGate(), RAW_CACHE_MAX_ENTRIES);
     }
 
     static ReachabilityCache reachabilityCache(TransitGraph graph, int rawMaxEntries) {
-        return reachabilityCache(graph, newGate(), rawMaxEntries, SearchEngine.LEGACY);
+        return reachabilityCache(graph, newGate(), rawMaxEntries);
     }
 
     static ReachabilityCache reachabilityCache(TransitGraph graph, SearchGate gate) {
-        return reachabilityCache(graph, gate, SearchEngine.LEGACY);
-    }
-
-    static ReachabilityCache reachabilityCache(TransitGraph graph, SearchGate gate, String engine) {
-        return reachabilityCache(graph, gate, RAW_CACHE_MAX_ENTRIES, engine);
+        return reachabilityCache(graph, gate, RAW_CACHE_MAX_ENTRIES);
     }
 
     private static SearchGate newGate() {
         return new SearchGate(SEARCH_PERMITS, MAX_QUEUED_SEARCHES);
     }
 
-    private static ReachabilityCache reachabilityCache(TransitGraph graph, SearchGate gate, int rawMaxEntries,
-                                                       String engine) {
-        return new ReachabilityCache(SearchEngine.named(engine, graph), gate, new ConcurrentMapCacheManager(),
+    private static ReachabilityCache reachabilityCache(TransitGraph graph, SearchGate gate, int rawMaxEntries) {
+        return new ReachabilityCache(new CompactReachabilitySearch(graph), gate, new ConcurrentMapCacheManager(),
                 rawMaxEntries);
     }
 

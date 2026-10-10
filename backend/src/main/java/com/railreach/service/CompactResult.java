@@ -9,14 +9,21 @@ import java.util.OptionalInt;
 import java.util.function.BiConsumer;
 
 /**
- * A compact search's result (S19): the labels of its chosen paths and of the rides before them, copied out of the
- * search's arena, and per station its chosen labels by ascending transfers. A journey's stations, connections and
- * running days are built from the {@link TimetableStore} when it is asked for, so a stored result is a few arrays.
- * A result with fewer transfers is a view on the same arrays.
+ * What a search found (S19): per station its paths by ascending transfers ({@link CompactReachabilitySearch#search}).
+ * It holds the labels of the chosen paths and of the rides before them, copied out of the search's arena, and per
+ * station its chosen labels by ascending transfers. A path's transfers and duration are at hand; its stations,
+ * connections and running days are built from the {@link TimetableStore} when it is asked for ({@link #journey}), so
+ * a stored result is a few arrays. A result with fewer transfers is a view on the same arrays.
  */
-final class CompactResult implements SearchResult {
+final class CompactResult {
 
     private static final List<PathSummary> START_PATHS = List.of(new PathSummary(0, 0));
+
+    /** A path's transfers and duration, which is all the stream sends of it. */
+    record PathSummary(int transfers, int durationMinutes) {}
+
+    /** A path's stations and connections, and the exact days on which the whole journey runs. */
+    record Journey(JourneyPath path, ServiceDays runningDays) {}
 
     /** The columns of {@link LabelArena} that journeys need, as arrays of exact size. */
     record Labels(int[] trip, int[] previous, int[] durationMinutes, short[] boardIdx, short[] alightIdx,
@@ -44,23 +51,27 @@ final class CompactResult implements SearchResult {
         this.maxTransfers = maxTransfers;
     }
 
-    @Override
-    public void forEachStation(BiConsumer<String, List<PathSummary>> action) {
+    /** Calls the action with every station that has a path and its paths; the start station has its one empty path. */
+    void forEachStation(BiConsumer<String, List<PathSummary>> action) {
         action.accept(startId, START_PATHS);
         for (int station = 0; station + 1 < chosen.start().length; station++) {
             if (hasPathWithin(station)) action.accept(store.stations().id(station), paths(station));
         }
     }
 
-    @Override
-    public List<PathSummary> paths(String stationId) {
+    /** The station's paths by ascending transfers; empty if it has none. */
+    List<PathSummary> paths(String stationId) {
         if (stationId.equals(startId)) return START_PATHS;
         OptionalInt station = store.stations().indexOf(stationId);
         return station.isPresent() ? paths(station.getAsInt()) : List.of();
     }
 
-    @Override
-    public Journey journey(String stationId, int transfers) {
+    /**
+     * The station's path with this many transfers, one of {@link #paths}.
+     *
+     * @throws IllegalArgumentException if the station has no such path
+     */
+    Journey journey(String stationId, int transfers) {
         if (stationId.equals(startId) && transfers == 0) return journey(LabelArena.NONE);
         OptionalInt station = store.stations().indexOf(stationId);
         if (station.isPresent()) {
@@ -72,13 +83,16 @@ final class CompactResult implements SearchResult {
         throw new IllegalArgumentException("No path with " + transfers + " transfers to " + stationId);
     }
 
-    @Override
-    public SearchResult withMaxTransfers(int transfers) {
+    /**
+     * The paths with at most this many transfers. Rounds of the search never depend on later rounds, so that is
+     * exactly the result of a search with that many.
+     */
+    CompactResult withMaxTransfers(int transfers) {
         return new CompactResult(store, graph, startId, labels, chosen, Math.min(transfers, maxTransfers));
     }
 
-    @Override
-    public int stationCount() {
+    /** Stations with a path, the start station included. */
+    int stationCount() {
         int count = 1;
         for (int station = 0; station + 1 < chosen.start().length; station++) {
             if (hasPathWithin(station)) count++;

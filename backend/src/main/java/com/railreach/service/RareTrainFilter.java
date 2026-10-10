@@ -6,9 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -70,30 +68,6 @@ final class RareTrainFilter {
         trips.keySet().removeIf(tripId -> rareTrains.contains(trainByTripId.get(tripId)));
         log.info("  Dropped {} trips of {} trains that run on fewer than {} days",
                 tripCount - trips.size(), rareTrains.size(), MIN_RUNNING_DAYS);
-    }
-
-    /**
-     * Per stop index of the trip: whether its departure there runs on at least {@link #MIN_RUNNING_DAYS} days,
-     * counting every trip that leaves the stop at the same time. A variant can match its regular train at the first
-     * stop and leave a later one at another time on a few days only (B33: Snälltåget NT from Berlin at 21:07 on 4
-     * days, the regular ones at 20:53, 21:06 and 21:09); a ride must not continue from such a stop.
-     */
-    static boolean[] regularDepartures(TripTimetable trip,
-                                       Function<String, List<TripTimetable.Departure>> departuresAt) {
-        boolean[] regular = new boolean[trip.stopCount()];
-        for (int stopIdx = 0; stopIdx < trip.stopCount() - 1; stopIdx++) {
-            if (!trip.hasLeg(stopIdx)) continue;
-            List<TripTimetable.Departure> departures = departuresAt.apply(trip.stops().get(stopIdx));
-            int departureSeconds = trip.legDepartureSeconds()[stopIdx];
-            ServiceDays days = null;
-            for (int i = TripTimetable.firstDepartureAt(departures, departureSeconds); i < departures.size()
-                    && departures.get(i).departureSeconds() == departureSeconds; i++) {
-                ServiceDays twinDays = departures.get(i).trip().serviceDays();
-                days = days == null ? twinDays : days.union(twinDays);
-            }
-            regular[stopIdx] = days == null || runsOftenEnough(days);
-        }
-        return regular;
     }
 
     static boolean runsOftenEnough(ServiceDays days) {

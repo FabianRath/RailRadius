@@ -57,8 +57,8 @@ final class TimetableStoreBuilder {
         int[] station = new int[eventCount];
         int[] depSec = new int[eventCount];
         int[] arrSec = new int[eventCount];
-        Arrays.fill(depSec, CachedTrip.NO_LEG);
-        Arrays.fill(arrSec, CachedTrip.NO_LEG);
+        Arrays.fill(depSec, TimetableStore.NO_LEG);
+        Arrays.fill(arrSec, TimetableStore.NO_LEG);
         for (int trip = 0; trip < trips.size(); trip++) {
             MergedTrips.Trip merged = trips.get(trip);
             int first = tripFirstEvent[trip];
@@ -85,7 +85,7 @@ final class TimetableStoreBuilder {
     private static Departures departures(int stationCount, Events events) {
         int[] start = new int[stationCount + 1];
         for (int event = 0; event < events.station().length; event++) {
-            if (events.depSec()[event] != CachedTrip.NO_LEG) start[events.station()[event] + 1]++;
+            if (events.depSec()[event] != TimetableStore.NO_LEG) start[events.station()[event] + 1]++;
         }
         Arrays.parallelPrefix(start, Integer::sum);
         // Seconds in the high half, the event in the low half: sorting the keys sorts by time, then by event
@@ -93,7 +93,7 @@ final class TimetableStoreBuilder {
         int[] next = start.clone();
         for (int event = 0; event < events.station().length; event++) {
             int seconds = events.depSec()[event];
-            if (seconds == CachedTrip.NO_LEG) continue;
+            if (seconds == TimetableStore.NO_LEG) continue;
             keys[next[events.station()[event]]++] = (long) seconds << SECONDS_SHIFT | event;
         }
         int[] seconds = new int[keys.length];

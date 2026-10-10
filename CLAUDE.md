@@ -7,7 +7,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 ## Layout
 - `backend/src/main/java/com/railreach/`
   - `controller/`: `/api` public API and `/api/admin` endpoints
-  - `service/`: `GtfsDataService` (startup/reload) → `GtfsFeedLoader`, `StationDeduplicator`, `GtfsCacheStore`; `TransitGraph` (the data + queries), `StationSearchIndex`, `ReachabilityService` (orchestrator, SSE) → `ReachabilitySearch` (BFS), `ReachabilityCache`, `ReachabilityWarmer`, `JourneyLegBuilder`
+  - `service/`: `GtfsDataService` (startup/reload) → `GtfsFeedLoader` and `StationDeduplicator` (into a load-time `RailNetwork`), `BinaryCacheStore`; `TransitGraph` (what is served: stations + `TimetableStore`), `StationSearchIndex`, `ReachabilityService` (orchestrator, SSE) → `ReachabilityCache` → `CompactReachabilitySearch` (round-based search), `ReachabilityWarmer`, `JourneyLegBuilder`
   - `dto/`, `model/`, `config/`
 - `backend/src/test/`: unit tests on the `gtfs-mini` fixture (see `src/test/resources/gtfs-mini/README.md`)
 - `frontend/`: `index.html` (markup), `css/app.css`, `js/*.js` (one ES module per concern, entry `main.js`). See guidelines §8.
@@ -32,7 +32,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 - **`backend/data/` holds multi-GB caches and zips. Look, don't read.**
   - OK (small, bounded output): `ls -la`, `du -sh`, `find -maxdepth`, `unzip -l <zip>` (list GTFS files), peeks capped by `head` (`unzip -p <zip> stops.txt | head -n 20`, `head -c 2000 gtfs-dev-cache.json`), `grep -m 5 …`, `wc -l`. Small text files (e.g. `gtfs/list.txt`) may be read normally.
   - Never: the Read tool (denied in settings), `cat`, `grep`/`jq`/`unzip -p` without a cap, or anything whose output scales with file size. Cache JSON can be one huge line, so cap by bytes (`head -c`), not lines.
-  - Prefer `gtfs-dev-cache.json` (20 MB) over `gtfs-cache.json` (576 MB) when inspecting the format.
+  - The app reads only the binary `gtfs-store.bin` / `gtfs-dev-store.bin` (S21). The `*-cache.json` files are kept only for rolling back to the `pre-compact` tag.
 - Never call `reload-gtfs` or the cache-delete endpoint against the full dataset unless asked.
 - A change is done only when `compile` and `test` pass. Say so explicitly if you could not run them.
 - Fixing a known bug: enable its `@Disabled` test first (or write a failing test), then fix.

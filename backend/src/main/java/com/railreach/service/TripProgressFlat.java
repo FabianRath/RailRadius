@@ -3,7 +3,12 @@ package com.railreach.service;
 import java.util.Arrays;
 
 /**
- * {@link TripProgress} of every trip a search reaches, reused from search to search. A trip's stop events get slots
+ * Per stop of every trip a search reaches: the shortest duration that reached it there, the days of that ride, and
+ * the days of every ride recorded there. Rides of one trip arrive at a stop at the same time and catch the same trains
+ * from there, so a ride is cut off where it is no faster and all its days are already reached. On some of those days
+ * the journey shown can then be a bit slower than the fastest possible.
+ * <p>
+ * Reused from search to search. A trip's stop events get slots
  * when the search first reaches it, marked by stamping the trip with the search's generation, so starting a search
  * costs nothing. A large search reaches about half the store's events, so slots are only made for reached trips.
  */

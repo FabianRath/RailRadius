@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -30,7 +31,7 @@ import static com.railreach.service.GtfsCsvReader.doubleField;
 import static com.railreach.service.GtfsCsvReader.field;
 import static com.railreach.service.GtfsCsvReader.intField;
 
-/** Parses the rail part of every {@code gtfs_<source>.zip} in a directory into a {@link TransitGraph}. */
+/** Parses the rail part of every {@code gtfs_<source>.zip} in a directory into a {@link RailNetwork}. */
 @Component
 @Slf4j
 public class GtfsFeedLoader {
@@ -62,7 +63,7 @@ public class GtfsFeedLoader {
 
     /**
      * The per-feed lookup tables that stop_times rows are resolved against. Routes and trips are rail only.
-     * Stations are keyed by canonical ID and only enter the graph once a rail trip uses them.
+     * Stations are keyed by canonical ID and only enter the network once a rail trip uses them.
      * Services are those of the rail trips that the calendar knows, by raw ID.
      */
     private record FeedTables(String source, Map<String, RailRoute> routes, Map<String, RailTrip> trips,
@@ -79,7 +80,8 @@ public class GtfsFeedLoader {
         return zipFiles == null ? new File[0] : zipFiles;
     }
 
-    void loadDirectory(String directory, TransitGraph graph, GtfsLoadProgress progress) {
+    /** Returns the zips read, in the order they were read. */
+    List<Path> loadDirectory(String directory, RailNetwork network, GtfsLoadProgress progress) {
         File dir = new File(directory);
         if (!dir.isDirectory()) {
             throw new IllegalStateException("GTFS directory not found: " + directory);
@@ -102,7 +104,7 @@ public class GtfsFeedLoader {
             log.info("[{}/{}] Loading: {} (source={})", i + 1, zipFiles.length, zipFile.getName(), source);
             progress.feedStarted(zipFile);
             try {
-                if (loadFeed(zipFile, source, graph) == 0) {
+                if (loadFeed(zipFile, source, network) == 0) {
                     log.warn("!!! {} added no rail connections to the graph; see the messages above",
                             zipFile.getName());
                 }
@@ -111,10 +113,11 @@ public class GtfsFeedLoader {
             }
             progress.feedFinished(zipFile);
         }
+        return Arrays.stream(zipFiles).map(File::toPath).toList();
     }
 
     /** Returns the number of connections added. */
-    private int loadFeed(File file, String source, TransitGraph graph) throws IOException {
+    private int loadFeed(File file, String source, RailNetwork network) throws IOException {
         try (ZipFile zipFile = new ZipFile(file)) {
             Map<String, RailRoute> routes = RailTripReader.loadRailRoutes(zipFile, source, trainCategories);
             Map<String, GtfsStop> stops = loadStops(zipFile);
@@ -138,23 +141,23 @@ public class GtfsFeedLoader {
                     translatedNames(StopNameTranslations.load(zipFile), stops, rawToCanonical, stations);
             Map<String, ServiceDays> services = ServiceCalendarReader.load(zipFile);
             RareTrainFilter.dropRareTrains(zipFile, trips, services, rawToCanonical);
-            Map<String, String> rawToCanonicalService = addServices(services, trips, source, graph);
+            Map<String, String> rawToCanonicalService = addServices(services, trips, source, network);
             FeedTables tables = new FeedTables(source, routes, trips, rawToCanonicalService, rawToCanonical,
                     stations);
-            int connectionsAdded = loadStopTimes(zipFile, tables, graph);
+            int connectionsAdded = loadStopTimes(zipFile, tables, network);
             translatedNames.forEach((id, names) -> {
-                if (graph.getStation(id) != null) graph.addTranslatedNames(id, names);
+                if (network.getStation(id) != null) network.addTranslatedNames(id, names);
             });
             return connectionsAdded;
         }
     }
 
     /**
-     * Adds the services of the rail trips to the graph under canonical IDs and returns raw ID -> canonical ID.
+     * Adds the services of the rail trips to the network under canonical IDs and returns raw ID -> canonical ID.
      * A trip whose service is not in the calendar runs every day.
      */
     private static Map<String, String> addServices(Map<String, ServiceDays> services, Map<String, RailTrip> trips,
-                                                   String source, TransitGraph graph) {
+                                                   String source, RailNetwork network) {
         Map<String, String> rawToCanonical = new HashMap<>();
         Map<String, ServiceDays> canonicalServices = new HashMap<>();
         long tripsWithoutService = 0;
@@ -167,7 +170,7 @@ public class GtfsFeedLoader {
             String canonical = rawToCanonical.computeIfAbsent(trip.serviceId(), id -> StopIds.of(source, id));
             canonicalServices.put(canonical, days);
         }
-        graph.addServices(canonicalServices);
+        network.addServices(canonicalServices);
         if (tripsWithoutService > 0) {
             log.warn("  {} of {} rail trips have no service in calendar.txt/calendar_dates.txt; they run every day",
                     tripsWithoutService, trips.size());
@@ -294,13 +297,13 @@ public class GtfsFeedLoader {
     }
 
     /** Returns the number of connections added. */
-    private int loadStopTimes(ZipFile zipFile, FeedTables tables, TransitGraph graph) throws IOException {
+    private int loadStopTimes(ZipFile zipFile, FeedTables tables, RailNetwork network) throws IOException {
         if (GtfsCsvReader.findEntry(zipFile, "stop_times.txt").isEmpty()) {
             log.warn("  No stop_times.txt found");
             return 0;
         }
         TripRowBatcher<GtfsStopTime> batcher =
-                new TripRowBatcher<>(tripBatchSize, stopTimesByTrip -> addTrips(stopTimesByTrip, tables, graph));
+                new TripRowBatcher<>(tripBatchSize, stopTimesByTrip -> addTrips(stopTimesByTrip, tables, network));
         int railRowsRead = 0;
         int nonRailRowsSkipped = 0;
         try (GtfsCsvReader csv = GtfsCsvReader.open(zipFile, "stop_times.txt")) {
@@ -333,8 +336,8 @@ public class GtfsFeedLoader {
         return edgesAdded;
     }
 
-    /** Adds each buffered trip's stop sequence and edges to the graph. Returns the number of edges added. */
-    private int addTrips(Map<String, List<GtfsStopTime>> stopTimesByTrip, FeedTables tables, TransitGraph graph) {
+    /** Adds each buffered trip's stop sequence and edges to the network. Returns the number of edges added. */
+    private int addTrips(Map<String, List<GtfsStopTime>> stopTimesByTrip, FeedTables tables, RailNetwork network) {
         int edgesAdded = 0;
         int skippedNoMapping = 0;
         int skippedSelfLoop = 0;
@@ -352,8 +355,8 @@ public class GtfsFeedLoader {
                 if (canonical != null) stopSequence.add(canonical);
             }
             if (stopSequence.size() < 2) continue;
-            stopSequence.forEach(id -> graph.addStationIfAbsent(tables.stations().get(id)));
-            graph.addTrip(tripId, stopSequence, trip.info(), tables.rawToCanonicalService().get(trip.serviceId()));
+            stopSequence.forEach(id -> network.addStationIfAbsent(tables.stations().get(id)));
+            network.addTrip(tripId, stopSequence, trip.info(), tables.rawToCanonicalService().get(trip.serviceId()));
 
             for (int i = 0; i < stopTimes.size() - 1; i++) {
                 GtfsStopTime from = stopTimes.get(i);
@@ -368,7 +371,7 @@ public class GtfsFeedLoader {
                     skippedSelfLoop++;
                     continue;
                 }
-                graph.addConnection(Connection.builder()
+                network.addConnection(Connection.builder()
                         .tripId(tripId)
                         .routeName(tables.routes().get(trip.routeId()).name())
                         .fromStopId(fromCanonical)

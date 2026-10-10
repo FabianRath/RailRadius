@@ -30,17 +30,15 @@ class BinaryCacheStoreTest {
     @MethodSource("feedCombinations")
     void aGraphRestoredFromTheBinaryCacheSearchesAndAnswersLikeTheParsedOne(List<String> feeds) throws IOException {
         TransitGraph parsed = GtfsTestFixtures.load(tempDir, feeds.toArray(String[]::new));
-        BinaryCacheStore store = saved(parsed);
 
         TransitGraph restored = TransitGraph.withToday(GtfsTestFixtures.TODAY);
-        restored.restore(store.load().orElseThrow());
+        restored.restore(store().load().orElseThrow());
 
-        assertThat(SearchSnapshotTest.dump(restored, SearchEngine.COMPACT))
-                .isEqualTo(SearchSnapshotTest.dump(parsed, SearchEngine.COMPACT));
+        assertThat(SearchSnapshotTest.dump(restored)).isEqualTo(SearchSnapshotTest.dump(parsed));
         assertThat(restored.getAllStations()).isEqualTo(parsed.getAllStations());
-        assertThat(restored.translatedNames()).isEqualTo(parsed.translatedNames());
         for (String stopId : parsed.getAllStations().keySet()) {
-            assertThat(restored.getNeighbors(stopId)).as(stopId).isEqualTo(parsed.getNeighbors(stopId));
+            assertThat(restored.getTranslatedNames(stopId)).as(stopId).isEqualTo(parsed.getTranslatedNames(stopId));
+            assertThat(restored.nextStationCount(stopId)).as(stopId).isEqualTo(parsed.nextStationCount(stopId));
         }
         TimetableStore parsedStore = parsed.timetableStore();
         for (int trip = 0; trip < parsedStore.tripCount(); trip++) {
@@ -51,29 +49,28 @@ class BinaryCacheStoreTest {
 
     @Test
     void aBinaryCacheOfAnotherFormatVersionIsNotRead() throws IOException {
-        BinaryCacheStore store = saved(GtfsTestFixtures.load(tempDir, "alpha", "beta"));
+        GtfsTestFixtures.load(tempDir, "alpha", "beta");
         try (RandomAccessFile file = new RandomAccessFile(binaryFile().toFile(), "rw")) {
             file.seek(FORMAT_VERSION_OFFSET);
             file.write(BinaryCacheStore.FORMAT_VERSION + 1);
         }
 
-        assertThat(store.load()).isEmpty();
+        assertThat(store().load()).isEmpty();
     }
 
     @Test
     void aTruncatedBinaryCacheIsNotRead() throws IOException {
-        BinaryCacheStore store = saved(GtfsTestFixtures.load(tempDir, "alpha", "beta"));
+        GtfsTestFixtures.load(tempDir, "alpha", "beta");
         try (FileChannel channel = FileChannel.open(binaryFile(), StandardOpenOption.WRITE)) {
             channel.truncate(channel.size() - 1);
         }
 
-        assertThat(store.load()).isEmpty();
+        assertThat(store().load()).isEmpty();
     }
 
-    private BinaryCacheStore saved(TransitGraph graph) {
-        BinaryCacheStore store = GtfsTestFixtures.binaryCacheStore(tempDir);
-        store.save(graph, Path.of(GtfsTestFixtures.cacheStore(tempDir).path()));
-        return store;
+    /** The binary cache that loading the feeds wrote. */
+    private BinaryCacheStore store() {
+        return GtfsTestFixtures.binaryCacheStore(tempDir);
     }
 
     private Path binaryFile() {

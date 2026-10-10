@@ -52,30 +52,30 @@ public class StationDeduplicator {
     private final StationNameMatcher nameMatcher = new StationNameMatcher();
     private final StationCodes stationCodes = new StationCodes();
 
-    void deduplicate(TransitGraph graph) {
+    void deduplicate(RailNetwork network) {
         log.info("=== Station deduplication ===");
-        assignCountries(graph);
-        Map<String, String> aliasToCanonical = findWithinFeedDuplicates(graph);
-        mergeSameStationCodes(graph, aliasToCanonical);
-        List<StationPair> candidates = crossBorderCandidates(graph);
-        mergeSimilarNames(graph, candidates, aliasToCanonical);
-        mergeSharedTrains(graph, candidates, aliasToCanonical);
-        int snapped = ForeignStopSnapper.snap(graph.stations(), nameMatcher, aliasToCanonical);
+        assignCountries(network);
+        Map<String, String> aliasToCanonical = findWithinFeedDuplicates(network);
+        mergeSameStationCodes(network, aliasToCanonical);
+        List<StationPair> candidates = crossBorderCandidates(network);
+        mergeSimilarNames(network, candidates, aliasToCanonical);
+        mergeSharedTrains(network, candidates, aliasToCanonical);
+        int snapped = ForeignStopSnapper.snap(network.stations(), nameMatcher, aliasToCanonical);
         log.info("  Foreign stops merged into the local station: {}", snapped);
-        if (!aliasToCanonical.isEmpty()) graph.mergeStations(aliasToCanonical);
+        if (!aliasToCanonical.isEmpty()) network.mergeStations(aliasToCanonical);
         log.info("  Deduplication complete: {} total stations merged", aliasToCanonical.size());
     }
 
     /** Merged stations keep the canonical station's country, so this runs once before any merge. */
-    private void assignCountries(TransitGraph graph) {
-        for (Station station : graph.stations()) {
+    private void assignCountries(RailNetwork network) {
+        for (Station station : network.stations()) {
             station.setCountry(countryLocator.countryAt(station.getLatitude(), station.getLongitude()).orElse(null));
         }
     }
 
-    private Map<String, String> findWithinFeedDuplicates(TransitGraph graph) {
+    private Map<String, String> findWithinFeedDuplicates(RailNetwork network) {
         Map<String, List<Station>> byName = new HashMap<>();
-        for (Station station : graph.stations()) {
+        for (Station station : network.stations()) {
             if (station.getName() != null) {
                 byName.computeIfAbsent(station.getName().trim(), k -> new ArrayList<>()).add(station);
             }
@@ -87,42 +87,42 @@ public class StationDeduplicator {
             Map<String, List<Station>> bySource = sameName.stream()
                     .collect(Collectors.groupingBy(s -> StopIds.source(s.getId())));
             for (List<Station> group : bySource.values()) {
-                mergeNearbyPairs(graph, group, aliasToCanonical);
+                mergeNearbyPairs(network, group, aliasToCanonical);
             }
         }
         log.info("  Within-country duplicates merged: {}", aliasToCanonical.size());
         return aliasToCanonical;
     }
 
-    private void mergeNearbyPairs(TransitGraph graph, List<Station> group, Map<String, String> aliasToCanonical) {
+    private void mergeNearbyPairs(RailNetwork network, List<Station> group, Map<String, String> aliasToCanonical) {
         for (int i = 0; i < group.size(); i++) {
             for (int j = i + 1; j < group.size(); j++) {
                 Station s1 = group.get(i);
                 Station s2 = group.get(j);
                 if (aliasToCanonical.containsKey(s1.getId()) || aliasToCanonical.containsKey(s2.getId())) continue;
                 if (!areNear(s1, s2, WITHIN_FEED_RADIUS_DEG)) continue;
-                Station canonical = betterConnected(graph, s1, s2);
+                Station canonical = betterConnected(network, s1, s2);
                 aliasToCanonical.put((canonical == s1 ? s2 : s1).getId(), canonical.getId());
             }
         }
     }
 
-    private void mergeSameStationCodes(TransitGraph graph, Map<String, String> aliasToCanonical) {
+    private void mergeSameStationCodes(RailNetwork network, Map<String, String> aliasToCanonical) {
         Map<String, List<Station>> byCode = new HashMap<>();
-        for (Station station : graph.stations()) {
+        for (Station station : network.stations()) {
             if (aliasToCanonical.containsKey(station.getId())) continue;
             stationCodes.of(station.getId())
                     .ifPresent(code -> byCode.computeIfAbsent(code, k -> new ArrayList<>()).add(station));
         }
         int merges = 0;
         for (Map.Entry<String, List<Station>> sameCode : byCode.entrySet()) {
-            merges += mergeSameCodePairs(graph, sameCode.getKey(), sameCode.getValue(), aliasToCanonical);
+            merges += mergeSameCodePairs(network, sameCode.getKey(), sameCode.getValue(), aliasToCanonical);
         }
         log.info("  Cross-border stations merged by station code: {}", merges);
     }
 
     /** Returns the number of merges. */
-    private static int mergeSameCodePairs(TransitGraph graph, String code, List<Station> sameCode,
+    private static int mergeSameCodePairs(RailNetwork network, String code, List<Station> sameCode,
                                           Map<String, String> aliasToCanonical) {
         int merges = 0;
         for (int i = 0; i < sameCode.size(); i++) {
@@ -130,7 +130,7 @@ public class StationDeduplicator {
                 StationPair pair = new StationPair(sameCode.get(i), sameCode.get(j));
                 if (pair.eitherMerged(aliasToCanonical) || pair.sameSource()) continue;
                 if (pair.distanceMeters() > SAME_CODE_MAX_DISTANCE_METERS) continue;
-                mergeIntoBetterConnected(graph, pair, aliasToCanonical, "station code " + code);
+                mergeIntoBetterConnected(network, pair, aliasToCanonical, "station code " + code);
                 merges++;
             }
         }
@@ -138,10 +138,10 @@ public class StationDeduplicator {
     }
 
     /** Pairs of stations of different feeds within the cross-border radius, each pair once. */
-    private static List<StationPair> crossBorderCandidates(TransitGraph graph) {
-        StationGrid grid = new StationGrid(graph.stations(), CROSS_BORDER_CELL_SIZE_DEG);
+    private static List<StationPair> crossBorderCandidates(RailNetwork network) {
+        StationGrid grid = new StationGrid(network.stations(), CROSS_BORDER_CELL_SIZE_DEG);
         List<StationPair> pairs = new ArrayList<>();
-        for (Station s1 : graph.stations()) {
+        for (Station s1 : network.stations()) {
             for (Station s2 : grid.near(s1)) {
                 if (s1.getId().compareTo(s2.getId()) >= 0) continue;
                 if (StopIds.source(s1.getId()).equals(StopIds.source(s2.getId()))) continue;
@@ -151,7 +151,7 @@ public class StationDeduplicator {
         return pairs;
     }
 
-    private void mergeSimilarNames(TransitGraph graph, List<StationPair> candidates,
+    private void mergeSimilarNames(RailNetwork network, List<StationPair> candidates,
                                   Map<String, String> aliasToCanonical) {
         int merges = 0;
         for (StationPair pair : candidates) {
@@ -160,11 +160,11 @@ public class StationDeduplicator {
             String name2 = pair.s2().getName();
             double similarity = nameMatcher.similarity(name1, name2);
             if (similarity >= CROSS_BORDER_MIN_NAME_SIMILARITY) {
-                mergeIntoBetterConnected(graph, pair, aliasToCanonical, String.format("sim=%.2f", similarity));
+                mergeIntoBetterConnected(network, pair, aliasToCanonical, String.format("sim=%.2f", similarity));
                 merges++;
             } else if (areNear(pair.s1(), pair.s2(), CONTAINED_NAME_RADIUS_DEG)
                     && nameMatcher.oneContainsTheOther(name1, name2)) {
-                mergeIntoBetterConnected(graph, pair, aliasToCanonical, "name contained");
+                mergeIntoBetterConnected(network, pair, aliasToCanonical, "name contained");
                 merges++;
             }
         }
@@ -172,7 +172,7 @@ public class StationDeduplicator {
     }
 
     /** Repeats until nothing changes: each merge can make neighbours of a later pair count as one station. */
-    private void mergeSharedTrains(TransitGraph graph, List<StationPair> candidates,
+    private void mergeSharedTrains(RailNetwork network, List<StationPair> candidates,
                                   Map<String, String> aliasToCanonical) {
         int merges = 0;
         int roundMerges;
@@ -180,10 +180,11 @@ public class StationDeduplicator {
             roundMerges = 0;
             for (StationPair pair : candidates) {
                 if (pair.eitherMerged(aliasToCanonical)) continue;
-                if (!SharedTrainMatcher.shareTrains(graph, pair.s1().getId(), pair.s2().getId(), aliasToCanonical)) {
+                if (!SharedTrainMatcher.shareTrains(network, pair.s1().getId(), pair.s2().getId(),
+                        aliasToCanonical)) {
                     continue;
                 }
-                mergeIntoBetterConnected(graph, pair, aliasToCanonical, "shared trains");
+                mergeIntoBetterConnected(network, pair, aliasToCanonical, "shared trains");
                 roundMerges++;
             }
             merges += roundMerges;
@@ -191,9 +192,9 @@ public class StationDeduplicator {
         log.info("  Cross-border stations merged by shared trains: {}", merges);
     }
 
-    private static void mergeIntoBetterConnected(TransitGraph graph, StationPair pair,
+    private static void mergeIntoBetterConnected(RailNetwork network, StationPair pair,
                                                  Map<String, String> aliasToCanonical, String reason) {
-        Station canonical = betterConnected(graph, pair.s1(), pair.s2());
+        Station canonical = betterConnected(network, pair.s1(), pair.s2());
         Station alias = canonical == pair.s1() ? pair.s2() : pair.s1();
         aliasToCanonical.put(alias.getId(), canonical.getId());
         log.info("  MERGED: '{}' ({}) -> '{}' ({}) [{}]",
@@ -201,8 +202,8 @@ public class StationDeduplicator {
     }
 
     /** The station with more outgoing edges; s1 on a tie. */
-    private static Station betterConnected(TransitGraph graph, Station s1, Station s2) {
-        return graph.getNeighbors(s1.getId()).size() >= graph.getNeighbors(s2.getId()).size() ? s1 : s2;
+    private static Station betterConnected(RailNetwork network, Station s1, Station s2) {
+        return network.getNeighbors(s1.getId()).size() >= network.getNeighbors(s2.getId()).size() ? s1 : s2;
     }
 
     private static boolean areNear(Station s1, Station s2, double radiusDeg) {

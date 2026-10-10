@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -193,12 +192,9 @@ public class AdminController {
         List<Map<String, Object>> stations = transitGraph.getAllStations().values().stream()
             // Like StationSearchIndex, only stations with an outgoing edge; the overlay also needs coordinates
             .filter(s -> s.getLatitude() != null && s.getLongitude() != null)
-            .filter(s -> {
-                Set<String> neighbors = transitGraph.getNeighbors(s.getId());
-                return neighbors != null && !neighbors.isEmpty();
-            })
+            .filter(s -> transitGraph.nextStationCount(s.getId()) > 0)
             .map(s -> {
-                int edges = transitGraph.getNeighbors(s.getId()).size();
+                int edges = transitGraph.nextStationCount(s.getId());
                 return Map.<String, Object>of(
                     "id",    s.getId(),
                     "name",  s.getName() != null ? s.getName() : s.getId(),

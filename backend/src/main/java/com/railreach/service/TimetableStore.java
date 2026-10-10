@@ -10,22 +10,24 @@ import java.util.Optional;
 import java.util.stream.IntStream;
 
 /**
- * The search's static data in flat arrays (S17), built from {@link MergedTrips} like {@link SearchTimetables} and
- * numbered the same way, so the two can be compared. It does without an object per trip, stop or departure, and
- * without strings except in packed tables.
+ * The search's static data in flat arrays (S17), built from {@link MergedTrips}. It does without an object per trip,
+ * stop or departure, and without strings except in packed tables.
  * <p>
  * A trip's stops are events {@code tripFirstEvent[trip]} up to {@code tripFirstEvent[trip + 1]}, numbered across all
  * trips. Event e leaves its station at {@code evDepSec[e]} towards event e + 1, or has no leg there
- * ({@link CachedTrip#NO_LEG}, also on a trip's last stop); it arrives at {@code evArrSec[e]}, {@link CachedTrip#NO_LEG}
- * on the first stop and after a missing leg. A station's departures are positions {@code depStart[station]} up to
+ * ({@link #NO_LEG}, also on a trip's last stop); it arrives at {@code evArrSec[e]}, {@link #NO_LEG} on the first stop
+ * and after a missing leg. A station's departures are positions {@code depStart[station]} up to
  * {@code depStart[station + 1]} of {@code depSec}/{@code depEvent}, by departure time, equal times in event order
- * (trip order, then stop order): the order of {@link SearchTimetables#departuresAt}.
+ * (trip order, then stop order).
  */
 @Slf4j
 final class TimetableStore {
 
     private static final int BITS_PER_WORD = Long.SIZE;
     static final int NO_ROUTE_NAME = -1;
+    /** Departure or arrival seconds of an event without a leg there. */
+    static final int NO_LEG = -1;
+    private static final int NOT_SEEN = -1;
 
     private final StationTable stations;
     private final int[] tripFirstEvent;
@@ -44,6 +46,8 @@ final class TimetableStore {
     private final int[] depSec;
     private final int[] depEvent;
     private final long[] regularDeparture;
+    // Derived: per station, how many stations its trips run to without a stop between
+    private final int[] nextStationCount;
 
     private TimetableStore(TimetableStoreBuilder.Parts parts, int[] evTrip, long[] regularDeparture) {
         this.stations = parts.stations();
@@ -62,17 +66,26 @@ final class TimetableStore {
         this.depSec = parts.depSec();
         this.depEvent = parts.depEvent();
         this.regularDeparture = regularDeparture;
+        this.nextStationCount = nextStationCounts(stations.size(), depStart, depEvent, evStation);
     }
 
-    static TimetableStore build(TransitGraph graph) {
+    static TimetableStore build(RailNetwork network) {
         long startMs = System.currentTimeMillis();
-        TimetableStoreBuilder.Parts parts = TimetableStoreBuilder.parts(MergedTrips.of(graph));
-        int[] evTrip = eventTrips(parts.tripFirstEvent());
-        TimetableStore store = new TimetableStore(parts, evTrip, regularDepartures(parts, evTrip));
+        TimetableStore store = of(TimetableStoreBuilder.parts(MergedTrips.of(network)));
         log.info("Timetable store built in {} ms: {} trips, {} stop events, {} stations, {} day patterns, {}",
                 System.currentTimeMillis() - startMs, store.tripCount(), store.eventCount(), store.stations.size(),
                 store.dayPatterns.size(), String.format("%.1f MB", store.sizeBytes() / 1e6));
         return store;
+    }
+
+    /** A store without trips or stations, what the app searches before a load. */
+    static TimetableStore empty() {
+        return of(TimetableStoreBuilder.parts(MergedTrips.of(new RailNetwork())));
+    }
+
+    private static TimetableStore of(TimetableStoreBuilder.Parts parts) {
+        int[] evTrip = eventTrips(parts.tripFirstEvent());
+        return new TimetableStore(parts, evTrip, regularDepartures(parts, evTrip));
     }
 
     /** Reads what {@link #writeTo} wrote. Only evTrip is derived again, which is quick. */
@@ -145,10 +158,10 @@ final class TimetableStore {
 
     /** Whether the trip runs on from this event to the next. */
     boolean hasLeg(int event) {
-        return evDepSec[event] != CachedTrip.NO_LEG;
+        return evDepSec[event] != NO_LEG;
     }
 
-    /** Whether the trip may be ridden away from this event ({@link RareTrainFilter#regularDepartures}). */
+    /** Whether the trip may be ridden away from this event ({@link #regularDepartures}). */
     boolean isRegularDeparture(int event) {
         return (regularDeparture[event / BITS_PER_WORD] & 1L << event) != 0;
     }
@@ -186,6 +199,11 @@ final class TimetableStore {
                 .departureTimeSeconds(evDepSec[event])
                 .arrivalTimeSeconds(evArrSec[event + 1])
                 .build();
+    }
+
+    /** How many stations the station's trips run to without a stop between; 0 if no trip leaves it. */
+    int nextStationCount(int station) {
+        return nextStationCount[station];
     }
 
     /** First position of the station's departures. */
@@ -242,7 +260,7 @@ final class TimetableStore {
     long sizeBytes() {
         long intArrays = (long) tripFirstEvent.length + evTrip.length + evStation.length + evDepSec.length
                 + evArrSec.length + tripDayPattern.length + tripRouteName.length + tripMemberStart.length
-                + depStart.length + depSec.length + depEvent.length;
+                + depStart.length + depSec.length + depEvent.length + nextStationCount.length;
         return intArrays * Integer.BYTES + (long) regularDeparture.length * Long.BYTES + stations.sizeBytes()
                 + dayPatterns.sizeBytes() + routeNames.sizeBytes() + memberTripIds.sizeBytes();
     }
@@ -255,6 +273,22 @@ final class TimetableStore {
         return trips;
     }
 
+    private static int[] nextStationCounts(int stationCount, int[] depStart, int[] depEvent, int[] evStation) {
+        int[] counts = new int[stationCount];
+        // The station that last counted each next station, so each counts once per station
+        int[] countedBy = new int[stationCount];
+        Arrays.fill(countedBy, NOT_SEEN);
+        for (int station = 0; station < stationCount; station++) {
+            for (int position = depStart[station]; position < depStart[station + 1]; position++) {
+                int next = evStation[depEvent[position] + 1];
+                if (countedBy[next] == station) continue;
+                countedBy[next] = station;
+                counts[station]++;
+            }
+        }
+        return counts;
+    }
+
     private boolean arrivesLike(int departureEvent, int station, int arrivalSeconds) {
         int end = endEvent(tripOf(departureEvent));
         for (int event = departureEvent + 1; event < end && hasLeg(event - 1); event++) {
@@ -265,8 +299,10 @@ final class TimetableStore {
 
     /**
      * Per event: whether all trips leaving its station at its time together run on enough days
-     * ({@link RareTrainFilter#runsOftenEnough}). Equal times are next to each other in a station's departures, so
-     * each such group is checked once.
+     * ({@link RareTrainFilter#runsOftenEnough}). A variant can match its regular train at the first stop and leave a
+     * later one at another time on a few days only (B33: Snälltåget NT from Berlin at 21:07 on 4 days, the regular
+     * ones at 20:53, 21:06 and 21:09); a ride must not continue from such a stop. Equal times are next to each other
+     * in a station's departures, so each such group is checked once.
      */
     private static long[] regularDepartures(TimetableStoreBuilder.Parts parts, int[] evTrip) {
         int[] depStart = parts.depStart();

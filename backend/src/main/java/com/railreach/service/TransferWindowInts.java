@@ -1,13 +1,15 @@
 package com.railreach.service;
 
 /**
- * {@link TransferWindow} on one station's {@link Arrivals}, with the day check built in instead of a lambda. The
- * window keeps its queue in a buffer as large as the arrivals. Arrival times count shiftSeconds later; start times
- * are only compared with each other, so they need no shift.
+ * Sliding window over one station's {@link Arrivals} for departures fed in time order: among the arrivals whose wait
+ * for the departure lies in the min/max wait and that add a day the departure needs, the one with the latest journey
+ * start. Boarding from it gives the shortest journey. The window keeps its queue in a buffer as large as the
+ * arrivals. Arrival times count shiftSeconds later, so waits past midnight can use their own window over the same
+ * arrivals; start times are only compared with each other, so they need no shift.
  * <p>
- * The fallback scan, which takes most of a large search, skips whole blocks of arrivals that cannot hold its answer:
- * a block none of whose arrivals adds a day, or whose latest start doesn't beat the best one so far. It still returns
- * exactly the arrival {@link TransferWindow} would.
+ * When the window's best arrival adds no day, a fallback scan looks through the wait range. It takes most of a large
+ * search, so it skips whole blocks of arrivals that cannot hold its answer: a block none of whose arrivals adds a
+ * day, or whose latest start doesn't beat the best one so far.
  */
 final class TransferWindowInts {
 
@@ -94,7 +96,7 @@ final class TransferWindowInts {
     }
 
     /**
-     * As in TransferWindow: the queue has dropped what its best arrival outranks, so the arrivals in range are
+     * The queue has dropped what its best arrival outranks, so the arrivals in range are
      * scanned for the one with the latest start that adds days, the first of equal ones.
      */
     private int bestUsableScan(int earliestArrival, int extraDays, long wanted) {

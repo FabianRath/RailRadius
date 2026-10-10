@@ -2,6 +2,7 @@ package com.railreach.service;
 
 import com.railreach.util.GtfsTime;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,23 +15,25 @@ import java.util.function.Consumer;
 import java.util.stream.IntStream;
 
 /**
- * The search of {@link ReachabilitySearch} on the flat {@link TimetableStore} (S18): rides are labels in a
- * {@link LabelArena}, per-trip and per-station state are arrays, and all of it is reused from search to search
- * ({@link SearchScratch}). It keeps the legacy search's rounds and processing order (ARCHITECTURE.md → Search
- * semantics contract), so both give the same result. Its result is a {@link CompactResult}: the labels of the chosen
- * paths, which every trim of the arena keeps, copied out at the end.
+ * Finds every station reachable from a start with at most a number of transfers, on the flat {@link TimetableStore}
+ * (S18): one round per transfer count, rides are labels in a {@link LabelArena}, per-trip and per-station state are
+ * arrays, and all of it is reused from search to search ({@link SearchScratch}). It follows the rounds and processing
+ * order of ARCHITECTURE.md → Search semantics contract. Its result is a {@link CompactResult}: the labels of the
+ * chosen paths, which every trim of the arena keeps, copied out at the end.
  * <p>
- * As in the legacy search, stations choose what to board in parallel and the boarded trips are ridden afterwards in
- * station order. Choosing paths needs the exact days of candidates ({@link LabelDays}), worked out in parallel too.
+ * Stations choose what to board in parallel and the boarded trips are ridden afterwards in station order, so the
+ * result is the same as on one thread. Choosing paths needs the exact days of candidates ({@link LabelDays}), worked
+ * out in parallel too.
  */
+@Component
 @Slf4j
-public class CompactReachabilitySearch implements SearchEngine {
+public class CompactReachabilitySearch {
 
     private final TransitGraph graph;
     // One per search running at once. A scratch fits one store, so after a reload the old ones are dropped
     private final Queue<SearchScratch> idleScratches = new ConcurrentLinkedQueue<>();
 
-    CompactReachabilitySearch(TransitGraph graph) {
+    public CompactReachabilitySearch(TransitGraph graph) {
         this.graph = graph;
     }
 
@@ -38,14 +41,14 @@ public class CompactReachabilitySearch implements SearchEngine {
     private record Run(TimetableStore store, SearchScratch scratch, String startId, int startIndex, int maxTransfers,
                        long[] patternDays, CompactTransferRound.Parameters parameters, SearchCounters counters) {}
 
-    @Override
-    public void prepare() {
-        graph.timetableStore();
-    }
-
-    @Override
-    public SearchResult search(String startId, int maxTransfers, int minTransferMins, int maxTransferMins,
-                               Consumer<Map<String, SearchResult.PathSummary>> roundPaths) {
+    /**
+     * Per station: the fastest path for each transfer count that is faster than every path with fewer transfers,
+     * ordered by ascending transfers. So the first path has the fewest transfers and the last one is the fastest.
+     * The start station has an empty path. After each round, roundPaths gets the path that round added to each
+     * station it added one to (never the start station).
+     */
+    public CompactResult search(String startId, int maxTransfers, int minTransferMins, int maxTransferMins,
+                                Consumer<Map<String, CompactResult.PathSummary>> roundPaths) {
         if (maxTransfers > Byte.MAX_VALUE) throw new IllegalArgumentException("Too many transfers: " + maxTransfers);
         TimetableStore store = graph.timetableStore();
         SearchScratch scratch = acquire(store);
@@ -67,7 +70,7 @@ public class CompactReachabilitySearch implements SearchEngine {
         }
     }
 
-    private CompactResult search(Run run, Consumer<Map<String, SearchResult.PathSummary>> roundPaths) {
+    private CompactResult search(Run run, Consumer<Map<String, CompactResult.PathSummary>> roundPaths) {
         long startNanos = System.nanoTime();
         SearchScratch scratch = run.scratch();
         SearchCounters counters = run.counters();
@@ -184,9 +187,8 @@ public class CompactReachabilitySearch implements SearchEngine {
 
     /**
      * Rides the trip from boardIdx on, recording each stop until an earlier ride was there no slower on all its days,
-     * or the trip leaves a stop at a time that runs on too few days ({@link RareTrainFilter#regularDepartures}). The
-     * duration adds each leg's run time and the dwell before it, both clamped at 0, like {@link TripTimetable}'s
-     * offsets.
+     * or the trip leaves a stop at a time that runs on too few days ({@link TimetableStore#isRegularDeparture}). The
+     * duration adds each leg's run time and the dwell before it, both clamped at 0.
      */
     private void ride(Run run, int trip, int boardIdx, int transfers, int boardDurationMinutes, int previous,
                       long days) {
@@ -225,7 +227,7 @@ public class CompactReachabilitySearch implements SearchEngine {
      * Chooses the path with this many transfers of each station the round reached, among its candidates. A path that
      * is not faster than the chosen one with fewer transfers is left out: choosing a slower candidate can make it so.
      */
-    private void finishRound(Run run, int transfers, Consumer<Map<String, SearchResult.PathSummary>> roundPaths) {
+    private void finishRound(Run run, int transfers, Consumer<Map<String, CompactResult.PathSummary>> roundPaths) {
         long startNanos = System.nanoTime();
         SearchScratch scratch = run.scratch();
         IntList stations = scratch.roundStations();
@@ -235,7 +237,7 @@ public class CompactReachabilitySearch implements SearchEngine {
         int[] newPaths = IntStream.range(0, stations.size()).parallel()
                 .map(i -> newPath(run, stations.get(i)))
                 .toArray();
-        Map<String, SearchResult.PathSummary> added = new HashMap<>();
+        Map<String, CompactResult.PathSummary> added = new HashMap<>();
         for (int i = 0; i < stations.size(); i++) {
             int station = stations.get(i);
             int label = newPaths[i];
@@ -243,7 +245,7 @@ public class CompactReachabilitySearch implements SearchEngine {
             int minutes = scratch.labels().durationMinutes(label);
             scratch.pathMinutes()[station] = minutes;
             scratch.chosen().add(station, label);
-            added.put(run.store().stations().id(station), new SearchResult.PathSummary(transfers, minutes));
+            added.put(run.store().stations().id(station), new CompactResult.PathSummary(transfers, minutes));
         }
         stations.clear();
         scratch.candidates().endRound();

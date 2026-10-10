@@ -4,8 +4,9 @@ How much server RailReach needs, measured on the full data. Re-measure when the 
 
 ## Plan
 
-- The server only answers searches, with the compact engine (`--railreach.search.engine=compact`). GTFS zips are parsed on the dev machine, and only the binary cache `data/gtfs-store.bin` (159 MB, S20) is uploaded.
-- Updating data: parse locally with the compact engine (a reload writes the JSON and the binary cache), upload the binary cache, restart the app. It is read only at startup, which takes ~3 s, so that is the downtime of an update. The log line `Binary cache read …` names the SHA-256 of the JSON cache it was built from.
+- The server only answers searches. GTFS zips are parsed on the dev machine, and only the binary cache `data/gtfs-store.bin` (159 MB, S20) is uploaded.
+- Updating data: parse locally (a reload writes the binary cache), upload it, restart the app. It is read only at startup, which takes ~3 s, so that is the downtime of an update. The log line `Binary cache read …` names the SHA-256 of the zips it was built from.
+- Rollback: the git tag `pre-compact` with its JSON cache `data/gtfs-cache.json` (the legacy engine, `-Xmx9g`).
 - The server needs the jar, `frontend/` and `data/gtfs-store.bin`. No zips, so a small disk is enough.
 - Leave `RAILREACH_ADMIN_TOKEN` unset, so `/api/admin/**` answers 403 (no reload, cache delete or feed download from outside).
 - Without zips, the feed update center logs all feeds as missing at startup and once a day. That is expected.
@@ -44,6 +45,18 @@ Full data, `-Xmx9g`, G1, warmer on, gate at 2 permits and 6 queued. 5 clients at
 | Closed client | Its stream stopped 1 s after the client left; nothing stored |
 | Live heap after the run (`bench.sh memory`) | 3,243 MB, with 22 stored results in the raw cache |
 | Peak working set | 9.5 GB: G1 grows the heap towards `-Xmx` |
+
+## Legacy engine deleted (S21, 2026-10-10)
+Full data, `-Xmx3g`, compact object headers, warmer off, started from a binary cache the S21 jar wrote from the zips. Compared with the S22 jar on the same file and machine where noted. Results: the S21 jar on the S22 binary cache gives the S22 dump byte for byte, and the S21 and S22 jars parsing the same zips give byte-identical dumps (dev and full).
+| Measure | How | Result | S21 target |
+|---|---|---|---|
+| Startup | log `Started … in` | **3.0 s** (reading the file ~0.2 s) | ≤ 3 s |
+| Idle live heap | `bench.sh memory` | **405 MB** (S22 jar: 416 MB); ~300 MB after the GCs in `gc.log` | ≤ 1.0 GB |
+| Startup peak | `gc.log`, largest heap before a GC until `Started` | **~450 MB** | ≤ 1.5 GB |
+| Held during a search | `bench.sh held`, Stockholm, 5 transfers, fresh app | **331 MB** (S22 jar: 333 MB); scratch 360–364 MB per the log | ≤ 200 MB, not met (see `decisions.md`) |
+| One stored result | the `Search stats (compact)` line, 5 transfers | **1.6–2.0 MB** | ≤ 3 MB |
+| Search time, 5 transfers | `bench.sh times full` | p50 **1,698 ms**, p95 **2,663 ms** (0–4 transfers: p95 16, 108, 313, 852, 1,626 ms) | p50 ≤ 1.5 s not met, p95 ≤ 3 s |
+| Full parse of all zips (dev machine) | log | 5.6 min loading, 7 min to `Started` (S22 jar: the same) | – |
 
 ## Compact engine memory (S22, 2026-10-10)
 Full data, compact engine, compact object headers, warmer off, started from `data/gtfs-store.bin`, against the S20 jar on the same machine. Results are byte-identical to S20 (`SearchSnapshot`, dev and full).

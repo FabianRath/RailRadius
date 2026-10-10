@@ -3,6 +3,6 @@ railreach:
   gtfs:
     directory: ./target/test-gtfs-none
     auto-load-from-files: false
-    cache-file: target/test-gtfs-cache-none.json
+    store-file: target/test-gtfs-store-none.bin
   cache:
     predictive-enabled: false

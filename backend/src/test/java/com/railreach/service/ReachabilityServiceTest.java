@@ -421,7 +421,7 @@ class ReachabilityServiceTest {
 
     @Test
     void streamStopsSearchingWhenTheClientIsGone() {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs, engine());
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs, cache);
         GoneClientEmitter emitter = new GoneClientEmitter();
 
@@ -435,7 +435,7 @@ class ReachabilityServiceTest {
     void streamIsTurnedAwayWhenTheSearchQueueIsFull() throws Exception {
         SearchGate gate = new SearchGate(1, 0);
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs,
-                GtfsTestFixtures.reachabilityCache(gtfs, gate, engine()));
+                GtfsTestFixtures.reachabilityCache(gtfs, gate));
         RecordingEmitter emitter = new RecordingEmitter();
 
         try (HeldPermit ignored = new HeldPermit(gate)) {
@@ -449,7 +449,7 @@ class ReachabilityServiceTest {
     @Test
     void streamThatRunsOutOfMemorySendsAnErrorAndFreesItsPermit() {
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs,
-                GtfsTestFixtures.reachabilityCache(gtfs, new SearchGate(1, 0), engine()));
+                GtfsTestFixtures.reachabilityCache(gtfs, new SearchGate(1, 0)));
         OutOfMemoryEmitter emitter = new OutOfMemoryEmitter();
 
         service.calculateReachabilityStreaming(streamRequest("alpha:A1", 3), emitter);
@@ -562,13 +562,8 @@ class ReachabilityServiceTest {
                 .build();
     }
 
-    /** The search engine these tests run on; {@link CompactReachabilityServiceTest} runs them on the other one. */
-    String engine() {
-        return SearchEngine.LEGACY;
-    }
-
-    private ReachabilityService service(TransitGraph graph) {
-        return GtfsTestFixtures.reachabilityService(graph, engine());
+    private static ReachabilityService service(TransitGraph graph) {
+        return GtfsTestFixtures.reachabilityService(graph);
     }
 
     private ReachabilityResponse query(TransitGraph data, String start, int maxTransfers,

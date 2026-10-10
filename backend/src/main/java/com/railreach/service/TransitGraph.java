@@ -1,57 +1,33 @@
 package com.railreach.service;
 
-import com.railreach.model.Connection;
 import com.railreach.model.Station;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.IdentityHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.IntStream;
 
-/** The merged rail network of all loaded feeds. All IDs are canonical stop/trip IDs. */
+/**
+ * What the app serves of the merged rail network: stations, their translated names, the {@link TimetableStore} the
+ * search runs on and the {@link TripInfo} of each store trip. Filled from the binary cache or from a load of the zips
+ * ({@link RailNetwork#servedData}). All IDs are canonical stop/trip IDs.
+ */
 @Component
-@Slf4j
 public class TransitGraph {
-
-    private static final String EDGE_SEPARATOR = "->";
-    private static final int MERGE_PROGRESS_LOG_INTERVAL = 1000;
 
     private final Map<String, Station> stations = new ConcurrentHashMap<>();
     // stop ID -> its names in other languages, from the feeds' translations.txt
     private final Map<String, Set<String>> translatedNames = new ConcurrentHashMap<>();
-    // stop ID -> stop IDs reachable without an intermediate stop
-    private final Map<String, Set<String>> neighbors = new ConcurrentHashMap<>();
-    // "fromId->toId" -> every trip's connection along that edge
-    private final Map<String, List<Connection>> connections = new ConcurrentHashMap<>();
-    // trip ID -> ordered stop IDs
-    private final Map<String, List<String>> tripStops = new ConcurrentHashMap<>();
-    // trip ID -> train number, headsign and operator
+    // trip ID of a store trip -> train number, headsign and operator
     private final Map<String, TripInfo> tripInfos = new ConcurrentHashMap<>();
-    // service ID -> the days it runs; only services of rail trips
-    private final Map<String, ServiceDays> services = new ConcurrentHashMap<>();
-    // trip ID -> the days it runs, shared per service; trips without a known service are missing (every day)
-    private final Map<String, ServiceDays> tripServiceDays = new ConcurrentHashMap<>();
-    // stop ID -> IDs of the trips that serve it
-    private final Map<String, Set<String>> stopTrips = new ConcurrentHashMap<>();
-    // Built lazily: "fromId->toId" -> (trip ID -> connection)
-    private final Map<String, Map<String, Connection>> connectionByTrip = new ConcurrentHashMap<>();
-    // Built in one pass on first use after a load; dropped when the graph is cleared
-    private volatile SearchTimetables searchTimetables;
-    // The same in flat arrays for the compact search engine (S18), built on its first search after a load
-    private volatile TimetableStore timetableStore;
+    private volatile TimetableStore timetableStore = TimetableStore.empty();
     private final Clock clock;
 
     public TransitGraph() {
@@ -80,33 +56,8 @@ public class TransitGraph {
         return translatedNames.getOrDefault(stopId, Collections.emptySet());
     }
 
-    Map<String, Set<String>> translatedNames() {
-        return Collections.unmodifiableMap(translatedNames);
-    }
-
-    public Set<String> getNeighbors(String stopId) {
-        return neighbors.getOrDefault(stopId, Collections.emptySet());
-    }
-
-    public List<Connection> getConnections(String fromId, String toId) {
-        return connections.getOrDefault(edgeKey(fromId, toId), Collections.emptyList());
-    }
-
-    public Set<String> getTripsAtStop(String stopId) {
-        return stopTrips.getOrDefault(stopId, Collections.emptySet());
-    }
-
-    public List<String> getStopsOnTrip(String tripId) {
-        return tripStops.getOrDefault(tripId, Collections.emptyList());
-    }
-
     public Optional<TripInfo> getTripInfo(String tripId) {
         return Optional.ofNullable(tripInfos.get(tripId));
-    }
-
-    /** The days the trip runs; {@link ServiceDays#EVERY_DAY} if its feed has no calendar entry for it. */
-    ServiceDays getServiceDays(String tripId) {
-        return tripServiceDays.getOrDefault(tripId, ServiceDays.EVERY_DAY);
     }
 
     /**
@@ -122,61 +73,25 @@ public class TransitGraph {
         return (int) LocalDate.now(clock).toEpochDay();
     }
 
-    /** The trips laid out for the search; built on the first call after a load. */
-    SearchTimetables searchTimetables() {
-        SearchTimetables built = searchTimetables;
-        if (built != null) return built;
-        synchronized (this) {
-            if (searchTimetables == null) searchTimetables = SearchTimetables.build(this);
-            return searchTimetables;
-        }
-    }
-
-    /** The trips in flat arrays for the compact search; built on the first call after a load. */
+    /** The trips in flat arrays for the search; empty before a load. */
     TimetableStore timetableStore() {
-        TimetableStore built = timetableStore;
-        if (built != null) return built;
-        synchronized (this) {
-            if (timetableStore == null) timetableStore = TimetableStore.build(this);
-            return timetableStore;
-        }
+        return timetableStore;
     }
 
-    Set<String> tripIds() {
-        return Collections.unmodifiableSet(tripStops.keySet());
-    }
-
-    /** Trip ID -> its connections, in no particular order. */
-    Map<String, List<Connection>> connectionsByTrip() {
-        Map<String, List<Connection>> byTrip = new HashMap<>(tripStops.size() * 2);
-        for (List<Connection> edgeConnections : connections.values()) {
-            for (Connection c : edgeConnections) {
-                byTrip.computeIfAbsent(c.getTripId(), k -> new ArrayList<>()).add(c);
-            }
-        }
-        return byTrip;
-    }
-
-    /** The trip's connection between two adjacent stops, or null. O(1) via a lazy per-edge index. */
-    public Connection getConnectionByTrip(String fromId, String toId, String tripId) {
-        return connectionByTrip.computeIfAbsent(edgeKey(fromId, toId), key -> {
-            List<Connection> edgeConnections = connections.getOrDefault(key, Collections.emptyList());
-            Map<String, Connection> byTrip = new HashMap<>(edgeConnections.size() * 2);
-            for (Connection c : edgeConnections) {
-                byTrip.put(c.getTripId(), c);
-            }
-            return byTrip;
-        }).get(tripId);
+    /** How many stations the station's trips run to without a stop between: its edges. */
+    public int nextStationCount(String stopId) {
+        TimetableStore store = timetableStore;
+        return store.stations().indexOf(stopId).stream().map(store::nextStationCount).findFirst().orElse(0);
     }
 
     public boolean isDataLoaded() {
-        return !stations.isEmpty() && !neighbors.isEmpty();
+        return !stations.isEmpty() && nodeCount() > 0;
     }
 
     public Map<String, Object> getStats() {
         return Map.of(
                 "stations", stations.size(),
-                "graphNodes", neighbors.size(),
+                "graphNodes", nodeCount(),
                 "totalEdges", edgeCount()
         );
     }
@@ -185,102 +100,32 @@ public class TransitGraph {
         return stations.size();
     }
 
+    /** Stations with an edge. */
     int nodeCount() {
-        return neighbors.size();
+        return (int) nextStationCounts().filter(count -> count > 0).count();
     }
 
     int edgeCount() {
-        return neighbors.values().stream().mapToInt(Set::size).sum();
-    }
-
-    long connectedStationCount() {
-        return stations.keySet().stream().filter(id -> !getNeighbors(id).isEmpty()).count();
+        return nextStationCounts().sum();
     }
 
     Collection<Station> stations() {
         return stations.values();
     }
 
+    private IntStream nextStationCounts() {
+        TimetableStore store = timetableStore;
+        return IntStream.range(0, store.stations().size()).map(store::nextStationCount);
+    }
+
     void clear() {
         stations.clear();
         translatedNames.clear();
-        neighbors.clear();
-        connections.clear();
-        tripStops.clear();
         tripInfos.clear();
-        services.clear();
-        tripServiceDays.clear();
-        stopTrips.clear();
-        connectionByTrip.clear();
-        searchTimetables = null;
-        timetableStore = null;
+        timetableStore = TimetableStore.empty();
     }
 
-    void addStationIfAbsent(Station station) {
-        stations.putIfAbsent(station.getId(), station);
-    }
-
-    void addTranslatedNames(String stopId, Collection<String> names) {
-        translatedNames.computeIfAbsent(stopId, k -> new HashSet<>()).addAll(names);
-    }
-
-    void addServices(Map<String, ServiceDays> serviceDaysById) {
-        services.putAll(serviceDaysById);
-    }
-
-    /** serviceId may be null or unknown; the trip then runs every day. Add its service first. */
-    void addTrip(String tripId, List<String> stopIds, TripInfo info, String serviceId) {
-        tripStops.put(tripId, stopIds);
-        tripInfos.put(tripId, info);
-        ServiceDays days = serviceId != null ? services.get(serviceId) : null;
-        if (days != null) tripServiceDays.put(tripId, days);
-        for (String stopId : stopIds) {
-            stopTrips.computeIfAbsent(stopId, k -> new HashSet<>()).add(tripId);
-        }
-    }
-
-    void addConnection(Connection connection) {
-        neighbors.computeIfAbsent(connection.getFromStopId(), k -> new HashSet<>()).add(connection.getToStopId());
-        connections.computeIfAbsent(edgeKey(connection.getFromStopId(), connection.getToStopId()),
-                k -> new ArrayList<>()).add(connection);
-    }
-
-    GtfsCacheStore.GtfsCacheData snapshot() {
-        Map<String, List<Connection>> connectionsByTrip = connectionsByTrip();
-        // Trips hold their service's shared ServiceDays, not its ID
-        Map<ServiceDays, String> serviceIds = new IdentityHashMap<>(services.size() * 2);
-        services.forEach((serviceId, days) -> serviceIds.put(days, serviceId));
-        Map<String, CachedTrip> trips = new HashMap<>(tripStops.size() * 2);
-        tripStops.forEach((tripId, stops) ->
-                trips.put(tripId, CachedTrip.of(stops, tripInfos.get(tripId), serviceIds.get(getServiceDays(tripId)),
-                        connectionsByTrip.getOrDefault(tripId, List.of()))));
-        long droppedCount = connections.values().stream().mapToLong(List::size).sum()
-                - trips.values().stream().mapToLong(CachedTrip::connectionCount).sum();
-        if (droppedCount > 0) {
-            log.warn("{} connections match no leg of their trip's stop list and are left out of the cache (B19)",
-                    droppedCount);
-        }
-        return new GtfsCacheStore.GtfsCacheData(GtfsCacheStore.FORMAT_VERSION, new HashMap<>(stations),
-                new HashMap<>(translatedNames), new HashMap<>(services), trips);
-    }
-
-    /** Edges, connections and the stop→trips index are not stored; they are rebuilt from the trips. */
-    void restore(GtfsCacheStore.GtfsCacheData data) {
-        clear();
-        data.stations().values().forEach(station -> stations.put(station.getId(), station));
-        data.translatedNames().forEach((stopId, names) -> translatedNames.put(sharedStopId(stopId), names));
-        services.putAll(data.services());
-        data.trips().forEach((tripId, trip) -> {
-            trip.stops().replaceAll(this::sharedStopId);
-            trip.addTo(tripId, this);
-        });
-    }
-
-    /**
-     * Fills the graph from the binary cache (S20): stations, translated names, the store trips' TripInfos and the
-     * store itself; the edges are the store's legs. Trips, connections and services stay empty, so only the compact
-     * engine can search it.
-     */
+    /** Replaces the graph's data with what a load or the binary cache gives. */
     void restore(BinaryCacheStore.BinaryCacheData data) {
         clear();
         data.stations().forEach(station -> stations.put(station.getId(), station));
@@ -289,111 +134,6 @@ public class TransitGraph {
         for (int trip = 0; trip < store.tripCount(); trip++) {
             tripInfos.put(store.tripId(trip), data.tripInfos().get(trip));
         }
-        String[] stationIds = new String[store.stations().size()];
-        Arrays.setAll(stationIds, station -> sharedStopId(store.stations().id(station)));
-        for (int event = 0; event < store.eventCount(); event++) {
-            if (!store.hasLeg(event)) continue;
-            neighbors.computeIfAbsent(stationIds[store.station(event)], k -> new HashSet<>())
-                    .add(stationIds[store.station(event + 1)]);
-        }
         timetableStore = store;
-    }
-
-    // The JSON reader makes a new String for every stop of every trip; on the full data those copies were a quarter
-    // of the heap (S16). Everything built from the trips then holds the station's own ID instead.
-    private String sharedStopId(String stopId) {
-        Station station = stations.get(stopId);
-        return station != null ? station.getId() : stopId;
-    }
-
-    /**
-     * Folds every alias stop into its canonical stop: edges, connections, trips, translated names; then drops the
-     * alias. A canonical stop may itself be an alias (A→B, B→C); A then ends up at C.
-     */
-    void mergeStations(Map<String, String> aliasToCanonicalOrAlias) {
-        Map<String, String> aliasToCanonical = resolveChains(aliasToCanonicalOrAlias);
-        searchTimetables = null;
-        timetableStore = null;
-        int merged = 0;
-        for (Map.Entry<String, String> mapping : aliasToCanonical.entrySet()) {
-            if (++merged % MERGE_PROGRESS_LOG_INTERVAL == 0) {
-                log.info("  Applying remapping: {}/{} completed", merged, aliasToCanonical.size());
-            }
-            String alias = mapping.getKey();
-            String canonical = mapping.getValue();
-            mergeEdges(alias, canonical, aliasToCanonical);
-            mergeConnections(alias, aliasToCanonical);
-            mergeTrips(alias, canonical);
-            Set<String> aliasTranslatedNames = translatedNames.remove(alias);
-            if (aliasTranslatedNames != null) addTranslatedNames(canonical, aliasTranslatedNames);
-            stations.remove(alias);
-        }
-    }
-
-    // Each merge step below remaps one hop only, so every alias must point straight at the end of its chain.
-    // Otherwise, depending on the merge order, trips and connections are left on removed or different stations (B19).
-    private static Map<String, String> resolveChains(Map<String, String> aliasToCanonical) {
-        Map<String, String> resolved = new HashMap<>(aliasToCanonical.size() * 2);
-        for (String alias : aliasToCanonical.keySet()) {
-            resolved.put(alias, canonicalOf(alias, aliasToCanonical));
-        }
-        return resolved;
-    }
-
-    /** The stop at the end of the stop's alias chain; the stop itself if it is no alias. */
-    static String canonicalOf(String stopId, Map<String, String> aliasToCanonical) {
-        String target = stopId;
-        for (int hops = 0; aliasToCanonical.containsKey(target); hops++) {
-            if (hops > aliasToCanonical.size()) throw new IllegalStateException("Station merge cycle at " + stopId);
-            target = aliasToCanonical.get(target);
-        }
-        return target;
-    }
-
-    private void mergeEdges(String alias, String canonical, Map<String, String> aliasToCanonical) {
-        Set<String> aliasNeighbors = neighbors.remove(alias);
-        if (aliasNeighbors != null) {
-            Set<String> canonicalNeighbors = neighbors.computeIfAbsent(canonical, k -> new HashSet<>());
-            for (String neighbor : aliasNeighbors) {
-                String remapped = aliasToCanonical.getOrDefault(neighbor, neighbor);
-                if (!remapped.equals(canonical)) canonicalNeighbors.add(remapped);
-            }
-        }
-        for (Set<String> targets : neighbors.values()) {
-            if (targets.remove(alias)) targets.add(canonical);
-        }
-    }
-
-    private void mergeConnections(String alias, Map<String, String> aliasToCanonical) {
-        List<String> keysToRemap = connections.keySet().stream()
-                .filter(key -> key.startsWith(alias + EDGE_SEPARATOR) || key.endsWith(EDGE_SEPARATOR + alias))
-                .toList();
-        for (String oldKey : keysToRemap) {
-            List<Connection> edgeConnections = connections.remove(oldKey);
-            String[] ends = oldKey.split(EDGE_SEPARATOR);
-            String newFrom = aliasToCanonical.getOrDefault(ends[0], ends[0]);
-            String newTo = aliasToCanonical.getOrDefault(ends[1], ends[1]);
-            if (newFrom.equals(newTo)) continue;
-            for (Connection c : edgeConnections) {
-                c.setFromStopId(newFrom);
-                c.setToStopId(newTo);
-            }
-            connections.computeIfAbsent(edgeKey(newFrom, newTo), k -> new ArrayList<>()).addAll(edgeConnections);
-        }
-    }
-
-    private void mergeTrips(String alias, String canonical) {
-        Set<String> aliasTrips = stopTrips.remove(alias);
-        if (aliasTrips == null) return;
-        stopTrips.computeIfAbsent(canonical, k -> new HashSet<>()).addAll(aliasTrips);
-        for (String tripId : aliasTrips) {
-            List<String> stops = tripStops.get(tripId);
-            if (stops == null) continue;
-            stops.replaceAll(stopId -> stopId.equals(alias) ? canonical : stopId);
-        }
-    }
-
-    private static String edgeKey(String fromId, String toId) {
-        return fromId + EDGE_SEPARATOR + toId;
     }
 }

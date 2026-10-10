@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 /**
- * Limits how many searches run at once. A full-data search holds about 1 GB while it runs, so without a limit enough
+ * Limits how many searches run at once. A full-data search holds about 330 MB while it runs, so without a limit enough
  * visitors at once run out of heap on any server size. Searches beyond the permits wait in a fair queue; when that is
  * full too, the next one is turned away as busy. Every search, the warmer's included, runs inside a permit.
  */
