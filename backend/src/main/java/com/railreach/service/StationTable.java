@@ -1,5 +1,6 @@
 package com.railreach.service;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.OptionalInt;
@@ -30,6 +31,16 @@ final class StationTable {
             idHash[slot] = index + 1;
         }
         return new StationTable(PackedStrings.of(idsByIndex), idHash);
+    }
+
+    // String.hashCode is fixed by the JLS, so the stored slots hold in every JVM
+    static StationTable readFrom(BinaryBlocks.Reader in) throws IOException {
+        return new StationTable(PackedStrings.readFrom(in), in.ints());
+    }
+
+    void writeTo(BinaryBlocks.Writer out) throws IOException {
+        ids.writeTo(out);
+        out.ints(idHash);
     }
 
     int size() {

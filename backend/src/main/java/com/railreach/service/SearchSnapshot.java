@@ -39,6 +39,7 @@ final class SearchSnapshot {
     // Relative to backend/, where Maven runs the main
     private static final Path BENCH_FILE = Path.of("../docs/bench-stations.txt");
     private static final String GZIP_SUFFIX = ".gz";
+    private static final String BINARY_CACHE_SUFFIX = ".bin";
     private static final String FIELD_SEPARATOR = "\t";
     private static final String RIDE_SEPARATOR = " | ";
     private static final String EVERY_DAY = "every day";
@@ -111,6 +112,19 @@ final class SearchSnapshot {
                 .toList();
     }
 
+    private static void restore(TransitGraph graph, String cacheFile, String engine) {
+        if (!cacheFile.endsWith(BINARY_CACHE_SUFFIX)) {
+            graph.restore(new GtfsCacheStore(cacheFile).load()
+                    .orElseThrow(() -> new IllegalStateException("No usable cache file " + cacheFile)));
+            return;
+        }
+        if (!engine.equals(SearchEngine.COMPACT)) {
+            throw new IllegalArgumentException("A binary cache needs the " + SearchEngine.COMPACT + " engine");
+        }
+        graph.restore(new BinaryCacheStore(cacheFile).load()
+                .orElseThrow(() -> new IllegalStateException("No usable binary cache file " + cacheFile)));
+    }
+
     /** Gzipped if the name ends in .gz: a full-data dump is several GB as text. */
     private static Writer writer(Path file) throws IOException {
         OutputStream out = Files.newOutputStream(file);
@@ -120,7 +134,8 @@ final class SearchSnapshot {
 
     /**
      * Args: cache file, bench set, today (yyyy-mm-dd), output file, optionally the search engine (default legacy).
-     * Paths are relative to backend/.
+     * A cache file ending in .bin is a binary cache, which only the compact engine can search (S20). Paths are
+     * relative to backend/.
      */
     public static void main(String[] args) throws IOException {
         if (args.length != 4 && args.length != 5) {
@@ -130,8 +145,7 @@ final class SearchSnapshot {
         String engine = args.length == 5 ? args[4] : SearchEngine.LEGACY;
         long startMs = System.currentTimeMillis();
         TransitGraph graph = TransitGraph.withToday(LocalDate.parse(args[2]));
-        graph.restore(new GtfsCacheStore(args[0]).load()
-                .orElseThrow(() -> new IllegalStateException("No usable cache file " + args[0])));
+        restore(graph, args[0], engine);
         List<String> startIds = benchStarts(ResourceLines.read(BENCH_FILE), args[1]);
         if (startIds.isEmpty()) throw new IllegalArgumentException("No starts in bench set " + args[1]);
         List<String> unknown = startIds.stream().filter(id -> graph.getStation(id) == null).toList();

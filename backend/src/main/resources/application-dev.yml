@@ -6,6 +6,7 @@ railreach:
     directory: ./data/gtfs-dev
     auto-load-from-files: true
     cache-file: data/gtfs-dev-cache.json
+    store-file: data/gtfs-dev-store.bin
 
   # A fresh checkout starts without zips: download these in the admin panel (Feeds tab), then reload GTFS
   feeds:

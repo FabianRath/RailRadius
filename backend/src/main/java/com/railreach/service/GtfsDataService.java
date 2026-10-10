@@ -7,9 +7,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
+import java.nio.file.Path;
 import java.util.Map;
+import java.util.Optional;
 
-/** Fills the {@link TransitGraph} at startup (from the cache file, else from the zips) and on reload. */
+/**
+ * Fills the {@link TransitGraph} at startup (from the binary cache file with the compact engine, else from the JSON
+ * cache file, else from the zips) and on reload.
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -19,6 +24,7 @@ public class GtfsDataService {
     private final GtfsFeedLoader feedLoader;
     private final StationDeduplicator deduplicator;
     private final GtfsCacheStore cacheStore;
+    private final BinaryCacheStore binaryCacheStore;
     private final ReachabilityCache reachabilityCache;
     private final SearchEngine searchEngine;
     private final StationSearchIndex stationSearchIndex;
@@ -35,15 +41,20 @@ public class GtfsDataService {
     @PostConstruct
     public void initialize() {
         log.info("=== RailReach GTFS Data Loader ===");
+        Optional<BinaryCacheStore.BinaryCacheData> binaryCached =
+                usesBinaryCache() ? binaryCacheStore.load() : Optional.empty();
+        if (binaryCached.isPresent()) {
+            graph.restore(binaryCached.get());
+            finishCacheLoad("binary cache");
+            return;
+        }
         var cached = cacheStore.load();
         if (cached.isPresent()) {
             graph.restore(cached.get());
             // Built now rather than by the first search, which would otherwise take twice as long
             searchEngine.prepare();
-            stationSearchIndex.rebuild();
-            log.info("✓ GTFS data loaded from cache: {} stations, {} graph nodes, {} connections",
-                    graph.stationCount(), graph.nodeCount(), graph.connectionCount());
-            dataLoaded = true;
+            saveBinaryCache();
+            finishCacheLoad("cache");
             return;
         }
         if (!autoLoadFromFiles) {
@@ -56,6 +67,22 @@ public class GtfsDataService {
             return;
         }
         loadFromFiles();
+    }
+
+    private void finishCacheLoad(String source) {
+        stationSearchIndex.rebuild();
+        log.info("✓ GTFS data loaded from {}: {} stations, {} graph nodes, {} edges", source,
+                graph.stationCount(), graph.nodeCount(), graph.edgeCount());
+        dataLoaded = true;
+    }
+
+    // The binary cache holds only what the compact engine searches on; the legacy one needs the JSON cache (until S21)
+    private boolean usesBinaryCache() {
+        return searchEngine instanceof CompactReachabilitySearch;
+    }
+
+    private void saveBinaryCache() {
+        if (usesBinaryCache()) binaryCacheStore.save(graph, Path.of(cacheStore.path()));
     }
 
     public void loadFromFiles() {
@@ -91,12 +118,14 @@ public class GtfsDataService {
         loadProgress.enter(GtfsLoadProgress.Phase.SAVING);
         cacheStore.save(graph.snapshot());
         searchEngine.prepare();
+        saveBinaryCache();
         stationSearchIndex.rebuild();
         reachabilityCache.clear();
     }
 
     public void clearCache() {
         cacheStore.delete();
+        binaryCacheStore.delete();
     }
 
     public Map<String, Object> getCacheStats() {
@@ -107,11 +136,11 @@ public class GtfsDataService {
             "dataLoaded", dataLoaded,
             "stationCount", graph.stationCount(),
             "graphNodeCount", graph.nodeCount(),
-            "connectionCount", graph.connectionCount()
+            "connectionCount", graph.edgeCount()
         );
     }
 
     public GtfsLoadStatus getLoadStatus() {
-        return loadProgress.status(graph.stationCount(), graph.connectionCount());
+        return loadProgress.status(graph.stationCount(), graph.edgeCount());
     }
 }

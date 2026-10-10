@@ -3,6 +3,7 @@ package com.railreach.service;
 import com.railreach.model.Connection;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -44,10 +45,10 @@ final class TimetableStore {
     private final int[] depEvent;
     private final long[] regularDeparture;
 
-    private TimetableStore(TimetableStoreBuilder.Parts parts) {
+    private TimetableStore(TimetableStoreBuilder.Parts parts, int[] evTrip, long[] regularDeparture) {
         this.stations = parts.stations();
         this.tripFirstEvent = parts.tripFirstEvent();
-        this.evTrip = eventTrips(parts.tripFirstEvent());
+        this.evTrip = evTrip;
         this.evStation = parts.evStation();
         this.evDepSec = parts.evDepSec();
         this.evArrSec = parts.evArrSec();
@@ -60,16 +61,45 @@ final class TimetableStore {
         this.depStart = parts.depStart();
         this.depSec = parts.depSec();
         this.depEvent = parts.depEvent();
-        this.regularDeparture = regularDepartures();
+        this.regularDeparture = regularDeparture;
     }
 
     static TimetableStore build(TransitGraph graph) {
         long startMs = System.currentTimeMillis();
-        TimetableStore store = new TimetableStore(TimetableStoreBuilder.parts(MergedTrips.of(graph)));
+        TimetableStoreBuilder.Parts parts = TimetableStoreBuilder.parts(MergedTrips.of(graph));
+        int[] evTrip = eventTrips(parts.tripFirstEvent());
+        TimetableStore store = new TimetableStore(parts, evTrip, regularDepartures(parts, evTrip));
         log.info("Timetable store built in {} ms: {} trips, {} stop events, {} stations, {} day patterns, {}",
                 System.currentTimeMillis() - startMs, store.tripCount(), store.eventCount(), store.stations.size(),
                 store.dayPatterns.size(), String.format("%.1f MB", store.sizeBytes() / 1e6));
         return store;
+    }
+
+    /** Reads what {@link #writeTo} wrote. Only evTrip is derived again, which is quick. */
+    static TimetableStore readFrom(BinaryBlocks.Reader in) throws IOException {
+        TimetableStoreBuilder.Parts parts = new TimetableStoreBuilder.Parts(StationTable.readFrom(in), in.ints(),
+                in.ints(), in.ints(), in.ints(), DayPatterns.readFrom(in), in.ints(), PackedStrings.readFrom(in),
+                in.ints(), PackedStrings.readFrom(in), in.ints(), in.ints(), in.ints(), in.ints());
+        return new TimetableStore(parts, eventTrips(parts.tripFirstEvent()), in.longs());
+    }
+
+    /** The parts in {@link TimetableStoreBuilder.Parts} order, then the regular departures. */
+    void writeTo(BinaryBlocks.Writer out) throws IOException {
+        stations.writeTo(out);
+        out.ints(tripFirstEvent);
+        out.ints(evStation);
+        out.ints(evDepSec);
+        out.ints(evArrSec);
+        dayPatterns.writeTo(out);
+        out.ints(tripDayPattern);
+        routeNames.writeTo(out);
+        out.ints(tripRouteName);
+        memberTripIds.writeTo(out);
+        out.ints(tripMemberStart);
+        out.ints(depStart);
+        out.ints(depSec);
+        out.ints(depEvent);
+        out.longs(regularDeparture);
     }
 
     StationTable stations() {
@@ -238,15 +268,18 @@ final class TimetableStore {
      * ({@link RareTrainFilter#runsOftenEnough}). Equal times are next to each other in a station's departures, so
      * each such group is checked once.
      */
-    private long[] regularDepartures() {
-        long[] regular = new long[(eventCount() + BITS_PER_WORD - 1) / BITS_PER_WORD];
-        for (int station = 0; station < stations.size(); station++) {
+    private static long[] regularDepartures(TimetableStoreBuilder.Parts parts, int[] evTrip) {
+        int[] depStart = parts.depStart();
+        int[] depSec = parts.depSec();
+        int[] depEvent = parts.depEvent();
+        long[] regular = new long[(evTrip.length + BITS_PER_WORD - 1) / BITS_PER_WORD];
+        for (int station = 0; station < parts.stations().size(); station++) {
             int groupStart = depStart[station];
             while (groupStart < depStart[station + 1]) {
                 int groupEnd = groupStart;
                 ServiceDays days = null;
                 for (; groupEnd < depStart[station + 1] && depSec[groupEnd] == depSec[groupStart]; groupEnd++) {
-                    ServiceDays twinDays = dayPatterns.days(tripDayPattern[tripOf(depEvent[groupEnd])]);
+                    ServiceDays twinDays = parts.dayPatterns().days(parts.tripDayPattern()[evTrip[depEvent[groupEnd]]]);
                     days = days == null ? twinDays : days.union(twinDays);
                 }
                 if (RareTrainFilter.runsOftenEnough(days)) {

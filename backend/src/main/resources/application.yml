@@ -25,6 +25,10 @@ railreach:
     auto-load-from-files: false
     # Where to store processed GTFS data (stations, graph, connections)
     cache-file: data/gtfs-cache.json
+    # What the compact search engine needs, as primitive arrays (S20): read in seconds instead of the JSON cache's
+    # half minute. Written next to the JSON cache when the compact engine loads it or the zips; a server needs only
+    # this file
+    store-file: data/gtfs-store.bin
     # stop_times.txt is handed to the graph in batches of this many trips, so big feeds don't hold all of it in memory
     trip-batch-size: 100000
 

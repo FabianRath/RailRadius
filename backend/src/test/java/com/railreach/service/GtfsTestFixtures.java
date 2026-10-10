@@ -36,7 +36,7 @@ final class GtfsTestFixtures {
     // Made-up countries KA and LA around the kappa and lambda feeds; every other feed lies outside them
     private static final String BORDERS_FILE = "gtfs-mini/borders.geojson";
     // Before every fixture's first service day, so no day counts as past (B31)
-    private static final LocalDate TODAY = LocalDate.of(2026, 1, 1);
+    static final LocalDate TODAY = LocalDate.of(2026, 1, 1);
 
     static TransitGraph load(Path tempDir, String... feedFolders) throws IOException {
         return load(tempDir, TRIP_BATCH_SIZE, TODAY, feedFolders);
@@ -56,7 +56,7 @@ final class GtfsTestFixtures {
             throws IOException {
         TransitGraph graph = TransitGraph.withToday(today);
         dataService(tempDir, graph, reachabilityCache(graph), new StationSearchIndex(graph), tripBatchSize,
-                feedFolders).loadFromFiles();
+                SearchEngine.LEGACY, feedFolders).loadFromFiles();
         return graph;
     }
 
@@ -75,12 +75,20 @@ final class GtfsTestFixtures {
     static GtfsDataService dataService(Path tempDir, TransitGraph graph, ReachabilityCache reachabilityCache,
                                        StationSearchIndex stationSearchIndex, String... feedFolders)
             throws IOException {
-        return dataService(tempDir, graph, reachabilityCache, stationSearchIndex, TRIP_BATCH_SIZE, feedFolders);
+        return dataService(tempDir, graph, reachabilityCache, stationSearchIndex, TRIP_BATCH_SIZE,
+                SearchEngine.LEGACY, feedFolders);
+    }
+
+    /** Like {@link #dataService(Path, TransitGraph, ReachabilityCache, StationSearchIndex, String...)}, on engine. */
+    static GtfsDataService dataService(Path tempDir, TransitGraph graph, String engine, String... feedFolders)
+            throws IOException {
+        return dataService(tempDir, graph, reachabilityCache(graph, engine), new StationSearchIndex(graph),
+                TRIP_BATCH_SIZE, engine, feedFolders);
     }
 
     private static GtfsDataService dataService(Path tempDir, TransitGraph graph, ReachabilityCache reachabilityCache,
                                                StationSearchIndex stationSearchIndex, int tripBatchSize,
-                                               String... feedFolders) throws IOException {
+                                               String engine, String... feedFolders) throws IOException {
         Path gtfsDir = Files.createDirectories(tempDir.resolve("gtfs"));
         for (String folder : feedFolders) {
             String source = folder.split("-")[0];
@@ -91,7 +99,7 @@ final class GtfsTestFixtures {
         ReflectionTestUtils.setField(feedLoader, "tripBatchSize", tripBatchSize);
         GtfsDataService service = new GtfsDataService(graph, feedLoader,
                 new StationDeduplicator(new CountryLocator(Files.newInputStream(resource(BORDERS_FILE)))),
-                cacheStore(tempDir), reachabilityCache, SearchEngine.named(SearchEngine.LEGACY, graph),
+                cacheStore(tempDir), binaryCacheStore(tempDir), reachabilityCache, SearchEngine.named(engine, graph),
                 stationSearchIndex, new GtfsLoadProgress());
         ReflectionTestUtils.setField(service, "gtfsDirectory", gtfsDir.toString());
         return service;
@@ -100,6 +108,11 @@ final class GtfsTestFixtures {
     /** The cache store that {@link #load} writes to. */
     static GtfsCacheStore cacheStore(Path tempDir) {
         return new GtfsCacheStore(tempDir.resolve("gtfs-cache.json").toString());
+    }
+
+    /** The binary cache store of a {@link #dataService} in tempDir; only the compact engine writes it. */
+    static BinaryCacheStore binaryCacheStore(Path tempDir) {
+        return new BinaryCacheStore(tempDir.resolve("gtfs-store.bin").toString());
     }
 
     /** A ReachabilityService wired like in the app, without warming or a Caffeine cache. */

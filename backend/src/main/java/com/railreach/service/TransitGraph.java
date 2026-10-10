@@ -9,6 +9,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -77,6 +78,10 @@ public class TransitGraph {
 
     Set<String> getTranslatedNames(String stopId) {
         return translatedNames.getOrDefault(stopId, Collections.emptySet());
+    }
+
+    Map<String, Set<String>> translatedNames() {
+        return Collections.unmodifiableMap(translatedNames);
     }
 
     public Set<String> getNeighbors(String stopId) {
@@ -188,10 +193,6 @@ public class TransitGraph {
         return neighbors.values().stream().mapToInt(Set::size).sum();
     }
 
-    int connectionCount() {
-        return connections.size();
-    }
-
     long connectedStationCount() {
         return stations.keySet().stream().filter(id -> !getNeighbors(id).isEmpty()).count();
     }
@@ -273,6 +274,29 @@ public class TransitGraph {
             trip.stops().replaceAll(this::sharedStopId);
             trip.addTo(tripId, this);
         });
+    }
+
+    /**
+     * Fills the graph from the binary cache (S20): stations, translated names, the store trips' TripInfos and the
+     * store itself; the edges are the store's legs. Trips, connections and services stay empty, so only the compact
+     * engine can search it.
+     */
+    void restore(BinaryCacheStore.BinaryCacheData data) {
+        clear();
+        data.stations().forEach(station -> stations.put(station.getId(), station));
+        translatedNames.putAll(data.translatedNames());
+        TimetableStore store = data.store();
+        for (int trip = 0; trip < store.tripCount(); trip++) {
+            tripInfos.put(store.tripId(trip), data.tripInfos().get(trip));
+        }
+        String[] stationIds = new String[store.stations().size()];
+        Arrays.setAll(stationIds, station -> sharedStopId(store.stations().id(station)));
+        for (int event = 0; event < store.eventCount(); event++) {
+            if (!store.hasLeg(event)) continue;
+            neighbors.computeIfAbsent(stationIds[store.station(event)], k -> new HashSet<>())
+                    .add(stationIds[store.station(event + 1)]);
+        }
+        timetableStore = store;
     }
 
     // The JSON reader makes a new String for every stop of every trip; on the full data those copies were a quarter
