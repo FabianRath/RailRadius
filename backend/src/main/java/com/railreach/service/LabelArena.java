@@ -3,10 +3,10 @@ package com.railreach.service;
 import java.util.Arrays;
 
 /**
- * The rides of one search as parallel arrays, a label per ride: its trip, where it boarded and left, its duration,
- * its journey's days and the ride before its transfer, without an object per ride. Labels are numbered in the order
- * they are made, so a round's arrivals are one range. An arena serves one search at a time and is reused by the next;
- * it grows by half its size and is never shrunk.
+ * The labels of one search as parallel arrays: the arrivals that become candidates or are boarded from, each with its
+ * trip, where it boarded and left, its duration, its journey's days and the label before its transfer, without an
+ * object per label. Other arrivals live only as their {@link RoundRides} row. An arena serves one search at a time and
+ * is reused by the next; it grows by half its size and is never shrunk.
  * <p>
  * Stop indexes are shorts, so a trip with more than 32,767 stops fails fast. A label's transfers are the rides
  * before it, so they need no column. daysMemo is {@link LabelDays}' memo of the journey's exact running days.
@@ -41,16 +41,28 @@ final class LabelArena {
 
     /** previous is the label boarded from, {@link #NONE} for a first ride; days are its {@link WeekPeriodDays}. */
     int add(int tripIndex, int board, int alight, int minutes, int previousLabel, long days) {
+        int label = reserve(1);
+        set(label, tripIndex, board, alight, minutes, previousLabel, days);
+        return label;
+    }
+
+    /** Makes room for count labels after the last one, to {@link #set} later. Returns the first of them. */
+    int reserve(int count) {
+        while (size + count > trip.length) grow();
+        size += count;
+        return size - count;
+    }
+
+    /** Fills a {@link #reserve}d label, as {@link #add} does. Threads may fill different labels at once. */
+    void set(int label, int tripIndex, int board, int alight, int minutes, int previousLabel, long days) {
         if (alight > Short.MAX_VALUE) throw new IllegalStateException("Trip " + tripIndex + " has too many stops");
-        if (size == trip.length) grow();
-        trip[size] = tripIndex;
-        previous[size] = previousLabel;
-        durationMinutes[size] = minutes;
-        boardIdx[size] = (short) board;
-        alightIdx[size] = (short) alight;
-        weekPeriodDays[size] = days;
-        daysMemo[size] = UNKNOWN_DAYS;
-        return size++;
+        trip[label] = tripIndex;
+        previous[label] = previousLabel;
+        durationMinutes[label] = minutes;
+        boardIdx[label] = (short) board;
+        alightIdx[label] = (short) alight;
+        weekPeriodDays[label] = days;
+        daysMemo[label] = UNKNOWN_DAYS;
     }
 
     int trip(int label) {
@@ -113,8 +125,8 @@ final class LabelArena {
     }
 
     /**
-     * Drops every label not marked since {@link #startTrim}. Kept labels stay in order, so a round's labels stay one
-     * range; until the next trim, {@link #trimmedIndex} maps a kept label's old index to its new one.
+     * Drops every label not marked since {@link #startTrim}. Kept labels stay in order, and until the next trim,
+     * {@link #trimmedIndex} maps a kept label's old index to its new one.
      */
     void trim() {
         int words = wordCount(size);
