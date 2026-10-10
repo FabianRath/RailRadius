@@ -42,8 +42,8 @@ public class StationSearchIndex {
 
     public void rebuild() {
         List<Station> ranked = graph.stations().stream()
-                .filter(s -> s.getName() != null && !graph.getNeighbors(s.getId()).isEmpty())
-                .sorted(Comparator.comparingInt((Station s) -> graph.getNeighbors(s.getId()).size()).reversed()
+                .filter(s -> s.getName() != null && graph.nextStationCount(s.getId()) > 0)
+                .sorted(Comparator.comparingInt((Station s) -> graph.nextStationCount(s.getId())).reversed()
                         .thenComparing(Station::getId))
                 .toList();
         List<String> names = ranked.stream().map(this::joinedVariants).toList();

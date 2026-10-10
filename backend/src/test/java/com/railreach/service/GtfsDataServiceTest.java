@@ -1,13 +1,13 @@
 package com.railreach.service;
 
+import com.railreach.model.Connection;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,10 +18,13 @@ class GtfsDataServiceTest {
     static Path tempDir;
 
     static TransitGraph gtfs;
+    // The same feeds before the store is built: their trips, connections and edges
+    static RailNetwork network;
 
     @BeforeAll
     static void loadFixture() throws Exception {
-        gtfs = GtfsTestFixtures.load(tempDir, "alpha", "beta");
+        gtfs = GtfsTestFixtures.load(tempDir.resolve("graph"), "alpha", "beta");
+        network = GtfsTestFixtures.network(tempDir.resolve("network"), "alpha", "beta");
     }
 
     // F25: a fresh checkout starts without zips, so the feeds can be downloaded in the running app
@@ -39,23 +42,18 @@ class GtfsDataServiceTest {
         assertThat(service.getCacheStats()).containsEntry("dataLoaded", false);
     }
 
-    // S20: the legacy engine needs the JSON cache's trips, the compact one only what the binary cache holds
+    // S21: the binary cache is all a start needs; with it, the zips are not read
     @Test
-    void compactEngineWritesTheBinaryCacheFromTheJsonCacheAndStartsFromItNextTime(@TempDir Path dir)
-            throws Exception {
+    void aLoadFromTheZipsWritesTheBinaryCacheTheNextStartReads(@TempDir Path dir) throws Exception {
         TransitGraph parsed = new TransitGraph();
-        GtfsTestFixtures.dataService(dir, parsed, SearchEngine.LEGACY, "alpha", "beta").loadFromFiles();
-        assertThat(dir.resolve("gtfs-store.bin")).doesNotExist();
-
-        TransitGraph fromJson = new TransitGraph();
-        GtfsTestFixtures.dataService(dir, fromJson, SearchEngine.COMPACT).initialize();
-        assertThat(fromJson.tripIds()).isNotEmpty();
+        GtfsTestFixtures.dataService(dir, parsed, "alpha", "beta").loadFromFiles();
         assertThat(dir.resolve("gtfs-store.bin")).exists();
 
         TransitGraph fromBinary = new TransitGraph();
-        GtfsDataService service = GtfsTestFixtures.dataService(dir, fromBinary, SearchEngine.COMPACT);
+        GtfsDataService service = GtfsTestFixtures.dataService(dir, fromBinary);
+        ReflectionTestUtils.setField(service, "gtfsDirectory", dir.resolve("missing").toString());
         service.initialize();
-        assertThat(fromBinary.tripIds()).isEmpty();
+
         assertThat(fromBinary.getAllStations()).isEqualTo(parsed.getAllStations());
         assertThat(service.getCacheStats()).containsEntry("dataLoaded", true)
                 .containsEntry("connectionCount", parsed.edgeCount());
@@ -70,8 +68,8 @@ class GtfsDataServiceTest {
     @Test
     void feedFilesStartingWithAByteOrderMarkAreParsed() {
         // every beta file starts with a UTF-8 BOM
-        assertThat(gtfs.getNeighbors("beta:B1")).containsExactly("beta:B2");
-        assertThat(gtfs.getStopsOnTrip("beta:U1")).containsExactly("beta:B1", "beta:B2");
+        assertThat(network.getNeighbors("beta:B1")).containsExactly("beta:B2");
+        assertThat(network.getStopsOnTrip("beta:U1")).containsExactly("beta:B1", "beta:B2");
     }
 
     // B35: the ÖBB zip keeps its files in a folder GTFS_Fahrplan_2026/
@@ -114,86 +112,86 @@ class GtfsDataServiceTest {
 
     @Test
     void suburbanRailwayTripsAreLoaded(@TempDir Path dir) throws Exception {
-        TransitGraph graph = GtfsTestFixtures.load(dir, "epsilon");
+        RailNetwork epsilon = GtfsTestFixtures.network(dir, "epsilon");
 
-        assertThat(graph.getStopsOnTrip("epsilon:S1")).containsExactly("epsilon:E4", "epsilon:E7");
-        assertThat(graph.getStation("epsilon:E7")).isNotNull();
+        assertThat(epsilon.getStopsOnTrip("epsilon:S1")).containsExactly("epsilon:E4", "epsilon:E7");
+        assertThat(epsilon.getStation("epsilon:E7")).isNotNull();
     }
 
     @Test
     void trainsThatRunOnFewerThanEightDaysAreNotLoaded(@TempDir Path dir) throws Exception {
-        TransitGraph graph = GtfsTestFixtures.load(dir, "eta");
+        RailNetwork eta = GtfsTestFixtures.network(dir, "eta");
 
-        assertThat(graph.getTripInfo("eta:HT5")).isEmpty();
-        assertThat(graph.getStation("eta:H4")).isNull();
-        assertThat(graph.getTripInfo("eta:HT2")).isPresent();
+        assertThat(eta.tripIds()).doesNotContain("eta:HT5");
+        assertThat(eta.getStation("eta:H4")).isNull();
+        assertThat(eta.tripIds()).contains("eta:HT2");
     }
 
     @Test
     void daysOfATrainSplitIntoSeveralTripsAreCountedTogether(@TempDir Path dir) throws Exception {
-        TransitGraph graph = GtfsTestFixtures.load(dir, "eta");
+        RailNetwork eta = GtfsTestFixtures.network(dir, "eta");
 
-        assertThat(graph.getTripInfo("eta:HT6")).isPresent();
-        assertThat(graph.getTripInfo("eta:HT7")).isPresent();
+        assertThat(eta.tripIds()).contains("eta:HT6");
+        assertThat(eta.tripIds()).contains("eta:HT7");
     }
 
     @Test
     void trainsWithoutNumberThatRunOnFewerThanEightDaysAreNotLoaded(@TempDir Path dir) throws Exception {
-        TransitGraph graph = GtfsTestFixtures.load(dir, "eta");
+        RailNetwork eta = GtfsTestFixtures.network(dir, "eta");
 
-        assertThat(graph.getTripInfo("eta:HT8")).isEmpty();
-        assertThat(graph.getStation("eta:H6")).isNull();
+        assertThat(eta.tripIds()).doesNotContain("eta:HT8");
+        assertThat(eta.getStation("eta:H6")).isNull();
     }
 
     // B33: HT11 has the number of the daily HT1 but leaves at another time on 2 days
     @Test
     void rareTimingVariantOfARegularTrainIsNotLoaded(@TempDir Path dir) throws Exception {
-        TransitGraph graph = GtfsTestFixtures.load(dir, "eta");
+        RailNetwork eta = GtfsTestFixtures.network(dir, "eta");
 
-        assertThat(graph.getTripInfo("eta:HT11")).isEmpty();
-        assertThat(graph.getTripInfo("eta:HT1")).isPresent();
+        assertThat(eta.tripIds()).doesNotContain("eta:HT11");
+        assertThat(eta.tripIds()).contains("eta:HT1");
     }
 
     // B32: without a number, trips of one route leaving the same stop at the same time are one train
     @Test
     void tripsWithoutNumberLeavingTogetherAreCountedAsOneTrain(@TempDir Path dir) throws Exception {
-        TransitGraph graph = GtfsTestFixtures.load(dir, "eta");
+        RailNetwork eta = GtfsTestFixtures.network(dir, "eta");
 
-        assertThat(graph.getTripInfo("eta:HT9")).isPresent();
-        assertThat(graph.getTripInfo("eta:HT10")).isPresent();
+        assertThat(eta.tripIds()).contains("eta:HT9");
+        assertThat(eta.tripIds()).contains("eta:HT10");
     }
 
     @Test
     void tripsStayWholeWhenStopTimesAreReadInSmallBatches(@TempDir Path dir) throws Exception {
-        TransitGraph graph = GtfsTestFixtures.load(dir, 1, "alpha");
+        RailNetwork alpha = GtfsTestFixtures.network(dir, 1, "alpha");
 
-        assertThat(graph.getStopsOnTrip("alpha:T1")).containsExactly("alpha:A1", "alpha:A2", "alpha:A3");
-        assertThat(graph.getConnectionByTrip("alpha:A2", "alpha:A3", "alpha:T1")).isNotNull();
+        assertThat(alpha.getStopsOnTrip("alpha:T1")).containsExactly("alpha:A1", "alpha:A2", "alpha:A3");
+        assertThat(connection(alpha, "alpha:A2", "alpha:A3", "alpha:T1")).isPresent();
     }
 
     @Test
     void interleavedStopTimesRowsSwitchOffBatching(@TempDir Path dir) throws Exception {
-        TransitGraph graph = GtfsTestFixtures.load(dir, 2, "beta");
+        RailNetwork beta = GtfsTestFixtures.network(dir, 2, "beta");
 
-        assertThat(graph.getStopsOnTrip("beta:U1")).containsExactly("beta:B1", "beta:B2");
-        assertThat(graph.getStopsOnTrip("beta:U2")).containsExactly("beta:B1", "beta:B2");
-        assertThat(graph.getConnections("beta:B1", "beta:B2")).hasSize(3);
+        assertThat(beta.getStopsOnTrip("beta:U1")).containsExactly("beta:B1", "beta:B2");
+        assertThat(beta.getStopsOnTrip("beta:U2")).containsExactly("beta:B1", "beta:B2");
+        assertThat(beta.getConnections("beta:B1", "beta:B2")).hasSize(3);
     }
 
     @Test
     void rowsOfATripAlreadyHandedToTheGraphAreDropped(@TempDir Path dir) throws Exception {
         // U1 is flushed with one stop before its second row turns up, so it never becomes a trip
-        TransitGraph graph = GtfsTestFixtures.load(dir, 1, "beta");
+        RailNetwork beta = GtfsTestFixtures.network(dir, 1, "beta");
 
-        assertThat(graph.getStopsOnTrip("beta:U1")).isEmpty();
-        assertThat(graph.getStopsOnTrip("beta:U2")).containsExactly("beta:B1", "beta:B2");
-        assertThat(graph.getConnectionByTrip("beta:B1", "beta:B2", "beta:U1")).isNull();
+        assertThat(beta.getStopsOnTrip("beta:U1")).isEmpty();
+        assertThat(beta.getStopsOnTrip("beta:U2")).containsExactly("beta:B1", "beta:B2");
+        assertThat(connection(beta, "beta:B1", "beta:B2", "beta:U1")).isEmpty();
     }
 
     @Test
     void nonRailRoutesProduceNoEdges() {
-        assertThat(gtfs.getNeighbors("alpha:A1")).doesNotContain("alpha:A9");
-        assertThat(gtfs.getNeighbors("alpha:A9")).isEmpty();
+        assertThat(network.getNeighbors("alpha:A1")).doesNotContain("alpha:A9");
+        assertThat(network.getNeighbors("alpha:A9")).isEmpty();
     }
 
     @Test
@@ -207,7 +205,7 @@ class GtfsDataServiceTest {
     @Test
     void sameNameNearbyStopsWithinFeedAreMerged() {
         // T1 serves A2b, which is merged into A2 (same name, ~50 m apart)
-        assertThat(gtfs.getNeighbors("alpha:A1")).contains("alpha:A2");
+        assertThat(network.getNeighbors("alpha:A1")).contains("alpha:A2");
         assertThat(gtfs.getStation("alpha:A2b")).isNull();
     }
 
@@ -215,16 +213,16 @@ class GtfsDataServiceTest {
     void platformFarFromItsParentStationIsMergedIntoIt() {
         // T1 departs from platform A5, ~390 m from its parent_station A1: beyond every distance-based merge
         assertThat(gtfs.getStation("alpha:A5")).isNull();
-        assertThat(gtfs.getNeighbors("alpha:A1")).contains("alpha:A2");
+        assertThat(network.getNeighbors("alpha:A1")).contains("alpha:A2");
     }
 
     @Test
     void similarNearbyStationsAcrossFeedsAreMerged() {
         // "Border Town" (alpha, no outgoing edges) merges into "Border Town Station" (beta)
         assertThat(gtfs.getStation("alpha:A3")).isNull();
-        assertThat(gtfs.getNeighbors("alpha:A2")).containsExactly("beta:B1");
-        assertThat(gtfs.getNeighbors("beta:B1")).containsExactly("beta:B2");
-        assertThat(gtfs.getStopsOnTrip("alpha:T1"))
+        assertThat(network.getNeighbors("alpha:A2")).containsExactly("beta:B1");
+        assertThat(network.getNeighbors("beta:B1")).containsExactly("beta:B2");
+        assertThat(network.getStopsOnTrip("alpha:T1"))
                 .containsExactly("alpha:A1", "alpha:A2", "beta:B1");
     }
 
@@ -258,25 +256,26 @@ class GtfsDataServiceTest {
     @Test
     void chainedMergesEndAtTheLastStation(@TempDir Path dir) throws Exception {
         // G2 merges into GX within gamma, then GX merges into delta's D1 across the border
-        TransitGraph graph = GtfsTestFixtures.load(dir, "gamma", "delta");
+        RailNetwork merged = GtfsTestFixtures.network(dir, "gamma", "delta");
 
-        assertThat(graph.getStation("gamma:GX")).isNull();
-        assertThat(graph.getStation("gamma:G2")).isNull();
-        assertThat(graph.getTripsAtStop("gamma:GX")).isEmpty();
-        assertThat(graph.getStopsOnTrip("gamma:V1")).containsExactly("gamma:G3", "delta:D1", "gamma:G4");
-        assertThat(graph.getStopsOnTrip("gamma:V2")).containsExactly("gamma:G3", "delta:D1");
-        assertThat(graph.getConnectionByTrip("gamma:G3", "delta:D1", "gamma:V2")).isNotNull();
-        assertThat(graph.getNeighbors("gamma:G3")).containsExactly("delta:D1");
+        assertThat(merged.getStation("gamma:GX")).isNull();
+        assertThat(merged.getStation("gamma:G2")).isNull();
+        assertThat(merged.getTripsAtStop("gamma:GX")).isEmpty();
+        assertThat(merged.getStopsOnTrip("gamma:V1")).containsExactly("gamma:G3", "delta:D1", "gamma:G4");
+        assertThat(merged.getStopsOnTrip("gamma:V2")).containsExactly("gamma:G3", "delta:D1");
+        assertThat(connection(merged, "gamma:G3", "delta:D1", "gamma:V2")).isPresent();
+        assertThat(merged.getNeighbors("gamma:G3")).containsExactly("delta:D1");
     }
 
     // B22
     @Test
     void crossFeedStationsSharingTrainsAreMergedWhateverTheirNames(@TempDir Path dir) throws Exception {
         // "Gamma Border" and "Delta Grens" are ~330 m apart; three trains leave both at the same minute for Twin Halt
-        TransitGraph graph = GtfsTestFixtures.load(dir, "gamma", "delta");
+        RailNetwork merged = GtfsTestFixtures.network(dir, "gamma", "delta");
 
-        assertThat(Stream.of("gamma:G5", "delta:D4").filter(id -> graph.getStation(id) != null)).hasSize(1);
-        assertThat(graph.getStopsOnTrip("gamma:V3").getFirst()).isEqualTo(graph.getStopsOnTrip("delta:W3").getFirst());
+        assertThat(Stream.of("gamma:G5", "delta:D4").filter(id -> merged.getStation(id) != null)).hasSize(1);
+        assertThat(merged.getStopsOnTrip("gamma:V3").getFirst())
+                .isEqualTo(merged.getStopsOnTrip("delta:W3").getFirst());
     }
 
     @Test
@@ -292,10 +291,10 @@ class GtfsDataServiceTest {
     @Test
     void stopsAbroadAreMergedIntoTheNearestLocalStation(@TempDir Path dir) throws Exception {
         // kappa's K3 "Lambda Gate" lies in lambda's country, ~700 m from lambda's L1 "Lambdastadt Ost"
-        TransitGraph graph = GtfsTestFixtures.load(dir, "kappa", "lambda");
+        RailNetwork merged = GtfsTestFixtures.network(dir, "kappa", "lambda");
 
-        assertThat(graph.getStation("kappa:K3")).isNull();
-        assertThat(graph.getStopsOnTrip("kappa:KT1")).containsExactly("kappa:K1", "kappa:K2", "lambda:L1");
+        assertThat(merged.getStation("kappa:K3")).isNull();
+        assertThat(merged.getStopsOnTrip("kappa:KT1")).containsExactly("kappa:K1", "kappa:K2", "lambda:L1");
     }
 
     @Test
@@ -312,20 +311,20 @@ class GtfsDataServiceTest {
     @Test
     void stopsAbroadAreMergedIntoALocalStationOfTheSameNameAFewKilometresAway(@TempDir Path dir) throws Exception {
         // kappa's K6 "Lambda Dorf (LA)" lies in lambda's country, ~2 km from lambda's L3 "Lambda Dorf"
-        TransitGraph graph = GtfsTestFixtures.load(dir, "kappa", "lambda");
+        RailNetwork merged = GtfsTestFixtures.network(dir, "kappa", "lambda");
 
-        assertThat(graph.getStation("kappa:K6")).isNull();
-        assertThat(graph.getStopsOnTrip("kappa:KT3")).containsExactly("kappa:K7", "lambda:L3");
+        assertThat(merged.getStation("kappa:K6")).isNull();
+        assertThat(merged.getStopsOnTrip("kappa:KT3")).containsExactly("kappa:K7", "lambda:L3");
     }
 
     // B30
     @Test
     void stationsWithTheSameStationCodeMergeThoughOverAKilometreApart(@TempDir Path dir) throws Exception {
         // UIC 8714621 in both feeds, the Swiss feed's stop ~1.1 km off
-        TransitGraph graph = GtfsTestFixtures.load(dir, "france", "switzerland");
+        RailNetwork merged = GtfsTestFixtures.network(dir, "france", "switzerland");
 
-        assertThat(graph.getStation("switzerland:8714621")).isNull();
-        assertThat(graph.getStopsOnTrip("switzerland:ST1"))
+        assertThat(merged.getStation("switzerland:8714621")).isNull();
+        assertThat(merged.getStopsOnTrip("switzerland:ST1"))
                 .containsExactly("switzerland:8500010", "france:StopArea:OCE87146217");
     }
 
@@ -350,7 +349,7 @@ class GtfsDataServiceTest {
 
     @Test
     void connectionsStoreTimesAsSecondsSinceMidnight() {
-        var conn = gtfs.getConnectionByTrip("alpha:A1", "alpha:A2", "alpha:T1");
+        var conn = connection(network, "alpha:A1", "alpha:A2", "alpha:T1").orElseThrow();
         assertThat(conn.getDepartureTimeSeconds()).isEqualTo(8 * 3600);
         assertThat(conn.getArrivalTimeSeconds()).isEqualTo(8 * 3600 + 30 * 60);
         assertThat(conn.getRouteName()).isEqualTo("RE1");
@@ -369,67 +368,24 @@ class GtfsDataServiceTest {
     }
 
     @Test
-    void graphRestoredFromCacheEqualsTheParsedGraph() {
-        TransitGraph restored = new TransitGraph();
-        restored.restore(GtfsTestFixtures.cacheStore(tempDir).load().orElseThrow());
-
-        assertThat(restored.getAllStations()).isEqualTo(gtfs.getAllStations());
-        assertThat(restored.edgeCount()).isEqualTo(gtfs.edgeCount());
-        for (String stopId : gtfs.getAllStations().keySet()) {
-            assertThat(restored.getNeighbors(stopId)).isEqualTo(gtfs.getNeighbors(stopId));
-            for (String neighbor : gtfs.getNeighbors(stopId)) {
-                assertThat(restored.getConnections(stopId, neighbor))
-                        .containsExactlyInAnyOrderElementsOf(gtfs.getConnections(stopId, neighbor));
-            }
-            assertThat(restored.getTranslatedNames(stopId)).isEqualTo(gtfs.getTranslatedNames(stopId));
-            assertThat(restored.getTripsAtStop(stopId)).isEqualTo(gtfs.getTripsAtStop(stopId));
-            for (String tripId : gtfs.getTripsAtStop(stopId)) {
-                assertThat(restored.getStopsOnTrip(tripId)).isEqualTo(gtfs.getStopsOnTrip(tripId));
-                assertThat(restored.getTripInfo(tripId)).isEqualTo(gtfs.getTripInfo(tripId));
+    void parsedTripsShareTheStationsIdStrings() {
+        for (String tripId : network.tripIds()) {
+            for (String stopId : network.getStopsOnTrip(tripId)) {
+                assertThat(stopId).isSameAs(network.getStation(stopId).getId());
             }
         }
-    }
-
-    @Test
-    void parsedAndRestoredTripsShareTheStationsIdStrings() {
-        TransitGraph restored = new TransitGraph();
-        restored.restore(GtfsTestFixtures.cacheStore(tempDir).load().orElseThrow());
-
-        for (TransitGraph graph : List.of(gtfs, restored)) {
-            for (String tripId : graph.tripIds()) {
-                for (String stopId : graph.getStopsOnTrip(tripId)) {
-                    assertThat(stopId).isSameAs(graph.getStation(stopId).getId());
-                }
-            }
-        }
-    }
-
-    @Test
-    void serviceDaysOfTripsSurviveTheCache(@TempDir Path dir) throws Exception {
-        TransitGraph parsed = GtfsTestFixtures.load(dir, "zeta");
-        TransitGraph restored = new TransitGraph();
-        restored.restore(GtfsTestFixtures.cacheStore(dir).load().orElseThrow());
-
-        for (String tripId : parsed.getTripsAtStop("zeta:Z2")) {
-            assertThat(restored.getServiceDays(tripId)).usingRecursiveComparison()
-                    .isEqualTo(parsed.getServiceDays(tripId));
-        }
-        assertThat(restored.getServiceDays("zeta:ZT1").intersect(restored.getServiceDays("zeta:ZT3"), 0).isEmpty())
-                .isFalse();
     }
 
     @Test
     void tripsOfAFeedWithoutCalendarRunEveryDay() {
-        assertThat(gtfs.getServiceDays("alpha:T1")).isSameAs(ServiceDays.EVERY_DAY);
-    }
-
-    @Test
-    void cacheFileInAnOldFormatIsIgnored(@TempDir Path oldCacheDir) throws Exception {
-        Files.writeString(oldCacheDir.resolve("gtfs-cache.json"), "{\"stations\":{},\"graph\":{},\"timestamp\":1}");
-        assertThat(GtfsTestFixtures.cacheStore(oldCacheDir).load()).isEmpty();
+        assertThat(network.getServiceDays("alpha:T1")).isSameAs(ServiceDays.EVERY_DAY);
     }
 
     private static String trainNumber(TransitGraph graph, String tripId) {
         return graph.getTripInfo(tripId).orElseThrow().trainNumber();
+    }
+
+    private static Optional<Connection> connection(RailNetwork network, String fromId, String toId, String tripId) {
+        return network.getConnections(fromId, toId).stream().filter(c -> c.getTripId().equals(tripId)).findFirst();
     }
 }

@@ -24,10 +24,10 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Reads and writes what the compact search engine needs as one {@link BinaryBlocks} file (S20): stations, their
- * translated names, the {@link TripInfo} of each store trip and the {@link TimetableStore}. Reading it takes well
- * under a second, where the JSON cache takes half a minute plus building the store. The dev machine writes it from the graph; its hash
- * is that of the JSON cache it was built from, so a server's file can be traced to it.
+ * Reads and writes what the app serves as one {@link BinaryBlocks} file (S20): stations, their translated names, the
+ * {@link TripInfo} of each store trip and the {@link TimetableStore}. Reading it takes well under a second, where
+ * parsing the zips takes minutes. The dev machine writes it after each load of the zips; its hash is that of the zips
+ * it was built from, so a server's file can be traced to them.
  * <p>
  * After a string table, the blocks are: stations (ID, name, parent station, country as string indexes; latitude,
  * longitude), translated names (stop, then its names as CSR), the trip infos (train number, headsign, operator by
@@ -81,24 +81,24 @@ public class BinaryCacheStore {
         try (BinaryBlocks.Reader in = new BinaryBlocks.Reader(file, FORMAT_VERSION)) {
             BinaryCacheData data = read(in);
             in.checkAllRead();
-            log.info("✓ Binary cache read in {} ms ({} MB, built from the JSON cache with {} {})",
+            log.info("✓ Binary cache read in {} ms ({} MB, built from the zips with {} {})",
                     System.currentTimeMillis() - startMs, Files.size(file) / BYTES_PER_MB, HASH_ALGORITHM,
                     HexFormat.of().formatHex(in.hash()));
             return Optional.of(data);
         } catch (Exception e) {
-            log.warn("Binary cache {} is not usable; using the JSON cache", file, e);
+            log.warn("Binary cache {} is not usable", file, e);
             return Optional.empty();
         }
     }
 
-    /** Writes the graph's data, hashed with inputFile, the JSON cache it comes from. Logs a failure. */
-    void save(TransitGraph graph, Path inputFile) {
+    /** Writes the data, hashed with inputFiles, the zips it comes from (in this order). Logs a failure. */
+    void save(BinaryCacheData data, List<Path> inputFiles) {
         Path part = file.resolveSibling(file.getFileName() + PART_SUFFIX);
         long startMs = System.currentTimeMillis();
         try {
             Files.createDirectories(file.getParent());
-            try (BinaryBlocks.Writer out = new BinaryBlocks.Writer(part, FORMAT_VERSION, hash(inputFile))) {
-                write(dataOf(graph), out);
+            try (BinaryBlocks.Writer out = new BinaryBlocks.Writer(part, FORMAT_VERSION, hash(inputFiles))) {
+                write(data, out);
             }
             // A server never sees a half-written file
             Files.move(part, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
@@ -117,16 +117,17 @@ public class BinaryCacheStore {
         }
     }
 
-    private static BinaryCacheData dataOf(TransitGraph graph) {
-        TimetableStore store = graph.timetableStore();
-        List<TripInfo> tripInfos = new ArrayList<>(store.tripCount());
-        for (int trip = 0; trip < store.tripCount(); trip++) {
-            String tripId = store.tripId(trip);
-            tripInfos.add(graph.getTripInfo(tripId)
-                    .orElseThrow(() -> new IllegalStateException("No trip info for " + tripId)));
-        }
-        return new BinaryCacheData(List.copyOf(graph.getAllStations().values()), graph.translatedNames(), tripInfos,
-                store);
+    String path() {
+        return file.toString();
+    }
+
+    boolean exists() {
+        return Files.exists(file);
+    }
+
+    /** 0 if the file is missing. */
+    long sizeMb() {
+        return file.toFile().length() / BYTES_PER_MB;
     }
 
     private static void write(BinaryCacheData data, BinaryBlocks.Writer out) throws IOException {
@@ -255,10 +256,12 @@ public class BinaryCacheStore {
         return Double.isNaN(degrees) ? null : degrees;
     }
 
-    private static byte[] hash(Path inputFile) throws IOException, NoSuchAlgorithmException {
+    private static byte[] hash(List<Path> inputFiles) throws IOException, NoSuchAlgorithmException {
         MessageDigest digest = MessageDigest.getInstance(HASH_ALGORITHM);
-        try (InputStream in = new DigestInputStream(Files.newInputStream(inputFile), digest)) {
-            in.transferTo(OutputStream.nullOutputStream());
+        for (Path inputFile : inputFiles) {
+            try (InputStream in = new DigestInputStream(Files.newInputStream(inputFile), digest)) {
+                in.transferTo(OutputStream.nullOutputStream());
+            }
         }
         return digest.digest();
     }

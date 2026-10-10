@@ -54,7 +54,7 @@ public class ReachabilityService {
 
         int maxJourneyMins = maxJourneyMinutes(request);
         List<ReachableStation> stations = new ArrayList<>();
-        SearchResult result = cache.getOrCompute(key);
+        CompactResult result = cache.getOrCompute(key);
         result.forEachStation((stopId, paths) -> fewestTransfersWithin(paths, maxJourneyMins)
                 .flatMap(path -> legBuilder.toReachableStation(stopId, result.journey(stopId, path.transfers())))
                 .ifPresent(stations::add));
@@ -79,7 +79,7 @@ public class ReachabilityService {
      */
     public Optional<ReachableStation> journey(ReachabilityRequest request, String targetId) {
         if (targetId.equals(request.getStartStationId())) return Optional.empty();
-        SearchResult result = cache.getOrCompute(searchKey(request));
+        CompactResult result = cache.getOrCompute(searchKey(request));
         return fewestTransfersWithin(result.paths(targetId), maxJourneyMinutes(request))
                 .flatMap(path -> legBuilder.toReachableStation(targetId, result.journey(targetId, path.transfers())));
     }
@@ -184,7 +184,7 @@ public class ReachabilityService {
         }
 
         @Override
-        public void roundPaths(Map<String, SearchResult.PathSummary> paths) {
+        public void roundPaths(Map<String, CompactResult.PathSummary> paths) {
             List<ReachableStationSummary> stations = new ArrayList<>();
             paths.forEach((stopId, path) -> addIfNew(stations, stopId, List.of(path)));
             sendBatches(stations);
@@ -194,14 +194,14 @@ public class ReachabilityService {
          * Sends the stations not sent yet that have a path within the time limit, as summaries: a station's journey
          * is fetched when it is clicked ({@link #journey}).
          */
-        void sendNew(SearchResult result) {
+        void sendNew(CompactResult result) {
             List<ReachableStationSummary> stations = new ArrayList<>();
             result.forEachStation((stopId, paths) -> addIfNew(stations, stopId, paths));
             sendBatches(stations);
         }
 
         private void addIfNew(List<ReachableStationSummary> stations, String stopId,
-                              List<SearchResult.PathSummary> paths) {
+                              List<CompactResult.PathSummary> paths) {
             if (stopId.equals(request.getStartStationId()) || sent.contains(stopId)) return;
             fewestTransfersWithin(paths, maxJourneyMins)
                     .flatMap(path -> legBuilder.toSummary(stopId, path))
@@ -233,8 +233,8 @@ public class ReachabilityService {
 
     // The paths are ordered by ascending transfers, so a station whose fewest-transfer path is too long still shows
     // up with a faster path that has more transfers (B4)
-    private static Optional<SearchResult.PathSummary> fewestTransfersWithin(List<SearchResult.PathSummary> paths,
-                                                                           int maxJourneyMins) {
+    private static Optional<CompactResult.PathSummary> fewestTransfersWithin(List<CompactResult.PathSummary> paths,
+                                                                             int maxJourneyMins) {
         return paths.stream().filter(path -> path.durationMinutes() <= maxJourneyMins).findFirst();
     }
 }

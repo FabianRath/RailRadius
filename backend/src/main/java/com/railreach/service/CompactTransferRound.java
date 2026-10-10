@@ -7,10 +7,10 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 /**
- * The transfer part of a round of {@link CompactReachabilitySearch}, like the legacy search's transferRound,
- * boardingsAt and board: the previous round's arrivals, minus those a faster ride of their round overtook, grouped by
- * station index, and what each station's departures board from them. Stations choose in parallel. A station's
- * sorted arrivals and transfer windows live only while it chooses, so the round keeps 4 bytes per arrival.
+ * The transfer part of a round of {@link CompactReachabilitySearch}: the previous round's arrivals, minus those a
+ * faster ride of their round overtook, grouped by station index, and what each station's departures board from them.
+ * Stations choose in parallel. A station's sorted arrivals and transfer windows live only while it chooses, so the
+ * round keeps 4 bytes per arrival.
  */
 final class CompactTransferRound {
 
@@ -169,8 +169,8 @@ final class CompactTransferRound {
     }
 
     /**
-     * Stable, like the legacy search's sort: equal times keep the order the arrivals came in, which is label order,
-     * so sorting by arrival seconds and then label does it.
+     * Stable (Search semantics contract): equal times keep the order the arrivals came in, which is label order, so
+     * sorting by arrival seconds and then label does it.
      */
     private StationArrivals sortedArrivals(int from, int to) {
         TransferWindowInts.Arrivals arrivals = TransferWindowInts.Arrivals.ofCapacity(to - from);
@@ -195,7 +195,7 @@ final class CompactTransferRound {
 
     /**
      * Boards the departure from the arrival that catches it with the shortest journey so far, then from slower ones
-     * only for days of the departing trip that no faster one runs on (B33), as the legacy search's board does.
+     * only for days of the departing trip that no faster one runs on (B33).
      */
     private void board(int event, int departureSeconds, StationArrivals arrivals, TransferWindowInts sameDay,
                        TransferWindowInts overnight, long[] patternDays, StationBoardings boardings) {

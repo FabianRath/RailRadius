@@ -8,13 +8,11 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Fills the {@link TransitGraph} at startup (from the binary cache file with the compact engine, else from the JSON
- * cache file, else from the zips) and on reload.
- */
+/** Fills the {@link TransitGraph} at startup (from the binary cache file, else from the zips) and on reload. */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -23,10 +21,8 @@ public class GtfsDataService {
     private final TransitGraph graph;
     private final GtfsFeedLoader feedLoader;
     private final StationDeduplicator deduplicator;
-    private final GtfsCacheStore cacheStore;
     private final BinaryCacheStore binaryCacheStore;
     private final ReachabilityCache reachabilityCache;
-    private final SearchEngine searchEngine;
     private final StationSearchIndex stationSearchIndex;
     private final GtfsLoadProgress loadProgress;
 
@@ -37,24 +33,19 @@ public class GtfsDataService {
     private boolean autoLoadFromFiles;
 
     private volatile boolean dataLoaded = false;
+    // The network a load from the zips is building, for its progress; null when none runs
+    private volatile RailNetwork loadingNetwork;
 
     @PostConstruct
     public void initialize() {
         log.info("=== RailReach GTFS Data Loader ===");
-        Optional<BinaryCacheStore.BinaryCacheData> binaryCached =
-                usesBinaryCache() ? binaryCacheStore.load() : Optional.empty();
-        if (binaryCached.isPresent()) {
-            graph.restore(binaryCached.get());
-            finishCacheLoad("binary cache");
-            return;
-        }
-        var cached = cacheStore.load();
+        Optional<BinaryCacheStore.BinaryCacheData> cached = binaryCacheStore.load();
         if (cached.isPresent()) {
             graph.restore(cached.get());
-            // Built now rather than by the first search, which would otherwise take twice as long
-            searchEngine.prepare();
-            saveBinaryCache();
-            finishCacheLoad("cache");
+            stationSearchIndex.rebuild();
+            log.info("✓ GTFS data loaded from the binary cache: {} stations, {} graph nodes, {} edges",
+                    graph.stationCount(), graph.nodeCount(), graph.edgeCount());
+            dataLoaded = true;
             return;
         }
         if (!autoLoadFromFiles) {
@@ -69,22 +60,6 @@ public class GtfsDataService {
         loadFromFiles();
     }
 
-    private void finishCacheLoad(String source) {
-        stationSearchIndex.rebuild();
-        log.info("✓ GTFS data loaded from {}: {} stations, {} graph nodes, {} edges", source,
-                graph.stationCount(), graph.nodeCount(), graph.edgeCount());
-        dataLoaded = true;
-    }
-
-    // The binary cache holds only what the compact engine searches on; the legacy one needs the JSON cache (until S21)
-    private boolean usesBinaryCache() {
-        return searchEngine instanceof CompactReachabilitySearch;
-    }
-
-    private void saveBinaryCache() {
-        if (usesBinaryCache()) binaryCacheStore.save(graph, Path.of(cacheStore.path()));
-    }
-
     public void loadFromFiles() {
         log.info("=== Loading GTFS from files ===");
         log.info("Scanning directory: {}", gtfsDirectory);
@@ -96,6 +71,8 @@ public class GtfsDataService {
         } catch (RuntimeException e) {
             loadProgress.enter(GtfsLoadProgress.Phase.FAILED);
             throw e;
+        } finally {
+            loadingNetwork = null;
         }
         loadProgress.enter(GtfsLoadProgress.Phase.DONE);
         dataLoaded = true;
@@ -103,36 +80,37 @@ public class GtfsDataService {
 
     private void buildGraphFromFiles() {
         long startMs = System.currentTimeMillis();
-        feedLoader.loadDirectory(gtfsDirectory, graph, loadProgress);
+        RailNetwork network = new RailNetwork();
+        loadingNetwork = network;
+        List<Path> zips = feedLoader.loadDirectory(gtfsDirectory, network, loadProgress);
         long durationMs = System.currentTimeMillis() - startMs;
         loadProgress.enter(GtfsLoadProgress.Phase.MERGING);
-        deduplicator.deduplicate(graph);
+        deduplicator.deduplicate(network);
 
-        long connected = graph.connectedStationCount();
+        long connected = network.connectedStationCount();
         log.info("=== Loading complete in {}ms ===", durationMs);
         log.info("Total stations  : {} ({} connected, {} isolated)",
-                graph.stationCount(), connected, graph.stationCount() - connected);
-        log.info("Graph nodes     : {}", graph.nodeCount());
-        log.info("Total edges     : {}", graph.edgeCount());
+                network.stationCount(), connected, network.stationCount() - connected);
+        log.info("Graph nodes     : {}", network.nodeCount());
+        log.info("Total edges     : {}", network.edgeCount());
 
         loadProgress.enter(GtfsLoadProgress.Phase.SAVING);
-        cacheStore.save(graph.snapshot());
-        searchEngine.prepare();
-        saveBinaryCache();
+        BinaryCacheStore.BinaryCacheData data = network.servedData();
+        binaryCacheStore.save(data, zips);
+        graph.restore(data);
         stationSearchIndex.rebuild();
         reachabilityCache.clear();
     }
 
     public void clearCache() {
-        cacheStore.delete();
         binaryCacheStore.delete();
     }
 
     public Map<String, Object> getCacheStats() {
         return Map.of(
-            "cacheFile", cacheStore.path(),
-            "cacheExists", cacheStore.exists(),
-            "cacheSizeMB", cacheStore.sizeMb(),
+            "cacheFile", binaryCacheStore.path(),
+            "cacheExists", binaryCacheStore.exists(),
+            "cacheSizeMB", binaryCacheStore.sizeMb(),
             "dataLoaded", dataLoaded,
             "stationCount", graph.stationCount(),
             "graphNodeCount", graph.nodeCount(),
@@ -141,6 +119,8 @@ public class GtfsDataService {
     }
 
     public GtfsLoadStatus getLoadStatus() {
-        return loadProgress.status(graph.stationCount(), graph.edgeCount());
+        RailNetwork network = loadingNetwork;
+        return network != null ? loadProgress.status(network.stationCount(), network.edgeCount())
+                : loadProgress.status(graph.stationCount(), graph.edgeCount());
     }
 }

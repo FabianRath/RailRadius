@@ -3,8 +3,6 @@ package com.railreach.service;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.file.Path;
 
@@ -26,16 +24,15 @@ class ReachabilityCacheTest {
     }
 
     // B20, B21: a shortcut must return exactly what the search returns
-    @ParameterizedTest
-    @ValueSource(strings = {SearchEngine.LEGACY, SearchEngine.COMPACT})
-    void lowerTransferCountsCutFromAStoredResultEqualTheirOwnSearch(String engine) {
-        SearchEngine search = SearchEngine.named(engine, gtfs);
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs, engine);
+    @Test
+    void lowerTransferCountsCutFromAStoredResultEqualTheirOwnSearch() {
+        CompactReachabilitySearch search = new CompactReachabilitySearch(gtfs);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         cache.getOrCompute(key(MAX_TRANSFERS));
 
         for (int transfers = 0; transfers < MAX_TRANSFERS; transfers++) {
-            SearchResult cutDown = cache.getOrCompute(key(transfers));
-            SearchResult searched = search.search(START_ID, transfers, 0, 180, roundPaths -> {});
+            CompactResult cutDown = cache.getOrCompute(key(transfers));
+            CompactResult searched = search.search(START_ID, transfers, 0, 180, roundPaths -> {});
             assertThat(cache.contains(key(transfers))).isTrue();
             assertThat(GtfsTestFixtures.journeys(cutDown)).as("%d transfers", transfers)
                     .isEqualTo(GtfsTestFixtures.journeys(searched));

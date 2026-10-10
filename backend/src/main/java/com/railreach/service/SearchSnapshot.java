@@ -1,5 +1,6 @@
 package com.railreach.service;
 
+import com.railreach.model.Connection;
 import com.railreach.model.JourneyPath;
 import com.railreach.util.ResourceLines;
 import lombok.extern.slf4j.Slf4j;
@@ -26,8 +27,8 @@ import java.util.zip.GZIPOutputStream;
  * duration, the path's stations, each ride's trip with departure and arrival seconds, and the exact running days
  * with their label. Running days depend on today (B31), so the dump pins it.
  * <p>
- * The gtfs-mini dumps are checked by SearchSnapshotTest, on both search engines. For dev and full data, {@link #main}
- * dumps the starts of one set in {@code docs/bench-stations.txt}.
+ * The gtfs-mini dumps are checked by SearchSnapshotTest. For dev and full data, {@link #main} dumps the starts of one
+ * set in {@code docs/bench-stations.txt} from a binary cache file.
  */
 @Slf4j
 final class SearchSnapshot {
@@ -39,7 +40,6 @@ final class SearchSnapshot {
     // Relative to backend/, where Maven runs the main
     private static final Path BENCH_FILE = Path.of("../docs/bench-stations.txt");
     private static final String GZIP_SUFFIX = ".gz";
-    private static final String BINARY_CACHE_SUFFIX = ".bin";
     private static final String FIELD_SEPARATOR = "\t";
     private static final String RIDE_SEPARATOR = " | ";
     private static final String EVERY_DAY = "every day";
@@ -47,12 +47,11 @@ final class SearchSnapshot {
     private static final String NO_LABEL = "-";
 
     private final TransitGraph graph;
-    private final SearchEngine search;
+    private final CompactReachabilitySearch search;
 
-    /** engine is {@link SearchEngine#LEGACY} or {@link SearchEngine#COMPACT}. */
-    SearchSnapshot(TransitGraph graph, String engine) {
+    SearchSnapshot(TransitGraph graph) {
         this.graph = graph;
-        this.search = SearchEngine.named(engine, graph);
+        this.search = new CompactReachabilitySearch(graph);
     }
 
     /** Today first, then one section per start and transfer limit 0 to {@link #MAX_TRANSFERS}. */
@@ -61,12 +60,12 @@ final class SearchSnapshot {
         for (String startId : startIds) {
             for (int maxTransfers = 0; maxTransfers <= MAX_TRANSFERS; maxTransfers++) {
                 out.write("## " + startId + " maxTransfers " + maxTransfers + "\n");
-                SearchResult result = search.search(startId, maxTransfers, MIN_TRANSFER_MINUTES,
+                CompactResult result = search.search(startId, maxTransfers, MIN_TRANSFER_MINUTES,
                         MAX_TRANSFER_MINUTES, roundPaths -> {});
-                Map<String, List<SearchResult.PathSummary>> pathsByStation = new TreeMap<>();
+                Map<String, List<CompactResult.PathSummary>> pathsByStation = new TreeMap<>();
                 result.forEachStation(pathsByStation::put);
-                for (Map.Entry<String, List<SearchResult.PathSummary>> station : pathsByStation.entrySet()) {
-                    for (SearchResult.PathSummary path : station.getValue()) {
+                for (Map.Entry<String, List<CompactResult.PathSummary>> station : pathsByStation.entrySet()) {
+                    for (CompactResult.PathSummary path : station.getValue()) {
                         out.write(line(station.getKey(), result.journey(station.getKey(), path.transfers())) + "\n");
                     }
                 }
@@ -74,17 +73,32 @@ final class SearchSnapshot {
         }
     }
 
-    private static String line(String stationId, SearchResult.Journey journey) {
+    private static String line(String stationId, CompactResult.Journey journey) {
         JourneyPath path = journey.path();
         ServiceDays days = journey.runningDays();
-        StringJoiner rides = new StringJoiner(RIDE_SEPARATOR);
-        for (JourneyRunningDays.RideTimes ride : JourneyRunningDays.rides(path.getConnections())) {
-            rides.add(String.join(" ", ride.tripId(), ride.fromStopId(), String.valueOf(ride.departureSeconds()),
-                    ride.toStopId(), String.valueOf(ride.arrivalSeconds())));
-        }
         return String.join(FIELD_SEPARATOR, stationId, String.valueOf(path.getTransfers()),
                 String.valueOf(path.getTotalDurationMinutes()), String.join(" ", path.getStationIds()),
-                rides.toString(), dayRanges(days), JourneyRunningDays.describe(days).orElse(NO_LABEL));
+                rides(path.getConnections()), dayRanges(days), JourneyRunningDays.describe(days).orElse(NO_LABEL));
+    }
+
+    /** Each ride as trip, board stop and departure, alight stop and arrival: consecutive connections on one trip. */
+    private static String rides(List<Connection> connections) {
+        StringJoiner rides = new StringJoiner(RIDE_SEPARATOR);
+        int rideStart = 0;
+        while (rideStart < connections.size()) {
+            Connection board = connections.get(rideStart);
+            int rideEnd = rideStart;
+            while (rideEnd + 1 < connections.size()
+                    && connections.get(rideEnd + 1).getTripId().equals(board.getTripId())) {
+                rideEnd++;
+            }
+            Connection alight = connections.get(rideEnd);
+            rides.add(String.join(" ", board.getTripId(), board.getFromStopId(),
+                    String.valueOf(board.getDepartureTimeSeconds()), alight.getToStopId(),
+                    String.valueOf(alight.getArrivalTimeSeconds())));
+            rideStart = rideEnd + 1;
+        }
+        return rides.toString();
     }
 
     /** The epoch days as ranges, such as "20458-20470,20475". */
@@ -112,19 +126,6 @@ final class SearchSnapshot {
                 .toList();
     }
 
-    private static void restore(TransitGraph graph, String cacheFile, String engine) {
-        if (!cacheFile.endsWith(BINARY_CACHE_SUFFIX)) {
-            graph.restore(new GtfsCacheStore(cacheFile).load()
-                    .orElseThrow(() -> new IllegalStateException("No usable cache file " + cacheFile)));
-            return;
-        }
-        if (!engine.equals(SearchEngine.COMPACT)) {
-            throw new IllegalArgumentException("A binary cache needs the " + SearchEngine.COMPACT + " engine");
-        }
-        graph.restore(new BinaryCacheStore(cacheFile).load()
-                .orElseThrow(() -> new IllegalStateException("No usable binary cache file " + cacheFile)));
-    }
-
     /** Gzipped if the name ends in .gz: a full-data dump is several GB as text. */
     private static Writer writer(Path file) throws IOException {
         OutputStream out = Files.newOutputStream(file);
@@ -133,27 +134,24 @@ final class SearchSnapshot {
     }
 
     /**
-     * Args: cache file, bench set, today (yyyy-mm-dd), output file, optionally the search engine (default legacy).
-     * A cache file ending in .bin is a binary cache, which only the compact engine can search (S20). Paths are
-     * relative to backend/.
+     * Args: binary cache file, bench set, today (yyyy-mm-dd), output file. Paths are relative to backend/.
      */
     public static void main(String[] args) throws IOException {
-        if (args.length != 4 && args.length != 5) {
-            throw new IllegalArgumentException(
-                    "Usage: SearchSnapshot <cache-file> <bench-set> <today> <out-file> [legacy|compact]");
+        if (args.length != 4) {
+            throw new IllegalArgumentException("Usage: SearchSnapshot <store-file> <bench-set> <today> <out-file>");
         }
-        String engine = args.length == 5 ? args[4] : SearchEngine.LEGACY;
         long startMs = System.currentTimeMillis();
         TransitGraph graph = TransitGraph.withToday(LocalDate.parse(args[2]));
-        restore(graph, args[0], engine);
+        graph.restore(new BinaryCacheStore(args[0]).load()
+                .orElseThrow(() -> new IllegalStateException("No usable binary cache file " + args[0])));
         List<String> startIds = benchStarts(ResourceLines.read(BENCH_FILE), args[1]);
         if (startIds.isEmpty()) throw new IllegalArgumentException("No starts in bench set " + args[1]);
         List<String> unknown = startIds.stream().filter(id -> graph.getStation(id) == null).toList();
         if (!unknown.isEmpty()) throw new IllegalArgumentException("Not in the cache file: " + unknown);
         try (Writer out = writer(Path.of(args[3]))) {
-            new SearchSnapshot(graph, engine).write(startIds, out);
+            new SearchSnapshot(graph).write(startIds, out);
         }
-        log.info("Wrote the {} snapshot of {} starts to {} in {} s", engine, startIds.size(), args[3],
+        log.info("Wrote the snapshot of {} starts to {} in {} s", startIds.size(), args[3],
                 TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - startMs));
     }
 }

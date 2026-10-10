@@ -73,25 +73,26 @@ class JourneyRunningDaysTest {
     // not one of its own twins (B37)
     @Test
     void aRideToALoopTripsSecondVisitRunsOnTheDaysOfEveryTripMergedIntoIt() {
-        TransitGraph graph = TransitGraph.withToday(DAY_ONE);
-        graph.addServices(Map.of("x:S1", days(DAY_ONE, DAY_ONE, date -> true),
+        RailNetwork network = new RailNetwork();
+        network.addServices(Map.of("x:S1", days(DAY_ONE, DAY_ONE, date -> true),
                 "x:S2", days(DAY_ONE.plusDays(1), DAY_ONE.plusDays(1), date -> true)));
-        List<Connection> ride = addLoopTrip(graph, "x:T1", "x:S1");
-        addLoopTrip(graph, "x:T2", "x:S2");
+        addLoopTrip(network, "x:T1", "x:S1");
+        addLoopTrip(network, "x:T2", "x:S2");
+        TimetableStore store = TimetableStore.build(network);
 
-        ServiceDays days = JourneyRunningDays.of(ride, graph);
+        ServiceDays days = JourneyRunningDays.withRide(JourneyRunningDays.SoFar.START, store, store.firstEvent(0),
+                store.firstEvent(0) + 3, TransitGraph.withToday(DAY_ONE)).days();
 
         assertThat(days.epochDays()).containsExactly((int) DAY_ONE.toEpochDay(), (int) DAY_ONE.toEpochDay() + 1);
     }
 
-    /** A → B → C → B; returns its connections. */
-    private static List<Connection> addLoopTrip(TransitGraph graph, String tripId, String serviceId) {
+    /** A → B → C → B. */
+    private static void addLoopTrip(RailNetwork network, String tripId, String serviceId) {
         List<String> stops = List.of("x:A", "x:B", "x:C", "x:B");
-        graph.addTrip(tripId, stops, NO_INFO, serviceId);
-        List<Connection> connections = List.of(connection(tripId, stops, 0), connection(tripId, stops, 1),
-                connection(tripId, stops, 2));
-        connections.forEach(graph::addConnection);
-        return connections;
+        network.addTrip(tripId, stops, NO_INFO, serviceId);
+        for (int leg = 0; leg < stops.size() - 1; leg++) {
+            network.addConnection(connection(tripId, stops, leg));
+        }
     }
 
     private static Connection connection(String tripId, List<String> stops, int leg) {

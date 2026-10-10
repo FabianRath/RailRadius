@@ -23,13 +23,13 @@ public class ReachabilityCache {
 
     static final String RESPONSE_CACHE_NAME = "reachability";
 
-    private final SearchEngine search;
+    private final CompactReachabilitySearch search;
     private final SearchGate gate;
     private final CacheManager cacheManager;
     // One full-data result holds paths to every reachable station, so the count must stay small
-    private final Cache<SearchKey, SearchResult> rawPaths;
+    private final Cache<SearchKey, CompactResult> rawPaths;
 
-    public ReachabilityCache(SearchEngine search, SearchGate gate, CacheManager cacheManager,
+    public ReachabilityCache(CompactReachabilitySearch search, SearchGate gate, CacheManager cacheManager,
                              @Value("${railreach.cache.raw-max-entries:30}") int rawMaxEntries) {
         this.search = search;
         this.gate = gate;
@@ -58,22 +58,22 @@ public class ReachabilityCache {
         default void queued() {}
 
         /** Each round's new path per station, as the search goes. */
-        default void roundPaths(Map<String, SearchResult.PathSummary> paths) {}
+        default void roundPaths(Map<String, CompactResult.PathSummary> paths) {}
     }
 
     /**
-     * The search's result (see {@link SearchEngine#search}). Taken from the stored
+     * The search's result (see {@link CompactReachabilitySearch#search}). Taken from the stored
      * result, else cut down from a stored result with more transfers, else searched and stored.
      *
      * @throws SearchGate.BusyException if it would have to search and too many searches wait already
      */
-    public SearchResult getOrCompute(SearchKey key) {
+    public CompactResult getOrCompute(SearchKey key) {
         return getOrCompute(key, SearchListener.NONE);
     }
 
     /** Like {@link #getOrCompute(SearchKey)}, telling the listener about the queue and the rounds of a search. */
-    public SearchResult getOrCompute(SearchKey key, SearchListener listener) {
-        Optional<SearchResult> stored = stored(key);
+    public CompactResult getOrCompute(SearchKey key, SearchListener listener) {
+        Optional<CompactResult> stored = stored(key);
         if (stored.isPresent()) return stored.get();
         return gate.run(() -> storedOrSearched(key, listener), listener::queued);
     }
@@ -84,10 +84,10 @@ public class ReachabilityCache {
     }
 
     // Checked again with the permit: an equal search may have finished while this one waited
-    private SearchResult storedOrSearched(SearchKey key, SearchListener listener) {
+    private CompactResult storedOrSearched(SearchKey key, SearchListener listener) {
         return stored(key).orElseGet(() -> {
             log.info("  Search: {} x{}", key.startId(), key.maxTransfers());
-            SearchResult result = search.search(key.startId(), key.maxTransfers(),
+            CompactResult result = search.search(key.startId(), key.maxTransfers(),
                     key.minTransferMins(), key.maxTransferMins(), listener::roundPaths);
             rawPaths.put(key, result);
             log.info("  Cached raw result: {} x{} ({} stations)", key.startId(), key.maxTransfers(),
@@ -96,8 +96,8 @@ public class ReachabilityCache {
         });
     }
 
-    private Optional<SearchResult> stored(SearchKey key) {
-        SearchResult cached = rawPaths.getIfPresent(key);
+    private Optional<CompactResult> stored(SearchKey key) {
+        CompactResult cached = rawPaths.getIfPresent(key);
         if (cached != null) {
             log.info("  Raw cache HIT: {} x{} ({} stations)", key.startId(), key.maxTransfers(),
                     cached.stationCount());
@@ -115,7 +115,7 @@ public class ReachabilityCache {
         return rawPaths.getIfPresent(key) != null || storedWithMoreTransfers(key).isPresent();
     }
 
-    private Optional<Map.Entry<SearchKey, SearchResult>> storedWithMoreTransfers(SearchKey key) {
+    private Optional<Map.Entry<SearchKey, CompactResult>> storedWithMoreTransfers(SearchKey key) {
         return rawPaths.asMap().entrySet().stream()
                 .filter(entry -> entry.getKey().maxTransfers() > key.maxTransfers()
                         && entry.getKey().withMaxTransfers(key.maxTransfers()).equals(key))

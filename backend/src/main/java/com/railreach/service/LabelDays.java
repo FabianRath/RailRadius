@@ -6,8 +6,8 @@ import java.util.stream.IntStream;
 
 /**
  * The exact running days of the journeys a compact search chooses among: per label its journey's
- * {@link JourneyRunningDays.SoFar}, like the legacy search's runningDays. Each label's days are worked out once and
- * interned per search, since a station's candidates share their earlier rides and many journeys run on the same days.
+ * {@link JourneyRunningDays.SoFar}. Each label's days are worked out once and interned per search, since a station's
+ * candidates share their earlier rides and many journeys run on the same days.
  * The memo is one int per label in the arena: the interned days' index and the day shift, packed. A side table by
  * label would be smaller, since only a few percent of the labels need it, but its lookups made choosing paths ~40 %
  * slower.

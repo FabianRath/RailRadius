@@ -10,8 +10,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The graph's trips as the search sees them, the input of {@link SearchTimetables} and {@link TimetableStore}. Trips
- * are numbered in trip ID order, stations in order of first appearance.
+ * The network's trips as the search sees them, the input of {@link TimetableStore}. Trips are numbered in trip ID
+ * order, stations in order of first appearance.
  * <p>
  * Trips with the same stations and times become one trip that runs on all their days. Feeds publish one train as
  * several trips that differ only in their days, and some trains are in two feeds; on the full data that was almost
@@ -46,8 +46,8 @@ record MergedTrips(List<Trip> trips, Map<String, Integer> stationIndexes, int so
             Connection[] legs = trip.legConnections();
             int[] legSeconds = new int[legs.length * 2];
             for (int leg = 0; leg < legs.length; leg++) {
-                legSeconds[2 * leg] = legs[leg] != null ? legs[leg].getDepartureTimeSeconds() : CachedTrip.NO_LEG;
-                legSeconds[2 * leg + 1] = legs[leg] != null ? legs[leg].getArrivalTimeSeconds() : CachedTrip.NO_LEG;
+                legSeconds[2 * leg] = legs[leg] != null ? legs[leg].getDepartureTimeSeconds() : TimetableStore.NO_LEG;
+                legSeconds[2 * leg + 1] = legs[leg] != null ? legs[leg].getArrivalTimeSeconds() : TimetableStore.NO_LEG;
             }
             return new TripKey(trip.stationIndexes(), legSeconds);
         }
@@ -64,17 +64,17 @@ record MergedTrips(List<Trip> trips, Map<String, Integer> stationIndexes, int so
         }
     }
 
-    static MergedTrips of(TransitGraph graph) {
-        Map<String, List<Connection>> connectionsByTrip = graph.connectionsByTrip();
-        List<String> tripIds = graph.tripIds().stream().sorted().toList();
+    static MergedTrips of(RailNetwork network) {
+        Map<String, List<Connection>> connectionsByTrip = network.connectionsByTrip();
+        List<String> tripIds = network.tripIds().stream().sorted().toList();
         Map<String, Integer> stationIndexes = new HashMap<>();
         // Insertion order keeps the trips numbered in the order of their first trip ID
         Map<TripKey, Trip> tripsByTimes = new LinkedHashMap<>();
         for (String tripId : tripIds) {
-            List<String> stops = graph.getStopsOnTrip(tripId);
+            List<String> stops = network.getStopsOnTrip(tripId);
             Trip trip = new Trip(List.of(tripId), stops, indexesOf(stops, stationIndexes),
                     legConnections(stops, connectionsByTrip.getOrDefault(tripId, List.of())),
-                    graph.getServiceDays(tripId));
+                    network.getServiceDays(tripId));
             tripsByTimes.merge(TripKey.of(trip), trip, Trip::withMember);
         }
         return new MergedTrips(List.copyOf(tripsByTimes.values()), stationIndexes, tripIds.size());

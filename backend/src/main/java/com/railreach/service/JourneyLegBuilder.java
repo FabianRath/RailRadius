@@ -32,7 +32,7 @@ public class JourneyLegBuilder {
     private final TransitGraph transitGraph;
 
     /** Empty if the destination station is unknown. */
-    public Optional<ReachableStation> toReachableStation(String stopId, SearchResult.Journey journey) {
+    public Optional<ReachableStation> toReachableStation(String stopId, CompactResult.Journey journey) {
         Station station = transitGraph.getStation(stopId);
         if (station == null) return Optional.empty();
         JourneyPath path = journey.path();
@@ -56,7 +56,7 @@ public class JourneyLegBuilder {
     }
 
     /** The station and the path's transfers and duration, without the journey; empty if the station is unknown. */
-    public Optional<ReachableStationSummary> toSummary(String stopId, SearchResult.PathSummary path) {
+    public Optional<ReachableStationSummary> toSummary(String stopId, CompactResult.PathSummary path) {
         Station station = transitGraph.getStation(stopId);
         if (station == null) return Optional.empty();
         return Optional.of(ReachableStationSummary.builder()

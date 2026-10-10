@@ -3,9 +3,10 @@ package com.railreach.service;
 import java.util.Arrays;
 
 /**
- * The rides of one compact search as parallel arrays: a label is what a {@link Ride} is to the legacy search, without
- * an object per ride. Labels are numbered in the order they are made, so a round's arrivals are one range. An arena
- * serves one search at a time and is reused by the next; it grows by half its size and is never shrunk.
+ * The rides of one search as parallel arrays, a label per ride: its trip, where it boarded and left, its duration,
+ * its journey's days and the ride before its transfer, without an object per ride. Labels are numbered in the order
+ * they are made, so a round's arrivals are one range. An arena serves one search at a time and is reused by the next;
+ * it grows by half its size and is never shrunk.
  * <p>
  * Stop indexes are shorts, so a trip with more than 32,767 stops fails fast. A label's transfers are the rides
  * before it, so they need no column. daysMemo is {@link LabelDays}' memo of the journey's exact running days.
