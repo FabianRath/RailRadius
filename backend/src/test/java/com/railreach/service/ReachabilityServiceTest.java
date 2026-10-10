@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
@@ -446,6 +447,22 @@ class ReachabilityServiceTest {
     }
 
     @Test
+    void streamThatRunsOutOfMemorySendsAnErrorAndFreesItsPermit() {
+        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs,
+                GtfsTestFixtures.reachabilityCache(gtfs, new SearchGate(1, 0), engine()));
+        OutOfMemoryEmitter emitter = new OutOfMemoryEmitter();
+
+        service.calculateReachabilityStreaming(streamRequest("alpha:A1", 3), emitter);
+
+        assertThat(emitter.texts).anyMatch(text -> text.contains("event:error"));
+        assertThat(emitter.error).isInstanceOf(OutOfMemoryError.class);
+        RecordingEmitter next = new RecordingEmitter();
+        service.calculateReachabilityStreaming(streamRequest("alpha:A1", 3), next);
+        assertThat(next.error).isNull();
+        assertThat(next.done().get("total")).isEqualTo(next.streamedStopIds().size());
+    }
+
+    @Test
     void journeyOfAStationIsItsStationInTheResponse() {
         ReachabilityService service = service(gtfs);
         ReachabilityRequest request = ReachabilityRequest.builder()
@@ -508,6 +525,20 @@ class ReachabilityServiceTest {
             return payloads.stream()
                     .filter(Map.class::isInstance).map(Map.class::cast)
                     .findFirst().orElseThrow();
+        }
+    }
+
+    /** Sending the first stations throws OutOfMemoryError, as an allocation of the search would. */
+    private static class OutOfMemoryEmitter extends RecordingEmitter {
+        final List<String> texts = new ArrayList<>();
+
+        @Override
+        public void send(SseEventBuilder event) {
+            String text = event.build().stream().map(DataWithMediaType::getData)
+                    .filter(String.class::isInstance).map(String.class::cast)
+                    .collect(Collectors.joining());
+            if (text.contains("event:stations")) throw new OutOfMemoryError("Java heap space");
+            texts.add(text);
         }
     }
 

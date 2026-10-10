@@ -4,20 +4,23 @@ import java.util.Arrays;
 
 /**
  * {@link StationCandidates} of every station at once, reused from search to search. A station's candidates are a
- * list through the labels (each label's next one), in the order they were offered, and removing slower ones keeps
- * that order like {@code removeIf} does. Only the newest transfer count's candidates are ever read, so the list
- * starts empty when the count goes up.
+ * list through slots of a pool, in the order they were offered, and removing slower ones keeps that order like
+ * {@code removeIf} does. Only the newest transfer count's candidates are ever read, so the list starts empty when the
+ * count goes up, and the pool is emptied after each round: a round has far fewer candidates than labels.
  */
 final class StationCandidatesFlat {
 
     private static final int NEVER_REACHED = -1;
+    static final int NONE = -1;
 
     private final int[] transfers;
     private final int[] fastestWithFewerMinutes;
     private final int[] fastestMinutes;
     private final int[] head;
     private final int[] tail;
-    private int[] next = new int[0];
+    // Per slot: its candidate's label, and the next slot of the station's list
+    private final IntList slotLabels = new IntList();
+    private final IntList slotNext = new IntList();
     private int reachedCount;
 
     StationCandidatesFlat(int stationCount) {
@@ -33,6 +36,13 @@ final class StationCandidatesFlat {
         Arrays.fill(fastestWithFewerMinutes, Integer.MAX_VALUE);
         Arrays.fill(fastestMinutes, Integer.MAX_VALUE);
         reachedCount = 0;
+        endRound();
+    }
+
+    /** After the round's paths are chosen: no later round reads its candidates. */
+    void endRound() {
+        slotLabels.clear();
+        slotNext.clear();
     }
 
     /** Stations that got a candidate in this search. */
@@ -51,8 +61,8 @@ final class StationCandidatesFlat {
         fastestWithFewerMinutes[station] = Math.min(fastestWithFewerMinutes[station], fastestMinutes[station]);
         fastestMinutes[station] = Integer.MAX_VALUE;
         transfers[station] = rideTransfers;
-        head[station] = LabelArena.NONE;
-        tail[station] = LabelArena.NONE;
+        head[station] = NONE;
+        tail[station] = NONE;
         return true;
     }
 
@@ -72,54 +82,60 @@ final class StationCandidatesFlat {
         append(station, label);
     }
 
-    /** The station's first candidate of its newest transfer count, {@link LabelArena#NONE} if none. */
+    /** The slot of the station's first candidate of its newest transfer count, {@link #NONE} if none. */
     int first(int station) {
         return head[station];
     }
 
-    /** The candidate after this one, {@link LabelArena#NONE} at the end. */
-    int next(int label) {
-        return next[label];
+    /** The slot after this one, {@link #NONE} at the end. */
+    int next(int slot) {
+        return slotNext.get(slot);
+    }
+
+    /** The label of the candidate in this slot. */
+    int label(int slot) {
+        return slotLabels.get(slot);
     }
 
     long sizeBytes() {
-        return (long) transfers.length * 5 * Integer.BYTES + (long) next.length * Integer.BYTES;
+        return (long) transfers.length * 5 * Integer.BYTES + slotLabels.sizeBytes() + slotNext.sizeBytes();
     }
 
     int count(int station) {
         int count = 0;
-        for (int label = head[station]; label != LabelArena.NONE; label = next[label]) {
+        for (int slot = head[station]; slot != NONE; slot = next(slot)) {
             count++;
         }
         return count;
     }
 
     private void append(int station, int label) {
-        if (label >= next.length) next = Arrays.copyOf(next, Math.max(label + 1, next.length + (next.length >> 1)));
-        next[label] = LabelArena.NONE;
-        if (tail[station] == LabelArena.NONE) {
-            head[station] = label;
+        int slot = slotLabels.size();
+        slotLabels.add(label);
+        slotNext.add(NONE);
+        if (tail[station] == NONE) {
+            head[station] = slot;
         } else {
-            next[tail[station]] = label;
+            slotNext.set(tail[station], slot);
         }
-        tail[station] = label;
+        tail[station] = slot;
     }
 
     private void removeSlowerThan(int station, int maxMinutes, LabelArena labels) {
-        int kept = LabelArena.NONE;
-        for (int label = head[station]; label != LabelArena.NONE; label = next[label]) {
-            if (labels.durationMinutes(label) > maxMinutes) continue;
-            if (kept == LabelArena.NONE) {
-                head[station] = label;
+        int kept = NONE;
+        for (int slot = head[station]; slot != NONE; slot = next(slot)) {
+            if (labels.durationMinutes(label(slot)) > maxMinutes) continue;
+            if (kept == NONE) {
+                head[station] = slot;
             } else {
-                next[kept] = label;
+                slotNext.set(kept, slot);
             }
-            kept = label;
+            kept = slot;
         }
-        if (kept == LabelArena.NONE) {
-            head[station] = LabelArena.NONE;
+        if (kept == NONE) {
+            head[station] = NONE;
         } else {
-            next[kept] = LabelArena.NONE;
+            slotNext.set(kept, NONE);
         }
         tail[station] = kept;
     }

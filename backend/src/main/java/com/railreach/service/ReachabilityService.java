@@ -32,6 +32,7 @@ public class ReachabilityService {
     private static final int STREAM_BATCH_SIZE = 30;
     private static final int DEFAULT_MAX_TRANSFERS = 5;
     private static final int MINUTES_PER_HOUR = 60;
+    private static final String OUT_OF_MEMORY_MESSAGE = "The server is too busy for this search, please try again later";
 
     private final TransitGraph transitGraph;
     private final ReachabilityCache cache;
@@ -117,20 +118,25 @@ public class ReachabilityService {
             log.info("Stream stopped after {} ms: {}", System.currentTimeMillis() - startMs, e.getMessage());
             emitter.complete();
         } catch (SearchGate.BusyException e) {
-            sendError(emitter, e);
+            sendError(emitter, e.getMessage(), e);
         } catch (Exception e) {
             log.error("Streaming BFS error", e);
-            sendError(emitter, e);
+            sendError(emitter, e.getMessage(), e);
+        } catch (OutOfMemoryError e) {
+            // The failed search's memory is garbage once it has unwound, and its permit is free, so the app goes on;
+            // without this the client would wait for an event forever (B38)
+            log.error("Search from {} x{} ran out of memory", key.startId(), key.maxTransfers(), e);
+            sendError(emitter, OUT_OF_MEMORY_MESSAGE, e);
         }
     }
 
-    private static void sendError(SseEmitter emitter, Exception e) {
+    private static void sendError(SseEmitter emitter, String message, Throwable error) {
         try {
-            emitter.send(SseEmitter.event().name("error").data(e.getMessage()));
+            emitter.send(SseEmitter.event().name("error").data(message));
         } catch (Exception sendError) {
             log.debug("Could not send the error event, the client is gone", sendError);
         }
-        emitter.completeWithError(e);
+        emitter.completeWithError(error);
     }
 
     public Map<String, Object> getCacheStats() {
