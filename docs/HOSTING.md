@@ -46,6 +46,26 @@ Full data, `-Xmx9g`, G1, warmer on, gate at 2 permits and 6 queued. 5 clients at
 | Live heap after the run (`bench.sh memory`) | 3,243 MB, with 22 stored results in the raw cache |
 | Peak working set | 9.5 GB: G1 grows the heap towards `-Xmx` |
 
+## Rides instead of labels per arrival (S23, partly done, 2026-10-10)
+Full data, `-Xmx3g`, compact object headers, warmer off, `data/gtfs-store.bin`, port 8081, both builds run from their classes on a fresh app, alternating, two runs each (HEAD = the dead-boardings step below). Results are byte-identical to S22 (`SearchSnapshot`, dev and full) with the same 16,975,551 stop arrivals and 9,231,942 boardings for Stockholm.
+
+| Measure | How | Result |
+|---|---|---|
+| Scratch per search | the `Search stats (compact)` line, Stockholm 5 transfers | **218 MB** (360 MB): labels 50.5 MB (255.6), trip progress 79, grouped arrivals with their drop flags 49, rides 36 |
+| Labels | arena peak | **1.24 M** (6.97 M): after a round's trim ~0.1 M are left, plus ~1.0 M arrivals boarded from and ~0.13 M candidates. 1.24 M is just over the 1.20 M growth step, so the arena has 1.8 M places |
+| Held during a search | `bench.sh held`'s method, sampled every 0.3 s, Stockholm, fresh app | **252, 252 MB** (HEAD: 385, 363 MB). Target ≤ 200 MB not met |
+
+Search time (`bench.sh times full`, two runs each, ms):
+
+| Transfers | p50 new | p50 HEAD | p95 new | p95 HEAD |
+|---|---|---|---|---|
+| 0 | 7, 7 | 6, 7 | 17, 18 | 19, 16 |
+| 1 | 40, 41 | 39, 42 | 124, 167 | 141, 140 |
+| 2 | 140, 141 | 141, 146 | 354, 352 | 382, 339 |
+| 3 | 392, 417 | 441, 419 | 796, 869 | 850, 788 |
+| 4 | 984, 1,008 | 1,063, 1,031 | 1,461, 1,483 | 1,559, 1,430 |
+| 5 | 1,444, 1,550 | 1,511, 1,493 | 2,377, 2,362 | 2,535, 2,364 |
+
 ## Dead boardings dropped (S23, partly done, 2026-10-10)
 Full data, `-Xmx3g`, compact object headers, warmer off, `data/gtfs-store.bin`, port 8081. S23 and S21 (HEAD) jars run alternately on a fresh app, two runs each. Results are byte-identical to S22 (`SearchSnapshot`, dev and full).
 | Measure | How | Result |

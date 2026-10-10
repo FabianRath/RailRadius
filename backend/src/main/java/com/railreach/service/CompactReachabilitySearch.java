@@ -76,15 +76,12 @@ public class CompactReachabilitySearch {
         SearchCounters counters = run.counters();
         scratch.startSearch();
         rideFromStart(run);
-        int roundStart = 0;
-        int roundEnd = scratch.labels().size();
         finishRound(run, 0, roundPaths);
         logRound(0, counters.stopArrivals, run, startNanos);
-        for (int transfers = 1; transfers <= run.maxTransfers() && roundEnd > roundStart; transfers++) {
+        for (int transfers = 1; transfers <= run.maxTransfers() && scratch.rides().size() > 0; transfers++) {
             long roundStartNanos = System.nanoTime();
             long arrivalsBefore = counters.stopArrivals;
-            roundStart = transferRound(run, roundStart, roundEnd, transfers);
-            roundEnd = scratch.labels().size();
+            transferRound(run, transfers);
             finishRound(run, transfers, roundPaths);
             logRound(transfers, counters.stopArrivals - arrivalsBefore, run, roundStartNanos);
         }
@@ -145,31 +142,18 @@ public class CompactReachabilitySearch {
     }
 
     /**
-     * Boards each station's departures from the previous round's arrivals there and rides them, in station order.
-     * Before riding, the arena drops every label that nothing boards from, no later label rides on from and no chosen
-     * path ends with: no later round reads them. Returns the first label of the round.
+     * Boards each station's departures from the arrivals of the previous round's rides and rides them, in station
+     * order. Before riding, the arena drops every label that no arrival boarded from leads back to and no chosen path
+     * ends with: no later round reads them. Then the arrivals boarded from get labels.
      */
-    private int transferRound(Run run, int firstArrival, int endArrival, int transfers) {
+    private void transferRound(Run run, int transfers) {
         TimetableStore store = run.store();
         SearchCounters counters = run.counters();
         CompactTransferRound round = run.scratch().transferRound();
-        List<CompactTransferRound.StationBoardings> stations = round.boardings(firstArrival, endArrival,
-                run.parameters());
-        trimArena(run.scratch(), arena -> {
-            for (CompactTransferRound.StationBoardings station : stations) {
-                for (int i = 0; i < station.count; i++) {
-                    arena.keepWithEarlierRides(station.fromLabels[i]);
-                }
-            }
-        });
-        LabelArena labels = run.scratch().labels();
-        // Only reads the trim's index, so stations do it in parallel
-        stations.parallelStream().forEach(station -> {
-            for (int i = 0; i < station.count; i++) {
-                station.fromLabels[i] = labels.trimmedIndex(station.fromLabels[i]);
-            }
-        });
-        int roundStart = labels.size();
+        List<CompactTransferRound.StationBoardings> stations = round.boardings(run.startIndex(), run.parameters());
+        trimArena(run.scratch(), arena -> round.keepBoardedFrom(stations, arena));
+        round.labelBoardedFrom(stations);
+        run.scratch().rides().clear();
         for (CompactTransferRound.StationBoardings station : stations) {
             counters.departuresScanned += station.departureCount;
             counters.boardings += station.count;
@@ -178,17 +162,17 @@ public class CompactReachabilitySearch {
             for (int i = 0; i < station.count; i++) {
                 int event = station.departureEvent(i);
                 int trip = store.tripOf(event);
-                ride(run, trip, event - store.firstEvent(trip), transfers, station.boardMinutes[i],
-                        station.fromLabels[i], round.boardDays(station, i, trip, run.patternDays()));
+                ride(run, trip, event - store.firstEvent(trip), transfers, station.boardMinutes[i], station.from[i],
+                        round.boardDays(station, i, trip, run.patternDays()));
             }
         }
-        return roundStart;
     }
 
     /**
      * Rides the trip from boardIdx on, recording each stop until an earlier ride was there no slower on all its days,
      * or the trip leaves a stop at a time that runs on too few days ({@link TimetableStore#isRegularDeparture}). The
-     * duration adds each leg's run time and the dwell before it, both clamped at 0.
+     * duration adds each leg's run time and the dwell before it, both clamped at 0. Only the arrivals that become
+     * candidates get a label here; the next round works out the others from the ride.
      */
     private void ride(Run run, int trip, int boardIdx, int transfers, int boardDurationMinutes, int previous,
                       long days) {
@@ -196,17 +180,15 @@ public class CompactReachabilitySearch {
         SearchScratch scratch = run.scratch();
         int firstEvent = store.firstEvent(trip);
         int endEvent = store.endEvent(trip);
+        int boardEvent = firstEvent + boardIdx;
         int slotBase = scratch.progress().reach(trip, firstEvent, endEvent);
         int durationMinutes = boardDurationMinutes;
-        for (int event = firstEvent + boardIdx + 1; event < endEvent; event++) {
+        int event = boardEvent + 1;
+        for (; event < endEvent; event++) {
             int legEvent = event - 1;
-            if (!store.hasLeg(legEvent) || !store.isRegularDeparture(legEvent)) return;
-            if (legEvent > firstEvent + boardIdx) {
-                durationMinutes += Math.max(0, GtfsTime.diffMinutes(store.arrivalSeconds(legEvent),
-                        store.departureSeconds(legEvent)));
-            }
-            durationMinutes += store.legMinutes(legEvent);
-            if (scratch.progress().reachedNoSlower(slotBase + event, durationMinutes, days)) return;
+            if (!store.hasLeg(legEvent) || !store.isRegularDeparture(legEvent)) break;
+            durationMinutes += store.rideLegMinutes(boardEvent, legEvent);
+            if (scratch.progress().reachedNoSlower(slotBase + event, durationMinutes, days)) break;
             scratch.progress().record(slotBase + event, durationMinutes, days);
             int station = store.station(event);
             if (station == run.startIndex()) continue;
@@ -214,11 +196,14 @@ public class CompactReachabilitySearch {
             run.counters().stopArrivals++;
             StationCandidatesFlat candidates = scratch.candidates();
             if (candidates.enter(station, transfers)) scratch.roundStations().add(station);
-            boolean candidate = candidates.accepts(station, durationMinutes);
-            // Nothing boards from the last round's arrivals, so only its candidates need a label
-            if (!candidate && transfers == run.maxTransfers()) continue;
+            if (!candidates.accepts(station, durationMinutes)) continue;
             int label = scratch.labels().add(trip, boardIdx, event - firstEvent, durationMinutes, previous, days);
-            if (candidate) candidates.add(station, label, scratch.labels());
+            candidates.add(station, label, scratch.labels());
+        }
+        int recordedStops = event - boardEvent - 1;
+        // Nothing boards from the last round's arrivals
+        if (recordedStops > 0 && transfers < run.maxTransfers()) {
+            scratch.rides().add(boardEvent, previous, boardDurationMinutes, days, recordedStops);
         }
     }
 

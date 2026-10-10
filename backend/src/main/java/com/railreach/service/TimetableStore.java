@@ -167,6 +167,16 @@ final class TimetableStore {
         return Math.max(0, GtfsTime.diffMinutes(evDepSec[event], evArrSec[event + 1]));
     }
 
+    /**
+     * Minutes a ride boarded at boardEvent adds over the leg leaving legEvent: the dwell before it, unless it boards
+     * there, and the leg's run time, both at least 0. Needs {@link #hasLeg}.
+     */
+    int rideLegMinutes(int boardEvent, int legEvent) {
+        int dwellMinutes = legEvent > boardEvent
+                ? Math.max(0, GtfsTime.diffMinutes(evArrSec[legEvent], evDepSec[legEvent])) : 0;
+        return dwellMinutes + legMinutes(legEvent);
+    }
+
     /** Whether the trip may be ridden away from this event ({@link #regularDepartures}). */
     boolean isRegularDeparture(int event) {
         return (regularDeparture[event / BITS_PER_WORD] & 1L << event) != 0;
