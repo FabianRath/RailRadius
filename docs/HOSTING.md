@@ -46,6 +46,25 @@ Full data, `-Xmx9g`, G1, warmer on, gate at 2 permits and 6 queued. 5 clients at
 | Live heap after the run (`bench.sh memory`) | 3,243 MB, with 22 stored results in the raw cache |
 | Peak working set | 9.5 GB: G1 grows the heap towards `-Xmx` |
 
+## Dead boardings dropped (S23, partly done, 2026-10-10)
+Full data, `-Xmx3g`, compact object headers, warmer off, `data/gtfs-store.bin`, port 8081. S23 and S21 (HEAD) jars run alternately on a fresh app, two runs each. Results are byte-identical to S22 (`SearchSnapshot`, dev and full).
+| Measure | How | Result |
+|---|---|---|
+| Boardings, Stockholm 5 transfers | the `Search stats (compact)` line | **9.2 M** (S21: 21.5 M); at most 3.5 M per round (9.8 M), ~42 MB held until ridden (~118 MB). Same 16,975,551 stop arrivals |
+| Scratch per search | the same line | Stockholm **360 MB**, unchanged: the arena peaks at 6.97 M labels (7.8 M), which needs the same 9.08 M capacity |
+| Held during a search | `bench.sh held`'s method, sampled every 1 s, Stockholm, fresh app | **349, 396 MB** (S21: 460, 436 MB). Samples are seconds apart, so it varies between runs |
+
+Search time (`bench.sh times full`, two runs each, ms):
+
+| Transfers | p50 S23 | p50 S21 | p95 S23 | p95 S21 |
+|---|---|---|---|---|
+| 0 | 6, 6 | 6, 6 | 17, 17 | 18, 18 |
+| 1 | 39, 37 | 40, 39 | 111, 117 | 128, 129 |
+| 2 | 135, 145 | 152, 142 | 326, 374 | 337, 366 |
+| 3 | 402, 432 | 438, 412 | 883, 803 | 923, 918 |
+| 4 | 1,019, 1,005 | 1,116, 1,082 | 1,489, 1,488 | 1,790, 1,677 |
+| 5 | 1,422, 1,477 | 1,759, 1,752 | 2,252, 2,333 | 2,751, 2,681 |
+
 ## Legacy engine deleted (S21, 2026-10-10)
 Full data, `-Xmx3g`, compact object headers, warmer off, started from a binary cache the S21 jar wrote from the zips. Compared with the S22 jar on the same file and machine where noted. Results: the S21 jar on the S22 binary cache gives the S22 dump byte for byte, and the S21 and S22 jars parsing the same zips give byte-identical dumps (dev and full).
 | Measure | How | Result | S21 target |

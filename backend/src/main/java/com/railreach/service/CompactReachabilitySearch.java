@@ -205,8 +205,7 @@ public class CompactReachabilitySearch {
                 durationMinutes += Math.max(0, GtfsTime.diffMinutes(store.arrivalSeconds(legEvent),
                         store.departureSeconds(legEvent)));
             }
-            durationMinutes += Math.max(0, GtfsTime.diffMinutes(store.departureSeconds(legEvent),
-                    store.arrivalSeconds(event)));
+            durationMinutes += store.legMinutes(legEvent);
             if (scratch.progress().reachedNoSlower(slotBase + event, durationMinutes, days)) return;
             scratch.progress().record(slotBase + event, durationMinutes, days);
             int station = store.station(event);

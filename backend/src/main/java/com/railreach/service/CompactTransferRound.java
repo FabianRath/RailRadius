@@ -209,13 +209,28 @@ final class CompactTransferRound {
             int from = faster(departureSeconds, arrivals, sameDayFrom, overnightFrom);
             if (from < 0) return;
             int extraDays = from == sameDayFrom ? SAME_DAY : NEXT_DAY;
-            served |= nextDays & WeekPeriodDays.movedForward(arrivals.arrivals().days()[from], extraDays);
+            long rideDays = nextDays & WeekPeriodDays.movedForward(arrivals.arrivals().days()[from], extraDays);
+            served |= rideDays;
             int fromLabel = arrivals.labels()[from];
+            int minutes = boardingMinutes(arrivals, from, departureSeconds);
             // Staying on this trip beats changing onto it from any arrival
-            if (labels.trip(fromLabel) != nextTrip) {
-                boardings.add(event, extraDays, fromLabel, boardingMinutes(arrivals, from, departureSeconds));
+            if (labels.trip(fromLabel) != nextTrip && ridesOn(event, nextTrip, minutes, rideDays)) {
+                boardings.add(event, extraDays, fromLabel, minutes);
             }
         }
+    }
+
+    /**
+     * Whether riding the boarding could record the trip's next stop: a ride that can't records nothing and makes no
+     * label, so it is not boarded at all, and its arrival needs no label in the next trim. A stop that earlier rides
+     * reached no slower on all the ride's days stays so for the rest of the round, since riding only lowers durations
+     * and adds days. On the full data, most of a large search's boardings are dropped this way.
+     */
+    private boolean ridesOn(int event, int trip, int boardMinutes, long rideDays) {
+        if (!store.hasLeg(event)) return false;
+        if (!progress.reached(trip)) return true;
+        return !progress.reachedNoSlower(progress.slot(trip, event + 1), boardMinutes + store.legMinutes(event),
+                rideDays);
     }
 
     /** The days a boarding rides on: those of its trip on which its arrival catches it. */

@@ -1,6 +1,7 @@
 package com.railreach.service;
 
 import com.railreach.model.Connection;
+import com.railreach.util.GtfsTime;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -159,6 +160,11 @@ final class TimetableStore {
     /** Whether the trip runs on from this event to the next. */
     boolean hasLeg(int event) {
         return evDepSec[event] != NO_LEG;
+    }
+
+    /** Minutes from leaving this event to arriving at the trip's next one, at least 0. Needs {@link #hasLeg}. */
+    int legMinutes(int event) {
+        return Math.max(0, GtfsTime.diffMinutes(evDepSec[event], evArrSec[event + 1]));
     }
 
     /** Whether the trip may be ridden away from this event ({@link #regularDepartures}). */

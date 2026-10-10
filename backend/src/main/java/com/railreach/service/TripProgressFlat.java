@@ -51,7 +51,7 @@ final class TripProgressFlat {
      * Returns what to add to one of its events to get the event's slot.
      */
     int reach(int trip, int firstEvent, int endEvent) {
-        if (tripGeneration[trip] == generation) return tripBase[trip];
+        if (reached(trip)) return tripBase[trip];
         tripGeneration[trip] = generation;
         int end = usedSlots + endEvent - firstEvent;
         if (end > durationMinutes.length) grow(end);
@@ -61,6 +61,11 @@ final class TripProgressFlat {
         tripBase[trip] = usedSlots - firstEvent;
         usedSlots = end;
         return tripBase[trip];
+    }
+
+    /** Whether this search reached the trip, so its events have slots. */
+    boolean reached(int trip) {
+        return tripGeneration[trip] == generation;
     }
 
     /** The slot of an event of a trip this search reached. */
