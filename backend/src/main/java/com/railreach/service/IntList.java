@@ -31,6 +31,10 @@ final class IntList {
         size = 0;
     }
 
+    int[] toArray() {
+        return Arrays.copyOf(values, size);
+    }
+
     long sizeBytes() {
         return (long) values.length * Integer.BYTES;
     }

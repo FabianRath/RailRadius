@@ -4,9 +4,9 @@ How much server RailReach needs, measured on the full data. Re-measure when the 
 
 ## Plan
 
-- The server only answers searches. GTFS zips are parsed on the dev machine, and only `data/gtfs-cache.json` is uploaded.
-- Updating data: parse locally, upload the cache, restart the app. The cache is read only at startup, so each update means ~50 s of downtime.
-- The server needs the jar, `frontend/` and `data/gtfs-cache.json` (~650 MB). No zips, so a small disk is enough.
+- The server only answers searches, with the compact engine (`--railreach.search.engine=compact`). GTFS zips are parsed on the dev machine, and only the binary cache `data/gtfs-store.bin` (159 MB, S20) is uploaded.
+- Updating data: parse locally with the compact engine (a reload writes the JSON and the binary cache), upload the binary cache, restart the app. It is read only at startup, which takes ~3 s, so that is the downtime of an update. The log line `Binary cache read …` names the SHA-256 of the JSON cache it was built from.
+- The server needs the jar, `frontend/` and `data/gtfs-store.bin`. No zips, so a small disk is enough.
 - Leave `RAILREACH_ADMIN_TOKEN` unset, so `/api/admin/**` answers 403 (no reload, cache delete or feed download from outside).
 - Without zips, the feed update center logs all feeds as missing at startup and once a day. That is expected.
 
@@ -44,6 +44,14 @@ Full data, `-Xmx9g`, G1, warmer on, gate at 2 permits and 6 queued. 5 clients at
 | Closed client | Its stream stopped 1 s after the client left; nothing stored |
 | Live heap after the run (`bench.sh memory`) | 3,243 MB, with 22 stored results in the raw cache |
 | Peak working set | 9.5 GB: G1 grows the heap towards `-Xmx` |
+
+## Binary cache (S20, 2026-10-10)
+Full data, compact engine, `-Xmx3g`, compact object headers, warmer off, started from `data/gtfs-store.bin` (written by the first start from the JSON cache: 5.3 s, most of it hashing the 650 MB JSON). Results are byte-identical to S19 (`SearchSnapshot` on dev and full data from the binary cache; the API's station search, station, `/stats`, POST and `/journey` answers equal those of a JSON start).
+| Measure | How | Result |
+|---|---|---|
+| Startup | log `Started … in` | **2.8–2.9 s** in all (S19: 38–39 s). Reading the file 142–151 ms, filling the graph and the station search index ~0.9 s |
+| Idle live heap | `bench.sh memory`; `gc.log` full GC | **327 MB**; 294 MB after the full GC (S19: 1,542 MB): no trips, connections or services in the graph |
+| Startup peak | `gc.log` (largest heap before a GC until `Started`), and a start at `-Xmx440m` (1.5 × 294 MB) | 365 MB, 1.24 × live. At `-Xmx440m` it starts without a full GC and answers a 1-transfer search. Peak working set 657 MB |
 
 ## Journeys and result cache on the store (S19, 2026-10-10)
 Full data, compact engine (`--railreach.search.engine=compact`), `-Xmx3g`, compact object headers, warmer off. Results are byte-identical to S18 (`SearchSnapshot`, gtfs-mini, dev and full).

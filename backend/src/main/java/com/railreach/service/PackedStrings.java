@@ -1,6 +1,7 @@
 package com.railreach.service;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
@@ -27,6 +28,15 @@ final class PackedStrings {
             offsets[i + 1] = bytes.size();
         }
         return new PackedStrings(bytes.toByteArray(), offsets);
+    }
+
+    static PackedStrings readFrom(BinaryBlocks.Reader in) throws IOException {
+        return new PackedStrings(in.bytes(), in.ints());
+    }
+
+    void writeTo(BinaryBlocks.Writer out) throws IOException {
+        out.bytes(blob);
+        out.ints(offsets);
     }
 
     int size() {

@@ -39,6 +39,28 @@ class GtfsDataServiceTest {
         assertThat(service.getCacheStats()).containsEntry("dataLoaded", false);
     }
 
+    // S20: the legacy engine needs the JSON cache's trips, the compact one only what the binary cache holds
+    @Test
+    void compactEngineWritesTheBinaryCacheFromTheJsonCacheAndStartsFromItNextTime(@TempDir Path dir)
+            throws Exception {
+        TransitGraph parsed = new TransitGraph();
+        GtfsTestFixtures.dataService(dir, parsed, SearchEngine.LEGACY, "alpha", "beta").loadFromFiles();
+        assertThat(dir.resolve("gtfs-store.bin")).doesNotExist();
+
+        TransitGraph fromJson = new TransitGraph();
+        GtfsTestFixtures.dataService(dir, fromJson, SearchEngine.COMPACT).initialize();
+        assertThat(fromJson.tripIds()).isNotEmpty();
+        assertThat(dir.resolve("gtfs-store.bin")).exists();
+
+        TransitGraph fromBinary = new TransitGraph();
+        GtfsDataService service = GtfsTestFixtures.dataService(dir, fromBinary, SearchEngine.COMPACT);
+        service.initialize();
+        assertThat(fromBinary.tripIds()).isEmpty();
+        assertThat(fromBinary.getAllStations()).isEqualTo(parsed.getAllStations());
+        assertThat(service.getCacheStats()).containsEntry("dataLoaded", true)
+                .containsEntry("connectionCount", parsed.edgeCount());
+    }
+
     @Test
     void stopIdsArePrefixedWithFeedSource() {
         assertThat(gtfs.getStation("alpha:A1").getName()).isEqualTo("Alpha Central");
@@ -352,7 +374,7 @@ class GtfsDataServiceTest {
         restored.restore(GtfsTestFixtures.cacheStore(tempDir).load().orElseThrow());
 
         assertThat(restored.getAllStations()).isEqualTo(gtfs.getAllStations());
-        assertThat(restored.connectionCount()).isEqualTo(gtfs.connectionCount());
+        assertThat(restored.edgeCount()).isEqualTo(gtfs.edgeCount());
         for (String stopId : gtfs.getAllStations().keySet()) {
             assertThat(restored.getNeighbors(stopId)).isEqualTo(gtfs.getNeighbors(stopId));
             for (String neighbor : gtfs.getNeighbors(stopId)) {

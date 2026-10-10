@@ -71,7 +71,7 @@ class SearchSnapshotTest {
         assertThat(SearchSnapshot.benchStarts(lines, "dev")).containsExactly("austria:1", "hungary:267");
     }
 
-    private static String dump(TransitGraph graph, String engine) throws IOException {
+    static String dump(TransitGraph graph, String engine) throws IOException {
         StringWriter out = new StringWriter();
         new SearchSnapshot(graph, engine).write(graph.getAllStations().keySet().stream().sorted().toList(), out);
         return out.toString();
