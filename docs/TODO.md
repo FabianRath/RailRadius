@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B39 · F26 · S23
+**Next free IDs:** B39 · F26 · S27
 
 ## Bugs (data loading)
 - [ ] **B36** Bosnia has no current rail feed, and Northern Ireland's can't be refreshed. State on 2026-10-07 (`gtfs-sources.md` has the details). Bosnia: the only source ends on 2025-12-13, so no Bosnian trains. Northern Ireland: the zip on disk (GTFS.pro copy from transitpdf, 2026-07-27) has NI Railways until mid-2027, but transitpdf is gone and Translink publishes only TransXChange, so no download URL is left in `gtfs-feeds.txt`. Check for a new GTFS source before mid-2027.
@@ -15,3 +15,7 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 - [ ] **F23** (Decide first) While a station's journey is shown (F21), the dots of the stations it passes through keep their own transfer-level colour, so they don't always match the line colour of the train passing them (first train green, second cyan, …): a stop on the third train can be green because another train reaches it directly. The route looks inconsistent, but the colour also tells the user that this stop can be reached with fewer transfers, and clicking it shows that shorter journey. Options: (1) recolour the path's dots by the train they are on while the journey is shown; (2) keep the station's own colour (current behaviour), maybe explained in the details panel; (3) both, e.g. the train's colour as fill and the station's own level as outline. Decide with the user, then implement.
 
 ## Structure
+- [ ] **S23** A large 5-transfer search still holds ~330 MB (target ≤ 200 MB, missed in S22 and S21). Full data, Stockholm, fresh app. Smaller labels won't get there (S22 already trimmed them, see `decisions.md` 2026-10-10); it needs fewer labels per search. Untried ideas from S22: ride each station batch right after choosing it, prune arrivals no departure can use. Gate: zero diff on gtfs-mini, dev and full data, no slower.
+- [ ] **S24** 5-transfer p50 is 1.70 s (target ≤ 1.5 s; p95 2.66 s meets its ≤ 3 s). Full data, `-Xmx3g`, `scripts/bench.sh`. Gate: zero diff.
+- [ ] **S25** `HOSTING.md` still recommends 16 GB RAM and `-Xmx9g`, sized for the legacy engine. The compact engine measured 405 MB idle heap, ~450 MB startup peak and ~330 MB per large search at `-Xmx3g` (4 concurrent 5-transfer searches fit in `-Xmx2g`). Re-measure concurrency, then pick a smaller server and heap and update the recommendation.
+- [ ] **S26** `backend/data/gtfs-store.bin` still carries the station merges from before B29/B30. `gtfs-store-s21.bin` is a fresh parse of the current zips with the current rules, and `data/snapshots/*-s21-*` are its reference dumps. Swap the store file in, make the s21 dumps the goldens, and delete the outdated dumps and stores no longer needed for the `pre-compact` rollback.
