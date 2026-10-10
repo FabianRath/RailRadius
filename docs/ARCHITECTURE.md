@@ -22,7 +22,7 @@ It loads GTFS timetable feeds for ~25 European countries, keeps only **rail** ro
 
 Run from `backend/`; the cache paths are relative to the working directory. The commands below are for Git Bash; in PowerShell use `.\mvnw.cmd` instead of `./mvnw`.
 
-- **Full data:** `./mvnw package -DskipTests && java -Xmx12g -XX:+UseCompactObjectHeaders -jar target/railreach-backend-0.0.1-SNAPSHOT.jar`
+- **Full data:** `./mvnw package -DskipTests && java -Xmx3g -XX:+UseCompactObjectHeaders -jar target/railreach-backend-0.0.1-SNAPSHOT.jar`
   - The app starts from the binary cache `data/gtfs-store.bin` (159 MB, S20): ~3 s in all, ~0.15 s of it reading the file. Without it, `--railreach.gtfs.auto-load-from-files=true` parses the zips (minutes) and writes it; so does `reload-gtfs`.
   - Server size and memory measurements: `docs/HOSTING.md`.
 - **Dev data:** `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev -Dspring-boot.run.jvmArguments=-XX:+UseCompactObjectHeaders`

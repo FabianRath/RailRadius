@@ -26,7 +26,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 - Test: `mvn -q -f backend/pom.xml test` (~10 s; prints nothing on success)
 - One test class: `mvn -q -f backend/pom.xml test -Dtest=ReachabilityServiceTest`
 - Run with small dev data: use the `/run-dev` skill. Then use `scripts/api.sh health`, `scripts/api.sh search wien`, etc.
-- Full data (12 GB heap, minutes to start): only when explicitly asked. See ARCHITECTURE.md.
+- Full data (3 GB heap, ~3 s to start from the binary cache): only when explicitly asked. See ARCHITECTURE.md.
 
 ## Hard rules
 - **`backend/data/` holds multi-GB caches and zips. Look, don't read.**
