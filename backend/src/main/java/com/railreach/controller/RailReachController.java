@@ -1,7 +1,6 @@
 package com.railreach.controller;
 
 import com.railreach.dto.ReachabilityRequest;
-import com.railreach.dto.ReachabilityResponse;
 import com.railreach.dto.ReachableStation;
 import com.railreach.model.Station;
 import com.railreach.service.ReachabilityService;
@@ -14,8 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -107,26 +104,6 @@ public class RailReachController {
         return ResponseEntity.of(reachabilityService.journey(req, targetId));
     }
 
-    @PostMapping("/reachability")
-    public ResponseEntity<ReachabilityResponse> calculateReachability(
-            @RequestBody ReachabilityRequest request) {
-        
-        log.info("Reachability request: startStation={}, maxTransfers={}", 
-                request.getStartStationId(), request.getMaxTransfers());
-        
-        if (request.getStartStationId() == null || request.getStartStationId().isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
-        
-        if (transitGraph.getStation(request.getStartStationId()) == null) {
-            log.warn("Station not found: {}", request.getStartStationId());
-            return ResponseEntity.notFound().build();
-        }
-        
-        ReachabilityResponse response = reachabilityService.calculateReachability(request);
-        return ResponseEntity.ok(response);
-    }
-    
     @GetMapping("/stations/search")
     public ResponseEntity<List<StationSearchResult>> searchStations(
             @RequestParam("q") String query,
