@@ -36,7 +36,7 @@ final class CompactTransferRound {
 
     /**
      * What one station boards, in departure order, and what choosing it took. A round can board ~10 M times on the
-     * full data and holds all of them until it rides them, so a boarding is three ints: its departure event with
+     * full data and holds them until it rides them, so a boarding is two ints and a char: its departure event with
      * whether the wait passes midnight, the arrival boarded from and the journey's minutes up to the departure. Its
      * days follow from those ({@link #boardDays}); working out the minutes again would read three more arrays of the
      * label per boarding, which made a large search ~8 % slower. Several departures board from one arrival, so the
@@ -45,15 +45,18 @@ final class CompactTransferRound {
     static final class StationBoardings {
 
         private static final int INITIAL_CAPACITY = 8;
+        // Most stations board nothing; growing copies, so they can share these
+        private static final int[] NO_INTS = new int[0];
+        private static final char[] NO_MINUTES = new char[0];
 
         int count;
         // departure event << 1 | extra days (0 or 1)
-        private int[] departures = new int[0];
+        private int[] departures = NO_INTS;
         // The arrival boarded from as an index into fromPositions, until labelBoardedFrom makes it the arrival's label
-        int[] from = new int[0];
-        int[] boardMinutes = new int[0];
+        int[] from = NO_INTS;
+        char[] boardMinutes = NO_MINUTES;
         // The grouped positions of the arrivals boarded from, each once
-        private int[] fromPositions = new int[0];
+        private int[] fromPositions = NO_INTS;
         private int fromCount;
         int departureCount;
         int fallbackScans;
@@ -71,7 +74,7 @@ final class CompactTransferRound {
             if (count == departures.length) resize(Math.max(INITIAL_CAPACITY, count * 2));
             departures[count] = departureEvent << 1 | extraDays;
             from[count] = fromIndex;
-            boardMinutes[count] = minutes;
+            boardMinutes[count] = PackedMinutes.of(minutes);
             count++;
         }
 
@@ -88,6 +91,14 @@ final class CompactTransferRound {
         private void trimToSize() {
             if (count < departures.length) resize(count);
             if (fromCount < fromPositions.length) fromPositions = Arrays.copyOf(fromPositions, fromCount);
+        }
+
+        /** Once ridden, so the round holds only the boardings it has yet to ride. */
+        void release() {
+            departures = NO_INTS;
+            from = NO_INTS;
+            boardMinutes = NO_MINUTES;
+            fromPositions = NO_INTS;
         }
 
         private void resize(int capacity) {

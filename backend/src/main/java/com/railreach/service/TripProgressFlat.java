@@ -21,7 +21,7 @@ final class TripProgressFlat {
     private final int[] tripBase;
     private final int[] tripGeneration;
     private int generation;
-    private int[] durationMinutes;
+    private char[] durationMinutes;
     private long[] fastestDays;
     private long[] reachedDays;
     private int usedSlots;
@@ -31,7 +31,7 @@ final class TripProgressFlat {
         tripBase = new int[store.tripCount()];
         tripGeneration = new int[store.tripCount()];
         int capacity = Math.min(INITIAL_CAPACITY, eventCount);
-        durationMinutes = new int[capacity];
+        durationMinutes = new char[capacity];
         fastestDays = new long[capacity];
         reachedDays = new long[capacity];
     }
@@ -55,7 +55,7 @@ final class TripProgressFlat {
         tripGeneration[trip] = generation;
         int end = usedSlots + endEvent - firstEvent;
         if (end > durationMinutes.length) grow(end);
-        Arrays.fill(durationMinutes, usedSlots, end, Integer.MAX_VALUE);
+        Arrays.fill(durationMinutes, usedSlots, end, PackedMinutes.UNREACHED);
         Arrays.fill(fastestDays, usedSlots, end, 0L);
         Arrays.fill(reachedDays, usedSlots, end, 0L);
         tripBase[trip] = usedSlots - firstEvent;
@@ -84,12 +84,12 @@ final class TripProgressFlat {
     void record(int slot, int rideMinutes, long rideDays) {
         reachedDays[slot] |= rideDays;
         if (rideMinutes >= durationMinutes[slot]) return;
-        durationMinutes[slot] = rideMinutes;
+        durationMinutes[slot] = PackedMinutes.of(rideMinutes);
         fastestDays[slot] = rideDays;
     }
 
     long sizeBytes() {
-        return (long) durationMinutes.length * (Integer.BYTES + 2 * Long.BYTES)
+        return (long) durationMinutes.length * (Character.BYTES + 2 * Long.BYTES)
                 + (long) tripGeneration.length * 2 * Integer.BYTES;
     }
 

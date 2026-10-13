@@ -165,6 +165,7 @@ public class CompactReachabilitySearch {
                 ride(run, trip, event - store.firstEvent(trip), transfers, station.boardMinutes[i], station.from[i],
                         round.boardDays(station, i, trip, run.patternDays()));
             }
+            station.release();
         }
     }
 
