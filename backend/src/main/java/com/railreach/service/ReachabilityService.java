@@ -118,25 +118,28 @@ public class ReachabilityService {
             log.info("Stream stopped after {} ms: {}", System.currentTimeMillis() - startMs, e.getMessage());
             emitter.complete();
         } catch (SearchGate.BusyException e) {
-            sendError(emitter, e.getMessage(), e);
+            sendError(emitter, e.getMessage());
         } catch (Exception e) {
             log.error("Streaming BFS error", e);
-            sendError(emitter, e.getMessage(), e);
+            sendError(emitter, e.getMessage());
         } catch (OutOfMemoryError e) {
             // The failed search's memory is garbage once it has unwound, and its permit is free, so the app goes on;
             // without this the client would wait for an event forever (B38)
             log.error("Search from {} x{} ran out of memory", key.startId(), key.maxTransfers(), e);
-            sendError(emitter, OUT_OF_MEMORY_MESSAGE, e);
+            sendError(emitter, OUT_OF_MEMORY_MESSAGE);
         }
     }
 
-    private static void sendError(SseEmitter emitter, String message, Throwable error) {
+    // Ends the stream normally: the error event is the client's answer and the caller has logged what it needs.
+    // completeWithError would hand the exception to Spring after the response is committed, which logs it as a
+    // server error (B39)
+    private static void sendError(SseEmitter emitter, String message) {
         try {
             emitter.send(SseEmitter.event().name("error").data(message));
         } catch (Exception sendError) {
             log.debug("Could not send the error event, the client is gone", sendError);
         }
-        emitter.completeWithError(error);
+        emitter.complete();
     }
 
     public Map<String, Object> getCacheStats() {
