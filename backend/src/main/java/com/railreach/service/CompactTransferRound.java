@@ -2,6 +2,8 @@ package com.railreach.service;
 
 import com.railreach.util.GtfsTime;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -10,7 +12,7 @@ import java.util.stream.IntStream;
  * The transfer part of a round of {@link CompactReachabilitySearch}: the arrivals of the previous round's
  * {@link RoundRides}, minus those a faster ride of their round overtook, grouped by station index, and what each
  * station's departures board from them. Stations choose in parallel. A station's sorted arrivals and transfer windows
- * live only while it chooses, so the round keeps about 9 bytes per arrival. Only the arrivals boarded from get a
+ * live only while it chooses, so the round keeps about 8 bytes per arrival. Only the arrivals boarded from get a
  * label ({@link #labelBoardedFrom}).
  */
 final class CompactTransferRound {
@@ -24,6 +26,10 @@ final class CompactTransferRound {
     private static final int MINUTES_BITS = 18;
     private static final int STOPS_BITS = 15;
     private static final int RIDE_SHIFT = MINUTES_BITS + STOPS_BITS;
+    // record >>> WORD_SHIFT is the record's word in dropped
+    private static final int WORD_SHIFT = 6;
+    // Rides mark their records in parallel, and a word can hold records of two rides
+    private static final VarHandle DROPPED_WORD = MethodHandles.arrayElementVarHandle(long[].class);
 
     /** A search's trips' days by day pattern ({@link WeekPeriodDays}) and its wait window. */
     record Parameters(long[] patternDays, int minWaitSeconds, int maxWaitSeconds) {}
@@ -104,8 +110,8 @@ final class CompactTransferRound {
     private final IntList stations = new IntList();
     // The round's arrivals, each station's together, in the order they came
     private long[] grouped = new long[0];
-    // Per record of the rides: whether its arrival is left out, being overtaken or at the start station
-    private boolean[] dropped = new boolean[0];
+    // A bit per record of the rides: whether its arrival is left out, being overtaken or at the start station
+    private long[] dropped = new long[0];
 
     CompactTransferRound(TimetableStore store, LabelArena labels, TripProgressFlat progress, RoundRides rides) {
         this.store = store;
@@ -151,7 +157,7 @@ final class CompactTransferRound {
 
     long sizeBytes() {
         return (long) (stationStart.length + stationNext.length) * Integer.BYTES + (long) grouped.length * Long.BYTES
-                + dropped.length;
+                + (long) dropped.length * Long.BYTES;
     }
 
     private void label(StationBoardings station, int firstLabel) {
@@ -175,8 +181,12 @@ final class CompactTransferRound {
      * lowers any best durations, so only same-round overtaking drops an arrival.
      */
     private void groupByStation(int startStation) {
-        int records = rides.recordCount();
-        if (dropped.length < records) dropped = new boolean[records];
+        int words = (rides.recordCount() + Long.SIZE - 1) >>> WORD_SHIFT;
+        if (dropped.length < words) {
+            dropped = new long[words];
+        } else {
+            Arrays.fill(dropped, 0, words, 0L);
+        }
         IntStream.range(0, rides.size()).parallel().forEach(ride -> markDropped(ride, startStation));
         Arrays.fill(stationStart, 0);
         int kept = 0;
@@ -184,7 +194,7 @@ final class CompactTransferRound {
             int end = rides.recordStart(ride + 1);
             for (int record = rides.recordStart(ride), event = rides.boardEvent(ride) + 1; record < end;
                  record++, event++) {
-                if (dropped[record]) continue;
+                if (isDropped(record)) continue;
                 stationStart[store.station(event) + 1]++;
                 kept++;
             }
@@ -198,7 +208,7 @@ final class CompactTransferRound {
             int minutes = 0;
             for (int record = rides.recordStart(ride), event = boardEvent + 1; record < end; record++, event++) {
                 minutes += store.rideLegMinutes(boardEvent, event - 1);
-                if (!dropped[record]) {
+                if (!isDropped(record)) {
                     grouped[stationNext[store.station(event)]++] = arrival(ride, event - boardEvent, minutes);
                 }
             }
@@ -209,18 +219,30 @@ final class CompactTransferRound {
         }
     }
 
-    /** A ride writes only its own records, so rides do it in parallel. */
+    /** Sets the bits of the ride's dropped records, a word at a time. Rides do it in parallel. */
     private void markDropped(int ride, int startStation) {
         int boardEvent = rides.boardEvent(ride);
         int trip = store.tripOf(boardEvent);
         long days = rides.days(ride);
         int minutes = rides.boardMinutes(ride);
         int end = rides.recordStart(ride + 1);
+        long bits = 0;
         for (int record = rides.recordStart(ride), event = boardEvent + 1; record < end; record++, event++) {
             minutes += store.rideLegMinutes(boardEvent, event - 1);
-            dropped[record] = store.station(event) == startStation
-                    || progress.reachedFaster(progress.slot(trip, event), minutes, days);
+            if (store.station(event) == startStation
+                    || progress.reachedFaster(progress.slot(trip, event), minutes, days)) {
+                bits |= 1L << record;
+            }
+            boolean wordEnds = record + 1 == end || ((record + 1) & (Long.SIZE - 1)) == 0;
+            if (wordEnds && bits != 0) {
+                DROPPED_WORD.getAndBitwiseOr(dropped, record >>> WORD_SHIFT, bits);
+                bits = 0;
+            }
         }
+    }
+
+    private boolean isDropped(int record) {
+        return (dropped[record >>> WORD_SHIFT] & 1L << record) != 0;
     }
 
     private StationBoardings boardingsAt(int station, Parameters parameters) {

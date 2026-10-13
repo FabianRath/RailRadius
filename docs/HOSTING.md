@@ -46,6 +46,26 @@ Full data, `-Xmx9g`, G1, warmer on, gate at 2 permits and 6 queued. 5 clients at
 | Live heap after the run (`bench.sh memory`) | 3,243 MB, with 22 stored results in the raw cache |
 | Peak working set | 9.5 GB: G1 grows the heap towards `-Xmx` |
 
+## Scratch grows by an eighth, drop flags as bits (S23, partly done, 2026-10-10)
+Full data (fresh-parse store, S26), `-Xmx3g`, compact object headers, warmer off, port 8081, both builds run from their classes on a fresh app, alternating, two runs each (HEAD = the rides step below). Results are byte-identical to the goldens (`SearchSnapshot`, dev and full).
+
+| Measure | How | Result |
+|---|---|---|
+| Used vs. allocated, Stockholm 5 transfers | temporary log at HEAD | arena 1.23 M of 1.79 M labels, rides 1.24 M of 1.51 M, trip progress 2.98 M of 3.78 M slots (5.80 M events), 5.88 M drop flags as bytes: ~43 MB unused |
+| Scratch per search | the `Search stats (compact)` line, Stockholm 5 transfers | **182 MB** (HEAD: 218 MB), labels 34.9 MB (50.5) |
+| Held during a search | `bench.sh held`'s method, sampled every 0.3 s, Stockholm, fresh app | **215, 209 MB** (HEAD: 232, 232 MB). Target ≤ 200 MB not met |
+
+Search time (`bench.sh times full`, two runs each, ms). Both builds were slower on this machine this time than in the runs below, so compare only within the table:
+
+| Transfers | p50 new | p50 HEAD | p95 new | p95 HEAD |
+|---|---|---|---|---|
+| 0 | 10, 8 | 9, 8 | 20, 20 | 20, 20 |
+| 1 | 67, 64 | 66, 65 | 128, 116 | 134, 123 |
+| 2 | 219, 215 | 228, 223 | 449, 497 | 436, 469 |
+| 3 | 611, 637 | 620, 601 | 1,242, 1,222 | 1,269, 1,236 |
+| 4 | 1,455, 1,466 | 1,443, 1,429 | 2,214, 2,433 | 2,215, 2,313 |
+| 5 | 2,261, 2,183 | 2,159, 2,200 | 3,543, 3,595 | 3,752, 3,650 |
+
 ## Rides instead of labels per arrival (S23, partly done, 2026-10-10)
 Full data, `-Xmx3g`, compact object headers, warmer off, `data/gtfs-store.bin`, port 8081, both builds run from their classes on a fresh app, alternating, two runs each (HEAD = the dead-boardings step below). Results are byte-identical to S22 (`SearchSnapshot`, dev and full) with the same 16,975,551 stop arrivals and 9,231,942 boardings for Stockholm.
 

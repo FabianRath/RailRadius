@@ -98,10 +98,9 @@ final class TripProgressFlat {
         return Arrays.stream(tripGeneration).filter(stamp -> stamp == generation).count();
     }
 
-    // Grows by half, but never past every event of the store
+    // Never past every event of the store
     private void grow(int minCapacity) {
-        int grown = durationMinutes.length + (durationMinutes.length >> 1);
-        int capacity = Math.min(eventCount, Math.max(minCapacity, grown));
+        int capacity = Math.min(eventCount, ScratchCapacity.grown(durationMinutes.length, minCapacity));
         durationMinutes = Arrays.copyOf(durationMinutes, capacity);
         fastestDays = Arrays.copyOf(fastestDays, capacity);
         reachedDays = Arrays.copyOf(reachedDays, capacity);
