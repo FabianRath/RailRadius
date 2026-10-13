@@ -57,8 +57,9 @@ railreach:
 
   search:
     gate:
-      # Searches that run at once. A 5-transfer search on the full data holds about 330 MB while it runs, so this bounds
-      # the heap a burst of visitors can take. The predictive warmer only runs when a permit is free
+      # Searches that run at once. A 5-transfer search on the full data holds about 200 MB while it runs and keeps
+      # its scratch for the next search, so this bounds the heap a burst of visitors can take. The predictive warmer only
+      # runs when a permit is free
       permits: 2
       # Searches that wait for a permit; the next one is turned away as busy (SSE error event, 503 otherwise)
       max-queued: 6
