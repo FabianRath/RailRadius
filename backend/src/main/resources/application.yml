@@ -44,8 +44,6 @@ railreach:
 
   algorithm:
     max-transfer-time-minutes: 180
-    cache-size: 10000
-    cache-ttl-minutes: 60
 
   cache:
     # When a user queries station X with N transfers, search this max in the background; N+1 and up are cut from it

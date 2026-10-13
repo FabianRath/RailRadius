@@ -1,15 +1,12 @@
 package com.railreach.service;
 
 import com.railreach.dto.ReachabilityRequest;
-import com.railreach.dto.ReachabilityResponse;
 import com.railreach.dto.ReachableStation;
 import com.railreach.dto.ReachableStationSummary;
-import com.railreach.model.Station;
 import com.railreach.service.ReachabilityCache.SearchKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -34,7 +31,6 @@ public class ReachabilityService {
     private static final int MINUTES_PER_HOUR = 60;
     private static final String OUT_OF_MEMORY_MESSAGE = "The server is too busy for this search, please try again later";
 
-    private final TransitGraph transitGraph;
     private final ReachabilityCache cache;
     private final ReachabilityWarmer warmer;
     private final JourneyLegBuilder legBuilder;
@@ -45,37 +41,9 @@ public class ReachabilityService {
     @Value("${railreach.cache.predictive-enabled:true}")
     private boolean predictiveEnabled;
 
-    @Cacheable(value = ReachabilityCache.RESPONSE_CACHE_NAME, key = "#request.startStationId + '-' + #request.maxTransfers + '-' + #request.minTransferTimeMinutes + '-' + #request.maxTransferTimeMinutes")
-    public ReachabilityResponse calculateReachability(ReachabilityRequest request) {
-        long startMs = System.currentTimeMillis();
-        SearchKey key = searchKey(request);
-        log.info("Calculating reachability from {} with maxTransfers={}, transfer window={}–{}m",
-                key.startId(), key.maxTransfers(), key.minTransferMins(), key.maxTransferMins());
-
-        int maxJourneyMins = maxJourneyMinutes(request);
-        List<ReachableStation> stations = new ArrayList<>();
-        CompactResult result = cache.getOrCompute(key);
-        result.forEachStation((stopId, paths) -> fewestTransfersWithin(paths, maxJourneyMins)
-                .flatMap(path -> legBuilder.toReachableStation(stopId, result.journey(stopId, path.transfers())))
-                .ifPresent(stations::add));
-
-        Station startStation = transitGraph.getStation(key.startId());
-        long durationMs = System.currentTimeMillis() - startMs;
-        log.info("Found {} reachable stations in {}ms", stations.size(), durationMs);
-        return ReachabilityResponse.builder()
-                .startStationId(key.startId())
-                .startStationName(startStation != null ? startStation.getName() : "Unknown")
-                .maxTransfers(key.maxTransfers())
-                .totalReachableStations(stations.size())
-                .calculationTimeMs(durationMs)
-                .reachableStations(stations)
-                .build();
-    }
-
     /**
-     * The journey to targetId as {@link #calculateReachability} returns it, without building every other station's;
-     * empty if the target is not reachable within the request's limits. The search result is usually stored by the
-     * stream that showed the station.
+     * The journey to targetId with the path the stream sent for it; empty if the target is not reachable within the
+     * request's limits. The search result is usually stored by the stream that showed the station.
      */
     public Optional<ReachableStation> journey(ReachabilityRequest request, String targetId) {
         if (targetId.equals(request.getStartStationId())) return Optional.empty();
@@ -96,13 +64,10 @@ public class ReachabilityService {
         try {
             StreamedStations streamed = new StreamedStations(request, emitter, startMs);
             // A station is sent once, with its first path within the time limit. Rounds add paths by ascending
-            // transfers, so that is the path the response picks too (B4).
+            // transfers, so that is the path its journey shows too (B4).
             streamed.sendNew(cache.getOrCompute(key, streamed));
             log.info("Streamed {} stations in {} ms, the first after {} ms", streamed.sent.size(),
                     System.currentTimeMillis() - startMs, streamed.firstSentMs);
-            // The raw cache now holds the authoritative result; a Caffeine entry may be older
-            cache.evictResponse(key);
-
             emitter.send(SseEmitter.event()
                     .name("done")
                     .data(Map.of(

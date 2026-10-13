@@ -1,7 +1,6 @@
 package com.railreach.service;
 
 import com.railreach.model.JourneyPath;
-import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.IOException;
@@ -132,13 +131,13 @@ final class GtfsTestFixtures {
         return new BinaryCacheStore(tempDir.resolve("gtfs-store.bin").toString());
     }
 
-    /** A ReachabilityService wired like in the app, without warming or a Caffeine cache. */
+    /** A ReachabilityService wired like in the app, without warming. */
     static ReachabilityService reachabilityService(TransitGraph graph) {
         return reachabilityService(graph, reachabilityCache(graph));
     }
 
     static ReachabilityService reachabilityService(TransitGraph graph, ReachabilityCache cache) {
-        ReachabilityService service = new ReachabilityService(graph, cache, new ReachabilityWarmer(cache),
+        ReachabilityService service = new ReachabilityService(cache, new ReachabilityWarmer(cache),
                 new JourneyLegBuilder(graph));
         ReflectionTestUtils.setField(service, "maxTransferTimeMinutes", 180);
         return service;
@@ -161,8 +160,7 @@ final class GtfsTestFixtures {
     }
 
     private static ReachabilityCache reachabilityCache(TransitGraph graph, SearchGate gate, int rawMaxEntries) {
-        return new ReachabilityCache(new CompactReachabilitySearch(graph), gate, new ConcurrentMapCacheManager(),
-                rawMaxEntries);
+        return new ReachabilityCache(new CompactReachabilitySearch(graph), gate, rawMaxEntries);
     }
 
     /** Zips the gtfs-mini feed folder to {@code zipFile}. */

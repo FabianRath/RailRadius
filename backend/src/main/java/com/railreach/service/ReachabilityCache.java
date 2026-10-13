@@ -2,11 +2,8 @@ package com.railreach.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.CacheManager;
-import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -14,26 +11,22 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Raw search results per search, computed on demand. Kept apart from the Caffeine response cache because a stored
- * result also answers every lower transfer count: it holds each station's best path per transfer count.
+ * Raw search results per search, computed on demand. A stored result also answers every lower transfer count: it
+ * holds each station's best path per transfer count.
  */
 @Component
 @Slf4j
 public class ReachabilityCache {
 
-    static final String RESPONSE_CACHE_NAME = "reachability";
-
     private final CompactReachabilitySearch search;
     private final SearchGate gate;
-    private final CacheManager cacheManager;
     // One full-data result holds paths to every reachable station, so the count must stay small
     private final Cache<SearchKey, CompactResult> rawPaths;
 
-    public ReachabilityCache(CompactReachabilitySearch search, SearchGate gate, CacheManager cacheManager,
+    public ReachabilityCache(CompactReachabilitySearch search, SearchGate gate,
                              @Value("${railreach.cache.raw-max-entries:30}") int rawMaxEntries) {
         this.search = search;
         this.gate = gate;
-        this.cacheManager = cacheManager;
         this.rawPaths = Caffeine.newBuilder().maximumSize(rawMaxEntries).build();
     }
 
@@ -43,7 +36,6 @@ public class ReachabilityCache {
             return new SearchKey(startId, transfers, minTransferMins, maxTransferMins);
         }
 
-        /** Same format as the {@code @Cacheable} key of {@code ReachabilityService.calculateReachability}. */
         String label() {
             return startId + "-" + maxTransfers + "-" + minTransferMins + "-" + maxTransferMins;
         }
@@ -122,30 +114,14 @@ public class ReachabilityCache {
                 .findAny();
     }
 
-    /** Drops every stored result and response; they describe a graph that no longer exists. */
+    /** Drops every stored result; they describe a graph that no longer exists. */
     public void clear() {
         rawPaths.invalidateAll();
-        var responseCache = cacheManager.getCache(RESPONSE_CACHE_NAME);
-        if (responseCache != null) responseCache.clear();
-        log.info("Reachability caches cleared");
-    }
-
-    /** Drops the Caffeine response for this search, which may predate the stored raw result. */
-    public void evictResponse(SearchKey key) {
-        var responseCache = cacheManager.getCache(RESPONSE_CACHE_NAME);
-        if (responseCache != null) responseCache.evict(key.label());
+        log.info("Reachability cache cleared");
     }
 
     public Map<String, Object> getStats() {
         Map<String, Object> stats = new LinkedHashMap<>();
-        if (cacheManager.getCache(RESPONSE_CACHE_NAME) instanceof CaffeineCache caffeineCache) {
-            CacheStats caffeineStats = caffeineCache.getNativeCache().stats();
-            stats.put("hitCount", caffeineStats.hitCount());
-            stats.put("missCount", caffeineStats.missCount());
-            stats.put("hitRate", String.format("%.1f%%", caffeineStats.hitRate() * 100));
-            stats.put("evictionCount", caffeineStats.evictionCount());
-            stats.put("estimatedSize", caffeineCache.getNativeCache().estimatedSize());
-        }
         // Applies pending evictions, so the count is exact
         rawPaths.cleanUp();
         stats.put("rawPathCacheEntries", rawPaths.estimatedSize());

@@ -11,9 +11,9 @@ It loads GTFS timetable feeds for ~25 European countries, keeps only **rail** ro
 
 ## Tech stack
 
-- Java 25 (JDK 25 required to build), Spring Boot 4.0.2 (`spring-boot-starter-webmvc`, actuator, cache). Virtual threads are on (`spring.threads.virtual.enabled`): SSE streams run on Spring's task executor (`applicationTaskExecutor`, named explicitly because `@EnableScheduling` adds a task scheduler of the same type).
+- Java 25 (JDK 25 required to build), Spring Boot 4.0.2 (`spring-boot-starter-webmvc`, actuator). Virtual threads are on (`spring.threads.virtual.enabled`): SSE streams run on Spring's task executor (`applicationTaskExecutor`, named explicitly because `@EnableScheduling` adds a task scheduler of the same type).
 - Lombok (`@Data`, `@Builder`, `@Slf4j`, `@RequiredArgsConstructor`)
-- Caffeine for the in-memory response cache
+- Caffeine for the in-memory search result cache (`ReachabilityCache`)
 - GTFS CSV parsing is hand-written (no GTFS library).
 - Jackson 3 (`tools.jackson`, from Spring Boot) for the country borders GeoJSON; the data cache is a hand-written binary file (`BinaryBlocks`)
 - Maven (wrapper `mvnw` / `mvnw.cmd`). Tests use JUnit 5 + AssertJ.
@@ -74,7 +74,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 
 | File | Package | Role |
 |---|---|---|
-| `RailReachBackendApplication` | root | Spring Boot entry point |
+| `RailReachBackendApplication` | root | Spring Boot entry point, `@EnableScheduling` and `@EnableAsync` |
 | `RailReachController` | controller | Public API under `/api` |
 | `AdminController` | controller | Admin/debug API under `/api/admin` |
 | `GtfsDataService` | service | Fills the `TransitGraph` at startup (binary cache file, else the zips) and on `reload-gtfs`: loads the zips into a `RailNetwork`, merges its stations, builds what is served (`RailNetwork.servedData`), writes the binary cache file, fills the graph, rebuilds the station search index and clears the reachability caches. While a load runs, its progress counts come from the network being built |
@@ -109,7 +109,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `CountryLocator` | service | Point → ISO country code, from `borders/europe.geojson` (Natural Earth 1:10m, Europe) |
 | `BinaryCacheStore` | service | Reads/writes what the app serves as one `BinaryBlocks` file (S20): a string table, stations, translated names, each store trip's `TripInfo`, then the `TimetableStore` (each part's `writeTo`/`readFrom`, `regularDeparture` included, only `evTrip` and `nextStationCount` derived again). The header hash is the SHA-256 of the zips it was built from (in file name order), logged on load. A missing file, another `FORMAT_VERSION` or a truncated file is logged and not used. Written to `.part` first, then moved |
 | `BinaryBlocks` | service | The binary cache's file format: magic `RRST`, format version, 32-byte hash, block count, then length-prefixed `byte`/`int`/`long` blocks (element size, length, little-endian elements), read and written through one 1 MB direct buffer via `FileChannel`. The reader checks magic and version before any block |
-| `ReachabilityService` | service | Thin orchestrator: request defaults, POST response (`@Cacheable`), SSE streaming, triggers warming |
+| `ReachabilityService` | service | Thin orchestrator: request defaults, SSE streaming, a station's journey, triggers warming |
 | `CompactResult` | service | A search's result (S19): per station its `PathSummary`s (transfers, minutes) by ascending transfers, the start station with its one empty path. Holds the chosen paths' labels and the rides before them (trip, previous, duration, board/alight stop, transfers, as exact-size arrays) and per station its chosen labels by ascending transfers (CSR over the store's stations). `journey(station, transfers)` builds that path's `JourneyPath` and exact running days from the `TimetableStore` on demand; `withMaxTransfers` gives the result of a search with fewer transfers, a view on the same arrays |
 | `CompactReachabilitySearch` | service | The search (S18): one round per transfer on the `TimetableStore`, with rides as labels; `search` returns a `CompactResult` and hands each round's new path per station to a listener as a `PathSummary`. Keeps one `SearchScratch` per search running at once; a scratch whose search failed with an `Error` (e.g. `OutOfMemoryError`) is dropped, not reused (B38) |
 | `SearchScratch` | service | What a compact search writes, sized for one store and reused by the next search: `LabelArena`, `TripProgressFlat`, `RoundRides`, `StationCandidatesFlat`, `LabelDays`, `CompactTransferRound`, the round's stations, each station's last path duration and the `ChosenPaths` |
@@ -138,14 +138,12 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `JourneyRunningDays` | service | Days on which every train of a returned journey runs (`withRide`, one ride as board and alight event of the `TimetableStore`), and their summary ("Runs Mon–Fri", "Irregular: 2 days in the timetable") |
 | `RegularJourneyChooser` | service | Picks a station's journey among the search's candidates with the same transfer count: the fastest that runs on at least half as many days as the most frequent one (B26) |
 | `SearchSnapshot` | service | Search oracle: every path of a search as one sorted text line, for each start and transfer limit 0–5; `main` dumps a set of `docs/bench-stations.txt` from a binary cache file |
-| `CacheConfig` | config | Caffeine `CacheManager` ("reachability" cache), `@EnableAsync` |
 | `AdminTokenInterceptor` | config | Guards `/api/admin/**`: `X-Admin-Token` must equal `railreach.admin.token` (constant-time); 401 if wrong or missing, 403 for every call when no token is configured; CORS preflights pass |
 | `WebConfig` | config | Registers `AdminTokenInterceptor` on `/api/admin/**` (same path matching as the controllers) |
 | `Station` | model | id, name, latitude, longitude, parentStation, country (ISO code from the coordinates, null if outside every border) |
 | `Connection` | model | One leg of one trip: tripId, routeName, from/to, dep/arr times as **int seconds since midnight** (string getters for display) |
 | `JourneyPath` | model | One found path: stationIds, connections, transfers, totalDurationMinutes. A `CompactResult` builds one when a journey is asked for |
 | `ReachabilityRequest` | dto | startStationId, maxTransfers, maxJourneyTimeHours, min/maxTransferTimeMinutes |
-| `ReachabilityResponse` | dto | Start info, count, calcTime, list of `ReachableStation` |
 | `ReachableStation` | dto | Station (incl. country) + transfers, duration, path ids/names, `legs`, `runningDays` (summary, null without calendar data), `hasCommonDay` (false if the trains share no date: the search's day check is coarse), `roundTripStation` (a station the journey passes twice, else null) |
 | `ReachableStationSummary` | dto | What the stream sends per station: id, name, country, coordinates, transfers, duration; the journey is fetched on click |
 | `GtfsLoadStatus` | dto | `GtfsLoadProgress` snapshot plus live station and edge counts (the edges as `connectionCount`); ETA extrapolated from zip bytes parsed |
@@ -194,7 +192,7 @@ After all feeds are loaded (`StationDeduplicator`, then `RailNetwork.mergeStatio
 `ReachabilityCache.getOrCompute` is the central dispatcher. It is keyed by `SearchKey(start, maxTransfers, minTransfer, maxTransfer)`:
 1. **Raw cache hit** → return the stored result immediately.
 2. **Cut down**: if a result with more transfers (same start and window) is stored, keep only its paths with ≤ N transfers. A round never depends on later rounds, so this equals a search with N.
-3. **Search** (`CompactReachabilitySearch.search`), stored afterwards. It runs inside a `SearchGate` permit, so every search (stream, POST, `/journey` after an eviction, warmer) counts against the same limit. A search beyond `search.gate.permits` (2) waits in a fair queue and checks the stored results again once it has a permit, since an equal search may have finished meanwhile. When `search.gate.max-queued` (6) searches already wait, it is turned away with `SearchGate.BusyException` (HTTP 503; an SSE `error` event on the stream). A full-data 5-transfer search holds about 200 MB while it runs and each permit keeps its scratch, so the permits bound the heap a burst of visitors can take: at 2 permits the full data runs at `-Xmx1280m` (S25, `docs/HOSTING.md`).
+3. **Search** (`CompactReachabilitySearch.search`), stored afterwards. It runs inside a `SearchGate` permit, so every search (stream, `/journey` after an eviction, warmer) counts against the same limit. A search beyond `search.gate.permits` (2) waits in a fair queue and checks the stored results again once it has a permit, since an equal search may have finished meanwhile. When `search.gate.max-queued` (6) searches already wait, it is turned away with `SearchGate.BusyException` (HTTP 503; an SSE `error` event on the stream). A full-data 5-transfer search holds about 200 MB while it runs and each permit keeps its scratch, so the permits bound the heap a burst of visitors can take: at 2 permits the full data runs at `-Xmx1280m` (S25, `docs/HOSTING.md`).
 
 The search has no start time: every trip leaving the start station can begin a journey, and duration counts from its departure. It runs one round per transfer count (like RAPTOR):
 - Round 0 rides every trip from the start station. Round k boards trips from the arrivals of round k−1. Riding a trip forward records each stop as an arrival.
@@ -216,8 +214,7 @@ The wait limit applies to each transfer, so a journey can bridge a longer wait b
 
 **Caching layers:**
 - `ReachabilityCache` (Caffeine, max `cache.raw-max-entries` (30) results) holds raw results (`CompactResult`: per station its paths' transfers and minutes, each path's journey built when asked for). A stored result also answers every lower transfer count. A result holds no strings or objects per path, only the labels of its chosen paths and the rides before them (the `Search stats (compact)` line logs its size).
-- Caffeine `"reachability"` cache holds full `ReachabilityResponse`s from `POST /api/reachability` (max 10k entries, 60 min TTL).
-- **Predictive warming**: after a streaming request with N < `predictive-max-transfers` (5), `ReachabilityWarmer` searches that maximum with the same transfer window on a background thread, into the raw cache only (the stream never reads Caffeine). Every count from N+1 up is then cut down from it. It only searches if a gate permit is free and no search is queued (`SearchGate.runIfFree`), otherwise it skips, so it never delays a visitor.
+- **Predictive warming**: after a streaming request with N < `predictive-max-transfers` (5), `ReachabilityWarmer` searches that maximum with the same transfer window on a background thread, into the raw cache. Every count from N+1 up is then cut down from it. It only searches if a gate permit is free and no search is queued (`SearchGate.runIfFree`), otherwise it skips, so it never delays a visitor.
 
 **Streaming** (`calculateReachabilityStreaming`): a search sends each round's stations as soon as the round ends; a stored result is sent at once. A station is sent once, with its first path within `maxJourneyHours`; paths come by ascending transfers, so that is the path the response picks too (B4), and a later round never changes a sent station. Stations go out as `ReachableStationSummary`s (no path, legs or running days: on the full data those made the stream about 100 MB) in SSE `stations` events in batches of 30, followed by a `done` event (`{total, calculationTimeMs}`), or an `error` event on failure (also when the gate's queue is full, or the search ran out of memory: B38). While the search waits for a gate permit, the stream sends an SSE comment (`:queued`, ignored by `EventSource`) about every second. A failed send means the client is gone: the search stops at the next round's send (or while queued), stores nothing and frees its permit.
 
@@ -252,7 +249,6 @@ What the search must keep, so a rewrite gives the same result as `SearchSnapshot
 |---|---|---|
 | GET | `/reachability/stream?stationId=&maxTransfers=&minTransferMinutes=0&maxTransferMinutes=180&maxJourneyHours=` | SSE; used by the frontend |
 | GET | `/reachability/journey?stationId=&maxTransfers=&minTransferMinutes=0&maxTransferMinutes=180&maxJourneyHours=&targetId=` | One station's `ReachableStation` (path, legs, running days) for the stream's parameters, built from the stored search result (searched again if it was evicted); 404 if the target is not reachable within them. The frontend calls it when a station is clicked |
-| POST | `/reachability` | JSON `ReachabilityRequest` → `ReachabilityResponse` (Caffeine-cached) |
 | GET | `/stations/search?q=&limit=50` | Case- and accent-insensitive substring match on any variant of the station name or of its `translations.txt` names (`StationNameVariants`; names are still returned in the local language); only stations with edges, sorted by degree. Candidates come from the rarest trigram of the query (`StationSearchIndex`); queries under 3 characters scan in degree order and stop at `limit`. Each result: id, name, latitude, longitude, country |
 | GET | `/stations/{id}` | Single station |
 | GET | `/stats` | stations / graphNodes / totalEdges |
@@ -261,8 +257,8 @@ What the search must keep, so a rewrite gives the same result as `SearchSnapshot
 **Admin (`/api/admin`)**: every call needs the header `X-Admin-Token: <railreach.admin.token>` (see `AdminTokenInterceptor`). `scripts/api.sh` sends `RAILREACH_ADMIN_TOKEN` (default `dev`). In the browser, the "Dev login" at the bottom of the side panel (`js/dev-auth.js`) checks the token against `/debug/status`, keeps it in `localStorage` and only then starts the debug polling and shows the "Admin panel" button. That opens a `<dialog>` (`js/admin-panel.js`) with two tabs. Below the title, a label shows the disk space of the zips in use and of the replaced ones in `previous/` (`/feeds/storage`, refreshed when the panel opens and whenever the Feeds tab reloads its list). "Tools" has buttons for the stats, debug-trigger, reload and cache-delete endpoints below; it prints the raw JSON response and asks for confirmation before reload and delete. "Feeds" (`js/feeds.js`) widens the panel to nearly the whole window and lists every zip and missing feed from `/feeds`: last service day (first day as a tooltip), days left, state with the early-ending main operators below it, size, download date, source host, and a download button for feeds in `gtfs-feeds.txt` ("manual" otherwise). "Download outdated" (missing, expired and expiring feeds) and "Download all" call `/feeds/{source}/download` for one feed after another, so each row shows its progress and the result of its last download. During a reload it shows a progress bar with phase, feeds, % parsed, elapsed time, ETA and graph size.
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/cache-stats` | Caffeine stats, warming jobs, rawPathCache keys |
-| POST | `/reload-gtfs` | Full reparse of the zips (minutes), rewrite of the binary cache, clears the raw and response reachability caches |
+| GET | `/cache-stats` | Warming jobs, rawPathCache size and keys |
+| POST | `/reload-gtfs` | Full reparse of the zips (minutes), rewrite of the binary cache, clears the raw reachability cache |
 | DELETE | `/gtfs-cache` | Deletes the binary cache file |
 | GET | `/gtfs-stats` | Binary cache file and data counts |
 | GET | `/feeds` | `FeedStatus` of every zip in the GTFS directory and of every expected feed without one, sorted by state (missing, expired, not yet valid, no calendar, unreadable, expiring, OK), then by days left, then by file name |
@@ -278,7 +274,7 @@ What the search must keep, so a rewrite gives the same result as `SearchSnapshot
 
 - `gtfs.directory` (`./data/gtfs`, env `GTFS_DIRECTORY`), `gtfs.auto-load-from-files` (false: a start without the binary cache starts empty), `gtfs.store-file` (`data/gtfs-store.bin`; the binary cache, S20)
 - `feeds.expiring-days` (30): feeds that end, or whose first early-ending main operator stops, within this many days are `EXPIRING`; `feeds.check-interval` (`PT24H`): how often the missing/expired/expiring feeds are logged; `feeds.sources` (empty = every feed in `gtfs-feeds.txt`): comma-separated feeds expected in the GTFS directory, listed as `MISSING` without a zip; `feeds.auth.<source>` (no default, never in git): credentials that `gtfs-feeds.txt` headers refer to, e.g. `feeds.auth.hungary` = base64 of `user:password` for MÁV's Basic auth. Set it in `backend/config/application.yml` (gitignored; Spring Boot reads `config/` in the working directory on top of the bundled file) or as env var `RAILREACH_FEEDS_AUTH_HUNGARY`
-- `algorithm.max-transfer-time-minutes` (180), `algorithm.cache-size` (10000), `algorithm.cache-ttl-minutes` (60)
+- `algorithm.max-transfer-time-minutes` (180)
 - `cache.predictive-enabled` (true), `cache.predictive-max-transfers` (5), `cache.raw-max-entries` (30)
 - `search.gate.permits` (2): searches that run at once; `search.gate.max-queued` (6): searches that may wait for a permit before the next one is turned away
 - `admin.token` (empty, env `RAILREACH_ADMIN_TOKEN`): shared secret for the admin API; empty disables it

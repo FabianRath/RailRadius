@@ -2,7 +2,6 @@ package com.railreach.service;
 
 import com.railreach.dto.JourneyLeg;
 import com.railreach.dto.ReachabilityRequest;
-import com.railreach.dto.ReachabilityResponse;
 import com.railreach.dto.ReachableStation;
 import com.railreach.dto.ReachableStationSummary;
 import com.railreach.service.ReachabilityCache.SearchKey;
@@ -40,12 +39,12 @@ class ReachabilityServiceTest {
 
     @Test
     void zeroTransfersOnlyReachesStationsOnDirectTrips() {
-        ReachabilityResponse response = query(gtfs, "alpha:A1", 0, 0, 180);
+        Search search = query(gtfs, "alpha:A1", 0, 0, 180);
 
-        assertThat(find(response, "alpha:A2")).isPresent();
-        assertThat(find(response, "beta:B1")).get()
+        assertThat(find(search, "alpha:A2")).isPresent();
+        assertThat(find(search, "beta:B1")).get()
                 .extracting(ReachableStation::getTransfers).isEqualTo(0);
-        assertThat(find(response, "beta:B2")).isEmpty();
+        assertThat(find(search, "beta:B2")).isEmpty();
     }
 
     @Test
@@ -146,11 +145,11 @@ class ReachabilityServiceTest {
     // minimum wait rules out V2 (10:30) → W1 (21.5 h) but not V2 → W2 at 09:00 (22.5 h).
     @Test
     void trainLeavingLessThanAnHourBeforeTheArrivalIsNotCaughtTheNextDay(@TempDir Path dir) throws Exception {
-        ReachabilityResponse response = query(GtfsTestFixtures.load(dir, "gamma", "delta"), "gamma:G3", 1,
+        Search search = query(GtfsTestFixtures.load(dir, "gamma", "delta"), "gamma:G3", 1,
                 LONGEST_MIN_WAIT_MINUTES, A_DAY_MINUTES);
 
-        assertThat(find(response, "delta:D3")).isPresent();
-        assertThat(find(response, "delta:D2")).isEmpty();
+        assertThat(find(search, "delta:D3")).isPresent();
+        assertThat(find(search, "delta:D2")).isEmpty();
     }
 
     // B2: the faster T6 evening train must not hide the T1 -> U1 connection
@@ -185,10 +184,9 @@ class ReachabilityServiceTest {
                 .minTransferTimeMinutes(0)
                 .maxTransferTimeMinutes(99999);
 
-        ReachableStation anyTime = find(service.calculateReachability(unlimitedWait.build()), "epsilon:E6")
+        ReachableStation anyTime = service.journey(unlimitedWait.build(), "epsilon:E6").orElseThrow();
+        ReachableStation withinTwoHours = service.journey(unlimitedWait.maxJourneyTimeHours(2.0).build(), "epsilon:E6")
                 .orElseThrow();
-        ReachableStation withinTwoHours = find(service.calculateReachability(
-                unlimitedWait.maxJourneyTimeHours(2.0).build()), "epsilon:E6").orElseThrow();
 
         assertThat(anyTime.getTransfers()).isEqualTo(1);
         assertThat(anyTime.getTotalDurationMinutes()).isEqualTo(750); // X1, wait until 22:00, X4
@@ -199,12 +197,12 @@ class ReachabilityServiceTest {
     // B25: the faster weekend ZT7 is the best arrival at the hub, but the weekday ZT3 can only be reached from ZT1
     @Test
     void transferOnlyBoardsATrainThatRunsOnADayTheArrivingTrainRuns(@TempDir Path dir) throws Exception {
-        ReachabilityResponse response = query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 1, 0, 180);
+        Search search = query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 1, 0, 180);
 
-        ReachableStation weekday = find(response, "zeta:Z4").orElseThrow();
+        ReachableStation weekday = find(search, "zeta:Z4").orElseThrow();
         assertThat(weekday.getTotalDurationMinutes()).isEqualTo(120); // ZT1 08:00, ZT3 09:30, not 90 via ZT7
         assertThat(weekday.getLegs().getFirst().getDepartureTime()).isEqualTo("08:00:00");
-        assertThat(find(response, "zeta:Z3")).get()
+        assertThat(find(search, "zeta:Z3")).get()
                 .extracting(ReachableStation::getTotalDurationMinutes).isEqualTo(90); // ZT7 08:30, ZT2 09:30
     }
 
@@ -212,9 +210,9 @@ class ReachabilityServiceTest {
     // by weekday and 6-week period, where they meet, so the journey is found but shows that no date fits.
     @Test
     void trainsOnlyRunningOnDaysRemovedFromTheOtherConnectWithAWarning(@TempDir Path dir) throws Exception {
-        ReachabilityResponse response = query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 2, 0, 180);
+        Search search = query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 2, 0, 180);
 
-        ReachableStation holiday = find(response, "zeta:Z6").orElseThrow();
+        ReachableStation holiday = find(search, "zeta:Z6").orElseThrow();
         assertThat(holiday.getHasCommonDay()).isFalse();
         assertThat(holiday.getRunningDays()).isNull();
     }
@@ -230,12 +228,12 @@ class ReachabilityServiceTest {
 
     @Test
     void journeyShowsTheDaysOnWhichAllItsTrainsRun(@TempDir Path dir) throws Exception {
-        ReachabilityResponse response = query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 1, 0, 180);
+        Search search = query(GtfsTestFixtures.load(dir, "zeta"), "zeta:Z1", 1, 0, 180);
 
-        assertThat(find(response, "zeta:Z4")).get().extracting(ReachableStation::getRunningDays)
+        assertThat(find(search, "zeta:Z4")).get().extracting(ReachableStation::getRunningDays)
                 .isEqualTo("Runs Mon–Fri");
         // Counted from the Friday train; the Saturday one after midnight is a day later
-        assertThat(find(response, "zeta:Z5")).get().extracting(ReachableStation::getRunningDays)
+        assertThat(find(search, "zeta:Z5")).get().extracting(ReachableStation::getRunningDays)
                 .isEqualTo("Runs Fri");
     }
 
@@ -251,22 +249,22 @@ class ReachabilityServiceTest {
     // B33: HT13 is loaded with the regular HT12, but leaves H7 at a time that runs on 2 days only
     @Test
     void rideEndsWhereItsTripLeavesAtATimeThatRunsOnFewDays(@TempDir Path dir) throws Exception {
-        ReachabilityResponse response = query(GtfsTestFixtures.load(dir, "eta"), "eta:H1", 0, 0, 180);
+        Search search = query(GtfsTestFixtures.load(dir, "eta"), "eta:H1", 0, 0, 180);
 
-        assertThat(find(response, "eta:H7")).isPresent();
-        assertThat(find(response, "eta:H8")).isEmpty();
+        assertThat(find(search, "eta:H7")).isPresent();
+        assertThat(find(search, "eta:H8")).isEmpty();
     }
 
     // B31: on Sat 2026-03-28 only that weekend is left of zeta's services, which end on Sun 2026-03-29
     @Test
     void journeyCountsOnlyItsDaysFromToday(@TempDir Path dir) throws Exception {
         TransitGraph graph = GtfsTestFixtures.load(dir, LocalDate.of(2026, 3, 28), "zeta");
-        ReachabilityResponse response = query(graph, "zeta:Z1", 1, 0, 180);
+        Search search = query(graph, "zeta:Z1", 1, 0, 180);
 
-        assertThat(find(response, "zeta:Z9")).get().extracting(ReachableStation::getRunningDays)
+        assertThat(find(search, "zeta:Z9")).get().extracting(ReachableStation::getRunningDays)
                 .isEqualTo("Irregular: 2 days in the timetable");
         // ZT1 → ZT3 runs on weekdays only, and none is left
-        assertThat(find(response, "zeta:Z4")).isEmpty();
+        assertThat(find(search, "zeta:Z4")).isEmpty();
     }
 
     // B31: zeta's last service day is 2026-03-29
@@ -393,8 +391,9 @@ class ReachabilityServiceTest {
 
     // B4 while streaming by round: E6 is first reached in round 1, but only round 2 brings it within the time limit
     @Test
-    void streamWithATimeLimitSendsTheSameStationsAsTheResponse(@TempDir Path dir) throws Exception {
-        ReachabilityService service = service(GtfsTestFixtures.load(dir, "epsilon"));
+    void streamWithATimeLimitSendsTheStationsThatHaveAJourney(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, "epsilon");
+        ReachabilityService service = service(graph);
         ReachabilityRequest request = ReachabilityRequest.builder()
                 .startStationId("epsilon:E1")
                 .maxTransfers(2)
@@ -405,8 +404,8 @@ class ReachabilityServiceTest {
 
         RecordingEmitter emitter = new RecordingEmitter();
         service.calculateReachabilityStreaming(request, emitter);
-        List<ReachableStation> expected = service.calculateReachability(request).getReachableStations().stream()
-                .filter(station -> !station.getStopId().equals("epsilon:E1"))
+        List<ReachableStation> expected = graph.getAllStations().keySet().stream()
+                .flatMap(stopId -> service.journey(request, stopId).stream())
                 .toList();
 
         assertThat(emitter.streamedStations())
@@ -464,22 +463,6 @@ class ReachabilityServiceTest {
         service.calculateReachabilityStreaming(streamRequest("alpha:A1", 3), next);
         assertThat(next.error).isNull();
         assertThat(next.done().get("total")).isEqualTo(next.streamedStopIds().size());
-    }
-
-    @Test
-    void journeyOfAStationIsItsStationInTheResponse() {
-        ReachabilityService service = service(gtfs);
-        ReachabilityRequest request = ReachabilityRequest.builder()
-                .startStationId("alpha:A1")
-                .maxTransfers(1)
-                .minTransferTimeMinutes(0)
-                .maxTransferTimeMinutes(180)
-                .build();
-
-        ReachableStation journey = service.journey(request, "beta:B2").orElseThrow();
-
-        assertThat(journey).usingRecursiveComparison()
-                .isEqualTo(find(service.calculateReachability(request), "beta:B2").orElseThrow());
     }
 
     @Test
@@ -580,9 +563,10 @@ class ReachabilityServiceTest {
         return GtfsTestFixtures.reachabilityService(graph);
     }
 
-    private ReachabilityResponse query(TransitGraph data, String start, int maxTransfers,
-                                              int minTransferMins, int maxTransferMins) {
-        return service(data).calculateReachability(ReachabilityRequest.builder()
+    private record Search(ReachabilityService service, ReachabilityRequest request) {}
+
+    private Search query(TransitGraph data, String start, int maxTransfers, int minTransferMins, int maxTransferMins) {
+        return new Search(service(data), ReachabilityRequest.builder()
                 .startStationId(start)
                 .maxTransfers(maxTransfers)
                 .minTransferTimeMinutes(minTransferMins)
@@ -590,9 +574,7 @@ class ReachabilityServiceTest {
                 .build());
     }
 
-    private static Optional<ReachableStation> find(ReachabilityResponse response, String stopId) {
-        return response.getReachableStations().stream()
-                .filter(s -> s.getStopId().equals(stopId))
-                .findFirst();
+    private static Optional<ReachableStation> find(Search search, String stopId) {
+        return search.service().journey(search.request(), stopId);
     }
 }
