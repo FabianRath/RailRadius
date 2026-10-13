@@ -130,6 +130,27 @@
         <button type="button" class="sidebar-show" id="sidebarShow"
                 aria-label="Show panel" aria-controls="sidebar" aria-expanded="true"><span data-icon="menu"></span> RailReach</button>
 
+        <!-- Hidden until about.js moves it into the map's controls, so it doesn't flash while the map loads -->
+        <button type="button" class="about-open" id="aboutOpen" aria-label="About the data"
+                aria-haspopup="dialog" hidden><span data-icon="info"></span></button>
+
+        <dialog class="about-panel" id="aboutPanel" aria-labelledby="aboutTitle">
+            <div class="about-header">
+                <h2 class="about-title" id="aboutTitle">About the data</h2>
+                <button type="button" class="admin-close" id="aboutClose" aria-label="Close">×</button>
+            </div>
+            <p class="about-text">
+                RailReach only shows rail connections in the countries listed below, built from the operators' public
+                GTFS timetables. Trains outside these countries, or missing from the data, are not shown.
+            </p>
+            <p class="about-text">
+                Timetables change and the data can be incomplete or out of date, so I can't guarantee that a
+                displayed connection exists or runs as shown. Please check with the rail operator before you travel.
+            </p>
+            <div class="section-title">Covered countries</div>
+            <ul class="about-countries" id="aboutCountries"></ul>
+        </dialog>
+
         <div id="loadingOverlay">
             <div class="loading-pulse"></div>
             <div class="loading-text">Calculating…</div>

@@ -10,6 +10,7 @@ import { initDevAuth } from './dev-auth.js';
 import { hideAdminPanel, initAdminPanel, showAdminEntry } from './admin-panel.js';
 import { showStatus } from './util.js';
 import { renderStaticIcons } from './icons.js';
+import { initAbout } from './about.js';
 
 const COVERAGE_REDRAW_DEBOUNCE_MS = 300;
 
@@ -25,6 +26,7 @@ fetchHealth()
 renderStaticIcons();
 initSidebarToggle();
 await initMap('map');
+initAbout();
 initStationDetails();
 onPointClick(LAYERS.reachable, async ({ stopId }) => {
     try {

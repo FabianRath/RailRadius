@@ -1,8 +1,10 @@
 package com.railreach.controller;
 
+import com.railreach.dto.Coverage;
 import com.railreach.dto.ReachabilityRequest;
 import com.railreach.dto.ReachableStation;
 import com.railreach.model.Station;
+import com.railreach.service.CoverageService;
 import com.railreach.service.ReachabilityService;
 import com.railreach.service.StationSearchIndex;
 import com.railreach.service.TransitGraph;
@@ -32,15 +34,17 @@ public class RailReachController {
     private final ReachabilityService reachabilityService;
     private final TransitGraph transitGraph;
     private final StationSearchIndex stationSearchIndex;
+    private final CoverageService coverageService;
     private final AsyncTaskExecutor taskExecutor;
 
     // With @EnableScheduling the task scheduler is an AsyncTaskExecutor too; SSE streams use the task executor
     public RailReachController(ReachabilityService reachabilityService, TransitGraph transitGraph,
-                               StationSearchIndex stationSearchIndex,
+                               StationSearchIndex stationSearchIndex, CoverageService coverageService,
                                @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor) {
         this.reachabilityService = reachabilityService;
         this.transitGraph = transitGraph;
         this.stationSearchIndex = stationSearchIndex;
+        this.coverageService = coverageService;
         this.taskExecutor = taskExecutor;
     }
     
@@ -138,6 +142,11 @@ public class RailReachController {
         return ResponseEntity.ok(transitGraph.getStats());
     }
     
+    @GetMapping("/coverage")
+    public Coverage coverage() {
+        return coverageService.coverage();
+    }
+
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> health() {
         return ResponseEntity.ok(Map.of(

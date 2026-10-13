@@ -42,6 +42,25 @@ export function cssVar(name) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+/**
+ * A backdrop click targets the dialog itself. Checking where the press started keeps a text selection dragged out
+ * of the dialog from closing it.
+ */
+export function closeOnBackdropClick(dialog) {
+    let pressStartedOutside = false;
+    dialog.addEventListener('pointerdown', event => { pressStartedOutside = isOutsideDialog(dialog, event); });
+    dialog.addEventListener('click', event => {
+        if (pressStartedOutside && isOutsideDialog(dialog, event)) dialog.close();
+    });
+}
+
+function isOutsideDialog(dialog, event) {
+    if (event.target !== dialog) return false;
+    const rect = dialog.getBoundingClientRect();
+    return event.clientX < rect.left || event.clientX > rect.right
+        || event.clientY < rect.top || event.clientY > rect.bottom;
+}
+
 const STATUS_LOGGERS = { error: console.error, warning: console.warn, info: console.log };
 
 /** type is 'info', 'warning' or 'error'; the message replaces the previous one in the sidebar. */
