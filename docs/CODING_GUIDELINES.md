@@ -7,7 +7,7 @@ Binding for every change. Existing code does not always follow them yet. New and
 |---|---|---|
 | Backend | Java 25, Spring Boot (webmvc, actuator), Lombok, Caffeine, Jackson, SLF4J via `@Slf4j` | Guava, Apache Commons, Gson, a second cache/JSON/logging lib |
 | Tests | JUnit 5, AssertJ, `gtfs-mini` fixture | Mockito (unless there is truly no real object), Hamcrest, Spring context in unit tests |
-| Frontend | Vanilla JS (native ES modules), MapLibre GL JS 6, Turf 6, from CDN; OpenFreeMap tiles | Frameworks, jQuery, Leaflet, npm/build step, map tiles that need a key or forbid commercial use |
+| Frontend | Vanilla JS (native ES modules), MapLibre GL JS 6, Turf 6, copied into `frontend/vendor/`; OpenFreeMap tiles | Frameworks, jQuery, Leaflet, npm/build step, scripts/styles/fonts from a CDN, map tiles that need a key or forbid commercial use |
 
 - Adding a dependency: **ask first**, then add a line in `decisions.md`. Try the JDK, Spring, and the existing deps first.
 
