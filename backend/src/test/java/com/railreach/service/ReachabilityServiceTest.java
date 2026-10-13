@@ -432,7 +432,7 @@ class ReachabilityServiceTest {
     }
 
     @Test
-    void streamIsTurnedAwayWhenTheSearchQueueIsFull() throws Exception {
+    void streamTurnedAwayWhenTheSearchQueueIsFullEndsWithAnErrorEvent() throws Exception {
         SearchGate gate = new SearchGate(1, 0);
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs,
                 GtfsTestFixtures.reachabilityCache(gtfs, gate));
@@ -442,7 +442,10 @@ class ReachabilityServiceTest {
             service.calculateReachabilityStreaming(streamRequest("alpha:A1", 1), emitter);
         }
 
-        assertThat(emitter.error).isInstanceOf(SearchGate.BusyException.class);
+        // completeWithError would hand the exception to Spring after the response is committed and log it (B39)
+        assertThat(emitter.texts).anyMatch(text -> text.contains("event:error"));
+        assertThat(emitter.completed).isTrue();
+        assertThat(emitter.error).isNull();
         assertThat(emitter.streamedStations()).isEmpty();
     }
 
@@ -455,7 +458,8 @@ class ReachabilityServiceTest {
         service.calculateReachabilityStreaming(streamRequest("alpha:A1", 3), emitter);
 
         assertThat(emitter.texts).anyMatch(text -> text.contains("event:error"));
-        assertThat(emitter.error).isInstanceOf(OutOfMemoryError.class);
+        assertThat(emitter.completed).isTrue();
+        assertThat(emitter.error).isNull();
         RecordingEmitter next = new RecordingEmitter();
         service.calculateReachabilityStreaming(streamRequest("alpha:A1", 3), next);
         assertThat(next.error).isNull();
@@ -492,16 +496,23 @@ class ReachabilityServiceTest {
         assertThat(service.journey(request, "alpha:A1")).isEmpty();
     }
 
-    /** Captures the data objects of every sent SSE event instead of writing them to a response. */
+    /** Captures every sent SSE event and how the stream ended instead of writing them to a response. */
     private static class RecordingEmitter extends SseEmitter {
         final List<Object> payloads = new ArrayList<>();
+        final List<String> texts = new ArrayList<>();
+        boolean completed;
         Throwable error;
 
         @Override
         public void send(SseEventBuilder event) {
-            event.build().stream().map(DataWithMediaType::getData)
-                    .filter(data -> !(data instanceof String))
-                    .forEach(payloads::add);
+            List<Object> data = event.build().stream().map(DataWithMediaType::getData).toList();
+            data.stream().filter(item -> !(item instanceof String)).forEach(payloads::add);
+            texts.add(text(data));
+        }
+
+        @Override
+        public void complete() {
+            completed = true;
         }
 
         @Override
@@ -530,16 +541,19 @@ class ReachabilityServiceTest {
 
     /** Sending the first stations throws OutOfMemoryError, as an allocation of the search would. */
     private static class OutOfMemoryEmitter extends RecordingEmitter {
-        final List<String> texts = new ArrayList<>();
-
         @Override
         public void send(SseEventBuilder event) {
-            String text = event.build().stream().map(DataWithMediaType::getData)
-                    .filter(String.class::isInstance).map(String.class::cast)
-                    .collect(Collectors.joining());
-            if (text.contains("event:stations")) throw new OutOfMemoryError("Java heap space");
-            texts.add(text);
+            if (text(event.build().stream().map(DataWithMediaType::getData).toList()).contains("event:stations")) {
+                throw new OutOfMemoryError("Java heap space");
+            }
+            super.send(event);
         }
+    }
+
+    // The SSE framing of an event: its name, id and comment lines, without the data objects
+    private static String text(List<Object> eventData) {
+        return eventData.stream().filter(String.class::isInstance).map(String.class::cast)
+                .collect(Collectors.joining());
     }
 
     /** A client that closed the page: every send fails. */
