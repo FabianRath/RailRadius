@@ -13,9 +13,11 @@ How much server RailReach needs, measured on the full data. Re-measure when the 
 
 ## Size
 
-- **16 GB RAM, run with `-Xmx9g -XX:+UseCompactObjectHeaders`.** The process then uses ~10 GB, which leaves room for the OS. 32 GB is only needed for many searches at the same time.
-- CPU: one 5-transfer search keeps a core busy for ~3–15 s. 8 shared vCores are fine for a small audience.
-- Candidate (2026-10-08): netcup VPS Lite 3 (8 vCores, 16 GB, 320 GB SSD, €16.66/month incl. VAT, cancellable monthly). Hetzner's cheap cloud lines (CX, CAX) were sold out and its 32 GB plans had become much more expensive after 2026 DRAM price increases. Hetzner's Server Auction was the alternative for dedicated hardware.
+- **4 vCores and 8 GB RAM, run with `-Xmx1280m -XX:+UseCompactObjectHeaders`** and the default gate (2 searches at once, 6 queued). The process peaks at ~1.5 GB working set, so 8 GB leaves room for the OS and for raising heap or permits later. Measured in S25 below.
+- RAM: 4 GB would fit too. Below `-Xmx1g` it gets tight: `-Xmx768m` still answers everything but with constant full GCs, and at `-Xmx640m` searches fail with the `error` event.
+- CPU: a 5-transfer search is partly parallel. Capped at 4 processors its p50 is ~2.0 s (12: ~1.5 s, 2: ~3.0 s) on the dev machine. Shared vCores are slower than its cores, so judge S24's targets on the server.
+- More permits don't help: 4 permits need ~1.5 GB heap and a burst of 8 large searches finished no sooner.
+- Candidate (2026-10-13): netcup VPS Lite 2 G12.5s (4 vCores, 8 GB, 160 GB SSD, €9.50/month incl. VAT, 3-month term). Budget option: VPS Lite 1 G12.5s (2 vCores, 4 GB, 80 GB, €5.86/month, 6-month term), with ~1.5× slower searches. Before S25 the candidate was VPS Lite 3 (8 vCores, 16 GB, €16.66/month) for the legacy engine's `-Xmx9g`.
 
 ## Measurements (2026-10-08)
 
@@ -31,7 +33,7 @@ Full data: 49 feeds, 34,081 stations, cache 649 MB. Windows 10 dev machine, 12 c
 | same, `-Xmx5g` | OutOfMemoryError |
 | same, `-Xmx4g` | OutOfMemoryError, app stuck in GC |
 
-Rule of thumb: ~3 GB for the data (~1.7 GB since S16) plus ~1 GB per 5-transfer search running at the same time. Since S15 the search gate runs at most `search.gate.permits` (2) searches at once and queues up to 6 more, so peak heap is about the data plus 2 GB plus the result cache.
+Rule of thumb for the legacy engine (S25 replaces it): ~3 GB for the data (~1.7 GB since S16) plus ~1 GB per 5-transfer search running at the same time. Since S15 the search gate runs at most `search.gate.permits` (2) searches at once and queues up to 6 more, so peak heap is about the data plus 2 GB plus the result cache.
 
 ## Search gate test (S15, 2026-10-09)
 
@@ -45,6 +47,28 @@ Full data, `-Xmx9g`, G1, warmer on, gate at 2 permits and 6 queued. 5 clients at
 | Closed client | Its stream stopped 1 s after the client left; nothing stored |
 | Live heap after the run (`bench.sh memory`) | 3,243 MB, with 22 stored results in the raw cache |
 | Peak working set | 9.5 GB: G1 grows the heap towards `-Xmx` |
+
+## Server size (S25, 2026-10-13)
+Full data (fresh-parse store), compact object headers, port 8081, set up like the server: `gtfs.directory` an empty folder (no zips), admin token unset, warmer on unless noted. Each line a fresh app. "Burst" = 8 large 5-transfer streams at once (Stockholm, Bruxelles-Midi, København, Roma, München, Basel, Wien, Paris), then "load" = S15's 5 clients × 6 searches over the 20 full starts, 4 and 5 transfers alternating. Full GCs exclude the ones `bench.sh memory` forces.
+
+| Heap, permits | Outcome | Full GCs | Live heap afterwards | Peak working set |
+|---|---|---|---|---|
+| `-Xmx640m`, 2 | Burst: 5 of 8 got the `error` event (out of memory); load: 10 of 30 | 683 | 485 MB | 819 MB |
+| `-Xmx768m`, 2 | All `done` | 32 | 715 MB | 958 MB |
+| `-Xmx1g`, 2 | All `done`, last burst stream after 12.6 s | 1 | 715 MB | 1,204 MB |
+| **`-Xmx1280m`, 2** | All `done`, last burst stream after 11.0 s | **0** | 724 MB | 1,467 MB |
+| `-Xmx1280m`, 4 | All `done`, last after 11.2 s | 8 | 1,044 MB | 1,465 MB |
+| `-Xmx1536m`, 4 | All `done`, last after 10.2 s | 0 | 1,062 MB | 1,715 MB |
+
+Idle live heap 279 MB. Each permit keeps its ~160–180 MB scratch, and stored results are ~1.3–1.8 MB, so with 2 permits the heap settles at ~720 MB. A 9th and 10th stream during the burst were turned away as busy.
+
+CPU (`-Xmx1280m`, warmer off, `-XX:ActiveProcessorCount` set, `bench.sh times full` once each, ms; same machine-speed caveat as S24):
+
+| Processors | 3 transfers p50 / p95 | 4 transfers p50 / p95 | 5 transfers p50 / p95 | Burst of 8, last `done` |
+|---|---|---|---|---|
+| 2 | 770 / 1,687 | 1,821 / 3,390 | 2,987 / 5,178 | 16.2 s |
+| 4 | 574 / 1,084 | 1,274 / 2,375 | 2,010 / 3,444 | 12.9 s |
+| 12 | 462 / 867 | 1,018 / 1,642 | 1,479 / 2,456 | 9.2 s |
 
 ## Minutes as chars, boardings released once ridden (S23 done, 2026-10-13)
 Full data (fresh-parse store), `-Xmx3g`, compact object headers, warmer off, port 8081, both builds run from their classes on a fresh app, alternating (HEAD = the growth step below). Results are byte-identical to the goldens (`SearchSnapshot`, gtfs-mini, dev and full).
