@@ -21,7 +21,7 @@ final class LabelArena {
 
     private int[] trip = new int[INITIAL_CAPACITY];
     private int[] previous = new int[INITIAL_CAPACITY];
-    private int[] durationMinutes = new int[INITIAL_CAPACITY];
+    private char[] durationMinutes = new char[INITIAL_CAPACITY];
     private short[] boardIdx = new short[INITIAL_CAPACITY];
     private short[] alightIdx = new short[INITIAL_CAPACITY];
     private long[] weekPeriodDays = new long[INITIAL_CAPACITY];
@@ -58,7 +58,7 @@ final class LabelArena {
         if (alight > Short.MAX_VALUE) throw new IllegalStateException("Trip " + tripIndex + " has too many stops");
         trip[label] = tripIndex;
         previous[label] = previousLabel;
-        durationMinutes[label] = minutes;
+        durationMinutes[label] = PackedMinutes.of(minutes);
         boardIdx[label] = (short) board;
         alightIdx[label] = (short) alight;
         weekPeriodDays[label] = days;
@@ -158,13 +158,13 @@ final class LabelArena {
             if (previous[label] != NONE) transfers[label] = (byte) (transfers[previous[label]] + 1);
         }
         return new CompactResult.Labels(Arrays.copyOf(trip, size), Arrays.copyOf(previous, size),
-                Arrays.copyOf(durationMinutes, size), Arrays.copyOf(boardIdx, size), Arrays.copyOf(alightIdx, size),
+                intColumn(durationMinutes, size), Arrays.copyOf(boardIdx, size), Arrays.copyOf(alightIdx, size),
                 transfers);
     }
 
     /** Bytes of the arrays, for the search's log. */
     long sizeBytes() {
-        return (long) trip.length * (4 * Integer.BYTES + 2 * Short.BYTES + Long.BYTES)
+        return (long) trip.length * (3 * Integer.BYTES + Character.BYTES + 2 * Short.BYTES + Long.BYTES)
                 + (long) kept.length * (Long.BYTES + Integer.BYTES);
     }
 
@@ -177,6 +177,14 @@ final class LabelArena {
         alightIdx[to] = alightIdx[label];
         weekPeriodDays[to] = weekPeriodDays[label];
         daysMemo[to] = daysMemo[label];
+    }
+
+    private static int[] intColumn(char[] column, int length) {
+        int[] ints = new int[length];
+        for (int i = 0; i < length; i++) {
+            ints[i] = column[i];
+        }
+        return ints;
     }
 
     private static int wordCount(int labelCount) {

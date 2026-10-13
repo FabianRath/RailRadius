@@ -46,6 +46,26 @@ Full data, `-Xmx9g`, G1, warmer on, gate at 2 permits and 6 queued. 5 clients at
 | Live heap after the run (`bench.sh memory`) | 3,243 MB, with 22 stored results in the raw cache |
 | Peak working set | 9.5 GB: G1 grows the heap towards `-Xmx` |
 
+## Minutes as chars, boardings released once ridden (S23 done, 2026-10-13)
+Full data (fresh-parse store), `-Xmx3g`, compact object headers, warmer off, port 8081, both builds run from their classes on a fresh app, alternating (HEAD = the growth step below). Results are byte-identical to the goldens (`SearchSnapshot`, gtfs-mini, dev and full).
+
+| Measure | How | Result |
+|---|---|---|
+| Scratch per search | the `Search stats (compact)` line, Stockholm 5 transfers | **171 MB** (HEAD: 183 MB), labels 32.8 MB (35.3) |
+| Held during a search | `bench.sh held`'s method, sampled every 0.3 s, Stockholm, fresh app | **193, 194, 192 MiB** (HEAD: 223, 207 MiB). Target ≤ 200 MiB met. Without releasing ridden boardings: 193, 200, 197 MiB; with char minutes in the scratch only: 203, 206 MiB |
+| Trip progress slots, Stockholm 5 transfers | temporary counters | 2.93 M allocated, 2.57 M ever recorded. Allocating from a trip's first boarded stop would need 6.47 M (334 k trips boarded earlier in a later round get a new block), so it was not done |
+
+Search time (`bench.sh times full`, two runs each, ms):
+
+| Transfers | p50 new | p50 HEAD | p95 new | p95 HEAD |
+|---|---|---|---|---|
+| 0 | 6, 7 | 8, 6 | 16, 16 | 24, 17 |
+| 1 | 38, 39 | 41, 40 | 134, 119 | 184, 119 |
+| 2 | 139, 141 | 135, 138 | 316, 347 | 407, 342 |
+| 3 | 374, 392 | 449, 397 | 801, 810 | 894, 823 |
+| 4 | 914, 876 | 963, 904 | 1,451, 1,380 | 1,529, 1,362 |
+| 5 | 1,355, 1,420 | 1,581, 1,348 | 2,276, 2,158 | 2,242, 2,237 |
+
 ## Scratch grows by an eighth, drop flags as bits (S23, partly done, 2026-10-10)
 Full data (fresh-parse store, S26), `-Xmx3g`, compact object headers, warmer off, port 8081, both builds run from their classes on a fresh app, alternating, two runs each (HEAD = the rides step below). Results are byte-identical to the goldens (`SearchSnapshot`, dev and full).
 

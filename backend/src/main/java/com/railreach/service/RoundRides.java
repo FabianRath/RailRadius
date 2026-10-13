@@ -16,7 +16,7 @@ final class RoundRides {
 
     private int[] boardEvent = new int[INITIAL_CAPACITY];
     private int[] previous = new int[INITIAL_CAPACITY];
-    private int[] boardMinutes = new int[INITIAL_CAPACITY];
+    private char[] boardMinutes = new char[INITIAL_CAPACITY];
     private long[] days = new long[INITIAL_CAPACITY];
     // recordEnd[r]: records of the rides up to r, inclusive
     private int[] recordEnd = new int[INITIAL_CAPACITY];
@@ -35,7 +35,7 @@ final class RoundRides {
         if (size == boardEvent.length) grow();
         boardEvent[size] = rideBoardEvent;
         previous[size] = previousLabel;
-        boardMinutes[size] = rideBoardMinutes;
+        boardMinutes[size] = PackedMinutes.of(rideBoardMinutes);
         days[size] = rideDays;
         recordEnd[size] = recordCount() + recordedStops;
         size++;
@@ -67,7 +67,7 @@ final class RoundRides {
     }
 
     long sizeBytes() {
-        return (long) boardEvent.length * (4 * Integer.BYTES + Long.BYTES);
+        return (long) boardEvent.length * (3 * Integer.BYTES + Character.BYTES + Long.BYTES);
     }
 
     private void grow() {
