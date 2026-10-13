@@ -8,7 +8,7 @@ import java.util.Arrays;
  * from the row: each stop's duration is worked out again from the trip's legs. Labels are made only for the arrivals
  * that need one, which on the full data are ~1 in 6. Records are numbered over the round, a ride's together: ride r
  * has records {@code recordStart(r)} up to {@code recordStart(r + 1)}. Reused from round to round and search to
- * search; grows by half and never shrinks.
+ * search; grows as {@link ScratchCapacity} says and never shrinks.
  */
 final class RoundRides {
 
@@ -71,7 +71,7 @@ final class RoundRides {
     }
 
     private void grow() {
-        int capacity = boardEvent.length + (boardEvent.length >> 1);
+        int capacity = ScratchCapacity.grown(boardEvent.length, size + 1);
         boardEvent = Arrays.copyOf(boardEvent, capacity);
         previous = Arrays.copyOf(previous, capacity);
         boardMinutes = Arrays.copyOf(boardMinutes, capacity);

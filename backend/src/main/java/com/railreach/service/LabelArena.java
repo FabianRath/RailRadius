@@ -6,7 +6,7 @@ import java.util.Arrays;
  * The labels of one search as parallel arrays: the arrivals that become candidates or are boarded from, each with its
  * trip, where it boarded and left, its duration, its journey's days and the label before its transfer, without an
  * object per label. Other arrivals live only as their {@link RoundRides} row. An arena serves one search at a time and
- * is reused by the next; it grows by half its size and is never shrunk.
+ * is reused by the next; it grows as {@link ScratchCapacity} says and is never shrunk.
  * <p>
  * Stop indexes are shorts, so a trip with more than 32,767 stops fails fast. A label's transfers are the rides
  * before it, so they need no column. daysMemo is {@link LabelDays}' memo of the journey's exact running days.
@@ -48,7 +48,7 @@ final class LabelArena {
 
     /** Makes room for count labels after the last one, to {@link #set} later. Returns the first of them. */
     int reserve(int count) {
-        while (size + count > trip.length) grow();
+        if (size + count > trip.length) grow(size + count);
         size += count;
         return size - count;
     }
@@ -183,8 +183,8 @@ final class LabelArena {
         return (labelCount + Long.SIZE - 1) >>> WORD_SHIFT;
     }
 
-    private void grow() {
-        int capacity = trip.length + (trip.length >> 1);
+    private void grow(int minCapacity) {
+        int capacity = ScratchCapacity.grown(trip.length, minCapacity);
         trip = Arrays.copyOf(trip, capacity);
         previous = Arrays.copyOf(previous, capacity);
         durationMinutes = Arrays.copyOf(durationMinutes, capacity);
