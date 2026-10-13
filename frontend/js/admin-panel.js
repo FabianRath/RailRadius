@@ -5,7 +5,7 @@ import {
     setDebugTrigger,
 } from './api.js';
 import { initFeeds, refreshFeedStorage, refreshFeeds } from './feeds.js';
-import { fmtSeconds } from './util.js';
+import { closeOnBackdropClick, fmtSeconds } from './util.js';
 
 const JSON_INDENT = 2;
 const PROGRESS_POLL_INTERVAL_MS = 1000;
@@ -48,13 +48,7 @@ export function initAdminPanel() {
         refreshFeedStorage();
     });
     document.getElementById('adminClose').addEventListener('click', () => dialog.close());
-    // A backdrop click targets the dialog itself. Checking where the press started keeps a text selection dragged
-    // out of the JSON output from closing the panel.
-    let pressStartedOutside = false;
-    dialog.addEventListener('pointerdown', event => { pressStartedOutside = isOutsideDialog(event); });
-    dialog.addEventListener('click', event => {
-        if (pressStartedOutside && isOutsideDialog(event)) dialog.close();
-    });
+    closeOnBackdropClick(dialog);
     actionButtons.forEach(button => button.addEventListener('click', () => runAction(button)));
     tabs.forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
     initFeeds();
@@ -82,13 +76,6 @@ function showTab(name) {
 }
 
 // The dialog's padding also targets the dialog itself, so the click position decides
-function isOutsideDialog(event) {
-    if (event.target !== dialog) return false;
-    const rect = dialog.getBoundingClientRect();
-    return event.clientX < rect.left || event.clientX > rect.right
-        || event.clientY < rect.top || event.clientY > rect.bottom;
-}
-
 async function runAction(button) {
     const action = ACTIONS[button.dataset.action];
     if (action.confirm && !window.confirm(action.confirm)) return;

@@ -42,6 +42,10 @@ export function fetchHealth() {
     return requestJson('/api/health');
 }
 
+export function fetchCoverage() {
+    return requestJson('/api/coverage');
+}
+
 export function searchStations(query) {
     return requestJson(`/api/stations/search?q=${encodeURIComponent(query)}&limit=${SEARCH_LIMIT}`);
 }

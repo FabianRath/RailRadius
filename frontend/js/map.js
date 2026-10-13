@@ -17,8 +17,20 @@ let map;
 let reachableFeatures = [];
 let reachableRenderPending = false;
 
+/** Adds a button under the zoom buttons, styled like them. */
+export function addMapButton(button) {
+    const group = document.createElement('div');
+    group.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+    group.append(button);
+    map.addControl({ onAdd: () => group, onRemove: () => group.remove() }, 'top-right');
+}
+
 export function initMap(containerId) {
-    map = new Map({ container: containerId, style: MAP_STYLE_URL, center: MAP_CENTER, zoom: MAP_ZOOM });
+    // The licences require the credit; spelled out, its own (i) toggle can't be mistaken for the about button
+    map = new Map({
+        container: containerId, style: MAP_STYLE_URL, center: MAP_CENTER, zoom: MAP_ZOOM,
+        attributionControl: { compact: false },
+    });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     return new Promise(resolve => map.on('load', () => {
         emphasizeRailways();

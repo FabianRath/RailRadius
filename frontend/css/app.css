@@ -33,6 +33,7 @@
     --transfer-5: #ffd700;
     --marker-stroke: #ffffff;
     --map-rail: #4f8a74;
+    --map-control-icon: #333333;
     --debug-low: #00ff9f;
     --debug-mid: #0099ff;
     --debug-high: #ff2244;
@@ -1190,4 +1191,56 @@ input[type="range"]::-moz-range-thumb {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--accent-rail);
+}
+
+/* ── About dialog (info button under the zoom buttons) ── */
+.about-open .icon {
+    width: 18px;
+    height: 18px;
+    vertical-align: middle;
+    color: var(--map-control-icon);
+}
+
+.about-panel {
+    margin: auto;
+    width: min(480px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--accent-rail-line);
+    border-radius: 12px;
+    padding: 24px;
+    font-family: var(--font-sans);
+    font-size: 14px;
+}
+
+.about-panel::backdrop {
+    background: var(--bg-overlay);
+}
+
+.about-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.about-title {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    color: var(--accent-rail);
+}
+
+.about-text {
+    margin-bottom: 12px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+.about-countries {
+    columns: 3 120px;
+    column-gap: 16px;
+    margin-top: 8px;
+    padding-left: 18px;
+    line-height: 1.6;
 }

@@ -7,12 +7,10 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Merges a feed's stops abroad into the local feed's station. A feed's home country is where most of its stations
@@ -29,14 +27,13 @@ final class ForeignStopSnapper {
     private static final double MAX_SAME_NAME_SNAP_DISTANCE_METERS = 5000;
     // 0.15° of longitude is still ~5.7 km at 70°N, so the 3×3 cell block covers the snap distances everywhere
     private static final double SNAP_CELL_SIZE_DEG = 0.15;
-    private static final double HOME_COUNTRY_MIN_SHARE = 0.5;
 
     private ForeignStopSnapper() {}
 
     /** Adds alias → local station for every foreign stop with a local station in reach; returns how many. */
     static int snap(Collection<Station> stations, StationNameMatcher nameMatcher,
                     Map<String, String> aliasToCanonical) {
-        Map<String, String> homeBySource = homeCountries(stations);
+        Map<String, String> homeBySource = HomeCountries.bySource(stations);
         StationGrid grid = new StationGrid(stations, SNAP_CELL_SIZE_DEG);
 
         int snapped = 0;
@@ -53,23 +50,6 @@ final class ForeignStopSnapper {
                     stop.getId(), stop.getName(), local.get().getId(), local.get().getName());
         }
         return snapped;
-    }
-
-    /** Source → the country most of its located stations lie in, for sources where that is more than half. */
-    private static Map<String, String> homeCountries(Collection<Station> stations) {
-        Map<String, Map<String, Long>> countsBySource = stations.stream()
-                .filter(station -> station.getCountry() != null)
-                .collect(Collectors.groupingBy(station -> StopIds.source(station.getId()),
-                        Collectors.groupingBy(Station::getCountry, Collectors.counting())));
-        Map<String, String> homeBySource = new HashMap<>();
-        countsBySource.forEach((source, counts) -> {
-            long total = counts.values().stream().mapToLong(Long::longValue).sum();
-            counts.entrySet().stream()
-                    .max(Map.Entry.comparingByValue())
-                    .filter(top -> top.getValue() > total * HOME_COUNTRY_MIN_SHARE)
-                    .ifPresent(top -> homeBySource.put(source, top.getKey()));
-        });
-        return homeBySource;
     }
 
     /** The nearest local station within the snap distance, else the nearest one of the same name farther away. */

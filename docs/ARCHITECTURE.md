@@ -47,7 +47,7 @@ RailReach/
 ├── frontend/css/app.css              # all styles and the map palette (CSS variables)
 ├── frontend/js/                      # ES modules: main (entry), api, map (only MapLibre user), search, query-form,
 │                                     #   reachability (SSE; fetches a station's journey on click), coverage (Turf), station-details (clicked station's journey, shown over the side panel), journey (its lines on the map), debug, dev-auth (dev login), admin-panel (admin
-│                                     #   endpoints as buttons), feeds (Feeds tab of the admin panel), sidebar (collapse toggle), icons (vendored Lucide SVGs;
+│                                     #   endpoints as buttons), feeds (Feeds tab of the admin panel), about (info button under the zoom buttons: disclaimer + covered countries), sidebar (collapse toggle), icons (vendored Lucide SVGs;
 │                                     #   `<span data-icon>` in the markup), util, config
 ├── frontend/backend_test.html        # small manual API test page
 └── backend/
@@ -99,6 +99,8 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `StationDeduplicator` | service | Within-country and cross-border station merging after all feeds are loaded; runs the merge rules in order |
 | `StationGrid` | service | Stations bucketed into square degree cells; `near` = the 3×3 cells around a station |
 | `SharedTrainMatcher` | service | Cross-border rule: two stops are one station if ≥ 3 trains serve both at the same minute with the same neighbour station |
+| `HomeCountries` | service | A feed's home country: where more than half of its located stations lie; used by `ForeignStopSnapper` and `CoverageService` |
+| `CoverageService` | service | Covered countries for `/api/coverage`: the distinct home countries of the loaded feeds, so a cross-border train's last stops abroad don't add a country |
 | `ForeignStopSnapper` | service | Cross-border rule: a feed's stop outside its home country is merged into the nearest station of that country's feed (≤ 1 km), or one of the same name (≤ 5 km) |
 | `FeedUpdateCenter` | service | Update center for the GTFS zips: status of each zip (`FeedStatus`, validity and early-ending operators memoized per file and modification time; a big feed takes seconds, as trips.txt is read too) plus a `MISSING` status for each expected feed (`railreach.feeds.sources`) without a zip, a scheduled log check (`railreach.feeds.check-interval`, first run at startup) that WARNs about missing, expired and expiring feeds, disk space of the zips in use and in `previous/` (`FeedStorage`), and downloads of registered feeds. A download is refused (`BUSY`) during a GTFS load or another download |
 | `FeedValidity` | service | First and last day any service of a feed runs, from `ServiceCalendarReader` over the whole feed (not only rail) |
@@ -150,6 +152,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `JourneyLeg` | dto | `TRAIN` or `TRANSFER` leg with from/to station names, stop IDs and countries, times and duration; TRAIN legs also carry route name, train number, headsign and operator |
 | `FeedStatus` | dto | One zip: source, file name, size, download time, first/last service date, days left, `earlyEndingOperators` (`OperatorEnd`: operator, last service date; earliest first), state (`MISSING` = expected but no zip yet, `OK`, `EXPIRING`, `EXPIRED`, `NOT_YET_VALID`, `NO_CALENDAR`, `UNREADABLE`; `EXPIRING` also when the first early-ending operator stops within `feeds.expiring-days` or already has), download URL (the first one in `gtfs-feeds.txt`; null = updated by hand) |
 | `FeedDownloadResult` | dto | Outcome (`REPLACED`, `REJECTED`, `BUSY`), message, `FeedStatus` before and after |
+| `Coverage` | dto | `countries`: sorted ISO codes of the covered countries |
 | `FeedStorage` | dto | Count and total bytes of the zips in the GTFS directory (in use) and of the replaced ones in `previous/` |
 | `GtfsTime` | util | Parse/format GTFS times, minute diffs with overnight wrap, clock minute of a time, duration text |
 | `StopIds` | util | Canonical `<source>:<rawId>` stop IDs |
@@ -252,6 +255,7 @@ What the search must keep, so a rewrite gives the same result as `SearchSnapshot
 | GET | `/stations/search?q=&limit=50` | Case- and accent-insensitive substring match on any variant of the station name or of its `translations.txt` names (`StationNameVariants`; names are still returned in the local language); only stations with edges, sorted by degree. Candidates come from the rarest trigram of the query (`StationSearchIndex`); queries under 3 characters scan in degree order and stop at `limit`. Each result: id, name, latitude, longitude, country |
 | GET | `/stations/{id}` | Single station |
 | GET | `/stats` | stations / graphNodes / totalEdges |
+| GET | `/coverage` | `Coverage`: home countries of the loaded feeds (`CoverageService`). The frontend's info button (`js/about.js`, added under the zoom buttons via `addMapButton` in `js/map.js`) lists them by name with a data-accuracy disclaimer |
 | GET | `/health` | UP/DOWN depending on whether data is loaded |
 
 **Admin (`/api/admin`)**: every call needs the header `X-Admin-Token: <railreach.admin.token>` (see `AdminTokenInterceptor`). `scripts/api.sh` sends `RAILREACH_ADMIN_TOKEN` (default `dev`). In the browser, the "Dev login" at the bottom of the side panel (`js/dev-auth.js`) checks the token against `/debug/status`, keeps it in `localStorage` and only then starts the debug polling and shows the "Admin panel" button. That opens a `<dialog>` (`js/admin-panel.js`) with two tabs. Below the title, a label shows the disk space of the zips in use and of the replaced ones in `previous/` (`/feeds/storage`, refreshed when the panel opens and whenever the Feeds tab reloads its list). "Tools" has buttons for the stats, debug-trigger, reload and cache-delete endpoints below; it prints the raw JSON response and asks for confirmation before reload and delete. "Feeds" (`js/feeds.js`) widens the panel to nearly the whole window and lists every zip and missing feed from `/feeds`: last service day (first day as a tooltip), days left, state with the early-ending main operators below it, size, download date, source host, and a download button for feeds in `gtfs-feeds.txt` ("manual" otherwise). "Download outdated" (missing, expired and expiring feeds) and "Download all" call `/feeds/{source}/download` for one feed after another, so each row shows its progress and the result of its last download. During a reload it shows a progress bar with phase, feeds, % parsed, elapsed time, ETA and graph size.
