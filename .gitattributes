@@ -2,3 +2,5 @@
 * text=auto eol=lf
 *.cmd text eol=crlf
 *.bat text eol=crlf
+# Vendored third-party builds: no line-ending changes, no text diffs.
+frontend/vendor/** -text -diff

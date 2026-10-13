@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B40 · F30 · S31
+**Next free IDs:** B40 · F30 · S32
 
 ## Bugs (data loading)
 - [ ] **B36** Bosnia has no current rail feed, and Northern Ireland's can't be refreshed. State on 2026-10-07 (`gtfs-sources.md` has the details). Bosnia: the only source ends on 2025-12-13, so no Bosnian trains. Northern Ireland: the zip on disk (GTFS.pro copy from transitpdf, 2026-07-27) has NI Railways until mid-2027, but transitpdf is gone and Translink publishes only TransXChange, so no download URL is left in `gtfs-feeds.txt`. Check for a new GTFS source before mid-2027.
@@ -42,5 +42,5 @@ Recommended order (2026-10-13): judge **S24** on the server picked in S25 (`HOST
     - Croatia, EAV: their licences (CC0, CC BY 4.0) come only from Transitous; confirm them with the publishers.
   - **Follow-up:** almost every licence requires attribution, so the site needs a page naming every source.
 - [ ] **S28** CORS: `@CrossOrigin(origins = "*")` on `RailReachController` and `AdminController` lets any site use the API. Restrict it to the production domain (council report, Phase 0).
-- [ ] **S29** Copy MapLibre GL JS and Turf into `frontend/vendor/` instead of loading them from unpkg (`index.html`, `js/map.js`), so visits don't send IP addresses to a third party (GDPR, LG München 2022; council report, Phase 0).
 - [ ] **S30** Set the actuator web exposure to `health` explicitly in `application.yml`. Today only Spring's default keeps the other endpoints closed (council report, Phase 0).
+- [ ] **S31** The fonts (Martian Mono, Outfit) still load from Google Fonts (`css/app.css:1`), which is the exact case of LG München 2022: every visit sends the visitor's IP address to Google. Either self-host them (`woff2` + `@font-face` in `frontend/vendor/fonts/`, both are SIL OFL) or switch to fonts that are less trouble, e.g. a system font stack that needs no files at all.

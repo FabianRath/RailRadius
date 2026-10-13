@@ -1,5 +1,5 @@
 import { Map, Popup, LngLatBounds, NavigationControl }
-    from 'https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.mjs';
+    from '../vendor/maplibre-gl/maplibre-gl.mjs';
 import { MAP_STYLE_URL, MAP_CENTER, MAP_ZOOM } from './config.js';
 import { cssVar } from './util.js';
 
