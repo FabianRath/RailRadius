@@ -14,65 +14,77 @@ The download URL of every feed with a direct download is in `backend/src/main/re
 
 Feeds in backticks are in `gtfs-feeds.txt`. Rail routes, dates and operators were checked on 2026-10-05 (see "Survey" below), the sources again on 2026-10-06. Status `–`: no direct download, so the feed isn't loaded.
 
-| Status | Country | Feed or source | Notes |
-|---|---|---|---|
-| L | Austria | `austria` | ÖBB's own feed (`static.web.oebb.at`: ÖBB, Montafonerbahn, CAT). The file name carries the timetable year (`GTFS_Fahrplan_2026.zip`), so the URL changes every December. Private railways (WESTbahn, GKB, Stern & Hafferl, Salzburger Lokalbahn, Zillertalbahn, NÖVOG) are only in the Verkehrsverbünde feeds at https://data.mobilitaetsverbuende.at/de/data-sets, which need a free login. |
-| L | Belgium | `belgien` | SNCB. Saved as `gtfs_belgien.zip`. Fallbacks: iRail and `data.gtfs.be` (same data). |
-| L | Bosnia and Herzegovina | `bosnia` | ŽFBiH and ŽRS (Republika Srpska), volunteer rehost. Ended on 2025-12-13 and not updated since (still the same file on 2026-10-06); no other source found (Transitous, Mobility Database, Transitland, transitpdf searched). |
-| L | Bulgaria | `bulgaria` | BDŽ (jbb also has the CFR and TCDD trains into Bulgaria). Fallback `gtfs.livetransport.eu` has BDŽ alone, 30 days ahead, and is a third of jbb's size, so the size check only accepts it when no zip is there. |
-| L | Croatia | `croatia` | HŽPP's own download. The older `hzpp.hr/api/v1/repository/download/…` link and the transitpdf copy stop at 2025-12-14. The promet-info.hr national feed needs a fee. |
-| L | Czechia | `czechia` | Whole national rail timetable, converted from the official CZPTT data by volunteers (used by Transitous). |
-| L | Denmark | `denmark` | Rejseplanen. |
-| L | Estonia | `estonia` | Elron, the only rail operator (`eu-gtfs.remix.com/elron.zip`, 1 MB). Fallback: the national unified feed (`estonia_unified_gtfs.zip`, 49 MB, same rail trips plus all buses; also MDB mirror `mdb-3235`). The old `peatus.ee/gtfs/gtfs.zip` now returns an HTML page. Downloaded by hand on 2026-10-07 (valid until 2026-12-31): the update center rejects a zip under half the size of the current one, so it would not replace the 20 MB unified zip with `elron.zip`. |
-| L | Finland | `finland` | VR + HSL commuter rail (Fintraffic). Needs header `Accept-Encoding: gzip` (else HTTP 406); send `Digitraffic-User: <app name>`. Fallback `gtfs-passenger-stops.zip` drops the heritage railways. busmaps' `fintraffic` feed has no rail routes; their `trains-fin` is request-only. |
-| L | France | `france` | SNCF Voyageurs: TGV INOUI, OUIGO, Intercités and every region's TER in one feed. The previous URL (`…/r/84f7501c-…`) now serves a feed without rail routes. |
-| L | Germany | `germany` | DELFI, the source of our `gtfs_germany.zip` (route IDs like `de:vgn:…`). Mirror refreshed 2026-09-29, 470 MB. Has train numbers (`trip_short_name`, zero-padded: `002310`) and headsigns, but no train category: DB Fernverkehr routes are named by line only (`33`), and only `route_type` tells ICE (101) from IC/EC (102). Transitous derives the category from that, see below. |
-| L | Great Britain | `great-britain` | All National Rail operators (aubin.app, used by Transitous). 970 MB because it includes every bus; it groups each operator's trains into one route. |
-| L | Greece | `greece` | Hellenic Train (jbb `gr-hellenic-train`, also has ferries). Fallback jbb `gr-railway-gov`: Hellenic Train alone, 30 days ahead, under half the size (size check rejects it while a zip is there). The transitpdf `trainose.zip` is from 2019. |
-| L | Hungary | `hungary` | MÁV, GYSEV and the Budapest Children's Railway, MÁV's official feed (6.5 MB, updated daily). Needs HTTP Basic auth with a free account from https://www.mavcsoport.hu/gtfs-igenybejelento (granted 2026-10-07): set `railreach.feeds.auth.hungary` locally (see ARCHITECTURE.md → config). Its TLS root (Microsec e-Szigno) is not in the JDK, so it is in `feed-roots.pem`. Calendar ends with the timetable year (2026-12-12), although `feed_info` says 2027-04-07. The transitpdf copy ended on 2025-11-23 and its host is gone. gtfs.menetbrand.com and gtfs.kti.hu have only Hungarian buses; BKK's feed has only the Budapest HÉV. |
-| L | Ireland | `ireland` | Iarnród Éireann, official (Transport for Ireland). Includes the Dublin–Belfast Enterprise. |
-| L | Italy | `italy` | Trenitalia including all regional trains, community conversion of the official NeTEx (CC BY 4.0), updated weekly. The regional Trenitalia feeds (Piemonte, Liguria, Toscana, Sardegna) add nothing. Other Italian operators: see Survey. |
-| L | Italy | `italy-cotral` | Cotral's railways Roma–Viterbo and Roma–Lido. Saved as `gtfs_italy-cotral.zip`. Its "Viterbo" is a separate station from Trenitalia's Viterbo Porta Fiorentina. |
-| L | Italy | `italy-eav` | EAV (Circumvesuviana, Cumana, Circumflegrea around Naples; also has buses, which the rail filter drops). Its "Napoli P. Garibaldi" is a separate station from Napoli Centrale. |
-| L | Italy | `italy-italo` | Italo high-speed (also has ItaloBus routes, which the rail filter drops). Saved as `gtfs_italy-italo.zip`. |
-| L | Italy | `italy-trenord` | Trenord (Lombardy, incl. Malpensa Express and the lines to Chiasso and Tirano), official (Regione Lombardia). Saved as `gtfs_italy-trenord.zip`. |
-| L | Kosovo | `kosovo` | Trainkos, volunteer rehost. |
-| L | Latvia | `latvia` | Vivi. |
-| L | Lithuania | `lithuania` | LTG Link rail. `data.public-transport.earth/gtfs/lt` has bus, ferry and trolleybus only. |
-| L | Luxembourg | `luxembourg` | CFL. |
-| L | Moldova | `moldova` | CFM, volunteer rehost. |
-| L | Montenegro | `montenegro` | ŽPCG. |
-| L | Netherlands | `netherlands` | NS, Arriva, Keolis and others (OVapi). |
-| L | North Macedonia | `northmacedonia` | Macedonian Railways, volunteer rehost. |
-| – | Northern Ireland | | Translink NI Railways. No GTFS source left (checked 2026-10-06): the transitpdf copy is gone, Translink publishes rail timetables only as TransXChange on https://www.opendatani.gov.uk/dataset/nir20160126v2 (monthly, OGL). The Irish Rail feed has the Dublin–Belfast Enterprise. The zip on disk, `gtfs_northern-ireland.zip` (GTFS.pro copy from transitpdf, 2026-07-27, downloaded on 2026-10-05), still runs until mid-2027 but can't be refreshed (B36). |
-| L | Norway | `norway` | Entur national feed (Vy, SJ, Go-Ahead, Flytoget). |
-| L | Poland | `poland` | All rail operators incl. PKP Intercity (mkuran.pl). Fallback `gtfs.kasznia.net/static/polish-trains.zip`, same feed. `gtfs.kasznia.net/static/pkp-ic.zip` has PKP Intercity alone. |
-| L | Portugal | `portugal` | CP. Enhanced variant with platforms and shapes: https://github.com/joaodcp/cp-gtfs-enhanced. |
-| L | Portugal | `portugal-fertagus` | Fertagus (Lisbon–Setúbal). Java accepts the server's certificate (Python doesn't). |
-| L | Romania | `romania` | CFR Călători and the private operators. |
-| L | Serbia | `serbia` | Srbijavoz. Fallback: the generator's own GitLab package (same file as jbb). |
-| L | Slovakia | `slovakia` | ZSSK, Leo Express, RegioJet. jbb's `sk-zssk.gtfs.zip` is an HTML page, not a feed. |
-| L | Slovenia | `slovenia` | SŽ. The national access point (`b2b.nap.si`) needs a login. |
-| L | Spain | `spain` | Renfe high-speed, long and medium distance. |
-| L | Spain | `spain-cercanias` | Renfe Cercanías (commuter). Saved as `gtfs_spain-cercanias.zip`. The NAP link (`nap.transportes.gob.es/api/Fichero/download/1130`) needs a login (HTTP 401). |
-| L | Spain | `spain-euskotren` | Euskotren (Basque Country). From the Mobility Database mirror, because the NAP original needs a login. |
-| L | Spain | `spain-fgc` | FGC (Catalan railways around Barcelona and to Montserrat). |
-| L | Spain | `spain-ouigo` | OUIGO España high speed. From the Mobility Database mirror. Station names are in capitals without accents. |
-| L | Sweden | `sweden` | Samtrafiken national feed, all operators. |
-| L | Switzerland | `switzerland` | opentransportdata.swiss, all operators. |
-| L | Turkey | `turkey` | TCDD (MIT). |
-| L | Ukraine | `ukraine` | Ukrzaliznytsia. |
-| No GTFS found | Albania, Belarus | | Transitous has only city buses for Albania. |
+| Status | Country | Feed or source | Licence | Notes |
+|---|---|---|---|---|
+| L | Austria | `austria` | CC BY 4.0 | ÖBB's own feed (`static.web.oebb.at`: ÖBB, Montafonerbahn, CAT). The file name carries the timetable year (`GTFS_Fahrplan_2026.zip`), so the URL changes every December. Private railways (WESTbahn, GKB, Stern & Hafferl, Salzburger Lokalbahn, Zillertalbahn, NÖVOG) are only in the Verkehrsverbünde feeds at https://data.mobilitaetsverbuende.at/de/data-sets, which need a free login. |
+| L | Belgium | `belgien` | SNCB licence ¹ | SNCB. Saved as `gtfs_belgien.zip`. Fallbacks: iRail and `data.gtfs.be` (same data). |
+| L | Bosnia and Herzegovina | `bosnia` | **unclear** | ŽFBiH and ŽRS (Republika Srpska), volunteer rehost. Ended on 2025-12-13 and not updated since (still the same file on 2026-10-06); no other source found (Transitous, Mobility Database, Transitland, transitpdf searched). |
+| L | Bulgaria | `bulgaria` | **unclear** (fallback: CC BY 4.0) | BDŽ (jbb also has the CFR and TCDD trains into Bulgaria). Fallback `gtfs.livetransport.eu` has BDŽ alone, 30 days ahead, and is a third of jbb's size, so the size check only accepts it when no zip is there. |
+| L | Croatia | `croatia` | CC0 ² | HŽPP's own download. The older `hzpp.hr/api/v1/repository/download/…` link and the transitpdf copy stop at 2025-12-14. The promet-info.hr national feed needs a fee. |
+| L | Czechia | `czechia` | CC0 | Whole national rail timetable, converted from the official CZPTT data by volunteers (used by Transitous). |
+| L | Denmark | `denmark` | CC BY 4.0 | Rejseplanen. |
+| L | Estonia | `estonia` | CC0 | Elron, the only rail operator (`eu-gtfs.remix.com/elron.zip`, 1 MB). Fallback: the national unified feed (`estonia_unified_gtfs.zip`, 49 MB, same rail trips plus all buses; also MDB mirror `mdb-3235`). The old `peatus.ee/gtfs/gtfs.zip` now returns an HTML page. Downloaded by hand on 2026-10-07 (valid until 2026-12-31): the update center rejects a zip under half the size of the current one, so it would not replace the 20 MB unified zip with `elron.zip`. |
+| L | Finland | `finland` | CC BY 4.0 | VR + HSL commuter rail (Fintraffic). Needs header `Accept-Encoding: gzip` (else HTTP 406); send `Digitraffic-User: <app name>`. Fallback `gtfs-passenger-stops.zip` drops the heritage railways. busmaps' `fintraffic` feed has no rail routes; their `trains-fin` is request-only. |
+| L | France | `france` | ODbL | SNCF Voyageurs: TGV INOUI, OUIGO, Intercités and every region's TER in one feed. The previous URL (`…/r/84f7501c-…`) now serves a feed without rail routes. |
+| L | Germany | `germany` | CC BY 4.0 | DELFI, the source of our `gtfs_germany.zip` (route IDs like `de:vgn:…`). Mirror refreshed 2026-09-29, 470 MB. Has train numbers (`trip_short_name`, zero-padded: `002310`) and headsigns, but no train category: DB Fernverkehr routes are named by line only (`33`), and only `route_type` tells ICE (101) from IC/EC (102). Transitous derives the category from that, see below. |
+| L | Great Britain | `great-britain` | NRE terms ¹ | All National Rail operators (aubin.app, used by Transitous). 970 MB because it includes every bus; it groups each operator's trains into one route. |
+| L | Greece | `greece` | **unclear** | Hellenic Train (jbb `gr-hellenic-train`, also has ferries). Fallback jbb `gr-railway-gov`: Hellenic Train alone, 30 days ahead, under half the size (size check rejects it while a zip is there). The transitpdf `trainose.zip` is from 2019. |
+| L | Hungary | `hungary` | MÁV terms ¹ | MÁV, GYSEV and the Budapest Children's Railway, MÁV's official feed (6.5 MB, updated daily). Needs HTTP Basic auth with a free account from https://www.mavcsoport.hu/gtfs-igenybejelento (granted 2026-10-07): set `railreach.feeds.auth.hungary` locally (see ARCHITECTURE.md → config). Its TLS root (Microsec e-Szigno) is not in the JDK, so it is in `feed-roots.pem`. Calendar ends with the timetable year (2026-12-12), although `feed_info` says 2027-04-07. The transitpdf copy ended on 2025-11-23 and its host is gone. gtfs.menetbrand.com and gtfs.kti.hu have only Hungarian buses; BKK's feed has only the Budapest HÉV. |
+| L | Ireland | `ireland` | CC BY 4.0 | Iarnród Éireann, official (Transport for Ireland). Includes the Dublin–Belfast Enterprise. |
+| L | Italy | `italy` | CC BY 4.0 | Trenitalia including all regional trains, community conversion of the official NeTEx (CC BY 4.0), updated weekly. The regional Trenitalia feeds (Piemonte, Liguria, Toscana, Sardegna) add nothing. Other Italian operators: see Survey. |
+| L | Italy | `italy-cotral` | **unclear** | Cotral's railways Roma–Viterbo and Roma–Lido. Saved as `gtfs_italy-cotral.zip`. Its "Viterbo" is a separate station from Trenitalia's Viterbo Porta Fiorentina. |
+| L | Italy | `italy-eav` | CC BY 4.0 ² | EAV (Circumvesuviana, Cumana, Circumflegrea around Naples; also has buses, which the rail filter drops). Its "Napoli P. Garibaldi" is a separate station from Napoli Centrale. |
+| L | Italy | `italy-italo` | CC BY 4.0 | Italo high-speed (also has ItaloBus routes, which the rail filter drops). Saved as `gtfs_italy-italo.zip`. |
+| L | Italy | `italy-trenord` | CC BY 4.0 | Trenord (Lombardy, incl. Malpensa Express and the lines to Chiasso and Tirano), official (Regione Lombardia). Saved as `gtfs_italy-trenord.zip`. |
+| L | Kosovo | `kosovo` | **unclear** | Trainkos, volunteer rehost. |
+| L | Latvia | `latvia` | CC0 | Vivi. |
+| L | Lithuania | `lithuania` | **unclear** | LTG Link rail. `data.public-transport.earth/gtfs/lt` has bus, ferry and trolleybus only. |
+| L | Luxembourg | `luxembourg` | CC BY 4.0 | CFL. |
+| L | Moldova | `moldova` | **unclear** | CFM, volunteer rehost. |
+| L | Montenegro | `montenegro` | ODbL | ŽPCG. |
+| L | Netherlands | `netherlands` | CC0 | NS, Arriva, Keolis and others (OVapi). |
+| L | North Macedonia | `northmacedonia` | **unclear** | Macedonian Railways, volunteer rehost. |
+| – | Northern Ireland | | **unclear** | Translink NI Railways. No GTFS source left (checked 2026-10-06): the transitpdf copy is gone, Translink publishes rail timetables only as TransXChange on https://www.opendatani.gov.uk/dataset/nir20160126v2 (monthly, OGL). The Irish Rail feed has the Dublin–Belfast Enterprise. The zip on disk, `gtfs_northern-ireland.zip` (GTFS.pro copy from transitpdf, 2026-07-27, downloaded on 2026-10-05), still runs until mid-2027 but can't be refreshed (B36). |
+| L | Norway | `norway` | NLOD 2.0 | Entur national feed (Vy, SJ, Go-Ahead, Flytoget). |
+| L | Poland | `poland` | CC BY 4.0 | All rail operators incl. PKP Intercity (mkuran.pl). Fallback `gtfs.kasznia.net/static/polish-trains.zip`, same feed. `gtfs.kasznia.net/static/pkp-ic.zip` has PKP Intercity alone. |
+| L | Portugal | `portugal` | NAP terms ¹ | CP. Enhanced variant with platforms and shapes: https://github.com/joaodcp/cp-gtfs-enhanced. |
+| L | Portugal | `portugal-fertagus` | NAP terms ¹ | Fertagus (Lisbon–Setúbal). Java accepts the server's certificate (Python doesn't). |
+| L | Romania | `romania` | OGL-ROU 1.0 | CFR Călători and the private operators. |
+| L | Serbia | `serbia` | **unclear** | Srbijavoz. Fallback: the generator's own GitLab package (same file as jbb). |
+| L | Slovakia | `slovakia` | **unclear** | ZSSK, Leo Express, RegioJet. jbb's `sk-zssk.gtfs.zip` is an HTML page, not a feed. |
+| L | Slovenia | `slovenia` | CC BY-SA 4.0 | SŽ. The national access point (`b2b.nap.si`) needs a login. |
+| L | Spain | `spain` | CC BY 4.0 | Renfe high-speed, long and medium distance. |
+| L | Spain | `spain-cercanias` | CC BY 4.0 | Renfe Cercanías (commuter). Saved as `gtfs_spain-cercanias.zip`. The NAP link (`nap.transportes.gob.es/api/Fichero/download/1130`) needs a login (HTTP 401). |
+| L | Spain | `spain-euskotren` | CC BY 4.0 | Euskotren (Basque Country). From the Mobility Database mirror, because the NAP original needs a login. |
+| L | Spain | `spain-fgc` | CC BY 4.0 | FGC (Catalan railways around Barcelona and to Montserrat). |
+| L | Spain | `spain-ouigo` | Spanish NAP licence ¹ | OUIGO España high speed. From the Mobility Database mirror. Station names are in capitals without accents. |
+| L | Sweden | `sweden` | CC0 | Samtrafiken national feed, all operators. |
+| L | Switzerland | `switzerland` | opentransportdata.swiss terms | opentransportdata.swiss, all operators. |
+| L | Turkey | `turkey` | MIT ¹ | TCDD. |
+| L | Ukraine | `ukraine` | **unclear** | Ukrzaliznytsia. |
+| No GTFS found | Albania, Belarus | | | Transitous has only city buses for Albania. |
 
 Not needed: Liechtenstein and Monaco (served by ÖBB / SNCF, so covered by the Austria and France feeds, unchecked); Andorra, San Marino, Malta, Iceland, Cyprus and Vatican City have no regular passenger rail.
 
 **Cross-border operators** (not in any national feed; the source name is the operator)
 
-| Status | Operator | Feed | Notes |
-|---|---|---|---|
-| L | Eurostar | `eurostar` | Official, includes ex-Thalys (Paris/Brussels–London, Amsterdam, Cologne). |
-| L | European Sleeper | `european-sleeper` | Night trains Brussels/Amsterdam–Berlin–Prague, also Paris and Milan. Its stop "Aachen Hauptbahnhof" doesn't merge with "Aachen Hbf" (name similarity 0.33). |
-| L | Trenitalia France | `trenitalia-france` | Paris–Lyon–Turin–Milan. |
+| Status | Operator | Feed | Licence | Notes |
+|---|---|---|---|---|
+| L | Eurostar | `eurostar` | Etalab 2.0 | Official, includes ex-Thalys (Paris/Brussels–London, Amsterdam, Cologne). |
+| L | European Sleeper | `european-sleeper` | ODbL | Night trains Brussels/Amsterdam–Berlin–Prague, also Paris and Milan. Its stop "Aachen Hauptbahnhof" doesn't merge with "Aachen Hbf" (name similarity 0.33). |
+| L | Trenitalia France | `trenitalia-france` | Etalab 2.0 | Paris–Lyon–Turin–Milan. |
+
+**Licences** (checked 2026-10-13, S27). Taken from the publisher's own page where it could be read, otherwise from the Transitous source list (https://transitous.org/sources/) or the Mobility Database catalogue. CC BY, CC BY-SA, ODbL, NLOD, Etalab and OGL-ROU all allow public and commercial use with attribution, so the site needs a page naming every source.
+
+- ¹ Not a standard open licence:
+  - Belgium: SNCB's own royalty-free licence, which has to be accepted and bans redistributing the raw data. Its text couldn't be read (belgiantrain.be blocks non-browser requests).
+  - Great Britain: the timetable comes from National Rail (NRE developer terms: publishing, including commercial use, is allowed with the credit "Powered by National Rail Enquiries"). Aubin's compilation states no licence of its own.
+  - Hungary: MÁV gives the feed free to registered developers for building apps, but names no licence (Transitous lists CC0).
+  - Portugal (CP, Fertagus): conditions are on the Portuguese NAP pages, which only render in a browser.
+  - Spain (OUIGO): Spanish NAP licence (LDA). Commercial use is allowed, but it requires the credit "Powered by MITRAMS" with a link, and shares raw data alike. OUIGO's own licence is unknown.
+  - Turkey: the generator is MIT, but the timetable is taken from TCDD's website, and TCDD has published no licence for it.
+- ² Only from Transitous; no licence page found at the publisher.
+- **unclear**: no licence found anywhere. These are the volunteer rehosts (Bosnia, Kosovo, Moldova, North Macedonia), the jbb feeds that Transitous lists without a licence (Bulgaria, Greece, Lithuania, Ukraine), Serbia's GitLab feed, Cotral, Slovakia (data.slovensko.sk only renders in a browser; an older Mobility Database entry said CC0) and Northern Ireland (a busmaps.com derivative whose licence page is gone).
 
 ## Survey: rail feeds not loaded yet (2026-10-05)
 
