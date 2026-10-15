@@ -1,6 +1,7 @@
 import { searchStations } from './api.js';
 import { countryBadgeHtml, escapeHtml } from './util.js';
 import { icon } from './icons.js';
+import { isUpdatingTimetables } from './server-status.js';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const MIN_QUERY_LENGTH = 2;
@@ -43,11 +44,20 @@ async function runSearch(query) {
     }
     try {
         const stations = await searchStations(query);
+        // During a reload the index is empty; the notice explains that better than "No stations found"
+        if (stations.length === 0 && await isUpdatingTimetables()) {
+            stationResults.innerHTML = '';
+            return;
+        }
         stationResults.innerHTML = stations.length === 0
             ? '<div class="no-results">No stations found</div>'
             : `<div class="station-list">${stations.map(stationItemHtml).join('')}</div>`;
     } catch (error) {
         console.error('Search error:', error);
+        if (await isUpdatingTimetables()) {
+            stationResults.innerHTML = '';
+            return;
+        }
         stationResults.innerHTML = `<div class="no-results">${icon('triangle-alert')} Backend connection failed</div>`;
     }
 }

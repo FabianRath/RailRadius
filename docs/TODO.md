@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B40 · F31 · S32
+**Next free IDs:** B40 · F32 · S32
 
 ## Bugs (data loading)
 - [ ] **B36** Bosnia has no current rail feed, and Northern Ireland's can't be refreshed. State on 2026-10-07 (`gtfs-sources.md` has the details). Bosnia: the only source ends on 2025-12-13, so no Bosnian trains. Northern Ireland: the zip on disk (GTFS.pro copy from transitpdf, 2026-07-27) has NI Railways until mid-2027, but transitpdf is gone and Translink publishes only TransXChange, so no download URL is left in `gtfs-feeds.txt`. Check for a new GTFS source before mid-2027.
@@ -13,7 +13,7 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 
 ## Features / UX
 - [ ] **F23** (Decide first) While a station's journey is shown (F21), the dots of the stations it passes through keep their own transfer-level colour, so they don't always match the line colour of the train passing them (first train green, second cyan, …): a stop on the third train can be green because another train reaches it directly. The route looks inconsistent, but the colour also tells the user that this stop can be reached with fewer transfers, and clicking it shows that shorter journey. Options: (1) recolour the path's dots by the train they are on while the journey is shown; (2) keep the station's own colour (current behaviour), maybe explained in the details panel; (3) both, e.g. the train's colour as fill and the station's own level as outline. Decide with the user, then implement.
-- [ ] **F28** Show "updating timetables" while the server restarts or reloads the GTFS data, instead of failed searches or a broken page (council report, Phase 0).
+- [ ] **F31** (Decide first, hosting) A visit while the backend is down (restart) gets no page at all, since the backend serves the frontend; F28's "updating timetables" notice only helps a page that is already open. Decide whether and how to cover this, e.g. a maintenance page from the reverse proxy on 502/503 (nginx `error_page`, Caddy `handle_errors`), or serving `frontend/` from the proxy so the page loads and shows the notice itself. Depends on the hosting setup (`HOSTING.md`).
 - [ ] **F29** Alert for feeds that expire within 30 days (council report, Phase 5). `FeedStatus` already has `EXPIRED`/`EXPIRING` and the admin panel shows them, but nobody is told unless they look.
 - [ ] **F30** Mark the start station on the map with its own marker (e.g. a distinct icon or ring, drawn above the reachable-station dots), so users can see at a glance where the search starts. Today it looks like any other station dot.
 

@@ -4,6 +4,7 @@ import { addReachableStations, clearReachableStations, fitToPoints, getZoom, has
 import { buildCoverage } from './coverage.js';
 import { coverageEnabled, readQuery } from './query-form.js';
 import { clearStatus, showStatus } from './util.js';
+import { isUpdatingTimetables } from './server-status.js';
 
 const calculateBtn = document.getElementById('calculateBtn');
 const resultsSection = document.getElementById('resultsSection');
@@ -121,10 +122,11 @@ function streamResults(params, key) {
     });
 
     // Fires for the backend's own 'error' event (message in e.data) and for a lost connection (no data)
-    stream.addEventListener('error', e => {
+    stream.addEventListener('error', async e => {
         console.error('SSE error:', e);
         finishStream();
         reachableCount.textContent = results.size > 0 ? results.size.toLocaleString() : '—';
+        if (await isUpdatingTimetables()) return;
         showStatus('error', e.data ? `Search failed: ${e.data}` : 'Search failed: backend not reachable');
     });
 }
