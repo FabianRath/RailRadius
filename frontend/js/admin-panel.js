@@ -1,10 +1,12 @@
 // Admin panel: buttons for the /api/admin endpoints, only reachable after the dev login. Each action shows the raw
-// JSON response, so it replaces the matching `scripts/api.sh` command. The Feeds tab is its own view (feeds.js).
+// JSON response, so it replaces the matching `scripts/api.sh` command. The Feeds and Alerts tabs are their own
+// views (feeds.js, feed-alerts.js).
 import {
     clearDebugTrigger, deleteGtfsCache, fetchCacheStats, fetchGtfsLoadStatus, fetchGtfsStats, reloadGtfs,
     setDebugTrigger,
 } from './api.js';
 import { initFeeds, refreshFeedStorage, refreshFeeds } from './feeds.js';
+import { initFeedAlerts, refreshFeedAlerts } from './feed-alerts.js';
 import { closeOnBackdropClick, fmtSeconds } from './util.js';
 
 const JSON_INDENT = 2;
@@ -52,6 +54,7 @@ export function initAdminPanel() {
     actionButtons.forEach(button => button.addEventListener('click', () => runAction(button)));
     tabs.forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
     initFeeds();
+    initFeedAlerts();
 }
 
 export function showAdminEntry() {
@@ -63,7 +66,7 @@ export function hideAdminPanel() {
     dialog.close();
 }
 
-// The feed table needs more room, so the panel widens while the Feeds tab is open
+// The feed tables need more room, so the panel widens while the Feeds or Alerts tab is open
 function showTab(name) {
     tabs.forEach(tab => {
         const active = tab.dataset.tab === name;
@@ -71,8 +74,9 @@ function showTab(name) {
         tab.setAttribute('aria-selected', String(active));
     });
     views.forEach(view => { view.hidden = view.dataset.view !== name; });
-    dialog.classList.toggle('admin-panel-wide', name === 'feeds');
+    dialog.classList.toggle('admin-panel-wide', name !== 'tools');
     if (name === 'feeds') refreshFeeds();
+    if (name === 'alerts') refreshFeedAlerts();
 }
 
 // The dialog's padding also targets the dialog itself, so the click position decides

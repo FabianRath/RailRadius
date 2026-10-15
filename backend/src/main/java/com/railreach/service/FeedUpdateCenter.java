@@ -5,7 +5,6 @@ import com.railreach.dto.FeedDownloadResult.Outcome;
 import com.railreach.dto.FeedStatus;
 import com.railreach.dto.FeedStatus.State;
 import com.railreach.dto.FeedStorage;
-import com.railreach.dto.OperatorEnd;
 import com.railreach.service.FeedDownloader.Replacement;
 import com.railreach.service.FeedRegistry.FeedSource;
 import com.railreach.util.FeedFiles;
@@ -63,12 +62,11 @@ public class FeedUpdateCenter {
     private List<String> sources;
 
     // Reading the calendar and trips of a big feed takes seconds, so it is redone only when the zip changes
-    private final Map<Path, ReadValidity> validityByZip = new ConcurrentHashMap<>();
+    private final Map<Path, ReadTimespan> timespanByZip = new ConcurrentHashMap<>();
     private final ReentrantLock downloadLock = new ReentrantLock();
 
-    /** {@code validity} is null for a feed without a calendar. */
-    private record ReadValidity(long lastModifiedMs, long sizeBytes, FeedValidity validity,
-                                List<OperatorEnd> earlyEndingOperators) {}
+    /** {@code timespan} is null for a feed without a calendar. */
+    private record ReadTimespan(long lastModifiedMs, long sizeBytes, FeedTimespan timespan) {}
 
     public List<FeedStatus> statuses() {
         return statuses(LocalDate.now());
@@ -202,14 +200,14 @@ public class FeedUpdateCenter {
             long sizeBytes = Files.size(zip);
             long lastModifiedMs = Files.getLastModifiedTime(zip).toMillis();
             status.sizeBytes(sizeBytes).downloadedAt(Instant.ofEpochMilli(lastModifiedMs));
-            ReadValidity read = validity(zip, lastModifiedMs, sizeBytes);
-            FeedValidity validity = read.validity();
-            if (validity == null) return status.state(State.NO_CALENDAR).build();
+            FeedTimespan timespan = timespan(zip, lastModifiedMs, sizeBytes).timespan();
+            if (timespan == null) return status.state(State.NO_CALENDAR).build();
+            FeedValidity validity = timespan.validity();
             return status.firstServiceDate(validity.firstDay())
                     .lastServiceDate(validity.lastDay())
                     .daysLeft(ChronoUnit.DAYS.between(today, validity.lastDay()))
-                    .earlyEndingOperators(read.earlyEndingOperators())
-                    .state(state(validity, read.earlyEndingOperators(), today))
+                    .earlyEndingOperators(timespan.earlyEndingOperators())
+                    .state(state(timespan, today))
                     .build();
         } catch (IOException e) {
             log.warn("Cannot read feed {}", fileName, e);
@@ -226,25 +224,22 @@ public class FeedUpdateCenter {
     }
 
     /** A main operator that stops early makes the feed expiring, though its calendar runs on (B34). */
-    private State state(FeedValidity validity, List<OperatorEnd> earlyEndingOperators, LocalDate today) {
-        if (validity.lastDay().isBefore(today)) return State.EXPIRED;
-        if (validity.firstDay().isAfter(today)) return State.NOT_YET_VALID;
-        LocalDate trainsEnd = earlyEndingOperators.isEmpty()
-                ? validity.lastDay() : earlyEndingOperators.getFirst().getLastServiceDate();
-        if (!trainsEnd.isAfter(today.plusDays(expiringDays))) return State.EXPIRING;
+    private State state(FeedTimespan timespan, LocalDate today) {
+        if (timespan.validity().lastDay().isBefore(today)) return State.EXPIRED;
+        if (timespan.validity().firstDay().isAfter(today)) return State.NOT_YET_VALID;
+        if (!timespan.trainsEnd().isAfter(today.plusDays(expiringDays))) return State.EXPIRING;
         return State.OK;
     }
 
-    private ReadValidity validity(Path zip, long lastModifiedMs, long sizeBytes) throws IOException {
-        ReadValidity known = validityByZip.get(zip);
+    private ReadTimespan timespan(Path zip, long lastModifiedMs, long sizeBytes) throws IOException {
+        ReadTimespan known = timespanByZip.get(zip);
         if (known != null && known.lastModifiedMs() == lastModifiedMs && known.sizeBytes() == sizeBytes) return known;
         try (ZipFile zipFile = new ZipFile(zip.toFile())) {
-            Map<String, ServiceDays> calendar = ServiceCalendarReader.load(zipFile);
-            FeedValidity validity = FeedValidity.of(calendar).orElse(null);
-            List<OperatorEnd> earlyEndingOperators = validity == null ? List.of() : EarlyEndingOperators.read(
-                    zipFile, FeedFiles.source(zip.getFileName().toString()), calendar, validity.lastDay());
-            ReadValidity read = new ReadValidity(lastModifiedMs, sizeBytes, validity, earlyEndingOperators);
-            validityByZip.put(zip, read);
+            String source = FeedFiles.source(zip.getFileName().toString());
+            FeedTimespan timespan = FeedTimespan.read(zipFile, source, ServiceCalendarReader.load(zipFile))
+                    .orElse(null);
+            ReadTimespan read = new ReadTimespan(lastModifiedMs, sizeBytes, timespan);
+            timespanByZip.put(zip, read);
             return read;
         }
     }

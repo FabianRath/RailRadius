@@ -1,11 +1,14 @@
 package com.railreach.controller;
 
 import com.railreach.config.AdminToken;
+import com.railreach.dto.FeedAlertMailResult;
+import com.railreach.dto.FeedAlertStatus;
 import com.railreach.dto.FeedDownloadResult;
 import com.railreach.dto.FeedStatus;
 import com.railreach.dto.FeedStorage;
 import com.railreach.dto.GtfsLoadStatus;
 import com.railreach.model.Station;
+import com.railreach.service.FeedAlerts;
 import com.railreach.service.FeedUpdateCenter;
 import com.railreach.service.GtfsDataService;
 import com.railreach.service.ReachabilityService;
@@ -21,7 +24,9 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Comparator;
@@ -45,6 +50,7 @@ public class AdminController {
     private final AtomicBoolean debugShowAllStations = new AtomicBoolean(false);
     private final ReachabilityService reachabilityService;
     private final FeedUpdateCenter feedUpdateCenter;
+    private final FeedAlerts feedAlerts;
     private final AdminToken adminToken;
 
     /**
@@ -152,6 +158,34 @@ public class AdminController {
     @PostMapping("/feeds/download-outdated")
     public List<FeedDownloadResult> downloadOutdatedFeeds() {
         return feedUpdateCenter.downloadOutdated();
+    }
+
+    /** The daily alert mail about served feeds that end soon: on or off, and the feeds due, paused or not. */
+    @GetMapping("/feeds/alerts")
+    public FeedAlertStatus getFeedAlerts() {
+        return feedAlerts.status();
+    }
+
+    @PutMapping("/feeds/alerts")
+    public FeedAlertStatus setFeedAlerts(@RequestParam("enabled") boolean enabled) {
+        return feedAlerts.setEnabled(enabled);
+    }
+
+    /** Mails the current alert now, also while alerts are off, to check the mail setup. */
+    @PostMapping("/feeds/alerts/test")
+    public FeedAlertMailResult sendTestFeedAlert() {
+        return feedAlerts.sendTest();
+    }
+
+    /** Leaves a served feed out of the alert mail until its data changes; 404 if it is not served. */
+    @PutMapping("/feeds/{source}/alert-pause")
+    public ResponseEntity<FeedAlertStatus> pauseFeedAlert(@PathVariable String source) {
+        return ResponseEntity.of(feedAlerts.pause(source));
+    }
+
+    @DeleteMapping("/feeds/{source}/alert-pause")
+    public FeedAlertStatus resumeFeedAlert(@PathVariable String source) {
+        return feedAlerts.resume(source);
     }
 
     private static HttpStatus statusOf(FeedDownloadResult result) {

@@ -1026,6 +1026,11 @@ input[type="range"]::-moz-range-thumb {
     color: var(--danger);
 }
 
+.admin-btn[aria-pressed="true"] {
+    border-color: var(--accent-rail);
+    color: var(--accent-rail);
+}
+
 .admin-btn:disabled {
     opacity: 0.5;
     cursor: wait;

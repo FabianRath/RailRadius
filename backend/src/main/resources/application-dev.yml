@@ -10,6 +10,8 @@ railreach:
   # A fresh checkout starts without zips: download these in the admin panel (Feeds tab), then reload GTFS
   feeds:
     sources: austria,hungary,slovakia
+    alerts:
+      settings-file: data/feed-alerts-dev.json
 
   cache:
     predictive-enabled: false

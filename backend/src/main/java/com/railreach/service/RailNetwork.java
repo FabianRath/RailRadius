@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,6 +39,8 @@ final class RailNetwork {
     private final Map<String, TripInfo> tripInfos = new ConcurrentHashMap<>();
     // service ID -> the days it runs; only services of rail trips
     private final Map<String, ServiceDays> services = new ConcurrentHashMap<>();
+    // source -> how long its trains run
+    private final Map<String, FeedTimespan> feedTimespans = new ConcurrentHashMap<>();
     // trip ID -> the days it runs, shared per service; trips without a known service are missing (every day)
     private final Map<String, ServiceDays> tripServiceDays = new ConcurrentHashMap<>();
     // stop ID -> IDs of the trips that serve it
@@ -116,8 +119,15 @@ final class RailNetwork {
             if (info == null) throw new IllegalStateException("No trip info for " + tripId);
             storeTripInfos.add(info);
         }
+        List<FeedTimespan> feeds = feedTimespans.values().stream()
+                .sorted(Comparator.comparing(FeedTimespan::source))
+                .toList();
         return new BinaryCacheStore.BinaryCacheData(List.copyOf(stations.values()),
-                Collections.unmodifiableMap(translatedNames), storeTripInfos, store);
+                Collections.unmodifiableMap(translatedNames), storeTripInfos, feeds, store);
+    }
+
+    void addFeedTimespan(FeedTimespan timespan) {
+        feedTimespans.put(timespan.source(), timespan);
     }
 
     void addStationIfAbsent(Station station) {

@@ -140,6 +140,8 @@ public class GtfsFeedLoader {
             Map<String, Set<String>> translatedNames =
                     translatedNames(StopNameTranslations.load(zipFile), stops, rawToCanonical, stations);
             Map<String, ServiceDays> services = ServiceCalendarReader.load(zipFile);
+            // Before the rare trains are dropped: the update center reads the whole calendar too
+            FeedTimespan.read(zipFile, source, services).ifPresent(network::addFeedTimespan);
             RareTrainFilter.dropRareTrains(zipFile, trips, services, rawToCanonical);
             Map<String, String> rawToCanonicalService = addServices(services, trips, source, network);
             FeedTables tables = new FeedTables(source, routes, trips, rawToCanonicalService, rawToCanonical,

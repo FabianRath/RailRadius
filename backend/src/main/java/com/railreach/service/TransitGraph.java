@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -16,8 +17,8 @@ import java.util.stream.IntStream;
 
 /**
  * What the app serves of the merged rail network: stations, their translated names, the {@link TimetableStore} the
- * search runs on and the {@link TripInfo} of each store trip. Filled from the binary cache or from a load of the zips
- * ({@link RailNetwork#servedData}). All IDs are canonical stop/trip IDs.
+ * search runs on, the {@link TripInfo} of each store trip and how long each feed runs. Filled from the binary cache
+ * or from a load of the zips ({@link RailNetwork#servedData}). All IDs are canonical stop/trip IDs.
  */
 @Component
 public class TransitGraph {
@@ -28,6 +29,7 @@ public class TransitGraph {
     // trip ID of a store trip -> train number, headsign and operator
     private final Map<String, TripInfo> tripInfos = new ConcurrentHashMap<>();
     private volatile TimetableStore timetableStore = TimetableStore.empty();
+    private volatile List<FeedTimespan> feedTimespans = List.of();
     private final Clock clock;
 
     public TransitGraph() {
@@ -119,6 +121,7 @@ public class TransitGraph {
     }
 
     void clear() {
+        feedTimespans = List.of();
         stations.clear();
         translatedNames.clear();
         tripInfos.clear();
@@ -135,5 +138,11 @@ public class TransitGraph {
             tripInfos.put(store.tripId(trip), data.tripInfos().get(trip));
         }
         timetableStore = store;
+        feedTimespans = data.feeds();
+    }
+
+    /** How long each served feed runs, sorted by source; empty before a load. */
+    List<FeedTimespan> feedTimespans() {
+        return feedTimespans;
     }
 }

@@ -1,5 +1,6 @@
 package com.railreach.service;
 
+import com.railreach.dto.OperatorEnd;
 import com.railreach.model.Station;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +15,7 @@ import java.nio.file.StandardCopyOption;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -25,21 +27,23 @@ import java.util.Set;
 
 /**
  * Reads and writes what the app serves as one {@link BinaryBlocks} file (S20): stations, their translated names, the
- * {@link TripInfo} of each store trip and the {@link TimetableStore}. Reading it takes well under a second, where
+ * {@link TripInfo} of each store trip, how long each feed runs ({@link FeedTimespan}, F29) and the
+ * {@link TimetableStore}. Reading it takes well under a second, where
  * parsing the zips takes minutes. The dev machine writes it after each load of the zips; its hash is that of the zips
  * it was built from, so a server's file can be traced to them.
  * <p>
  * After a string table, the blocks are: stations (ID, name, parent station, country as string indexes; latitude,
  * longitude), translated names (stop, then its names as CSR), the trip infos (train number, headsign, operator by
- * store trip), and the store ({@link TimetableStore#writeTo}). A missing string is {@link #NO_STRING}, a missing
- * coordinate NaN.
+ * store trip), the feed timespans (source, first and last day as epoch days, then the early-ending operators as CSR:
+ * name and last day), and the store ({@link TimetableStore#writeTo}). A missing string is {@link #NO_STRING}, a
+ * missing coordinate NaN.
  */
 @Component
 @Slf4j
 public class BinaryCacheStore {
 
     /** Bump on every change of the layout or of how the store is built: a file with another version is not read. */
-    static final int FORMAT_VERSION = 1;
+    static final int FORMAT_VERSION = 2;
 
     private static final int NO_STRING = -1;
     private static final long BYTES_PER_MB = 1024 * 1024;
@@ -52,9 +56,9 @@ public class BinaryCacheStore {
         this.file = Path.of(storeFile).toAbsolutePath();
     }
 
-    /** What the file holds. tripInfos.get(i) belongs to the store's trip i. */
+    /** What the file holds. tripInfos.get(i) belongs to the store's trip i; feeds are sorted by source. */
     record BinaryCacheData(List<Station> stations, Map<String, Set<String>> translatedNames, List<TripInfo> tripInfos,
-                           TimetableStore store) {}
+                           List<FeedTimespan> feeds, TimetableStore store) {}
 
     /** Strings by index, each stored once. */
     private static final class StringTable {
@@ -135,6 +139,7 @@ public class BinaryCacheStore {
         int[][] stationColumns = stationColumns(data.stations(), strings);
         int[][] translatedNameColumns = translatedNameColumns(data.translatedNames(), strings);
         int[][] tripInfoColumns = tripInfoColumns(data.tripInfos(), strings);
+        int[][] feedColumns = feedColumns(data.feeds(), strings);
         PackedStrings.of(strings.strings).writeTo(out);
         for (int[] column : stationColumns) {
             out.ints(column);
@@ -145,6 +150,9 @@ public class BinaryCacheStore {
             out.ints(column);
         }
         for (int[] column : tripInfoColumns) {
+            out.ints(column);
+        }
+        for (int[] column : feedColumns) {
             out.ints(column);
         }
         data.store().writeTo(out);
@@ -158,7 +166,7 @@ public class BinaryCacheStore {
             strings[i] = packed.get(i);
         }
         return new BinaryCacheData(readStations(in, strings), readTranslatedNames(in, strings),
-                readTripInfos(in, strings), TimetableStore.readFrom(in));
+                readTripInfos(in, strings), readFeeds(in, strings), TimetableStore.readFrom(in));
     }
 
     /** ID, name, parent station and country of each station. */
@@ -241,6 +249,49 @@ public class BinaryCacheStore {
                     string(strings, operators[trip])));
         }
         return tripInfos;
+    }
+
+    /** Source, first and last day of each feed, then its early-ending operators (name, last day) as CSR. */
+    private static int[][] feedColumns(List<FeedTimespan> feeds, StringTable strings) {
+        int[] sources = new int[feeds.size()];
+        int[] firstDays = new int[feeds.size()];
+        int[] lastDays = new int[feeds.size()];
+        int[] operatorStart = new int[feeds.size() + 1];
+        IntList operators = new IntList();
+        IntList operatorLastDays = new IntList();
+        for (int feed = 0; feed < feeds.size(); feed++) {
+            FeedTimespan timespan = feeds.get(feed);
+            sources[feed] = strings.index(timespan.source());
+            firstDays[feed] = Math.toIntExact(timespan.validity().firstDay().toEpochDay());
+            lastDays[feed] = Math.toIntExact(timespan.validity().lastDay().toEpochDay());
+            for (OperatorEnd end : timespan.earlyEndingOperators()) {
+                operators.add(strings.index(end.getOperator()));
+                operatorLastDays.add(Math.toIntExact(end.getLastServiceDate().toEpochDay()));
+            }
+            operatorStart[feed + 1] = operators.size();
+        }
+        return new int[][] {sources, firstDays, lastDays, operatorStart, operators.toArray(),
+                operatorLastDays.toArray()};
+    }
+
+    private static List<FeedTimespan> readFeeds(BinaryBlocks.Reader in, String[] strings) throws IOException {
+        int[] sources = in.ints();
+        int[] firstDays = in.ints();
+        int[] lastDays = in.ints();
+        int[] operatorStart = in.ints();
+        int[] operators = in.ints();
+        int[] operatorLastDays = in.ints();
+        List<FeedTimespan> feeds = new ArrayList<>(sources.length);
+        for (int feed = 0; feed < sources.length; feed++) {
+            List<OperatorEnd> earlyEnding = new ArrayList<>();
+            for (int i = operatorStart[feed]; i < operatorStart[feed + 1]; i++) {
+                earlyEnding.add(new OperatorEnd(strings[operators[i]], LocalDate.ofEpochDay(operatorLastDays[i])));
+            }
+            FeedValidity validity = new FeedValidity(LocalDate.ofEpochDay(firstDays[feed]),
+                    LocalDate.ofEpochDay(lastDays[feed]));
+            feeds.add(new FeedTimespan(strings[sources[feed]], validity, List.copyOf(earlyEnding)));
+        }
+        return feeds;
     }
 
     private static String string(String[] strings, int index) {
