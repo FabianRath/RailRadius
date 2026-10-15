@@ -1,7 +1,7 @@
 import { fetchHealth } from './api.js';
 import { initMap, LAYERS, onEmptyMapClick, onPointClick, onZoomEnd } from './map.js';
 import { closeStationDetails, initStationDetails, showStationDetails } from './station-details.js';
-import { initSearch } from './search.js';
+import { initSearch, prefillStation } from './search.js';
 import { initSidebarToggle } from './sidebar.js';
 import { initQueryForm, showQueryForm } from './query-form.js';
 import { getJourney, initReachability, refreshCoverage } from './reachability.js';
@@ -11,8 +11,11 @@ import { hideAdminPanel, initAdminPanel, showAdminEntry } from './admin-panel.js
 import { showStatus } from './util.js';
 import { renderStaticIcons } from './icons.js';
 import { initAbout } from './about.js';
+import { initIntroHint } from './intro-hint.js';
 
 const COVERAGE_REDRAW_DEBOUNCE_MS = 300;
+// Pre-filled for new visitors: small enough that its 1-transfer map isn't cluttered
+const EXAMPLE_STATION_NAME = 'Krems Bahnhof';
 
 let selectedStation = null;
 
@@ -38,10 +41,14 @@ onPointClick(LAYERS.reachable, async ({ stopId }) => {
 });
 onEmptyMapClick(closeStationDetails);
 
-initSearch(station => {
+function selectStation(station) {
     selectedStation = station;
     showQueryForm();
-});
+}
+
+initIntroHint();
+initSearch(selectStation);
+prefillStation(EXAMPLE_STATION_NAME, selectStation);
 initQueryForm(refreshCoverage);
 initReachability(() => selectedStation);
 

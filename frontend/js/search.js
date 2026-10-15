@@ -24,6 +24,18 @@ export function initSearch(onSelect) {
     });
 }
 
+/** Selects the station with exactly this name as an example, unless the user has started typing meanwhile. */
+export async function prefillStation(name, onSelect) {
+    try {
+        const station = (await searchStations(name)).find(s => s.name === name);
+        if (!station || searchInput.value) return;
+        searchInput.value = station.name;
+        onSelect({ id: station.id, name: station.name });
+    } catch (error) {
+        console.error('Example station lookup failed:', error);
+    }
+}
+
 async function runSearch(query) {
     if (!query || query.length < MIN_QUERY_LENGTH) {
         stationResults.innerHTML = '';
