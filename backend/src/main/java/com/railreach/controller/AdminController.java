@@ -1,5 +1,6 @@
 package com.railreach.controller;
 
+import com.railreach.config.AdminToken;
 import com.railreach.dto.FeedDownloadResult;
 import com.railreach.dto.FeedStatus;
 import com.railreach.dto.FeedStorage;
@@ -9,8 +10,10 @@ import com.railreach.service.FeedUpdateCenter;
 import com.railreach.service.GtfsDataService;
 import com.railreach.service.ReachabilityService;
 import com.railreach.service.TransitGraph;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -42,6 +45,26 @@ public class AdminController {
     private final AtomicBoolean debugShowAllStations = new AtomicBoolean(false);
     private final ReachabilityService reachabilityService;
     private final FeedUpdateCenter feedUpdateCenter;
+    private final AdminToken adminToken;
+
+    /**
+     * Sets the admin cookie, so this browser's searches skip the rate limit: its EventSource cannot send the
+     * {@value AdminToken#HEADER} header. Called on dev login.
+     */
+    @PostMapping("/session")
+    public ResponseEntity<Void> startSession(HttpServletRequest request) {
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, adminToken.cookie(request.isSecure()).toString())
+                .build();
+    }
+
+    /** Deletes the admin cookie again (dev logout). */
+    @DeleteMapping("/session")
+    public ResponseEntity<Void> endSession() {
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, adminToken.clearedCookie().toString())
+                .build();
+    }
 
     /**
      * Show what is currently in the reachability cache and what is being warmed.
