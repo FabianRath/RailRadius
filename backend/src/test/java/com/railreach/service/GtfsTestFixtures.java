@@ -36,6 +36,9 @@ final class GtfsTestFixtures {
     private static final String BORDERS_FILE = "gtfs-mini/borders.geojson";
     // Before every fixture's first service day, so no day counts as past (B31)
     static final LocalDate TODAY = LocalDate.of(2026, 1, 1);
+    // Tests that are not about the rate limit search as this client, with a budget no test can use up
+    static final SearchRateLimiter.Client VISITOR = new SearchRateLimiter.Client("192.0.2.1", false);
+    private static final int UNLIMITED_SEARCH_BUDGET = 1_000_000;
 
     static TransitGraph load(Path tempDir, String... feedFolders) throws IOException {
         return load(tempDir, TRIP_BATCH_SIZE, TODAY, feedFolders);
@@ -137,8 +140,13 @@ final class GtfsTestFixtures {
     }
 
     static ReachabilityService reachabilityService(TransitGraph graph, ReachabilityCache cache) {
+        return reachabilityService(graph, cache, new SearchRateLimiter(UNLIMITED_SEARCH_BUDGET, 1));
+    }
+
+    static ReachabilityService reachabilityService(TransitGraph graph, ReachabilityCache cache,
+                                                   SearchRateLimiter rateLimiter) {
         ReachabilityService service = new ReachabilityService(cache, new ReachabilityWarmer(cache),
-                new JourneyLegBuilder(graph));
+                new JourneyLegBuilder(graph), rateLimiter);
         ReflectionTestUtils.setField(service, "maxTransferTimeMinutes", 180);
         return service;
     }

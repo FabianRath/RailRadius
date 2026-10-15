@@ -1,6 +1,7 @@
-// Dev login: the admin token unlocks dev features (debug overlay, admin panel). It is checked against the
-// backend before it is kept, and a stored token that no longer works is dropped on page load.
-import { fetchDebugStatus, hasAdminToken, setAdminToken } from './api.js';
+// Dev login: the admin token unlocks dev features (debug overlay, admin panel) and exempts this browser's searches
+// from the rate limit (via a cookie). It is checked against the backend before it is kept, and a stored token that no
+// longer works is dropped on page load.
+import { endAdminSession, fetchDebugStatus, hasAdminToken, setAdminToken, startAdminSession } from './api.js';
 
 const toggle = document.getElementById('devToggle');
 const form = document.getElementById('devLoginForm');
@@ -15,15 +16,20 @@ export async function initDevAuth(onLogin, onLogout) {
     toggle.addEventListener('click', onToggleClick);
     form.addEventListener('submit', onSubmit);
     if (hasAdminToken() && await tokenIsValid()) {
-        enterDevMode();
+        await enterDevMode();
     } else {
         setAdminToken(null);
         render(false);
     }
 }
 
-function onToggleClick() {
+async function onToggleClick() {
     if (hasAdminToken()) {
+        try {
+            await endAdminSession();
+        } catch (error) {
+            console.error('Could not delete the admin cookie:', error);
+        }
         setAdminToken(null);
         render(false);
         callbacks.onLogout();
@@ -37,7 +43,7 @@ async function onSubmit(event) {
     event.preventDefault();
     setAdminToken(tokenInput.value.trim());
     if (await tokenIsValid()) {
-        enterDevMode();
+        await enterDevMode();
         return;
     }
     setAdminToken(null);
@@ -54,9 +60,14 @@ async function tokenIsValid() {
     }
 }
 
-function enterDevMode() {
+async function enterDevMode() {
     render(true);
     callbacks.onLogin();
+    try {
+        await startAdminSession();
+    } catch (error) {
+        console.error('Could not set the admin cookie, searches stay rate limited:', error);
+    }
 }
 
 function render(loggedIn) {

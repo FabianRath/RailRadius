@@ -8,7 +8,8 @@ How much server RailReach needs, measured on the full data. Re-measure when the 
 - Updating data: parse locally (a reload writes the binary cache), upload it, restart the app. It is read only at startup, which takes ~3 s, so that is the downtime of an update. The log line `Binary cache read …` names the SHA-256 of the zips it was built from.
 - Rollback: the git tag `pre-compact` with its JSON cache `data/gtfs-cache.json` (the legacy engine, `-Xmx9g`).
 - The server needs the jar, `frontend/` and `data/gtfs-store.bin`. No zips, so a small disk is enough.
-- Leave `RAILREACH_ADMIN_TOKEN` unset, so `/api/admin/**` answers 403 (no reload, cache delete or feed download from outside).
+- Leave `RAILREACH_ADMIN_TOKEN` unset, so `/api/admin/**` answers 403 (no reload, cache delete or feed download from outside). The price: nobody is exempt from the search rate limit, the owner included. To be exempt, set a long random token; that also opens the admin API to whoever has it.
+- The search rate limit (F26) is per client IP. Behind a reverse proxy (nginx, Caddy, Cloudflare) set `RAILREACH_FORWARD_HEADERS_STRATEGY=native`, or every visitor shares the proxy's budget. Without one, leave it unset: clients could otherwise fake their IP with `X-Forwarded-For`.
 - Without zips, the feed update center logs all feeds as missing at startup and once a day. That is expected.
 
 ## Size

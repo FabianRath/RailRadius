@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.railreach.service.GtfsTestFixtures.VISITOR;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
@@ -26,6 +27,8 @@ class ReachabilityServiceTest {
 
     private static final int A_DAY_MINUTES = 24 * 60;
     private static final int LONGEST_MIN_WAIT_MINUTES = 1300;
+    // What SearchRateLimiter charges for a 5-transfer search
+    private static final int BIG_SEARCH_COST = 65;
 
     @TempDir
     static Path tempDir;
@@ -184,8 +187,9 @@ class ReachabilityServiceTest {
                 .minTransferTimeMinutes(0)
                 .maxTransferTimeMinutes(99999);
 
-        ReachableStation anyTime = service.journey(unlimitedWait.build(), "epsilon:E6").orElseThrow();
-        ReachableStation withinTwoHours = service.journey(unlimitedWait.maxJourneyTimeHours(2.0).build(), "epsilon:E6")
+        ReachableStation anyTime = service.journey(VISITOR, unlimitedWait.build(), "epsilon:E6").orElseThrow();
+        ReachableStation withinTwoHours = service.journey(VISITOR, unlimitedWait.maxJourneyTimeHours(2.0).build(),
+                        "epsilon:E6")
                 .orElseThrow();
 
         assertThat(anyTime.getTransfers()).isEqualTo(1);
@@ -349,7 +353,7 @@ class ReachabilityServiceTest {
         // A2 (30 min) and A3/B1 (60 min) fit into 1 h, B2 (120 min) does not
         RecordingEmitter emitter = new RecordingEmitter();
         ReachabilityService service = service(gtfs);
-        service.calculateReachabilityStreaming(ReachabilityRequest.builder()
+        service.calculateReachabilityStreaming(VISITOR, ReachabilityRequest.builder()
                 .startStationId("alpha:A1")
                 .maxTransfers(1)
                 .minTransferTimeMinutes(0)
@@ -379,9 +383,9 @@ class ReachabilityServiceTest {
                 .build();
 
         RecordingEmitter first = new RecordingEmitter();
-        service.calculateReachabilityStreaming(request, first);
+        service.calculateReachabilityStreaming(VISITOR, request, first);
         RecordingEmitter repeat = new RecordingEmitter();
-        service.calculateReachabilityStreaming(request, repeat);
+        service.calculateReachabilityStreaming(VISITOR, request, repeat);
 
         assertThat(first.streamedStopIds()).doesNotHaveDuplicates().doesNotContain("alpha:A1");
         assertThat(first.streamedStopIds()).containsExactlyInAnyOrderElementsOf(repeat.streamedStopIds());
@@ -403,9 +407,9 @@ class ReachabilityServiceTest {
                 .build();
 
         RecordingEmitter emitter = new RecordingEmitter();
-        service.calculateReachabilityStreaming(request, emitter);
+        service.calculateReachabilityStreaming(VISITOR, request, emitter);
         List<ReachableStation> expected = graph.getAllStations().keySet().stream()
-                .flatMap(stopId -> service.journey(request, stopId).stream())
+                .flatMap(stopId -> service.journey(VISITOR, request, stopId).stream())
                 .toList();
 
         assertThat(emitter.streamedStations())
@@ -424,7 +428,7 @@ class ReachabilityServiceTest {
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs, cache);
         GoneClientEmitter emitter = new GoneClientEmitter();
 
-        service.calculateReachabilityStreaming(streamRequest("alpha:A1", 3), emitter);
+        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 3), emitter);
 
         assertThat(emitter.sendAttempts).isEqualTo(1);
         assertThat(cache.contains(new SearchKey("alpha:A1", 3, 0, 180))).isFalse();
@@ -438,7 +442,7 @@ class ReachabilityServiceTest {
         RecordingEmitter emitter = new RecordingEmitter();
 
         try (HeldPermit ignored = new HeldPermit(gate)) {
-            service.calculateReachabilityStreaming(streamRequest("alpha:A1", 1), emitter);
+            service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 1), emitter);
         }
 
         // completeWithError would hand the exception to Spring after the response is committed and log it (B39)
@@ -449,18 +453,63 @@ class ReachabilityServiceTest {
     }
 
     @Test
+    void streamOverTheSearchBudgetEndsWithAnErrorEventAndSearchesNothing() {
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
+        ReachabilityService service = serviceWithBudgetForOneBigSearch(cache);
+        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 5),
+                new RecordingEmitter());
+
+        RecordingEmitter emitter = new RecordingEmitter();
+        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A2", 0), emitter);
+
+        assertThat(emitter.texts).anyMatch(text -> text.contains("event:error") && text.contains("try again in"));
+        assertThat(emitter.completed).isTrue();
+        assertThat(emitter.error).isNull();
+        assertThat(cache.contains(new SearchKey("alpha:A2", 0, 0, 180))).isFalse();
+    }
+
+    @Test
+    void storedResultsCostNoSearchBudget() {
+        ReachabilityService service = serviceWithBudgetForOneBigSearch(GtfsTestFixtures.reachabilityCache(gtfs));
+        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 5),
+                new RecordingEmitter());
+
+        RecordingEmitter repeat = new RecordingEmitter();
+        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 5), repeat);
+        RecordingEmitter fewerTransfers = new RecordingEmitter();
+        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 1), fewerTransfers);
+
+        assertThat(repeat.done().get("total")).isEqualTo(repeat.streamedStopIds().size());
+        assertThat(fewerTransfers.done().get("total")).isEqualTo(fewerTransfers.streamedStopIds().size());
+        assertThat(service.journey(VISITOR, streamRequest("alpha:A1", 5), "alpha:A2")).isPresent();
+    }
+
+    @Test
+    void adminSearchesAreNeverRateLimited() {
+        ReachabilityService service = serviceWithBudgetForOneBigSearch(GtfsTestFixtures.reachabilityCache(gtfs));
+        SearchRateLimiter.Client admin = new SearchRateLimiter.Client(VISITOR.ip(), true);
+        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 5),
+                new RecordingEmitter());
+
+        RecordingEmitter emitter = new RecordingEmitter();
+        service.calculateReachabilityStreaming(admin, streamRequest("alpha:A2", 5), emitter);
+
+        assertThat(emitter.done().get("total")).isEqualTo(emitter.streamedStopIds().size());
+    }
+
+    @Test
     void streamThatRunsOutOfMemorySendsAnErrorAndFreesItsPermit() {
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs,
                 GtfsTestFixtures.reachabilityCache(gtfs, new SearchGate(1, 0)));
         OutOfMemoryEmitter emitter = new OutOfMemoryEmitter();
 
-        service.calculateReachabilityStreaming(streamRequest("alpha:A1", 3), emitter);
+        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 3), emitter);
 
         assertThat(emitter.texts).anyMatch(text -> text.contains("event:error"));
         assertThat(emitter.completed).isTrue();
         assertThat(emitter.error).isNull();
         RecordingEmitter next = new RecordingEmitter();
-        service.calculateReachabilityStreaming(streamRequest("alpha:A1", 3), next);
+        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 3), next);
         assertThat(next.error).isNull();
         assertThat(next.done().get("total")).isEqualTo(next.streamedStopIds().size());
     }
@@ -475,8 +524,8 @@ class ReachabilityServiceTest {
                 .maxTransferTimeMinutes(180)
                 .build();
 
-        assertThat(service.journey(request, "beta:B2")).isEmpty();
-        assertThat(service.journey(request, "alpha:A1")).isEmpty();
+        assertThat(service.journey(VISITOR, request, "beta:B2")).isEmpty();
+        assertThat(service.journey(VISITOR, request, "alpha:A1")).isEmpty();
     }
 
     /** Captures every sent SSE event and how the stream ended instead of writing them to a response. */
@@ -559,6 +608,12 @@ class ReachabilityServiceTest {
                 .build();
     }
 
+    // A clock that stands still, so the budget never refills during the test
+    private ReachabilityService serviceWithBudgetForOneBigSearch(ReachabilityCache cache) {
+        return GtfsTestFixtures.reachabilityService(gtfs, cache,
+                new SearchRateLimiter(BIG_SEARCH_COST, 1, () -> 0L));
+    }
+
     private static ReachabilityService service(TransitGraph graph) {
         return GtfsTestFixtures.reachabilityService(graph);
     }
@@ -575,6 +630,6 @@ class ReachabilityServiceTest {
     }
 
     private static Optional<ReachableStation> find(Search search, String stopId) {
-        return search.service().journey(search.request(), stopId);
+        return search.service().journey(VISITOR, search.request(), stopId);
     }
 }

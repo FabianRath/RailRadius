@@ -4,7 +4,8 @@
 #   mvn -q -f backend/pom.xml spring-boot:run -Dspring-boot.run.jvmArguments="-Xmx12g -XX:+UseCompactObjectHeaders -Xlog:gc*:file=<log>" \
 #       -Dspring-boot.run.arguments=--railreach.cache.predictive-enabled=false
 # <log> must be relative (to backend/): -Xlog splits at the colon of "C:". jcmd/jfr come from $JAVA_HOME/bin, else PATH;
-# alloc and held write their files to $BENCH_OUT (default: the current directory).
+# alloc and held write their files to $BENCH_OUT (default: the current directory). Searches send RAILREACH_ADMIN_TOKEN
+# (default "dev"): without the dev profile, start the app with the same env var, or the rate limit turns them away.
 # Usage: scripts/bench.sh <command> [args]
 set -euo pipefail
 BASE="${RAILREACH_URL:-http://localhost:8080}"
@@ -24,9 +25,10 @@ live_heap_mb() {
 # Bytes of all live objects (forces a full GC)
 histogram_bytes() { "${JDK_BIN}jcmd" "$(app_pid)" GC.class_histogram | awk '/^Total/ {print $3}'; }
 
-# Streams a search and prints "<stations> <calculationTimeMs>" from its done event
+# Streams a search and prints "<stations> <calculationTimeMs>" from its done event. It sends the admin token, so the
+# search rate limit never turns a run away
 stream() {
-  curl -sN "$BASE/api/reachability/stream?stationId=$1&maxTransfers=$2" \
+  curl -sN -H "X-Admin-Token: ${RAILREACH_ADMIN_TOKEN:-dev}" "$BASE/api/reachability/stream?stationId=$1&maxTransfers=$2" \
     | grep -A1 '^event:done' | sed -nE 's/.*"(calculationTimeMs|total)":([0-9]+).*"(calculationTimeMs|total)":([0-9]+).*/\1 \2 \3 \4/p' \
     | awk '{v[$1]=$2; v[$3]=$4; print v["total"], v["calculationTimeMs"]}'
 }

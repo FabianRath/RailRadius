@@ -1,13 +1,16 @@
 package com.railreach.controller;
 
+import com.railreach.config.AdminToken;
 import com.railreach.dto.Coverage;
 import com.railreach.dto.ReachabilityRequest;
 import com.railreach.dto.ReachableStation;
 import com.railreach.model.Station;
 import com.railreach.service.CoverageService;
 import com.railreach.service.ReachabilityService;
+import com.railreach.service.SearchRateLimiter;
 import com.railreach.service.StationSearchIndex;
 import com.railreach.service.TransitGraph;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
@@ -36,16 +39,19 @@ public class RailReachController {
     private final StationSearchIndex stationSearchIndex;
     private final CoverageService coverageService;
     private final AsyncTaskExecutor taskExecutor;
+    private final AdminToken adminToken;
 
     // With @EnableScheduling the task scheduler is an AsyncTaskExecutor too; SSE streams use the task executor
     public RailReachController(ReachabilityService reachabilityService, TransitGraph transitGraph,
                                StationSearchIndex stationSearchIndex, CoverageService coverageService,
-                               @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor) {
+                               @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor,
+                               AdminToken adminToken) {
         this.reachabilityService = reachabilityService;
         this.transitGraph = transitGraph;
         this.stationSearchIndex = stationSearchIndex;
         this.coverageService = coverageService;
         this.taskExecutor = taskExecutor;
+        this.adminToken = adminToken;
     }
     
     /**
@@ -56,7 +62,7 @@ public class RailReachController {
      *   "stations" — JSON array of ReachableStationSummary objects (batch); the journey comes from
      *                /reachability/journey when a station is clicked
      *   "done"     — {"total": N, "calculationTimeMs": M}
-     *   "error"    — error message string
+     *   "error"    — error message string, also when the client is over its search budget (SearchRateLimiter)
      *
      * Example:
      *   GET /api/reachability/stream?stationId=de:8011160&maxTransfers=2&minTransferMinutes=5&maxTransferMinutes=180
@@ -67,7 +73,8 @@ public class RailReachController {
             @RequestParam("maxTransfers")         int maxTransfers,
             @RequestParam(value = "minTransferMinutes", defaultValue = "0")   int minTransferMinutes,
             @RequestParam(value = "maxTransferMinutes", defaultValue = "180") int maxTransferMinutes,
-            @RequestParam(value = "maxJourneyHours", required = false) Double maxJourneyHours) {
+            @RequestParam(value = "maxJourneyHours", required = false) Double maxJourneyHours,
+            HttpServletRequest httpRequest) {
 
         // 30-minute timeout — enough for any realistic BFS
         SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
@@ -79,16 +86,18 @@ public class RailReachController {
                 .maxTransferTimeMinutes(maxTransferMinutes)
                 .maxJourneyTimeHours(maxJourneyHours)
                 .build();
+        // Read here: the servlet request is recycled before the worker runs
+        SearchRateLimiter.Client client = client(httpRequest);
 
         taskExecutor.execute(() ->
-                reachabilityService.calculateReachabilityStreaming(req, emitter));
+                reachabilityService.calculateReachabilityStreaming(client, req, emitter));
 
         return emitter;
     }
 
     /**
      * One reachable station with its journey (path, legs, running days), for the same parameters as the stream.
-     * 404 if targetId is not reachable within them.
+     * 404 if targetId is not reachable within them, 429 if it would have to search and the client is over its budget.
      */
     @GetMapping("/reachability/journey")
     public ResponseEntity<ReachableStation> journey(
@@ -97,7 +106,8 @@ public class RailReachController {
             @RequestParam(value = "minTransferMinutes", defaultValue = "0")   int minTransferMinutes,
             @RequestParam(value = "maxTransferMinutes", defaultValue = "180") int maxTransferMinutes,
             @RequestParam(value = "maxJourneyHours", required = false) Double maxJourneyHours,
-            @RequestParam("targetId")             String targetId) {
+            @RequestParam("targetId")             String targetId,
+            HttpServletRequest httpRequest) {
         ReachabilityRequest req = ReachabilityRequest.builder()
                 .startStationId(stationId)
                 .maxTransfers(maxTransfers)
@@ -105,7 +115,11 @@ public class RailReachController {
                 .maxTransferTimeMinutes(maxTransferMinutes)
                 .maxJourneyTimeHours(maxJourneyHours)
                 .build();
-        return ResponseEntity.of(reachabilityService.journey(req, targetId));
+        return ResponseEntity.of(reachabilityService.journey(client(httpRequest), req, targetId));
+    }
+
+    private SearchRateLimiter.Client client(HttpServletRequest request) {
+        return new SearchRateLimiter.Client(request.getRemoteAddr(), adminToken.sentWith(request));
     }
 
     @GetMapping("/stations/search")

@@ -5,10 +5,14 @@ const ADMIN_TOKEN_KEY = 'railreach.adminToken';
 
 let adminToken = readStoredAdminToken();
 
-async function requestJson(path, init = {}) {
+async function request(path, init = {}) {
     const response = await fetch(API_BASE + path, init);
     if (!response.ok) throw new Error(`HTTP ${response.status} for ${path}`);
-    return response.json();
+    return response;
+}
+
+async function requestJson(path, init = {}) {
+    return (await request(path, init)).json();
 }
 
 function readStoredAdminToken() {
@@ -19,8 +23,12 @@ function readStoredAdminToken() {
     }
 }
 
+function adminInit(method) {
+    return { method, headers: { 'X-Admin-Token': adminToken ?? '' } };
+}
+
 function adminJson(path, method = 'GET') {
-    return requestJson(path, { method, headers: { 'X-Admin-Token': adminToken ?? '' } });
+    return requestJson(path, adminInit(method));
 }
 
 export function hasAdminToken() {
@@ -36,6 +44,15 @@ export function setAdminToken(token) {
     } catch {
         // Storage blocked (private mode): the login lasts until the page is reloaded
     }
+}
+
+/** Sets the admin cookie, so this browser's searches skip the rate limit (EventSource cannot send the header). */
+export async function startAdminSession() {
+    await request('/api/admin/session', adminInit('POST'));
+}
+
+export async function endAdminSession() {
+    await request('/api/admin/session', adminInit('DELETE'));
 }
 
 export function fetchHealth() {

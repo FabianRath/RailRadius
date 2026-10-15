@@ -34,6 +34,7 @@ public class ReachabilityService {
     private final ReachabilityCache cache;
     private final ReachabilityWarmer warmer;
     private final JourneyLegBuilder legBuilder;
+    private final SearchRateLimiter rateLimiter;
 
     @Value("${railreach.algorithm.max-transfer-time-minutes:180}")
     private int maxTransferTimeMinutes;
@@ -44,10 +45,15 @@ public class ReachabilityService {
     /**
      * The journey to targetId with the path the stream sent for it; empty if the target is not reachable within the
      * request's limits. The search result is usually stored by the stream that showed the station.
+     *
+     * @throws SearchRateLimiter.TooManySearchesException if it would have to search and the client's budget is too low
      */
-    public Optional<ReachableStation> journey(ReachabilityRequest request, String targetId) {
+    public Optional<ReachableStation> journey(SearchRateLimiter.Client client, ReachabilityRequest request,
+                                              String targetId) {
         if (targetId.equals(request.getStartStationId())) return Optional.empty();
-        CompactResult result = cache.getOrCompute(searchKey(request));
+        SearchKey key = searchKey(request);
+        chargeUnlessStored(client, key);
+        CompactResult result = cache.getOrCompute(key);
         return fewestTransfersWithin(result.paths(targetId), maxJourneyMinutes(request))
                 .flatMap(path -> legBuilder.toReachableStation(targetId, result.journey(targetId, path.transfers())));
     }
@@ -56,12 +62,15 @@ public class ReachabilityService {
      * Resolves the request and sends the stations to the emitter in batches, then a "done" event. A search sends
      * each round's stations when the round ends; a stored result is sent at once. Runs on a worker thread; the HTTP
      * response stays open until it completes. A search that waits for a {@link SearchGate} permit sends SSE comments
-     * meanwhile, and the search stops when a send fails because the client is gone, which frees its permit.
+     * meanwhile, and the search stops when a send fails because the client is gone, which frees its permit. A client
+     * over its {@link SearchRateLimiter} budget gets an error event instead.
      */
-    public void calculateReachabilityStreaming(ReachabilityRequest request, SseEmitter emitter) {
+    public void calculateReachabilityStreaming(SearchRateLimiter.Client client, ReachabilityRequest request,
+                                               SseEmitter emitter) {
         long startMs = System.currentTimeMillis();
         SearchKey key = searchKey(request);
         try {
+            chargeUnlessStored(client, key);
             StreamedStations streamed = new StreamedStations(request, emitter, startMs);
             // A station is sent once, with its first path within the time limit. Rounds add paths by ascending
             // transfers, so that is the path its journey shows too (B4).
@@ -82,7 +91,7 @@ public class ReachabilityService {
         } catch (CancellationException e) {
             log.info("Stream stopped after {} ms: {}", System.currentTimeMillis() - startMs, e.getMessage());
             emitter.complete();
-        } catch (SearchGate.BusyException e) {
+        } catch (SearchGate.BusyException | SearchRateLimiter.TooManySearchesException e) {
             sendError(emitter, e.getMessage());
         } catch (Exception e) {
             log.error("Streaming BFS error", e);
@@ -105,6 +114,12 @@ public class ReachabilityService {
             log.debug("Could not send the error event, the client is gone", sendError);
         }
         emitter.complete();
+    }
+
+    // A stored result costs no search, so it costs no budget either
+    private void chargeUnlessStored(SearchRateLimiter.Client client, SearchKey key) {
+        if (client.admin() || cache.contains(key)) return;
+        rateLimiter.charge(client.ip(), key.maxTransfers());
     }
 
     public Map<String, Object> getCacheStats() {

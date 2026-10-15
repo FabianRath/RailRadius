@@ -3,7 +3,8 @@
 # Usage: scripts/api.sh <command> [args]     e.g. scripts/api.sh search wien
 set -euo pipefail
 BASE="${RAILREACH_URL:-http://localhost:8080}"
-# Admin calls send RAILREACH_ADMIN_TOKEN; "dev" matches the dev profile's default
+# Admin calls send RAILREACH_ADMIN_TOKEN; "dev" matches the dev profile's default. reach sends it too, so it is never
+# rate limited
 admin() { curl -s -H "X-Admin-Token: ${RAILREACH_ADMIN_TOKEN:-dev}" "$@"; }
 
 case "${1:-help}" in
@@ -12,7 +13,7 @@ case "${1:-help}" in
   search)        curl -s "$BASE/api/stations/search?q=${2:?query}&limit=${3:-10}" ;;
   station)       curl -s "$BASE/api/stations/${2:?stationId}" ;;
   # reach <stationId> <maxTransfers> [minTransferMin] [maxTransferMin] -> prints the "done" event only
-  reach)         curl -sN "$BASE/api/reachability/stream?stationId=${2:?stationId}&maxTransfers=${3:?maxTransfers}&minTransferMinutes=${4:-0}&maxTransferMinutes=${5:-180}" | grep -A1 '^event:done' ;;
+  reach)         admin -N "$BASE/api/reachability/stream?stationId=${2:?stationId}&maxTransfers=${3:?maxTransfers}&minTransferMinutes=${4:-0}&maxTransferMinutes=${5:-180}" | grep -A1 '^event:done' ;;
   cache-stats)   admin "$BASE/api/admin/cache-stats" ;;
   gtfs-stats)    admin "$BASE/api/admin/gtfs-stats" ;;
   # Feed update center: validity of every zip; downloads replace zips (old one kept in previous/), then reload-gtfs
