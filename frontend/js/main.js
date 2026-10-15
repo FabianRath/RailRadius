@@ -1,4 +1,4 @@
-import { fetchHealth } from './api.js';
+import { isUpdatingTimetables } from './server-status.js';
 import { initMap, LAYERS, onEmptyMapClick, onPointClick, onZoomEnd } from './map.js';
 import { closeStationDetails, initStationDetails, showStationDetails } from './station-details.js';
 import { initSearch, prefillStation } from './search.js';
@@ -19,12 +19,7 @@ const EXAMPLE_STATION_NAME = 'Krems Bahnhof';
 
 let selectedStation = null;
 
-fetchHealth()
-    .then(health => console.log('Backend health:', health))
-    .catch(error => {
-        console.error('Backend connection failed:', error);
-        showStatus('error', 'Backend not reachable');
-    });
+isUpdatingTimetables();
 
 renderStaticIcons();
 initSidebarToggle();
@@ -36,6 +31,7 @@ onPointClick(LAYERS.reachable, async ({ stopId }) => {
         showStationDetails(await getJourney(stopId));
     } catch (error) {
         console.error('Journey request failed:', error);
+        if (await isUpdatingTimetables()) return;
         showStatus('error', 'Could not load the journey to this station');
     }
 });
