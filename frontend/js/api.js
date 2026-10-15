@@ -122,6 +122,27 @@ export function fetchFeedStorage() {
     return adminJson('/api/admin/feeds/storage');
 }
 
+export function fetchFeedAlerts() {
+    return adminJson('/api/admin/feeds/alerts');
+}
+
+export function setFeedAlertsEnabled(enabled) {
+    return adminJson(`/api/admin/feeds/alerts?enabled=${enabled}`, 'PUT');
+}
+
+/** Mails the current alert now, also while alerts are off; answers whether it was sent. */
+export function sendTestFeedAlert() {
+    return adminJson('/api/admin/feeds/alerts/test', 'POST');
+}
+
+export function pauseFeedAlert(source) {
+    return adminJson(`/api/admin/feeds/${encodeURIComponent(source)}/alert-pause`, 'PUT');
+}
+
+export function resumeFeedAlert(source) {
+    return adminJson(`/api/admin/feeds/${encodeURIComponent(source)}/alert-pause`, 'DELETE');
+}
+
 export function downloadFeed(source) {
     return adminJson(`/api/admin/feeds/${encodeURIComponent(source)}/download`, 'POST');
 }

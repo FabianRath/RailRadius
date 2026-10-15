@@ -10,14 +10,19 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 class BinaryCacheStoreTest {
 
     // Little-endian, after the magic
     private static final int FORMAT_VERSION_OFFSET = 4;
+    // zeta's services run from 2026-01-05 to 2026-03-29
+    private static final LocalDate ZETA_FIRST_DAY = LocalDate.of(2026, 1, 5);
+    private static final LocalDate ZETA_LAST_DAY = LocalDate.of(2026, 3, 29);
 
     @TempDir
     Path tempDir;
@@ -45,6 +50,19 @@ class BinaryCacheStoreTest {
             String tripId = parsedStore.tripId(trip);
             assertThat(restored.getTripInfo(tripId)).as(tripId).isEqualTo(parsed.getTripInfo(tripId));
         }
+    }
+
+    @Test
+    void howLongEachFeedRunsIsStoredWithTheServedData() throws IOException {
+        TransitGraph parsed = GtfsTestFixtures.load(tempDir, "alpha", "zeta");
+
+        TransitGraph restored = TransitGraph.withToday(GtfsTestFixtures.TODAY);
+        restored.restore(store().load().orElseThrow());
+
+        assertThat(restored.feedTimespans()).isEqualTo(parsed.feedTimespans());
+        // alpha has no calendar, so its trains run every day and never end
+        assertThat(restored.feedTimespans()).extracting(FeedTimespan::source, FeedTimespan::validity)
+                .containsExactly(tuple("zeta", new FeedValidity(ZETA_FIRST_DAY, ZETA_LAST_DAY)));
     }
 
     @Test

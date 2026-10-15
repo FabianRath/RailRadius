@@ -186,6 +186,7 @@
                 <button type="button" class="admin-tab is-active" role="tab" aria-selected="true"
                     data-tab="tools">Tools</button>
                 <button type="button" class="admin-tab" role="tab" aria-selected="false" data-tab="feeds">Feeds</button>
+                <button type="button" class="admin-tab" role="tab" aria-selected="false" data-tab="alerts">Alerts</button>
             </div>
             <section class="admin-view" data-view="tools" role="tabpanel">
                 <div class="admin-group">
@@ -235,6 +236,25 @@
                             </tr>
                         </thead>
                         <tbody id="feedRows"></tbody>
+                    </table>
+                </div>
+            </section>
+            <section class="admin-view" data-view="alerts" role="tabpanel" hidden>
+                <div class="admin-buttons">
+                    <button type="button" class="admin-btn" id="alertToggle" aria-pressed="false">
+                        Email alerts: off</button>
+                    <button type="button" class="admin-btn" id="alertTest">Send test email</button>
+                </div>
+                <div class="feed-summary" id="alertSummary"></div>
+                <div class="feed-table-wrap">
+                    <table class="feed-table">
+                        <thead>
+                            <tr>
+                                <th>Feed</th><th>Trains end</th><th>Days left</th><th>Ending early</th>
+                                <th>Runs until</th><th>Alert</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="alertRows"></tbody>
                     </table>
                 </div>
             </section>

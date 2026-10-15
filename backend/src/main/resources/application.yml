@@ -21,6 +21,18 @@ spring:
         cachecontrol:
           # Browsers revalidate on every load, so they never run a stale copy of an edited file
           no-cache: true
+  # SMTP server for the feed alert mail (railreach.feeds.alerts). Without a host nothing is mailed. Never set the login
+  # here: use the gitignored backend/config/application.yml or env vars (SPRING_MAIL_HOST, SPRING_MAIL_USERNAME,
+  # SPRING_MAIL_PASSWORD; for Gmail: host smtp.gmail.com and an app password)
+  mail:
+    port: 587
+    properties:
+      "[mail.smtp.auth]": true
+      "[mail.smtp.starttls.enable]": true
+      # Milliseconds; a hanging server must not block the admin panel's test mail for long
+      "[mail.smtp.connectiontimeout]": 10000
+      "[mail.smtp.timeout]": 10000
+      "[mail.smtp.writetimeout]": 10000
 
 railreach:
   gtfs:
@@ -45,6 +57,16 @@ railreach:
     # Credentials that header placeholders in gtfs-feeds.txt refer to, e.g. auth.hungary (base64 of "user:password").
     # Never set them here: use the gitignored backend/config/application.yml or env vars (RAILREACH_FEEDS_AUTH_HUNGARY).
     # A feed whose setting is missing is rejected when downloaded.
+    alerts:
+      # One mail a day (at cron, server time) listing the served feeds whose trains end within this many days or
+      # already have. Read from the served store, so it works on a server without zips. Turned on and off, and
+      # feeds paused, in the admin panel (Alerts tab); both are kept in settings-file. Off until turned on there
+      days: 14
+      cron: "0 0 8 * * *"
+      settings-file: data/feed-alerts.json
+      # Recipient; nothing is mailed while empty. Sender: empty = the SMTP login (spring.mail.username)
+      to: ${RAILREACH_ALERTS_TO:}
+      from: ${RAILREACH_ALERTS_FROM:${spring.mail.username:}}
 
   algorithm:
     max-transfer-time-minutes: 180
@@ -74,7 +96,8 @@ railreach:
 
   admin:
     # Shared secret for /api/admin/** (sent as X-Admin-Token). Empty = admin API disabled (403), so a deployment
-    # without RAILREACH_ADMIN_TOKEN never exposes it. Use a long random value, e.g. 32+ random bytes in hex
+    # without RAILREACH_ADMIN_TOKEN never exposes it. The live server sets it (feed alerts are managed in the admin
+    # panel, docs/HOSTING.md). Use a long random value, e.g. 32+ random bytes in hex
     token: ${RAILREACH_ADMIN_TOKEN:}
 
 logging:
