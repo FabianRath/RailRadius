@@ -20,6 +20,11 @@
             </div>
 
             <div class="content">
+                <div class="intro-hint" id="introHint" hidden>
+                    <p>Pick a station and a number of transfers: the map shows every station you can reach by train.</p>
+                    <button type="button" class="admin-close" id="introHintClose" aria-label="Dismiss hint">×</button>
+                </div>
+
                 <div class="section" id="searchSection">
                     <div class="section-title">Step 1: Find Starting Station</div>
                     <div class="search-box">
@@ -33,9 +38,10 @@
                     <div class="slider-container">
                         <div class="slider-label">
                             <span>Maximum Transfers</span>
-                            <span class="slider-value" id="transferValue">0</span>
+                            <span class="slider-value" id="transferValue">1</span>
                         </div>
-                        <input type="range" id="transferSlider" min="0" max="5" value="0" step="1">
+                        <input type="range" id="transferSlider" min="0" max="5" value="1" step="1">
+                        <div class="field-hint">0 = direct trains only</div>
                     </div>
 
                     <div class="field">
