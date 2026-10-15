@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B40 · F30 · S32
+**Next free IDs:** B40 · F31 · S32
 
 ## Bugs (data loading)
 - [ ] **B36** Bosnia has no current rail feed, and Northern Ireland's can't be refreshed. State on 2026-10-07 (`gtfs-sources.md` has the details). Bosnia: the only source ends on 2025-12-13, so no Bosnian trains. Northern Ireland: the zip on disk (GTFS.pro copy from transitpdf, 2026-07-27) has NI Railways until mid-2027, but transitpdf is gone and Translink publishes only TransXChange, so no download URL is left in `gtfs-feeds.txt`. Check for a new GTFS source before mid-2027.
@@ -13,9 +13,9 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 
 ## Features / UX
 - [ ] **F23** (Decide first) While a station's journey is shown (F21), the dots of the stations it passes through keep their own transfer-level colour, so they don't always match the line colour of the train passing them (first train green, second cyan, …): a stop on the third train can be green because another train reaches it directly. The route looks inconsistent, but the colour also tells the user that this stop can be reached with fewer transfers, and clicking it shows that shorter journey. Options: (1) recolour the path's dots by the train they are on while the journey is shown; (2) keep the station's own colour (current behaviour), maybe explained in the details panel; (3) both, e.g. the train's colour as fill and the station's own level as outline. Decide with the user, then implement.
-- [ ] **F27** First-visit hint, before launch (council report, Phase 0): one sentence explaining what the map shows, a pre-filled example search, and the label "0 = direct trains only" on the transfer slider.
 - [ ] **F28** Show "updating timetables" while the server restarts or reloads the GTFS data, instead of failed searches or a broken page (council report, Phase 0).
 - [ ] **F29** Alert for feeds that expire within 30 days (council report, Phase 5). `FeedStatus` already has `EXPIRED`/`EXPIRING` and the admin panel shows them, but nobody is told unless they look.
+- [ ] **F30** Mark the start station on the map with its own marker (e.g. a distinct icon or ring, drawn above the reachable-station dots), so users can see at a glance where the search starts. Today it looks like any other station dot.
 
 ## Structure
 Recommended order (2026-10-13): judge **S24** on the server picked in S25 (`HOSTING.md`: 4 vCores, 8 GB, `-Xmx1280m`).
