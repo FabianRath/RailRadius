@@ -49,34 +49,36 @@
             </div>
 
             <div class="board-field board-options">
-                <div class="option-box">
-                    <div class="option-row">
-                        <span class="option-title">Limit Transfer Wait Time</span>
-                        <div class="option-controls">
-                            <span class="toggle-hint" id="transferTimeToggleHint"></span>
-                            <button type="button" class="toggle is-on" id="transferTimeToggle"
-                                    role="switch" aria-checked="true" aria-label="Limit transfer wait time"></button>
-                        </div>
+                <button type="button" class="board-options-toggle" id="optionsToggle"
+                        aria-expanded="false" aria-controls="optionsPanel">
+                    <span class="board-label">Wait</span>
+                    <span class="board-value"><span id="transferTimeToggleHint"></span>
+                        <span class="board-caret">▾</span></span>
+                </button>
+                <div id="optionsPanel" class="options-panel" hidden>
+                    <div class="panel-row">
+                        <span class="panel-title">Limit wait at changes</span>
+                        <button type="button" class="toggle is-on" id="transferTimeToggle"
+                                role="switch" aria-checked="true" aria-label="Limit transfer wait time"></button>
                     </div>
-                    <div class="range-inputs" id="transferTimeInputWrap">
-                        <div class="range-field">
-                            <div class="range-label">Min</div>
-                            <input type="number" id="minTransferTime" class="search-input"
+                    <div class="panel-range" id="transferTimeInputWrap">
+                        <label class="panel-range-field">
+                            <span class="board-label">Min</span>
+                            <input type="number" id="minTransferTime" class="panel-input"
                                    value="5" min="0" max="9999" step="1">
-                        </div>
-                        <div class="range-separator">—</div>
-                        <div class="range-field">
-                            <div class="range-label">Max</div>
-                            <input type="number" id="maxTransferTime" class="search-input"
+                        </label>
+                        <span class="panel-muted">–</span>
+                        <label class="panel-range-field">
+                            <span class="board-label">Max</span>
+                            <input type="number" id="maxTransferTime" class="panel-input"
                                    value="180" min="1" max="9999" step="1">
-                        </div>
+                        </label>
+                        <span class="panel-muted">min</span>
                     </div>
-                </div>
-
-                <div class="option-box">
-                    <label class="checkbox-row">
+                    <hr class="panel-rule">
+                    <label class="panel-check">
                         <input type="checkbox" id="showMergedZones">
-                        <span>Show merged coverage areas (slower)</span>
+                        <span>Show reach as areas (slower)</span>
                     </label>
                 </div>
             </div>
