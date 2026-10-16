@@ -11,122 +11,130 @@
     <script type="module" src="js/main.js"></script>
 </head>
 <body>
-    <div class="container" id="container">
-        <div class="sidebar" id="sidebar">
-            <div class="header">
-                <button type="button" class="sidebar-hide" id="sidebarHide"
-                        aria-label="Hide panel" aria-controls="sidebar" aria-expanded="true">‹</button>
+    <div class="app">
+        <header class="board-bar">
+            <div class="board-brand">
                 <h1>RailRadius</h1>
                 <div class="tagline">Explore train networks by transfer limits</div>
             </div>
 
-            <div class="content">
-                <div class="status status-warning" id="updatingNotice" role="status" hidden>
-                    Updating timetables. Search works again in a moment.
-                </div>
+            <div class="board-field board-from">
+                <input type="text" class="search-input" id="searchInput" placeholder="Search for a station...">
+                <div id="stationResults"></div>
+            </div>
 
-                <div class="intro-hint" id="introHint" hidden>
-                    <p>Pick a station and a number of transfers: the map shows every station you can reach by train.</p>
-                    <button type="button" class="admin-close" id="introHintClose" aria-label="Dismiss hint">×</button>
-                </div>
-
-                <div class="section" id="searchSection">
-                    <div class="section-title">Step 1: Find Starting Station</div>
-                    <div class="search-box">
-                        <input type="text" class="search-input" id="searchInput" placeholder="Search for a station...">
+            <div class="board-field board-changes">
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Maximum Transfers</span>
+                        <span class="slider-value" id="transferValue">1</span>
                     </div>
-                    <div id="stationResults"></div>
-                </div>
-
-                <div class="section" id="calculateSection" hidden>
-                    <div class="section-title">Step 2: Calculate Reachability</div>
-                    <div class="slider-container">
-                        <div class="slider-label">
-                            <span>Maximum Transfers</span>
-                            <span class="slider-value" id="transferValue">1</span>
-                        </div>
-                        <input type="range" id="transferSlider" min="0" max="5" value="1" step="1">
-                        <div class="field-hint">0 = direct trains only</div>
-                    </div>
-
-                    <div class="field">
-                        <label class="field-label" for="maxJourneyTime">
-                            Max Journey Time (hours)<span class="field-optional"> — optional</span>
-                        </label>
-                        <input type="number" id="maxJourneyTime" class="search-input"
-                               placeholder="e.g., 8" min="0.5" max="24" step="0.5">
-                        <div class="field-hint">Leave empty for no time limit</div>
-                    </div>
-
-                    <div class="option-box">
-                        <div class="option-row">
-                            <span class="option-title">Limit Transfer Wait Time</span>
-                            <div class="option-controls">
-                                <span class="toggle-hint" id="transferTimeToggleHint"></span>
-                                <button type="button" class="toggle is-on" id="transferTimeToggle"
-                                        role="switch" aria-checked="true" aria-label="Limit transfer wait time"></button>
-                            </div>
-                        </div>
-                        <div class="range-inputs" id="transferTimeInputWrap">
-                            <div class="range-field">
-                                <div class="range-label">Min</div>
-                                <input type="number" id="minTransferTime" class="search-input"
-                                       value="5" min="0" max="9999" step="1">
-                            </div>
-                            <div class="range-separator">—</div>
-                            <div class="range-field">
-                                <div class="range-label">Max</div>
-                                <input type="number" id="maxTransferTime" class="search-input"
-                                       value="180" min="1" max="9999" step="1">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="option-box">
-                        <label class="checkbox-row">
-                            <input type="checkbox" id="showMergedZones">
-                            <span>Show merged coverage areas (slower)</span>
-                        </label>
-                    </div>
-
-                    <button class="btn" id="calculateBtn" disabled>
-                        <span class="btn-label">Calculate Reachability</span>
-                        <span class="btn-busy"><span class="spinner spinner-small"></span>Calculating…</span>
-                        <span class="btn-cancel-hint">click to cancel</span>
-                    </button>
-                </div>
-
-                <div class="status" id="statusMessage" role="status" hidden></div>
-
-                <div class="section" id="resultsSection" hidden>
-                    <div class="section-title">Results</div>
-                    <div class="stats">
-                        <div class="stat-card">
-                            <div class="stat-label">Reachable</div>
-                            <div class="stat-value" id="reachableCount">—</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Max Transfers</div>
-                            <div class="stat-value" id="maxTransfersUsed">—</div>
-                        </div>
-                    </div>
+                    <input type="range" id="transferSlider" min="0" max="5" value="1" step="1">
+                    <div class="field-hint">0 = direct trains only</div>
                 </div>
             </div>
 
-            <div class="dev-footer">
-                <div class="dev-actions">
-                    <button type="button" class="dev-toggle" id="devToggle">Dev login</button>
-                    <button type="button" class="dev-toggle" id="adminOpen" hidden>Admin panel</button>
+            <div class="board-field board-maxtime">
+                <div class="field">
+                    <label class="field-label" for="maxJourneyTime">
+                        Max Journey Time (hours)<span class="field-optional"> — optional</span>
+                    </label>
+                    <input type="number" id="maxJourneyTime" class="search-input"
+                           placeholder="e.g., 8" min="0.5" max="24" step="0.5">
+                    <div class="field-hint">Leave empty for no time limit</div>
                 </div>
-                <form class="dev-login" id="devLoginForm" hidden>
-                    <input type="password" class="search-input" id="devToken" placeholder="Admin token"
-                           aria-label="Admin token" autocomplete="current-password" required>
-                    <button type="submit" class="dev-toggle">Log in</button>
-                </form>
-                <div class="dev-error" id="devError" role="alert" hidden></div>
             </div>
 
-            <section class="station-details" id="stationDetails" aria-label="Connection details" hidden>
+            <div class="board-field board-options">
+                <div class="option-box">
+                    <div class="option-row">
+                        <span class="option-title">Limit Transfer Wait Time</span>
+                        <div class="option-controls">
+                            <span class="toggle-hint" id="transferTimeToggleHint"></span>
+                            <button type="button" class="toggle is-on" id="transferTimeToggle"
+                                    role="switch" aria-checked="true" aria-label="Limit transfer wait time"></button>
+                        </div>
+                    </div>
+                    <div class="range-inputs" id="transferTimeInputWrap">
+                        <div class="range-field">
+                            <div class="range-label">Min</div>
+                            <input type="number" id="minTransferTime" class="search-input"
+                                   value="5" min="0" max="9999" step="1">
+                        </div>
+                        <div class="range-separator">—</div>
+                        <div class="range-field">
+                            <div class="range-label">Max</div>
+                            <input type="number" id="maxTransferTime" class="search-input"
+                                   value="180" min="1" max="9999" step="1">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="option-box">
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="showMergedZones">
+                        <span>Show merged coverage areas (slower)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="board-count" id="resultsSection">
+                <div class="stat-value" id="reachableCount">—</div>
+                <div class="stat-value" id="maxTransfersUsed">—</div>
+            </div>
+
+            <button class="btn" id="calculateBtn" disabled>
+                <span class="btn-label">Calculate Reachability</span>
+                <span class="btn-busy"><span class="spinner spinner-small"></span>Calculating…</span>
+                <span class="btn-cancel-hint">click to cancel</span>
+            </button>
+        </header>
+
+        <main class="board-main">
+            <div class="map-area">
+                <div id="map"></div>
+
+                <div class="map-notices">
+                    <div class="intro-hint" id="introHint" hidden>
+                        <p>Pick a station and a number of transfers: the map shows every station you can reach by train.</p>
+                        <button type="button" class="admin-close" id="introHintClose" aria-label="Dismiss hint">×</button>
+                    </div>
+                    <div class="status status-warning" id="updatingNotice" role="status" hidden>
+                        Updating timetables. Search works again in a moment.
+                    </div>
+                    <div class="status" id="statusMessage" role="status" hidden></div>
+                </div>
+
+                <div id="loadingOverlay">
+                    <div class="loading-pulse"></div>
+                    <div class="loading-text">Calculating…</div>
+                    <div class="loading-count" id="loadingCount">0 stations found</div>
+                    <div class="spinner"></div>
+                </div>
+
+                <div class="debug-banner" id="debugBanner" hidden>
+                    <span><span data-icon="bug"></span> DEBUG MODE</span>
+                    <span id="debugBannerText">Loading stations…</span>
+                    <span class="debug-separator">|</span>
+                    <button type="button" class="debug-clear" id="debugClear">clear</button>
+                    <span class="debug-command">scripts/api.sh debug-off</span>
+                </div>
+
+                <div class="dev-footer">
+                    <div class="dev-actions">
+                        <button type="button" class="dev-toggle" id="devToggle">Dev login</button>
+                        <button type="button" class="dev-toggle" id="adminOpen" hidden>Admin panel</button>
+                    </div>
+                    <form class="dev-login" id="devLoginForm" hidden>
+                        <input type="password" class="search-input" id="devToken" placeholder="Admin token"
+                               aria-label="Admin token" autocomplete="current-password" required>
+                        <button type="submit" class="dev-toggle">Log in</button>
+                    </form>
+                    <div class="dev-error" id="devError" role="alert" hidden></div>
+                </div>
+            </div>
+
+            <section class="station-details journey" id="stationDetails" aria-label="Connection details" hidden>
                 <div class="station-details-header">
                     <div class="section-title">Connection</div>
                     <button type="button" class="station-details-close" id="stationDetailsClose"
@@ -134,12 +142,7 @@
                 </div>
                 <div class="station-details-body" id="stationDetailsBody"></div>
             </section>
-        </div>
-
-        <div id="map"></div>
-
-        <button type="button" class="sidebar-show" id="sidebarShow"
-                aria-label="Show panel" aria-controls="sidebar" aria-expanded="true"><span data-icon="menu"></span> RailRadius</button>
+        </main>
 
         <!-- Hidden until about.js moves it into the map's controls, so it doesn't flash while the map loads -->
         <button type="button" class="about-open" id="aboutOpen" aria-label="About the data"
@@ -161,21 +164,6 @@
             <div class="section-title">Covered countries</div>
             <ul class="about-countries" id="aboutCountries"></ul>
         </dialog>
-
-        <div id="loadingOverlay">
-            <div class="loading-pulse"></div>
-            <div class="loading-text">Calculating…</div>
-            <div class="loading-count" id="loadingCount">0 stations found</div>
-            <div class="spinner"></div>
-        </div>
-
-        <div class="debug-banner" id="debugBanner" hidden>
-            <span><span data-icon="bug"></span> DEBUG MODE</span>
-            <span id="debugBannerText">Loading stations…</span>
-            <span class="debug-separator">|</span>
-            <button type="button" class="debug-clear" id="debugClear">clear</button>
-            <span class="debug-command">scripts/api.sh debug-off</span>
-        </div>
 
         <dialog class="admin-panel" id="adminPanel" aria-labelledby="adminTitle">
             <div class="admin-header">

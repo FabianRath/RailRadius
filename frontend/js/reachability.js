@@ -7,7 +7,6 @@ import { clearStatus, showStatus } from './util.js';
 import { isUpdatingTimetables } from './server-status.js';
 
 const calculateBtn = document.getElementById('calculateBtn');
-const resultsSection = document.getElementById('resultsSection');
 const reachableCount = document.getElementById('reachableCount');
 const maxTransfersUsed = document.getElementById('maxTransfersUsed');
 const loadingOverlay = document.getElementById('loadingOverlay');
@@ -77,7 +76,6 @@ function calculate(station) {
     setStartStation(station);
     shownStart = station;
     setCoverage(null);
-    resultsSection.hidden = false;
     maxTransfersUsed.textContent = query.maxTransfers;
 
     const cached = localResultsCache.get(key);

@@ -63,7 +63,7 @@ function isOutsideDialog(dialog, event) {
 
 const STATUS_LOGGERS = { error: console.error, warning: console.warn, info: console.log };
 
-/** type is 'info', 'warning' or 'error'; the message replaces the previous one in the sidebar. */
+/** type is 'info', 'warning' or 'error'; the message replaces the previous one in the notices over the map. */
 export function showStatus(type, message) {
     STATUS_LOGGERS[type]('Status:', message);
     const statusMessage = document.getElementById('statusMessage');
