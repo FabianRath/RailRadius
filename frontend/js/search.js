@@ -8,8 +8,10 @@ const MIN_QUERY_LENGTH = 2;
 
 const searchInput = document.getElementById('searchInput');
 const stationResults = document.getElementById('stationResults');
+// The shown results by id, so a click hands on the whole station, coordinates included
+const stationsById = new Map();
 
-/** onSelect receives { id, name } of the clicked station. */
+/** onSelect receives the clicked station as the search returns it (id, name, latitude, longitude, …). */
 export function initSearch(onSelect) {
     let debounceTimer;
     searchInput.addEventListener('input', () => {
@@ -21,7 +23,8 @@ export function initSearch(onSelect) {
         if (!item) return;
         searchInput.value = item.dataset.name;
         stationResults.innerHTML = '';
-        onSelect({ id: item.dataset.id, name: item.dataset.name });
+        const station = stationsById.get(item.dataset.id);
+        if (station) onSelect(station);
     });
 }
 
@@ -31,7 +34,7 @@ export async function prefillStation(name, onSelect) {
         const station = (await searchStations(name)).find(s => s.name === name);
         if (!station || searchInput.value) return;
         searchInput.value = station.name;
-        onSelect({ id: station.id, name: station.name });
+        onSelect(station);
     } catch (error) {
         console.error('Example station lookup failed:', error);
     }
@@ -44,6 +47,8 @@ async function runSearch(query) {
     }
     try {
         const stations = await searchStations(query);
+        stationsById.clear();
+        stations.forEach(s => stationsById.set(s.id, s));
         // During a reload the index is empty; the notice explains that better than "No stations found"
         if (stations.length === 0 && await isUpdatingTimetables()) {
             stationResults.innerHTML = '';

@@ -1,7 +1,8 @@
-import { Map, Popup, LngLatBounds, NavigationControl }
+import { Map, Marker, Popup, LngLatBounds, NavigationControl }
     from '../vendor/maplibre-gl/maplibre-gl.mjs';
 import { MAP_STYLE_URL, MAP_CENTER, MAP_ZOOM } from './config.js';
 import { cssVar } from './util.js';
+import { icon } from './icons.js';
 
 export const MAX_TRANSFER_LEVEL = 5;
 export const LAYERS = { reachable: 'reachable-stations', debug: 'debug-stations' };
@@ -16,6 +17,7 @@ const EMPTY_COLLECTION = { type: 'FeatureCollection', features: [] };
 let map;
 let reachableFeatures = [];
 let reachableRenderPending = false;
+let startMarker = null;
 
 /** Adds a button under the zoom buttons, styled like them. */
 export function addMapButton(button) {
@@ -113,6 +115,22 @@ export function addReachableStations(stations) {
         reachableFeatures.push(pointFeature(s.longitude, s.latitude, { stopId: s.stopId, level }));
     }
     scheduleReachableRender();
+}
+
+/**
+ * Pins the station a search starts from (latitude, longitude); one without coordinates only removes the old pin.
+ * An HTML marker, so it stays above every dot and line drawn on the canvas.
+ */
+export function setStartStation(station) {
+    startMarker?.remove();
+    startMarker = null;
+    if (!hasCoordinates(station.latitude, station.longitude)) return;
+    const element = document.createElement('div');
+    element.className = 'start-marker';
+    element.innerHTML = icon('map-pin');
+    startMarker = new Marker({ element, anchor: 'bottom' })
+        .setLngLat([station.longitude, station.latitude])
+        .addTo(map);
 }
 
 export function clearReachableStations() {
