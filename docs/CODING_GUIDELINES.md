@@ -15,8 +15,8 @@ Binding for every change. Existing code does not always follow them yet. New and
 - **Search first.** Before adding a helper, grep for an existing one (`formatTime`, `parse`, `split(":")`, `fetch(` …).
 - **Rule of two:** if you are about to write logic that already exists somewhere, extract it into one shared place and call it from both. Never paste a copy.
 - Single homes for shared concerns (create them when you first need them, then migrate callers you touch):
-  - GTFS time and durations (parse `HH:MM:SS`, format, minutes↔seconds, overnight wrap) → `com.railreach.util.GtfsTime`
-  - Stop ID handling (canonical ID, extract source) → `com.railreach.util.StopIds`
+  - GTFS time and durations (parse `HH:MM:SS`, format, minutes↔seconds, overnight wrap) → `com.railradius.util.GtfsTime`
+  - Stop ID handling (canonical ID, extract source) → `com.railradius.util.StopIds`
   - Frontend backend URL → `API_BASE` in `js/config.js`; all calls go through `js/api.js`
 - New logic goes into a new focused class. Don't grow `TransitGraph` or `ReachabilityService` into catch-alls.
 
@@ -32,12 +32,12 @@ Binding for every change. Existing code does not always follow them yet. New and
 ## 4. Java style
 - 4-space indent, braces on the same line, ≤ 120 columns. One-line guards (`if (x == null) return;`, `continue;`) are fine. Otherwise always use braces.
 - Imports: explicit, no wildcards, no inline fully-qualified names (`new java.util.concurrent.ConcurrentHashMap<>()`).
-- Names carry units: `departureSeconds`, `durationMinutes`, `timeoutMs`, `radiusDeg`. Constants are `private static final UPPER_SNAKE`. No magic numbers: use a named constant or a `railreach.*` config key.
+- Names carry units: `departureSeconds`, `durationMinutes`, `timeoutMs`, `radiusDeg`. Constants are `private static final UPPER_SNAKE`. No magic numbers: use a named constant or a `railradius.*` config key.
 - Lombok:
   - DTOs/models: `@Data @Builder @NoArgsConstructor @AllArgsConstructor`
   - Services/controllers: `@Slf4j @RequiredArgsConstructor` with `private final` deps. Write the constructor by hand only when needed (e.g. `@Lazy`).
 - Internal immutable value types (queue items, keys, results inside a service) are `record`s, not hand-written classes.
-- Config: `@Value("${railreach.x.y:default}")`, always with a default, documented in `application.yml`.
+- Config: `@Value("${railradius.x.y:default}")`, always with a default, documented in `application.yml`.
 - Collections: `List.of`/`Map.of`, `stream().toList()` (not `Collectors.toList()`) unless the result is mutated. Return empty collections, never `null`. New lookup methods return `Optional`.
 - Errors: throw `IllegalArgumentException`/`IllegalStateException` (or a specific exception), not bare `RuntimeException`. Catch `Exception` only at boundaries (per-feed load loop, SSE worker) and always log it with the exception as the last argument.
 - Logging: `{}` placeholders only. Wrap non-trivial formatting in `String.format` inside the argument. INFO for lifecycle and summaries, DEBUG for per-item detail, nothing at INFO inside BFS loops. No `System.out`, no `printStackTrace`.

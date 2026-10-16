@@ -1,6 +1,6 @@
 ---
 name: run-dev
-description: Start the RailReach backend with the small dev dataset (Austria/Hungary/Slovakia) in the background and wait until it is healthy. Use to check backend changes end to end, or when asked to run, start or try the app.
+description: Start the RailRadius backend with the small dev dataset (Austria/Hungary/Slovakia) in the background and wait until it is healthy. Use to check backend changes end to end, or when asked to run, start or try the app.
 ---
 
 # Run the backend with dev data

@@ -1,7 +1,7 @@
 import { API_BASE } from './config.js';
 
 const SEARCH_LIMIT = 50;
-const ADMIN_TOKEN_KEY = 'railreach.adminToken';
+const ADMIN_TOKEN_KEY = 'railradius.adminToken';
 
 let adminToken = readStoredAdminToken();
 

@@ -57,7 +57,7 @@ function render(status) {
 function overview(status) {
     const mail = status.mailConfigured
         ? `Daily email to ${status.recipient}.`
-        : 'Mail is not configured (spring.mail.host, railreach.feeds.alerts.to), so nothing is sent.';
+        : 'Mail is not configured (spring.mail.host, railradius.feeds.alerts.to), so nothing is sent.';
     const paused = status.feeds.filter(feed => feed.paused).length;
     return `${mail} ${status.feeds.length} served feed(s) end within ${status.alertDays} days, ${paused} paused.`;
 }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rail Reachability Explorer</title>
+    <title>RailRadius</title>
     <link rel="stylesheet" href="vendor/maplibre-gl/maplibre-gl.css">
     <link rel="stylesheet" href="css/app.css">
     <script src="vendor/turf/turf.min.js"></script>
@@ -15,7 +15,7 @@
             <div class="header">
                 <button type="button" class="sidebar-hide" id="sidebarHide"
                         aria-label="Hide panel" aria-controls="sidebar" aria-expanded="true">‹</button>
-                <h1>RailReach</h1>
+                <h1>RailRadius</h1>
                 <div class="tagline">Explore train networks by transfer limits</div>
             </div>
 
@@ -138,7 +138,7 @@
         <div id="map"></div>
 
         <button type="button" class="sidebar-show" id="sidebarShow"
-                aria-label="Show panel" aria-controls="sidebar" aria-expanded="true"><span data-icon="menu"></span> RailReach</button>
+                aria-label="Show panel" aria-controls="sidebar" aria-expanded="true"><span data-icon="menu"></span> RailRadius</button>
 
         <!-- Hidden until about.js moves it into the map's controls, so it doesn't flash while the map loads -->
         <button type="button" class="about-open" id="aboutOpen" aria-label="About the data"
@@ -150,7 +150,7 @@
                 <button type="button" class="admin-close" id="aboutClose" aria-label="Close">×</button>
             </div>
             <p class="about-text">
-                RailReach only shows rail connections in the countries listed below, built from the operators' public
+                RailRadius only shows rail connections in the countries listed below, built from the operators' public
                 GTFS timetables. Trains outside these countries, or missing from the data, are not shown.
             </p>
             <p class="about-text">

@@ -8,11 +8,11 @@
 		<version>4.0.2</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.railreach</groupId>
-	<artifactId>railreach-backend</artifactId>
+	<groupId>com.railradius</groupId>
+	<artifactId>railradius-backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>RailReach Backend</name>
-	<description>RailReach backend</description>
+	<name>RailRadius Backend</name>
+	<description>RailRadius backend</description>
 	<url/>
 	<licenses>
 		<license/>

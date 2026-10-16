@@ -1,11 +1,11 @@
-# RailReach
+# RailRadius
 
 Spring Boot backend + vanilla MapLibre frontend (served by the backend at `http://localhost:8080/`). Given a start station and a max number of transfers, it shows every European rail station you can reach.
 GTFS feeds → merged rail graph (cross-border station dedup) → transfer-bounded trip BFS → results streamed to the map via SSE.
 Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this file.
 
 ## Layout
-- `backend/src/main/java/com/railreach/`
+- `backend/src/main/java/com/railradius/`
   - `controller/`: `/api` public API and `/api/admin` endpoints
   - `service/`: `GtfsDataService` (startup/reload) → `GtfsFeedLoader` and `StationDeduplicator` (into a load-time `RailNetwork`), `BinaryCacheStore`; `TransitGraph` (what is served: stations + `TimetableStore`), `StationSearchIndex`, `ReachabilityService` (orchestrator, SSE) → `ReachabilityCache` → `CompactReachabilitySearch` (round-based search), `ReachabilityWarmer`, `JourneyLegBuilder`
   - `dto/`, `model/`, `config/`
