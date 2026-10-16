@@ -2,7 +2,6 @@ import { Map, Marker, Popup, LngLatBounds, NavigationControl }
     from '../vendor/maplibre-gl/maplibre-gl.mjs';
 import { MAP_STYLE_URL, MAP_CENTER, MAP_ZOOM } from './config.js';
 import { cssVar } from './util.js';
-import { icon } from './icons.js';
 
 export const MAX_TRANSFER_LEVEL = 5;
 export const LAYERS = { reachable: 'reachable-stations', debug: 'debug-stations' };
@@ -11,7 +10,16 @@ const FIT_PADDING_PX = 50;
 const FIT_MAX_ZOOM = 12;
 const RAILWAY_MIN_ZOOM = 8;
 const POPUP_MAX_WIDTH = '360px';
-const JOURNEY_LINE_WIDTH_PX = 3;
+const JOURNEY_LINE_WIDTH_PX = 5;
+const JOURNEY_CASING_WIDTH_PX = 9;
+// Index = transfer level; direct destinations stand out
+const DOT_RADIUS_BY_LEVEL_PX = [6, 5, 4.5, 4, 3.5, 3];
+const LAND_FILL_LAYERS = ['landcover_ice_shelf', 'landcover_glacier', 'landuse_residential', 'landcover_wood',
+    'landuse_park', 'building', 'aeroway-area'];
+const RAIL_LAYERS = ['railway', 'railway_minor', 'railway_transit'];
+const BOUNDARY_LAYERS = ['boundary_state', 'boundary_country_z0-4', 'boundary_country_z5-'];
+const LABEL_LAYERS = ['water_name', 'place_other', 'place_suburb', 'place_village', 'place_town', 'place_city',
+    'place_city_large', 'place_state', 'place_country_other', 'place_country_minor', 'place_country_major'];
 const EMPTY_COLLECTION = { type: 'FeatureCollection', features: [] };
 
 let map;
@@ -35,7 +43,7 @@ export function initMap(containerId) {
     });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     return new Promise(resolve => map.on('load', () => {
-        emphasizeRailways();
+        applyBoardColors();
         addDataLayers();
         resolve();
     }));
@@ -53,12 +61,30 @@ export function hasCoordinates(lat, lon) {
     return lat != null && lon != null;
 }
 
-// The dark style draws railways almost invisibly and only from z13. Rail is the point of this app.
-function emphasizeRailways() {
-    const railColor = cssVar('--map-rail');
-    for (const id of ['railway', 'railway_minor', 'railway_transit']) {
-        if (map.getLayer(id)) map.setPaintProperty(id, 'line-color', railColor);
+/** Recolours the base style down to land, water and rail, so the coloured dots carry the map. */
+function applyBoardColors() {
+    const land = cssVar('--map-land');
+    const water = cssVar('--map-water');
+    setPaint(['background'], 'background-color', land);
+    setPaint(['water'], 'fill-color', water);
+    setPaint(['waterway'], 'line-color', water);
+    setPaint(LAND_FILL_LAYERS, 'fill-color', land);
+    setPaint(RAIL_LAYERS, 'line-color', cssVar('--map-rail'));
+    setPaint(BOUNDARY_LAYERS, 'line-color', cssVar('--map-boundary'));
+    setPaint(LABEL_LAYERS, 'text-color', cssVar('--map-label'));
+    setPaint(LABEL_LAYERS, 'text-halo-color', cssVar('--map-label-halo'));
+    emphasizeRailway();
+}
+
+/** Skips ids the style doesn't have, so a changed base style only loses its recolouring. */
+function setPaint(layerIds, property, value) {
+    for (const id of layerIds) {
+        if (map.getLayer(id)) map.setPaintProperty(id, property, value);
     }
+}
+
+// The dark style draws railways almost invisibly and only from z13. Rail is the point of this app.
+function emphasizeRailway() {
     if (!map.getLayer('railway')) return;
     map.setLayerZoomRange('railway', RAILWAY_MIN_ZOOM, 24);
     map.setPaintProperty('railway', 'line-width',
@@ -72,14 +98,20 @@ function colorByLevelExpression() {
     return ['match', ['get', 'level'], ...pairs, cssVar(`--transfer-${MAX_TRANSFER_LEVEL}`)];
 }
 
+/** ['match', level, 0, radius0, 1, radius1, …, radiusOfMaxLevel] */
+function radiusByLevelExpression() {
+    const pairs = DOT_RADIUS_BY_LEVEL_PX.slice(0, -1).flatMap((radius, level) => [level, radius]);
+    return ['match', ['get', 'level'], ...pairs, DOT_RADIUS_BY_LEVEL_PX.at(-1)];
+}
+
 function addDataLayers() {
     const colorByLevel = colorByLevelExpression();
 
     map.addSource('coverage', { type: 'geojson', data: EMPTY_COLLECTION });
     map.addLayer({ id: 'coverage-fill', type: 'fill', source: 'coverage',
-        paint: { 'fill-color': colorByLevel, 'fill-opacity': 0.6 } });
+        paint: { 'fill-color': colorByLevel, 'fill-opacity': 0.45 } });
     map.addLayer({ id: 'coverage-outline', type: 'line', source: 'coverage',
-        paint: { 'line-color': colorByLevel, 'line-opacity': 0.8, 'line-width': 1 } });
+        paint: { 'line-color': colorByLevel, 'line-opacity': 0.9, 'line-width': 1 } });
 
     map.addSource('debug', { type: 'geojson', data: EMPTY_COLLECTION });
     map.addLayer({ id: LAYERS.debug, type: 'circle', source: 'debug',
@@ -87,17 +119,20 @@ function addDataLayers() {
 
     // Below the stations, so the stops of the journey stay clickable on top of its lines
     map.addSource('journey', { type: 'geojson', data: EMPTY_COLLECTION });
+    map.addLayer({ id: 'journey-casing', type: 'line', source: 'journey',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': cssVar('--marker-stroke'), 'line-width': JOURNEY_CASING_WIDTH_PX } });
     map.addLayer({ id: 'journey-lines', type: 'line', source: 'journey',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': colorByLevel, 'line-width': JOURNEY_LINE_WIDTH_PX } });
 
     map.addSource('reachable', { type: 'geojson', data: EMPTY_COLLECTION });
     map.addLayer({ id: LAYERS.reachable, type: 'circle', source: 'reachable',
-        // Direct connections (level 0) are drawn on top and slightly larger
+        // Direct connections (level 0) are drawn on top
         layout: { 'circle-sort-key': ['-', MAX_TRANSFER_LEVEL, ['get', 'level']] },
         paint: {
             'circle-color': colorByLevel,
-            'circle-radius': ['case', ['==', ['get', 'level'], 0], 5, 3],
+            'circle-radius': radiusByLevelExpression(),
             'circle-stroke-color': cssVar('--marker-stroke'),
             'circle-stroke-width': 1
         } });
@@ -118,7 +153,7 @@ export function addReachableStations(stations) {
 }
 
 /**
- * Pins the station a search starts from (latitude, longitude); one without coordinates only removes the old pin.
+ * Marks the station a search starts from (latitude, longitude); one without coordinates only removes the old marker.
  * An HTML marker, so it stays above every dot and line drawn on the canvas.
  */
 export function setStartStation(station) {
@@ -127,8 +162,7 @@ export function setStartStation(station) {
     if (!hasCoordinates(station.latitude, station.longitude)) return;
     const element = document.createElement('div');
     element.className = 'start-marker';
-    element.innerHTML = icon('map-pin');
-    startMarker = new Marker({ element, anchor: 'bottom' })
+    startMarker = new Marker({ element, anchor: 'center' })
         .setLngLat([station.longitude, station.latitude])
         .addTo(map);
 }
