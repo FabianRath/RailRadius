@@ -1,5 +1,3 @@
-import { fmtMins } from './util.js';
-
 const HINT_MIN_TRANSFER_MINUTES = 5;
 const DEFAULT_MAX_TRANSFER_MINUTES = 180;
 // Sent when the wait-time limit is switched off; large enough to never constrain a search
@@ -16,6 +14,9 @@ const transferTimeWrap = document.getElementById('transferTimeInputWrap');
 const minTransferTimeInput = document.getElementById('minTransferTime');
 const maxTransferTimeInput = document.getElementById('maxTransferTime');
 const coverageToggle = document.getElementById('showMergedZones');
+const optionsCell = document.querySelector('.board-options');
+const optionsToggle = document.getElementById('optionsToggle');
+const optionsPanel = document.getElementById('optionsPanel');
 
 let transferTimeLimitEnabled = true;
 
@@ -27,6 +28,7 @@ export function initQueryForm(onCoverageToggle) {
     minTransferTimeInput.addEventListener('input', updateTransferTimeHint);
     maxTransferTimeInput.addEventListener('input', updateTransferTimeHint);
     coverageToggle.addEventListener('change', onCoverageToggle);
+    initOptionsPanel();
     updateStepperButtons();
     updateTransferTimeHint();
 }
@@ -66,6 +68,25 @@ function clampTransfers(value) {
     return Math.min(max, Math.max(min, transfers));
 }
 
+function initOptionsPanel() {
+    optionsToggle.addEventListener('click', () => setOptionsOpen(optionsPanel.hidden));
+    // Listens on the cell, so stopPropagation keeps the document-level Escape from also closing the journey
+    optionsCell.addEventListener('keydown', e => {
+        if (e.key !== 'Escape' || optionsPanel.hidden) return;
+        e.stopPropagation();
+        setOptionsOpen(false);
+        optionsToggle.focus();
+    });
+    document.addEventListener('pointerdown', e => {
+        if (!optionsCell.contains(e.target)) setOptionsOpen(false);
+    });
+}
+
+function setOptionsOpen(open) {
+    optionsPanel.hidden = !open;
+    optionsToggle.setAttribute('aria-expanded', String(open));
+}
+
 function toggleTransferTimeLimit() {
     transferTimeLimitEnabled = !transferTimeLimitEnabled;
     transferTimeToggle.classList.toggle('is-on', transferTimeLimitEnabled);
@@ -82,5 +103,5 @@ function updateTransferTimeHint() {
     }
     const minMins = parseInt(minTransferTimeInput.value) || HINT_MIN_TRANSFER_MINUTES;
     const maxMins = parseInt(maxTransferTimeInput.value) || DEFAULT_MAX_TRANSFER_MINUTES;
-    transferTimeHint.textContent = `${fmtMins(minMins)} – ${fmtMins(maxMins)}`;
+    transferTimeHint.textContent = `${minMins}–${maxMins} min`;
 }

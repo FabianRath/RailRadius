@@ -205,11 +205,6 @@ body {
     display: none;
 }
 
-/* Interim look for the cells after From: the old controls, compacted to fit the bar's height */
-.board-bar .search-input {
-    padding: 6px 10px;
-}
-
 .board-changes,
 .board-maxtime {
     flex: none;
@@ -266,24 +261,133 @@ body {
 }
 
 .board-options {
-    flex-direction: row;
+    flex: none;
+}
+
+.board-options-toggle {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    height: 100%;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    text-align: left;
+    padding: 0;
+    cursor: pointer;
+}
+
+.board-caret {
+    font-size: 14px;
+    color: var(--muted);
+}
+
+#transferTimeToggleHint.is-off {
+    color: var(--muted);
+}
+
+/* ── Options panel (opened from the Wait cell) ── */
+.options-panel {
+    position: absolute;
+    top: calc(100% + 3px);
+    right: 0;
+    width: 300px;
+    z-index: 20;
+    background: var(--board-2);
+    border: 1px solid var(--line);
+    border-top: 0;
+    padding: 16px;
+    display: grid;
+    gap: 14px;
+}
+
+.panel-row {
+    display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.panel-title {
+    font: 600 15px var(--font-ui);
+}
+
+.toggle {
+    width: 36px;
+    height: 20px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--line);
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.toggle::after {
+    content: '';
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--board);
+    position: absolute;
+    top: 3px;
+    left: 3px;
+}
+
+.toggle.is-on {
+    background: var(--amber);
+}
+
+.toggle.is-on::after {
+    left: 19px;
+}
+
+.panel-range {
+    display: flex;
+    align-items: last baseline;
     gap: 8px;
 }
 
-.board-options .option-box {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+.panel-range-field {
+    display: grid;
+    gap: 4px;
+}
+
+.panel-input {
+    width: 70px;
+    background: var(--board-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    font: 600 16px var(--font-ui);
+    color: var(--text);
+    text-align: center;
+}
+
+.panel-muted {
+    color: var(--muted);
+}
+
+.panel-rule {
     margin: 0;
+    border: 0;
+    border-top: 1px solid var(--line);
 }
 
-.board-options .range-inputs {
-    margin-top: 0;
+.panel-check {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 14px;
+    cursor: pointer;
 }
 
-.board-options .range-field .search-input {
-    width: 64px;
+.panel-check input {
+    accent-color: var(--amber);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
 }
 
 .board-count {
@@ -411,117 +515,6 @@ input[type="number"]::-webkit-inner-spin-button {
     color: var(--muted);
     font-size: 14px;
     text-align: left;
-}
-
-/* ── Query form ── */
-.option-box {
-    margin-bottom: 16px;
-    padding: 12px;
-    background: var(--accent-rail-faint);
-    border-radius: 8px;
-}
-
-.option-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 13px;
-}
-
-.option-title {
-    font-weight: 500;
-}
-
-.option-controls {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.toggle-hint {
-    font-size: 11px;
-    color: var(--accent-rail);
-    font-family: var(--font-mono);
-}
-
-.toggle-hint.is-off {
-    color: var(--text-secondary);
-}
-
-.toggle {
-    width: 36px;
-    height: 20px;
-    border: none;
-    border-radius: 10px;
-    background: var(--border);
-    position: relative;
-    transition: background 0.2s;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-
-.toggle::after {
-    content: '';
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--bg-primary);
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    transition: left 0.2s;
-}
-
-.toggle.is-on {
-    background: var(--accent-rail);
-}
-
-.toggle.is-on::after {
-    left: 19px;
-}
-
-.range-inputs {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    margin-top: 12px;
-}
-
-.range-field {
-    flex: 1;
-}
-
-.range-field .search-input {
-    text-align: center;
-}
-
-.range-label {
-    font-size: 10px;
-    color: var(--text-secondary);
-    margin-bottom: 4px;
-    font-family: var(--font-mono);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.range-separator {
-    color: var(--text-secondary);
-    font-size: 18px;
-    margin-top: 16px;
-}
-
-.checkbox-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    font-size: 13px;
-}
-
-.checkbox-row input {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
 }
 
 /* ── Calculate button ── */
