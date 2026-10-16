@@ -146,7 +146,7 @@ Package `com.railradius.<sub>` lives in `backend/src/main/java/com/railradius/<s
 | `RegularJourneyChooser` | service | Picks a station's journey among the search's candidates with the same transfer count: the fastest that runs on at least half as many days as the most frequent one (B26) |
 | `SearchSnapshot` | service | Search oracle: every path of a search as one sorted text line, for each start and transfer limit 0–5; `main` dumps a set of `docs/bench-stations.txt` from a binary cache file |
 | `AdminToken` | config | `railradius.admin.token` and its constant-time check; `sentWith` accepts the `X-Admin-Token` header or the `railradius_admin` cookie (HttpOnly, SameSite=Strict, path `/api/reachability`; set by `/api/admin/session`), which is how the browser's `EventSource` proves the admin to the rate limit |
-| `AdminTokenInterceptor` | config | Guards `/api/admin/**`: the `X-Admin-Token` header (never the cookie, which a cross-site request would carry) must match `AdminToken`; 401 if wrong or missing, 403 for every call when no token is configured; CORS preflights pass |
+| `AdminTokenInterceptor` | config | Guards `/api/admin/**`: the `X-Admin-Token` header (never the cookie, which a cross-site request would carry) must match `AdminToken`; 401 if wrong or missing, 403 for every call when no token is configured |
 | `WebConfig` | config | Registers `AdminTokenInterceptor` on `/api/admin/**` (same path matching as the controllers) |
 | `Station` | model | id, name, latitude, longitude, parentStation, country (ISO code from the coordinates, null if outside every border) |
 | `Connection` | model | One leg of one trip: tripId, routeName, from/to, dep/arr times as **int seconds since midnight** (string getters for display) |
@@ -255,7 +255,7 @@ What the search must keep, so a rewrite gives the same result as `SearchSnapshot
 
 ## REST API
 
-**Public (`/api`)**, CORS `*`:
+**Public (`/api`)**, same-origin only (no CORS headers; the backend serves the frontend):
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/reachability/stream?stationId=&maxTransfers=&minTransferMinutes=0&maxTransferMinutes=180&maxJourneyHours=` | SSE; used by the frontend |
