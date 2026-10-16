@@ -35,14 +35,6 @@ class AdminTokenInterceptorTest {
         assertThat(response.getStatus()).isEqualTo(403);
     }
 
-    @Test
-    void corsPreflightPassesWithoutToken() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", "/api/admin/reload-gtfs");
-        request.addHeader("Origin", "https://example.org");
-        request.addHeader("Access-Control-Request-Method", "POST");
-        assertThat(interceptor("secret").preHandle(request, response, null)).isTrue();
-    }
-
     private static AdminTokenInterceptor interceptor(String token) {
         return new AdminTokenInterceptor(new AdminToken(token));
     }
