@@ -14,12 +14,17 @@
     <div class="app">
         <header class="board-bar">
             <div class="board-brand">
-                <h1>RailRadius</h1>
-                <div class="tagline">Explore train networks by transfer limits</div>
+                <h1 class="board-wordmark">Rail<span>radius</span></h1>
+                <div class="board-tagline">Every station by train</div>
             </div>
 
             <div class="board-field board-from">
-                <input type="text" class="search-input" id="searchInput" placeholder="Search for a station...">
+                <label class="board-label" for="searchInput">From</label>
+                <div class="board-from-row">
+                    <input type="text" id="searchInput" class="board-value" placeholder="Search a station"
+                           autocomplete="off">
+                    <small id="searchCountry" class="board-country"></small>
+                </div>
                 <div id="stationResults"></div>
             </div>
 
