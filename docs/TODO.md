@@ -47,30 +47,6 @@ The user picked concept 5, "Abfahrt", from the design council of 2026-10-16. The
 - F32 (merged coverage areas, "decide first") may rework or remove the "Show reach as areas" option. If F32 is decided before F38, follow its outcome in F38 (keep, change or drop the checkbox). Otherwise build F38 as written.
 - `frontend/backend_test.html` is a dev test page and is not part of this redesign.
 
-- [ ] **F36** Top bar, part 1: brand cell, shared cell look and the "From" field with its dropdown.
-  1. `.board-brand`: `flex: none; width: 210px; padding: 16px 20px; border-right: 1px solid var(--line); display: flex; flex-direction: column; justify-content: center;`.
-     - Content: `<h1 class="board-wordmark">Rail<span>radius</span></h1>`. Style: `margin: 0; font: 700 25px/1 var(--font-ui); text-transform: uppercase; letter-spacing: 0.02em; color: var(--text);`; the `span` is `color: var(--amber)`.
-     - Below it `<div class="board-tagline">Every station by train</div>`: 13px, `--muted`, `margin-top: 4px`. Copy change: the tagline was "Explore train networks by transfer limits".
-     - Delete the old `h1` and `.tagline` rules.
-  2. Shared cell content:
-     - `.board-label`: `font: 600 12px var(--font-ui); text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted);`
-     - `.board-value`: `font: 600 22px var(--font-ui); color: var(--text); white-space: nowrap;`
-     - Inputs inside cells (`.board-field input`) are borderless: `background: transparent; border: 0; border-radius: 0; color: inherit; font: inherit; padding: 0; min-width: 0; caret-color: var(--amber);`, with no focus box-shadow.
-     - The cell holding the focus gets `background: var(--board-2)` (`.board-field:focus-within`). The global focus outline still shows on the input.
-  3. `.board-from` markup:
-     - `<label class="board-label" for="searchInput">From</label>`, then `<div class="board-from-row">` (flex, `align-items: baseline`, `gap: 8px`) with `<input type="text" id="searchInput" class="board-value" placeholder="Search a station" autocomplete="off">` (`flex: 1; width: 100%; text-overflow: ellipsis;`, placeholder colour `--muted`) and `<small id="searchCountry" class="board-country"></small>` (`font: 500 13px var(--font-ui); color: var(--muted); flex: none;`).
-     - `#searchInput` loses the class `search-input`.
-     - In `search.js`, set `searchCountry.textContent = station.country ?? ''` when a station is chosen (list click and `prefillStation`). Search results carry `country`; `stationItemHtml` already shows it. Clear it on every `input` event.
-  4. Dropdown `#stationResults`:
-     - `position: absolute; top: calc(100% + 3px); left: 0; width: max(100%, 380px); max-height: 320px; overflow-y: auto; z-index: 20; background: var(--board-2); border: 1px solid var(--line); border-top: 0;` and `#stationResults:empty { display: none; }`.
-     - `.station-list` loses its border, radius, background and max-height (the dropdown scrolls).
-     - `.station-item`: `padding: 10px 16px; border-bottom: 1px solid var(--line); cursor: pointer;`. On hover: `background: var(--board-3); box-shadow: inset 3px 0 0 var(--amber);`.
-     - `.station-name`: 16px, weight 600, `margin-bottom: 2px`. `.station-id` (the "N connections" line): `font: 400 13px var(--font-ui); color: var(--muted);`.
-     - `.no-results` ("No stations found", "Backend connection failed"): `padding: 16px; color: var(--muted); font-size: 14px; text-align: left;`.
-     - Needed because the list now covers the map: Escape in `#searchInput` and a click outside `.board-from` clear `#stationResults` (`innerHTML = ''`). Attach these listeners in `initSearch`. The Escape handler calls `event.stopPropagation()`, so it doesn't also close an open journey (`station-details.js` listens on `document`).
-  5. `.country-badge` everywhere (search list, journey): `margin-left: 4px; padding: 0 5px; border: 1px solid var(--line); border-radius: var(--radius); background: transparent; color: var(--muted); font: 600 11px/16px var(--font-ui); letter-spacing: 0.06em; vertical-align: middle;`.
-  Done when: the smoke check passes. Typing "wien" opens the dropdown under the From cell over the map, and Escape or a click elsewhere closes it. Picking a station fills the field and shows its country code. The brand and From cells match the mockup's left part.
-
 - [ ] **F37** Top bar, part 2: "Changes" stepper and "Max journey".
   1. Replace the slider block (`.slider-container`, `#transferSlider`, `#transferValue`, the "0 = direct trains only" hint) in `.board-changes` (`flex: none`) with:
      ```

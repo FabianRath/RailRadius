@@ -7,7 +7,9 @@ const SEARCH_DEBOUNCE_MS = 300;
 const MIN_QUERY_LENGTH = 2;
 
 const searchInput = document.getElementById('searchInput');
+const searchCountry = document.getElementById('searchCountry');
 const stationResults = document.getElementById('stationResults');
+const searchCell = searchInput.closest('.board-from');
 // The shown results by id, so a click hands on the whole station, coordinates included
 const stationsById = new Map();
 
@@ -15,6 +17,7 @@ const stationsById = new Map();
 export function initSearch(onSelect) {
     let debounceTimer;
     searchInput.addEventListener('input', () => {
+        searchCountry.textContent = '';
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => runSearch(searchInput.value), SEARCH_DEBOUNCE_MS);
     });
@@ -24,7 +27,16 @@ export function initSearch(onSelect) {
         searchInput.value = item.dataset.name;
         stationResults.innerHTML = '';
         const station = stationsById.get(item.dataset.id);
-        if (station) onSelect(station);
+        if (station) chooseStation(station, onSelect);
+    });
+    // The list covers the map, so it closes like a dropdown; stopPropagation keeps Escape from also closing the journey
+    searchInput.addEventListener('keydown', e => {
+        if (e.key !== 'Escape') return;
+        e.stopPropagation();
+        stationResults.innerHTML = '';
+    });
+    document.addEventListener('click', e => {
+        if (!searchCell.contains(e.target)) stationResults.innerHTML = '';
     });
 }
 
@@ -34,10 +46,15 @@ export async function prefillStation(name, onSelect) {
         const station = (await searchStations(name)).find(s => s.name === name);
         if (!station || searchInput.value) return;
         searchInput.value = station.name;
-        onSelect(station);
+        chooseStation(station, onSelect);
     } catch (error) {
         console.error('Example station lookup failed:', error);
     }
+}
+
+function chooseStation(station, onSelect) {
+    searchCountry.textContent = station.country ?? '';
+    onSelect(station);
 }
 
 async function runSearch(query) {

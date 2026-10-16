@@ -92,14 +92,33 @@ body {
     max-width: 360px;
 }
 
-/* ── Board cells (interim look: the old controls, compacted to fit the bar's height) ── */
+/* ── Board cells ── */
 .board-brand {
     flex: none;
-    padding: 14px 18px;
+    width: 210px;
+    padding: 16px 20px;
     border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
     justify-content: center;
+}
+
+.board-wordmark {
+    margin: 0;
+    font: 700 25px/1 var(--font-ui);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--text);
+}
+
+.board-wordmark span {
+    color: var(--amber);
+}
+
+.board-tagline {
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--muted);
 }
 
 .board-field {
@@ -117,15 +136,75 @@ body {
     flex: 1 1 320px;
 }
 
+.board-field:focus-within {
+    background: var(--board-2);
+}
+
+.board-label {
+    font: 600 12px var(--font-ui);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+}
+
+.board-value {
+    font: 600 22px var(--font-ui);
+    color: var(--text);
+    white-space: nowrap;
+}
+
+/* Zero specificity, so classes on the input (.board-value, .search-input) override this reset */
+:where(.board-field input) {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    color: inherit;
+    font: inherit;
+    padding: 0;
+    min-width: 0;
+    caret-color: var(--amber);
+}
+
+.board-from-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+#searchInput {
+    flex: 1;
+    width: 100%;
+    text-overflow: ellipsis;
+}
+
+#searchInput::placeholder {
+    color: var(--muted);
+}
+
+.board-country {
+    flex: none;
+    font: 500 13px var(--font-ui);
+    color: var(--muted);
+}
+
 #stationResults {
     position: absolute;
     top: calc(100% + 3px);
     left: 0;
     width: max(100%, 380px);
+    max-height: 320px;
+    overflow-y: auto;
     z-index: 20;
     background: var(--board-2);
+    border: 1px solid var(--line);
+    border-top: 0;
 }
 
+#stationResults:empty {
+    display: none;
+}
+
+/* Interim look for the cells after From: the old controls, compacted to fit the bar's height */
 .board-bar .search-input {
     padding: 6px 10px;
 }
@@ -178,21 +257,6 @@ body {
     flex: none;
     width: auto;
     padding: 0 22px;
-}
-
-h1 {
-    font-family: var(--font-mono);
-    font-weight: 800;
-    font-size: 28px;
-    letter-spacing: -1px;
-    color: var(--text);
-    margin-bottom: 8px;
-}
-
-.tagline {
-    font-size: 13px;
-    color: var(--text-secondary);
-    font-weight: 300;
 }
 
 .intro-hint {
@@ -254,19 +318,10 @@ input[type="number"]::-webkit-inner-spin-button {
     margin: 0;
 }
 
-.station-list {
-    max-height: 280px;
-    overflow-y: auto;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg-primary);
-}
-
 .station-item {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
     cursor: pointer;
-    transition: all 0.2s;
 }
 
 .station-item:last-child {
@@ -274,33 +329,31 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .station-item:hover {
-    background: var(--accent-rail-faint);
+    background: var(--board-3);
+    box-shadow: inset 3px 0 0 var(--amber);
 }
 
 .station-name {
-    font-size: 14px;
-    font-weight: 500;
-    margin-bottom: 4px;
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 2px;
 }
 
 .station-id {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--text-secondary);
+    font: 400 13px var(--font-ui);
+    color: var(--muted);
 }
 
 .country-badge {
     display: inline-block;
     margin-left: 4px;
     padding: 0 5px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 400;
-    line-height: 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--muted);
+    font: 600 11px/16px var(--font-ui);
+    letter-spacing: 0.06em;
     vertical-align: middle;
 }
 
@@ -312,10 +365,10 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .no-results {
-    padding: 32px 16px;
-    text-align: center;
-    color: var(--text-secondary);
-    font-size: 13px;
+    padding: 16px;
+    color: var(--muted);
+    font-size: 14px;
+    text-align: left;
 }
 
 /* ── Query form ── */
