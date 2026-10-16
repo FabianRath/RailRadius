@@ -40,4 +40,3 @@ Recommended order (2026-10-13): judge **S24** on the server picked in S25 (`HOST
   - **Follow-up:** almost every licence requires attribution, so the site needs a page naming every source.
 - [ ] **S28** CORS: `@CrossOrigin(origins = "*")` on `RailRadiusController` and `AdminController` lets any site use the API. Restrict it to the production domain (council report, Phase 0).
 - [ ] **S30** Set the actuator web exposure to `health` explicitly in `application.yml`. Today only Spring's default keeps the other endpoints closed (council report, Phase 0).
-- [ ] **S31** The fonts (Martian Mono, Outfit) still load from Google Fonts (`css/app.css:1`), which is the exact case of LG München 2022: every visit sends the visitor's IP address to Google. Either self-host them (`woff2` + `@font-face` in `frontend/vendor/fonts/`, both are SIL OFL) or switch to fonts that are less trouble, e.g. a system font stack that needs no files at all.
