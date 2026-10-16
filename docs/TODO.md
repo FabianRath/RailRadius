@@ -47,29 +47,6 @@ The user picked concept 5, "Abfahrt", from the design council of 2026-10-16. The
 - F32 (merged coverage areas, "decide first") may rework or remove the "Show reach as areas" option. If F32 is decided before F38, follow its outcome in F38 (keep, change or drop the checkbox). Otherwise build F38 as written.
 - `frontend/backend_test.html` is a dev test page and is not part of this redesign.
 
-- [ ] **F34** Map look. Only `js/map.js`, `css/app.css` (map rules) and, if needed, `js/config.js`.
-  1. The base map stays `MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/dark'`. Rename `emphasizeRailways()` to `applyBoardColors()` and recolour these layers of the style from tokens, read with `cssVar`. Check with `map.getLayer(id)` and skip any id that is missing, as today. The ids are those of the style on 2026-10-16 (list them with `curl -s https://tiles.openfreemap.org/styles/dark | python -c "import json,sys; print([l['id'] for l in json.load(sys.stdin)['layers']])"`):
-     - `background` (paint `background-color`) → `--map-land`
-     - `water` (`fill-color`) → `--map-water`; `waterway` (`line-color`) → `--map-water`
-     - `landcover_ice_shelf`, `landcover_glacier`, `landuse_residential`, `landcover_wood`, `landuse_park`, `building`, `aeroway-area` (`fill-color`) → `--map-land`. They melt into the land, so the map has three tones: land, water, rail.
-     - `railway`, `railway_minor`, `railway_transit` (`line-color`) → `--map-rail`. Keep today's zoom range and width interpolation for `railway`.
-     - `boundary_state`, `boundary_country_z0-4`, `boundary_country_z5-` (`line-color`) → `--map-boundary`
-     - `water_name`, `place_other`, `place_suburb`, `place_village`, `place_town`, `place_city`, `place_city_large`, `place_state`, `place_country_other`, `place_country_minor`, `place_country_major` (`text-color` → `--map-label`, `text-halo-color` → `--map-label-halo`)
-     - Roads, aeroway lines and the dash layers stay as the style draws them.
-  2. Station dots (`reachable-stations` layer). `circle-color` stays the level match on `--transfer-*`. **Decision:** the radius shrinks with each transfer, so direct destinations stand out. Add the constant `DOT_RADIUS_BY_LEVEL_PX = [6, 5, 4.5, 4, 3.5, 3]` and use it in a `['match', ['get', 'level'], 0, 6, 1, 5, …]` expression built from the array. `circle-stroke-color: --marker-stroke`, `circle-stroke-width: 1`. The sort key stays (level 0 on top).
-  3. Journey lines. Add a `journey-casing` line layer directly below `journey-lines`, on the same source, with `line-color: --marker-stroke`, round join and cap, and **Decision:** width `JOURNEY_CASING_WIDTH_PX = 9`. `JOURNEY_LINE_WIDTH_PX` becomes 5.
-  4. Start marker: a disc instead of the Lucide pin. `setStartStation` creates `<div class="start-marker"></div>` with no icon and `anchor: 'center'`. Remove the then-unused `import { icon }` from `map.js`. CSS: `.start-marker { width: 18px; height: 18px; border-radius: 50%; background: var(--marker-start-fill); border: 4px solid var(--marker-start-ring); box-shadow: 0 0 0 1px var(--marker-stroke); }`. Delete `.start-marker .icon` and `.start-marker .icon circle`, and the bridge variable `--marker-start-outline`. The `map-pin` icon is still used by `station-details.js` until F40.
-  5. Coverage areas: the fill colour by level stays. **Decision:** `fill-opacity` 0.45, `coverage-outline` `line-opacity` 0.9.
-  6. Map controls (zoom buttons and the about button) and attribution:
-     - `.maplibregl-ctrl-group { background: var(--board-2); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: none; }`
-     - `.maplibregl-ctrl-group button + button { border-top: 1px solid var(--line); }` and `.maplibregl-ctrl-group button:not(:disabled):hover { background-color: var(--board-3); }`
-     - `.maplibregl-ctrl-icon { filter: invert(1) brightness(0.9); }`. MapLibre draws these icons as dark SVG backgrounds.
-     - `.about-open .icon` uses `color: var(--text)`. Delete the bridge variable `--map-control-icon`.
-     - `.maplibregl-ctrl-attrib { background: var(--overlay); color: var(--muted); font-size: 11px; }` and `.maplibregl-ctrl-attrib a { color: var(--muted); }`
-     - The attribution stays visible and spelled out (`compact: false`); the licences require it.
-  7. Debug popup (`.station-popup`, only shown in debug mode): `--board-2` background, 1px `--line` border, `--radius` corners, tip colours `--board-2`, text `--text`/`--muted`.
-  Done when: the smoke check passes. From Krems with 5 transfers, the map shows three calm tones and six distinguishable dot colours, getting smaller with each transfer. A clicked station's route has a dark casing. The start is a white disc with an amber ring. Zoom and info buttons are light on dark.
-
 - [ ] **F35** Page skeleton: top bar, map area and journey column. Moves every element to its final place and positions it properly. Cells keep their current look until F36–F42 restyle them, but nothing is hidden or overlapping. After this ticket the sidebar is gone.
   1. New `<body>` structure. Existing ids stay; the old elements move as they are, including the transfers slider and the stat values, which are replaced in F37 and F39:
      ```

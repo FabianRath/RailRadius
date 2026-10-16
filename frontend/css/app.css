@@ -20,8 +20,6 @@
     --border: var(--line);
     --divider: var(--line);
     --font-sans: var(--font-ui);
-    --marker-start-outline: var(--marker-stroke);
-    --map-control-icon: var(--text);
 }
 
 * {
@@ -631,30 +629,51 @@ input[type="range"]::-moz-range-thumb {
     height: 100%;
 }
 
-/* The pin's tip sits 2px above the bottom of its 24px viewBox; the margin puts it on the station */
 .start-marker {
-    margin-top: 3px;
-    line-height: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--marker-start-fill);
+    border: 4px solid var(--marker-start-ring);
+    box-shadow: 0 0 0 1px var(--marker-stroke);
 }
 
-.start-marker .icon {
-    width: 32px;
-    height: 32px;
-    color: var(--marker-start-outline);
-    fill: var(--marker-start-fill);
-    stroke-width: 1.5;
+.maplibregl-ctrl-group {
+    background: var(--board-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: none;
 }
 
-.start-marker .icon circle {
-    fill: var(--marker-start-outline);
+.maplibregl-ctrl-group button + button {
+    border-top: 1px solid var(--line);
+}
+
+.maplibregl-ctrl-group button:not(:disabled):hover {
+    background-color: var(--board-3);
+}
+
+/* MapLibre draws these icons as dark SVG backgrounds */
+.maplibregl-ctrl-icon {
+    filter: invert(1) brightness(0.9);
+}
+
+.maplibregl-ctrl-attrib {
+    background: var(--overlay);
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.maplibregl-ctrl-attrib a {
+    color: var(--muted);
 }
 
 .station-popup .maplibregl-popup-content {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
+    background: var(--board-2);
+    color: var(--text);
     font-family: var(--font-sans);
-    border-radius: 8px;
-    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
     padding: 12px 16px;
 }
 
@@ -663,33 +682,33 @@ input[type="range"]::-moz-range-thumb {
     height: 32px;
     font-size: 24px;
     line-height: 1;
-    color: var(--text-secondary);
-    border-radius: 0 8px 0 8px;
+    color: var(--muted);
+    border-radius: 0 var(--radius) 0 var(--radius);
 }
 
 .station-popup .maplibregl-popup-close-button:hover {
-    color: var(--text-primary);
-    background: var(--divider);
+    color: var(--text);
+    background: var(--line);
 }
 
 .station-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
 .station-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
 .station-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
-    border-top-color: var(--bg-secondary);
+    border-top-color: var(--board-2);
 }
 
 .station-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
 .station-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
 .station-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
-    border-bottom-color: var(--bg-secondary);
+    border-bottom-color: var(--board-2);
 }
 
 .station-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
-    border-right-color: var(--bg-secondary);
+    border-right-color: var(--board-2);
 }
 
 .station-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
-    border-left-color: var(--bg-secondary);
+    border-left-color: var(--board-2);
 }
 
 .popup-station {
@@ -1213,7 +1232,7 @@ input[type="range"]::-moz-range-thumb {
     width: 18px;
     height: 18px;
     vertical-align: middle;
-    color: var(--map-control-icon);
+    color: var(--text);
 }
 
 .about-panel {
