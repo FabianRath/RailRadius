@@ -47,35 +47,6 @@ The user picked concept 5, "Abfahrt", from the design council of 2026-10-16. The
 - F32 (merged coverage areas, "decide first") may rework or remove the "Show reach as areas" option. If F32 is decided before F38, follow its outcome in F38 (keep, change or drop the checkbox). Otherwise build F38 as written.
 - `frontend/backend_test.html` is a dev test page and is not part of this redesign.
 
-- [ ] **F37** Top bar, part 2: "Changes" stepper and "Max journey".
-  1. Replace the slider block (`.slider-container`, `#transferSlider`, `#transferValue`, the "0 = direct trains only" hint) in `.board-changes` (`flex: none`) with:
-     ```
-     <span class="board-label" id="transferLabel">Changes</span>
-     <div class="stepper" title="0 = direct trains only">
-       <button type="button" class="stepper-btn" id="transferMinus" aria-label="Fewer changes">−</button>
-       <input type="number" id="transferInput" class="stepper-value" min="0" max="5" step="1" value="1"
-              aria-labelledby="transferLabel" aria-describedby="transferHint">
-       <button type="button" class="stepper-btn" id="transferPlus" aria-label="More changes">+</button>
-     </div>
-     <span id="transferHint" hidden>0 = direct trains only</span>
-     ```
-     The default stays 1. `hidden` keeps the hint out of the layout, while `aria-describedby` still reads it to screen readers.
-  2. Styles:
-     - `.stepper { display: flex; align-items: center; gap: 8px; }`
-     - `.stepper-value { font: 900 28px/1 var(--font-board); color: var(--amber); width: 1.4ch; text-align: center; }` (Doto, the dot-matrix face), plus the spin-button hiding rules that already exist for number inputs
-     - `.stepper-btn { width: 28px; height: 28px; background: transparent; border: 1px solid var(--line); border-radius: var(--radius); color: var(--muted); font: 600 18px/1 var(--font-ui); cursor: pointer; }`, hover `border-color: var(--amber); color: var(--text);`, `:disabled { opacity: 0.35; cursor: default; }`
-  3. `query-form.js`:
-     - Replace `transferSlider`/`transferValue` with `transferInput`, `transferMinus` and `transferPlus`.
-     - Minus and plus call `transferInput.stepDown()`/`stepUp()` and then `updateStepperButtons()`, which disables minus at `transferInput.min` and plus at `transferInput.max`. Call it once in `initQueryForm` and on the input's `input` event.
-     - `readQuery()` clamps the typed value: `maxTransfers: clampTransfers(transferInput.value)`, where `clampTransfers` uses `Number(transferInput.min)` and `Number(transferInput.max)` and maps empty or invalid input to the min.
-     - Delete the old slider listener.
-  4. Delete the CSS for `.slider-container`, `.slider-label`, `.slider-value` and `input[type="range"]` with its thumb rules.
-  5. `.board-maxtime` (`flex: none`):
-     - `<label class="board-label" for="maxJourneyTime">Max journey</label>`, then a row with `<input type="number" id="maxJourneyTime" class="board-value" placeholder="any" min="0.5" max="24" step="0.5" title="Leave empty for no time limit">` (`width: 3ch; text-align: right;`) and `<span class="board-unit">h</span>` (`font: 500 13px var(--font-ui); color: var(--muted); margin-left: 4px;`).
-     - `#maxJourneyTime` loses the class `search-input`. Remove the old `.field` wrapper, `.field-label`, `.field-optional` and `.field-hint` markup.
-  6. Copy changes from the mockup: "Maximum Transfers" → "Changes", "Max Journey Time (hours) — optional" → "Max journey". The two hints become `title` tooltips; the transfers hint is also the screen-reader description.
-  Done when: the smoke check passes. Minus at 0 and plus at 5 are disabled. A typed 9 searches with 5 and an empty field with 0. An empty max time means no limit, and 8 limits to 8 h (compare the counts with the same query before this ticket).
-
 - [ ] **F38** Top bar, part 3: the "Wait" cell and its options panel (wait-time limit and coverage areas).
   1. `.board-options` (`flex: none`) holds a toggle button and the panel:
      ```
@@ -107,7 +78,7 @@ The user picked concept 5, "Abfahrt", from the design council of 2026-10-16. The
      - Escape inside `.board-options` closes the panel, calls `event.stopPropagation()` (so it doesn't also close the journey) and returns focus to the toggle.
      - A `pointerdown` outside `.board-options` closes it.
      - The existing listeners (`toggleTransferTimeLimit`, the input listeners, the coverage `change` listener) stay as they are.
-  5. Delete the now-unused rules `.option-box`, `.option-row`, `.option-title`, `.option-controls`, `.toggle-hint`, `.range-inputs`, `.range-field`, `.range-label`, `.range-separator`, `.checkbox-row` and `.field*`.
+  5. Delete the now-unused rules `.option-box`, `.option-row`, `.option-title`, `.option-controls`, `.toggle-hint`, `.range-inputs`, `.range-field`, `.range-label`, `.range-separator`, `.checkbox-row` and `.board-bar .search-input` (the `.field*` rules went already in F37).
   Done when: the smoke check passes. The cell shows "5–180 min", or "off" in muted grey. The panel opens and closes (click, Escape, click outside). Switching the limit off hides the range and makes the search unlimited, as before. "Show reach as areas" still draws the areas.
 
 - [ ] **F39** Top bar, part 4: result count and the GO button.
