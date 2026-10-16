@@ -1,7 +1,7 @@
 // The selected station's journey, in its own column beside the map so it never covers the route drawn on it (F22).
 import { countryBadgeHtml, escapeHtml, fmtGtfsClock } from './util.js';
 import { icon } from './icons.js';
-import { clearJourney, resizeMap, showJourney } from './map.js';
+import { clearJourney, MAX_TRANSFER_LEVEL, resizeMap, showJourney } from './map.js';
 import { journeyRoute } from './journey.js';
 
 const panel = document.getElementById('stationDetails');
@@ -33,11 +33,27 @@ export function closeStationDetails() {
 }
 
 function stationDetailsHtml(station) {
-    return `<div class="popup-station">${escapeHtml(station.stopName)}${countryBadgeHtml(station.country)}</div>`
-        + `<div class="popup-meta">Transfers: ${station.transfers}</div>`
+    return summaryHtml(station)
         + runningDaysHtml(station)
         + roundTripHtml(station)
         + journeyHtml(station);
+}
+
+function summaryHtml(station) {
+    const trainLegs = (station.legs ?? []).filter(leg => leg.type === 'TRAIN');
+    const times = trainLegs.length
+        ? `${fmtGtfsClock(trainLegs[0].departureTime)} – ${fmtGtfsClock(trainLegs.at(-1).arrivalTime)}` : '';
+    const meta = [times, station.totalDuration, changesText(station.transfers)].filter(Boolean).join(' · ');
+    return '<div class="journey-summary">'
+        + `<div class="journey-dest">${escapeHtml(station.stopName)}${countryBadgeHtml(station.country)}</div>`
+        + (meta ? `<div class="journey-meta">${escapeHtml(meta)}</div>` : '')
+        + '</div>';
+}
+
+function changesText(transfers) {
+    if (transfers == null) return '';
+    if (transfers === 0) return 'direct';
+    return transfers === 1 ? '1 change' : `${transfers} changes`;
 }
 
 /**
@@ -46,11 +62,10 @@ function stationDetailsHtml(station) {
  */
 function runningDaysHtml(station) {
     if (station.hasCommonDay === false) {
-        return `<div class="popup-meta popup-warning">${icon('triangle-alert')}`
-            + ' No single day on which all these trains run</div>';
+        return noteHtml('triangle-alert', 'No single day on which all these trains run');
     }
     if (!station.runningDays) return '';
-    return `<div class="popup-meta">${icon('calendar')} ${escapeHtml(station.runningDays)}</div>`;
+    return noteHtml('calendar', escapeHtml(station.runningDays));
 }
 
 /**
@@ -59,46 +74,67 @@ function runningDaysHtml(station) {
  */
 function roundTripHtml(station) {
     if (!station.roundTripStation) return '';
-    return `<div class="popup-meta popup-warning">${icon('triangle-alert')}`
-        + ` Contains a round trip: passes ${escapeHtml(station.roundTripStation)} twice</div>`;
+    return noteHtml('triangle-alert',
+        `Contains a round trip: passes ${escapeHtml(station.roundTripStation)} twice`);
+}
+
+function noteHtml(iconName, textHtml) {
+    return `<div class="journey-note">${icon(iconName)}<span>${textHtml}</span></div>`;
 }
 
 function journeyHtml(station) {
-    if (station.legs?.length) return legsHtml(station);
-    if (station.path?.length > 1) return pathHtml(station);
+    if (station.legs?.length) return tableHtml(legsHtml(station.legs));
+    if (station.path?.length > 1) return tableHtml(pathHtml(station));
     return '';
 }
 
-function legsHtml(station) {
-    const legs = station.legs.map(leg => {
-        const duration = leg.duration ? ` <span class="leg-duration">(${escapeHtml(leg.duration)})</span>` : '';
-        if (leg.type === 'TRAIN') return trainLegHtml(leg, duration);
-        if (leg.type === 'TRANSFER') {
-            const station = escapeHtml(leg.fromStation) + countryBadgeHtml(leg.fromCountry);
-            return `<div class="leg leg-transfer">${icon('arrow-left-right')} Transfer at ${station}${duration}</div>`;
-        }
+function tableHtml(rowsHtml) {
+    return '<div class="journey-thead"><span class="board-label">Time</span><span class="board-label">Station</span>'
+        + '<span class="board-label journey-train">Train</span></div>'
+        + rowsHtml;
+}
+
+function legsHtml(legs) {
+    let trainIndex = 0;
+    return legs.map(leg => {
+        if (leg.type === 'TRAIN') return trainLegHtml(leg, trainIndex++);
+        if (leg.type === 'TRANSFER') return changeHtml(leg.fromStation, leg.duration);
         return '';
     }).join('');
-    return '<div class="popup-path">'
-        + `<div class="popup-total">${icon('clock')} Total Journey Time: ${escapeHtml(station.totalDuration || 'N/A')}</div>`
-        + '<div class="popup-heading">Journey details</div>'
-        + `<div class="leg leg-stop">${icon('map-pin')} START: ${escapeHtml(station.pathNames?.[0] || 'Start')}`
-        + `${countryBadgeHtml(station.legs[0].fromCountry)}</div>`
-        + legs
-        + `<div class="leg leg-stop">${icon('flag')} DESTINATION: ${escapeHtml(station.stopName)}`
-        + `${countryBadgeHtml(station.country)}</div>`
-        + '</div>';
 }
 
 /** Train number, times and direction, so the train can be found on the operator's site. */
-function trainLegHtml(leg, duration) {
-    const times = `${fmtGtfsClock(leg.departureTime)} ${escapeHtml(leg.fromStation)}`
-        + ` → ${fmtGtfsClock(leg.arrivalTime)} ${escapeHtml(leg.toStation)}`;
-    const details = [leg.headsign && `towards ${leg.headsign}`, leg.operator].filter(Boolean);
-    const detailsHtml = details.length
-        ? `<div class="leg-detail">${escapeHtml(details.join(' · '))}</div>` : '';
-    return `<div class="leg leg-train"><div>${icon('train-front')} ${escapeHtml(trainTitle(leg))}${duration}</div>`
-        + `<div class="leg-times">${times}</div>${detailsHtml}</div>`;
+function trainLegHtml(leg, trainIndex) {
+    const sub = [leg.headsign && `towards ${leg.headsign}`, leg.operator].filter(Boolean).join(' · ');
+    const from = `<span class="journey-from">${escapeHtml(leg.fromStation)}</span>${countryBadgeHtml(leg.fromCountry)}`
+        + (sub ? `<div class="journey-sub">${escapeHtml(sub)}</div>` : '');
+    // Same index journeyRoute gives the train's line, so the badge matches its colour on the map
+    const level = Math.min(trainIndex, MAX_TRANSFER_LEVEL);
+    const badge = `<span class="train-badge level-${level}">${escapeHtml(trainTitle(leg))}</span>`;
+    const duration = `<span class="journey-duration">${escapeHtml(leg.duration)}</span>`;
+    return rowHtml(timeHtml(leg.departureTime), from, badge)
+        + rowHtml(timeHtml(leg.arrivalTime), arrivalHtml(leg.toStation), duration);
+}
+
+function rowHtml(timeCellHtml, stationHtml, trainHtml) {
+    return `<div class="journey-row"><div>${timeCellHtml}</div><div class="journey-station">${stationHtml}</div>`
+        + `<div class="journey-train">${trainHtml}</div></div>`;
+}
+
+function arrivalHtml(stationName) {
+    return `<span class="journey-to">→ ${escapeHtml(stationName)}</span>`;
+}
+
+function changeHtml(stationName, duration) {
+    const text = [`Change at ${stationName}`, duration].filter(Boolean).join(' · ');
+    return `<div class="journey-change">${escapeHtml(text)}</div>`;
+}
+
+/** fmtGtfsClock appends the day offset as " +N"; the board shows it smaller beside the clock. */
+function timeHtml(gtfsTime) {
+    const [clock, dayOffset] = fmtGtfsClock(gtfsTime).split(' ');
+    return `<span class="journey-time">${clock}</span>`
+        + (dayOffset ? `<small class="journey-day">${dayOffset}</small>` : '');
 }
 
 /**
@@ -118,12 +154,9 @@ function trainTitle(leg) {
 
 /** Fallback when the backend sent no legs: only the station sequence is known. */
 function pathHtml(station) {
-    const lastIndex = station.path.length - 1;
-    const stops = station.path.map((id, i) => {
-        const name = escapeHtml(station.pathNames?.[i] || id);
-        if (i === 0) return `<div class="leg leg-stop">${icon('map-pin')} START: ${name}</div>`;
-        if (i === lastIndex) return `<div class="leg leg-stop">${icon('flag')} DESTINATION: ${name}</div>`;
-        return `<div class="leg leg-transfer">${icon('arrow-left-right')} TRANSFER: ${name}</div>`;
-    }).join('');
-    return `<div class="popup-path"><div class="popup-heading">Connection</div>${stops}</div>`;
+    const names = station.path.map((id, i) => station.pathNames?.[i] || id);
+    const noTime = '<span class="journey-time">—</span>';
+    return rowHtml(noTime, `<span class="journey-from">${escapeHtml(names[0])}</span>`, '')
+        + names.slice(1, -1).map(name => changeHtml(name)).join('')
+        + rowHtml(noTime, arrivalHtml(names.at(-1)), '');
 }
