@@ -50,26 +50,6 @@ The user picked concept 5, "Abfahrt", from the design council of 2026-10-16. The
 - F32 (merged coverage areas, "decide first") may rework or remove the "Show reach as areas" option. If F32 is decided before F38, follow its outcome in F38 (keep, change or drop the checkbox). Otherwise build F38 as written.
 - `frontend/backend_test.html` is a dev test page and is not part of this redesign.
 
-- [ ] **F39** Top bar, part 4: result count and the GO button.
-  1. `.board-count#resultsSection`:
-     - `flex: none; margin-left: auto; padding: 10px 22px; border-left: 1px solid var(--line); display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 2px;`
-     - Content: `<b id="reachableCount" class="board-digits">—</b>`, styled `font: 900 40px/1 var(--font-board); color: var(--amber); min-width: 4ch; text-align: right;`. The fixed width keeps the cell from jumping while the stream counts up.
-     - Below it `<span class="board-label">stations · max <span id="maxTransfersUsed">—</span> changes</span>`.
-     - `reachability.js` already writes both ids: the count with `toLocaleString()`, "…" while waiting for the first stations, "—" after a failure or a cancel with no results. Keep that unchanged.
-     - Delete the old `.stat-value` rule.
-  2. `#calculateBtn` gets class `board-go` (replacing `btn`):
-     - `flex: none; min-width: 110px; padding: 0 22px; border: 0; border-radius: 0; background: var(--amber); color: var(--on-amber); font: 700 18px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer;`
-     - Hover (not disabled): `filter: brightness(1.08)`. `:disabled`: `opacity: 0.4; cursor: not-allowed;`.
-     - `.btn-label` text: "Go" (was "Calculate Reachability").
-  3. Loading state. `reachability.js` toggles `.btn-loading` on the button (unchanged). Inner spans:
-     - `.btn-label` "Go": hidden while loading.
-     - `.btn-busy`: a small spinner and the text "Stop" (was "Calculating…"), shown while loading.
-     - `.btn-cancel-hint`: delete it from the markup and CSS. "Stop" says it, and it also works on touch screens, where there is no hover.
-
-     Loading look: `background: var(--board-2); color: var(--amber); box-shadow: inset 0 0 0 2px var(--amber);`. On hover while loading, `color: var(--danger); box-shadow: inset 0 0 0 2px var(--danger);`, and the spinner's top colour turns `--danger`.
-  4. `.spinner`: `border: 2px solid var(--line); border-top-color: var(--amber);`, keep the animation, and add `@media (prefers-reduced-motion: reduce) { .spinner, .loading-pulse::after { animation: none; } }`. Delete the old `.btn`, `.btn:hover`, `.btn:disabled` and `.btn-loading*` gradient rules.
-  Done when: the smoke check passes, and the bar matches the mockup end to end: amber dot-matrix count, an amber "stations · max N changes" label, an amber GO that is disabled before a station is chosen, "Stop" while streaming (red on hover), and the partial results kept after Stop.
-
 - [ ] **F40** Journey column ("Connection" board). Rewrites the HTML that `station-details.js` builds. The data, `journeyRoute`, `trainTitle` and the open/close behaviour stay as they are.
   1. Column and header:
      - `#stationDetails.journey`: `background: var(--board-2); border-left: 1px solid var(--line);` (width and flex from F35).

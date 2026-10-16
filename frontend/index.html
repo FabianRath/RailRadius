@@ -84,14 +84,13 @@
             </div>
 
             <div class="board-count" id="resultsSection">
-                <div class="stat-value" id="reachableCount">—</div>
-                <div class="stat-value" id="maxTransfersUsed">—</div>
+                <b id="reachableCount" class="board-digits">—</b>
+                <span class="board-label">stations · max <span id="maxTransfersUsed">—</span> changes</span>
             </div>
 
-            <button class="btn" id="calculateBtn" disabled>
-                <span class="btn-label">Calculate Reachability</span>
-                <span class="btn-busy"><span class="spinner spinner-small"></span>Calculating…</span>
-                <span class="btn-cancel-hint">click to cancel</span>
+            <button class="board-go" id="calculateBtn" disabled>
+                <span class="btn-label">Go</span>
+                <span class="btn-busy"><span class="spinner spinner-small"></span>Stop</span>
             </button>
         </header>
 
