@@ -1,42 +1,27 @@
+/* Bridge from the old sidebar palette to tokens.css until the redesign replaces these names */
 :root {
-    --bg-primary: #0f0f23;
-    --bg-secondary: #1a1a2e;
-    --bg-tertiary: #16213e;
-    --bg-overlay: rgba(15, 15, 35, 0.92);
-    --accent-rail: #00ff9f;
-    --accent-rail-strong: #00d98f;
-    --accent-rail-faint: rgba(0, 255, 159, 0.05);
-    --accent-rail-soft: rgba(0, 255, 159, 0.1);
-    --accent-rail-line: rgba(0, 255, 159, 0.3);
-    --accent-warm: #ff6b35;
-    --accent-warm-soft: rgba(255, 107, 53, 0.1);
-    --accent-warm-line: rgba(255, 107, 53, 0.3);
-    --accent-train-soft: rgba(0, 217, 255, 0.05);
-    --warning: #ffc107;
-    --danger: #ff4455;
-    --danger-bg: #2a0a0a;
-    --text-primary: #e4e4e7;
-    --text-secondary: #a1a1aa;
-    --border: #27272a;
-    --divider: rgba(255, 255, 255, 0.1);
-    --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
-    --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-
-    /* Map palette, read by js/map.js and js/debug.js */
-    --transfer-0: #00ff9f;
-    --transfer-1: #00d9ff;
-    --transfer-2: #8b5cf6;
-    --transfer-3: #ff006e;
-    --transfer-4: #ff7b00;
-    --transfer-5: #ffd700;
-    --marker-stroke: #ffffff;
-    --marker-start-fill: #ffffff;
-    --marker-start-outline: #0f0f23;
-    --map-rail: #4f8a74;
-    --map-control-icon: #333333;
-    --debug-low: #00ff9f;
-    --debug-mid: #0099ff;
-    --debug-high: #ff2244;
+    --bg-primary: var(--board);
+    --bg-secondary: var(--board-2);
+    --bg-tertiary: var(--board-3);
+    --bg-overlay: var(--overlay);
+    --accent-rail: var(--amber);
+    --accent-rail-strong: var(--amber);
+    --accent-rail-faint: var(--board-3);
+    --accent-rail-soft: var(--board-3);
+    --accent-rail-line: var(--line);
+    --accent-warm: var(--amber);
+    --accent-warm-soft: var(--board-3);
+    --accent-warm-line: var(--line);
+    --accent-train-soft: var(--board-3);
+    --warning: var(--amber);
+    --danger-bg: var(--board-2);
+    --text-primary: var(--text);
+    --text-secondary: var(--muted);
+    --border: var(--line);
+    --divider: var(--line);
+    --font-sans: var(--font-ui);
+    --marker-start-outline: var(--marker-stroke);
+    --map-control-icon: var(--text);
 }
 
 * {
@@ -49,8 +34,14 @@
     display: none !important;
 }
 
+:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+}
+
 body {
-    font-family: var(--font-sans);
+    font-family: var(--font-ui);
+    font-variant-numeric: tabular-nums;
     background: var(--bg-primary);
     color: var(--text-primary);
     overflow: hidden;
@@ -65,7 +56,7 @@ body {
 }
 
 .sidebar {
-    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+    background: var(--board-2);
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
@@ -125,7 +116,6 @@ body {
     padding: 10px 14px;
     font-size: 13px;
     font-weight: 600;
-    backdrop-filter: blur(4px);
 }
 
 h1 {
@@ -133,10 +123,7 @@ h1 {
     font-weight: 800;
     font-size: 28px;
     letter-spacing: -1px;
-    background: linear-gradient(135deg, var(--accent-rail), var(--accent-warm));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--text);
     margin-bottom: 8px;
 }
 
@@ -321,7 +308,6 @@ input[type="range"]::-webkit-slider-thumb {
     background: var(--accent-rail);
     border-radius: 50%;
     cursor: pointer;
-    box-shadow: 0 2px 8px var(--accent-rail-line);
 }
 
 input[type="range"]::-moz-range-thumb {
@@ -331,7 +317,6 @@ input[type="range"]::-moz-range-thumb {
     border-radius: 50%;
     cursor: pointer;
     border: none;
-    box-shadow: 0 2px 8px var(--accent-rail-line);
 }
 
 .field {
@@ -470,7 +455,7 @@ input[type="range"]::-moz-range-thumb {
 .btn {
     width: 100%;
     padding: 16px;
-    background: linear-gradient(135deg, var(--accent-rail), var(--accent-rail-strong));
+    background: var(--amber);
     border: none;
     border-radius: 8px;
     color: var(--bg-primary);
@@ -482,11 +467,6 @@ input[type="range"]::-moz-range-thumb {
     cursor: pointer;
     transition: all 0.3s;
     position: relative;
-}
-
-.btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px var(--accent-rail-line);
 }
 
 .btn:disabled {
@@ -502,7 +482,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .btn-loading {
-    background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+    background: var(--bg-secondary);
     border: 1px solid var(--accent-rail);
     color: var(--accent-rail);
     transition: background 0.2s, border-color 0.2s;
@@ -517,7 +497,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .btn-loading:hover {
-    background: linear-gradient(135deg, var(--danger-bg), var(--bg-primary));
+    background: var(--danger-bg);
     border-color: var(--danger);
     color: var(--danger);
 }
@@ -602,7 +582,7 @@ input[type="range"]::-moz-range-thumb {
     inset: 0;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+    background: var(--board-2);
 }
 
 .station-details-header {
@@ -834,8 +814,6 @@ input[type="range"]::-moz-range-thumb {
     align-items: center;
     gap: 14px;
     z-index: 900;
-    backdrop-filter: blur(6px);
-    box-shadow: 0 4px 24px var(--accent-rail-soft);
     white-space: nowrap;
     pointer-events: none;
 }
@@ -896,8 +874,6 @@ input[type="range"]::-moz-range-thumb {
     display: flex;
     align-items: center;
     gap: 12px;
-    backdrop-filter: blur(4px);
-    box-shadow: 0 4px 20px var(--accent-warm-line);
     white-space: nowrap;
 }
 
