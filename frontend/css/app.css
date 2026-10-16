@@ -706,7 +706,8 @@ input[type="number"]::-webkit-inner-spin-button {
     filter: invert(1) brightness(0.9);
 }
 
-.maplibregl-ctrl-attrib {
+/* Doubled class to beat MapLibre's own .maplibregl-ctrl.maplibregl-ctrl-attrib background */
+.maplibregl-ctrl.maplibregl-ctrl-attrib {
     background: var(--overlay);
     color: var(--muted);
     font-size: 11px;
