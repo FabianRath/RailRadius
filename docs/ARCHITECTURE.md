@@ -1,11 +1,11 @@
-# RailReach — Architecture
+# RailRadius — Architecture
 
 _Read this only when you need detail beyond CLAUDE.md. Last reviewed: 2026-10-03._
 _Describes the code as it is now. Update it in the same commit as any change it covers (see CLAUDE.md → Workflow). After a full check against the code, bump the date._
 
 ## Purpose
 
-RailReach answers the question **"Where can I get by train from station X with at most N transfers?"** across Europe.
+RailRadius answers the question **"Where can I get by train from station X with at most N transfers?"** across Europe.
 
 It loads GTFS timetable feeds for ~25 European countries, keeps only **rail** routes, merges them into one network (with cross-border station deduplication) and lays its trips out as flat arrays (`TimetableStore`). It then runs a transfer-bounded, round-based search from a start station. The result is every reachable station with transfer count, total duration, path, and a leg-by-leg itinerary (train legs and transfer waits). The browser frontend (`frontend/`, served by the backend at `http://localhost:8080/`) draws the results on a MapLibre map with OpenFreeMap's dark style and receives stations live via Server-Sent Events.
 
@@ -22,8 +22,8 @@ It loads GTFS timetable feeds for ~25 European countries, keeps only **rail** ro
 
 Run from `backend/`; the cache paths are relative to the working directory. The commands below are for Git Bash; in PowerShell use `.\mvnw.cmd` instead of `./mvnw`.
 
-- **Full data:** `./mvnw package -DskipTests && java -Xmx3g -XX:+UseCompactObjectHeaders -jar target/railreach-backend-0.0.1-SNAPSHOT.jar`
-  - The app starts from the binary cache `data/gtfs-store.bin` (159 MB, S20): ~3 s in all, ~0.15 s of it reading the file. Without it, `--railreach.gtfs.auto-load-from-files=true` parses the zips (minutes) and writes it; so does `reload-gtfs`.
+- **Full data:** `./mvnw package -DskipTests && java -Xmx3g -XX:+UseCompactObjectHeaders -jar target/railradius-backend-0.0.1-SNAPSHOT.jar`
+  - The app starts from the binary cache `data/gtfs-store.bin` (159 MB, S20): ~3 s in all, ~0.15 s of it reading the file. Without it, `--railradius.gtfs.auto-load-from-files=true` parses the zips (minutes) and writes it; so does `reload-gtfs`.
   - Server size and memory measurements: `docs/HOSTING.md`.
 - **Dev data:** `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev -Dspring-boot.run.jvmArguments=-XX:+UseCompactObjectHeaders`
   - Austria + Hungary + Slovakia from `data/gtfs-dev/`, binary cache in `data/gtfs-dev-store.bin`.
@@ -33,7 +33,7 @@ Run from `backend/`; the cache paths are relative to the working directory. The 
 
 - **Search oracle (S12):** `SearchSnapshot` dumps every path a search returns, one sorted line each: station, transfers, minutes, the path's stations, each ride as `tripId from departureSeconds to arrivalSeconds`, the exact running days as epoch-day ranges and their label. One section per start and transfer limit 0–5, with today pinned, because it decides the days (B31). Two runs must give the same bytes.
   - gtfs-mini: `SearchSnapshotTest` compares a search from every station of each feed combination with `src/test/resources/search-snapshots/`. After an intended change, rewrite them with `./mvnw -q test -Dtest=SearchSnapshotTest -Dsnapshot.update=true` and explain every changed line.
-  - Dev and full data: the starts of one set in `docs/bench-stations.txt`, searched on a binary cache file and written to the gitignored `data/snapshots/` (gzipped if the name ends in `.gz`; a full-data dump is several GB as text): `./mvnw spring-boot:run -Dspring-boot.run.main-class=com.railreach.service.SearchSnapshot "-Dspring-boot.run.jvmArguments=-Xmx3g -XX:+UseCompactObjectHeaders" "-Dspring-boot.run.arguments=data/gtfs-dev-store.bin dev 2026-10-09 data/snapshots/dev-2026-10-09.txt.gz"`. For full data use `data/gtfs-store.bin full` (2.7 M lines, 136 MB gzipped). Compare two dumps with `cmp`, and list the differing lines with `diff <(gzip -dc a.txt.gz) <(gzip -dc b.txt.gz)`.
+  - Dev and full data: the starts of one set in `docs/bench-stations.txt`, searched on a binary cache file and written to the gitignored `data/snapshots/` (gzipped if the name ends in `.gz`; a full-data dump is several GB as text): `./mvnw spring-boot:run -Dspring-boot.run.main-class=com.railradius.service.SearchSnapshot "-Dspring-boot.run.jvmArguments=-Xmx3g -XX:+UseCompactObjectHeaders" "-Dspring-boot.run.arguments=data/gtfs-dev-store.bin dev 2026-10-09 data/snapshots/dev-2026-10-09.txt.gz"`. For full data use `data/gtfs-store.bin full` (2.7 M lines, 136 MB gzipped). Compare two dumps with `cmp`, and list the differing lines with `diff <(gzip -dc a.txt.gz) <(gzip -dc b.txt.gz)`.
 
 **Startup flow:**
 1. `GtfsDataService` loads the binary cache file (`BinaryCacheStore`) if present and of the current format version. Otherwise it parses the zips only if `auto-load-from-files` is true (true for dev, false for default) and the GTFS directory has a zip; with none (fresh checkout) it logs a WARN and starts empty. With no data, use `POST /api/admin/reload-gtfs`.
@@ -41,7 +41,7 @@ Run from `backend/`; the cache paths are relative to the working directory. The 
 ## Directory layout
 
 ```
-RailReach/
+RailRadius/
 ├── CLAUDE.md, docs/ (ARCHITECTURE, TODO, decisions, HOSTING, bench-stations.txt), scripts/ (api.sh, bench.sh)
 ├── frontend/index.html               # markup; served at / by Spring (static-locations: file:../frontend/)
 ├── frontend/css/app.css              # all styles and the map palette (CSS variables)
@@ -54,12 +54,12 @@ RailReach/
 ├── frontend/backend_test.html        # small manual API test page
 └── backend/
     ├── pom.xml
-    ├── src/main/java/com/railreach/{controller,service,dto,model,config}/
+    ├── src/main/java/com/railradius/{controller,service,dto,model,config}/
     ├── src/main/resources/application.yml (+ application-dev.yml), borders/europe.geojson (country borders),
     │                                          #   station-aliases.txt, station-codes.txt, train-categories.txt, train-category-columns.txt,
     │                                          #   gtfs-feeds.txt (download URLs per feed), feed-roots.pem (extra TLS roots)
     ├── config/application.yml                 # GITIGNORED local secrets (feed credentials), optional
-    ├── src/test/java/com/railreach/           # service/ (GtfsDataService, Reachability*, GtfsTestFixtures), util/, config/ tests
+    ├── src/test/java/com/railradius/           # service/ (GtfsDataService, Reachability*, GtfsTestFixtures), util/, config/ tests
     ├── src/test/resources/gtfs-mini/          # hand-written fixture feeds (see its README)
     ├── src/test/resources/search-snapshots/   # search oracle dumps of gtfs-mini, one per feed combination
     └── data/                                  # GITIGNORED
@@ -72,12 +72,12 @@ RailReach/
 
 ## Source files
 
-Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub>/`.
+Package `com.railradius.<sub>` lives in `backend/src/main/java/com/railradius/<sub>/`.
 
 | File | Package | Role |
 |---|---|---|
-| `RailReachBackendApplication` | root | Spring Boot entry point, `@EnableScheduling` and `@EnableAsync` |
-| `RailReachController` | controller | Public API under `/api` |
+| `RailRadiusBackendApplication` | root | Spring Boot entry point, `@EnableScheduling` and `@EnableAsync` |
+| `RailRadiusController` | controller | Public API under `/api` |
 | `AdminController` | controller | Admin/debug API under `/api/admin` |
 | `GtfsDataService` | service | Fills the `TransitGraph` at startup (binary cache file, else the zips) and on `reload-gtfs`: loads the zips into a `RailNetwork`, merges its stations, builds what is served (`RailNetwork.servedData`), writes the binary cache file, fills the graph, rebuilds the station search index and clears the reachability caches. While a load runs, its progress counts come from the network being built |
 | `TransitGraph` | service | What the app serves: stations, their translated names, the `TripInfo` of each store trip, each feed's `FeedTimespan` (`feedTimespans`, read by `FeedAlerts`) and the `TimetableStore` (an empty one before a load); `nextStationCount` (a station's edges, from the store), `upcomingDays` and `todayEpochDay` (by its `Clock`). Filled from the binary cache or a load (`restore`). Everything that reads GTFS data injects this |
@@ -104,7 +104,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `HomeCountries` | service | A feed's home country: where more than half of its located stations lie; used by `ForeignStopSnapper` and `CoverageService` |
 | `CoverageService` | service | Covered countries for `/api/coverage`: the distinct home countries of the loaded feeds, so a cross-border train's last stops abroad don't add a country |
 | `ForeignStopSnapper` | service | Cross-border rule: a feed's stop outside its home country is merged into the nearest station of that country's feed (≤ 1 km), or one of the same name (≤ 5 km) |
-| `FeedUpdateCenter` | service | Update center for the GTFS zips: status of each zip (`FeedStatus`, its `FeedTimespan` memoized per file and modification time; a big feed takes seconds, as trips.txt is read too) plus a `MISSING` status for each expected feed (`railreach.feeds.sources`) without a zip, a scheduled log check (`railreach.feeds.check-interval`, first run at startup) that WARNs about missing, expired and expiring feeds, disk space of the zips in use and in `previous/` (`FeedStorage`), and downloads of registered feeds. A download is refused (`BUSY`) during a GTFS load or another download |
+| `FeedUpdateCenter` | service | Update center for the GTFS zips: status of each zip (`FeedStatus`, its `FeedTimespan` memoized per file and modification time; a big feed takes seconds, as trips.txt is read too) plus a `MISSING` status for each expected feed (`railradius.feeds.sources`) without a zip, a scheduled log check (`railradius.feeds.check-interval`, first run at startup) that WARNs about missing, expired and expiring feeds, disk space of the zips in use and in `previous/` (`FeedStorage`), and downloads of registered feeds. A download is refused (`BUSY`) during a GTFS load or another download |
 | `FeedValidity` | service | First and last day any service of a feed runs, from `ServiceCalendarReader` over the whole feed (not only rail) |
 | `FeedTimespan` | service | How long a feed's trains run: its `FeedValidity` and `EarlyEndingOperators`; `trainsEnd` is the last day, or the earlier last day of the first early-ending operator. Read per zip by `FeedUpdateCenter` and on each load by `GtfsFeedLoader` (from the whole calendar, before the rare-train filter), and stored in the binary cache, so a server without zips has it too. None for a feed without a calendar |
 | `FeedAlerts` | service | Feed alert mail (F29): at `feeds.alerts.cron` (daily 08:00), if turned on, one mail to `feeds.alerts.to` listing every served feed (`TransitGraph.feedTimespans`) whose trains end within `feeds.alerts.days` (14) or already have, minus paused ones; nothing when none is due. On/off and the pauses (source → the `trainsEnd` it was paused at) are kept in `feeds.alerts.settings-file` (JSON), so they survive restarts; a pause only applies while the feed's `trainsEnd` is still that day, so new data for it ends the pause. Off until turned on. Sends through Spring's `JavaMailSender` (only there when `spring.mail.host` is set); a test mail goes out whether on or off |
@@ -145,7 +145,7 @@ Package `com.railreach.<sub>` lives in `backend/src/main/java/com/railreach/<sub
 | `JourneyRunningDays` | service | Days on which every train of a returned journey runs (`withRide`, one ride as board and alight event of the `TimetableStore`), and their summary ("Runs Mon–Fri", "Irregular: 2 days in the timetable") |
 | `RegularJourneyChooser` | service | Picks a station's journey among the search's candidates with the same transfer count: the fastest that runs on at least half as many days as the most frequent one (B26) |
 | `SearchSnapshot` | service | Search oracle: every path of a search as one sorted text line, for each start and transfer limit 0–5; `main` dumps a set of `docs/bench-stations.txt` from a binary cache file |
-| `AdminToken` | config | `railreach.admin.token` and its constant-time check; `sentWith` accepts the `X-Admin-Token` header or the `railreach_admin` cookie (HttpOnly, SameSite=Strict, path `/api/reachability`; set by `/api/admin/session`), which is how the browser's `EventSource` proves the admin to the rate limit |
+| `AdminToken` | config | `railradius.admin.token` and its constant-time check; `sentWith` accepts the `X-Admin-Token` header or the `railradius_admin` cookie (HttpOnly, SameSite=Strict, path `/api/reachability`; set by `/api/admin/session`), which is how the browser's `EventSource` proves the admin to the rate limit |
 | `AdminTokenInterceptor` | config | Guards `/api/admin/**`: the `X-Admin-Token` header (never the cookie, which a cross-site request would carry) must match `AdminToken`; 401 if wrong or missing, 403 for every call when no token is configured; CORS preflights pass |
 | `WebConfig` | config | Registers `AdminTokenInterceptor` on `/api/admin/**` (same path matching as the controllers) |
 | `Station` | model | id, name, latitude, longitude, parentStation, country (ISO code from the coordinates, null if outside every border) |
@@ -174,7 +174,7 @@ Everything below fills a load-time `RailNetwork`, which is dropped once the serv
 1. **routes.txt / agency.txt** (`RailTripReader`): keep only rail route types `2`, `100–106` and `109` (S-Bahn), each with its operator (`agency_name`; a route without `agency_id` gets the feed's only agency).
 2. **stops.txt / trips.txt / calendar**: load stops and the rail trips: route, service ID and `TripInfo` (train number, headsign, operator). `ServiceCalendarReader` reads the days of each service; the services of rail trips go to the network as `<source>:<serviceId>`. A trip whose service is in neither calendar file (or whose feed has neither) runs every day, with a WARN count. `RareTrainFilter` then drops every train that runs on fewer than 8 days of the feed, past days included: one-off specials and timetable-change leftovers (B26: NJ 479 ran 3 days, the regular NJ 469 is 15 min slower from Aachen). A train is all trips of one route with the same train number that leave the same first stop (canonical, so platforms match) at the same time, because feeds split one train into several trips with different days. Trips without a train number (all of norway, france, hungary, …) are grouped the same way (B32), and the departure keeps a rare timing variant of a regular train apart from it (B33: ICE 104 from Köln at 19:17 on 6 days). For this the filter reads stop_times.txt once more beforehand, keeping only each trip's first row. A train with a trip that has no calendar entry is kept, and so is a trip without stop_times. A trip with a value in its feed's category column (`train-category-columns.txt`) gets that category in front of its train number: `2835` → `Intercity 2835`, `1900/1 Zosia` → `IC 1900/1 Zosia`. Otherwise a numeric train number on a route that matches a `train-categories.txt` rule gets the rule's category: `002310` → `ICE 2310`.
 3. **Per-feed stop dedup**: a stop whose `parent_station` is in the feed (with coordinates) is merged into that parent, at any distance. The other stops are merged when they have the same name and lie within ~0.0015°. IDs are canonicalised to `<source>:<id>`, with `_ARR`/`_DEP`/`ARRIVAL_` style suffixes and prefixes stripped.
-4. **stop_times.txt**: streamed and buffered per trip (`TripRowBatcher`), rail trips only, and handed to the network in batches of `railreach.gtfs.trip-batch-size` (100k) trips. A batch is only cut where a new trip starts, so trips stay whole in files grouped by `trip_id`. If a trip shows up again after another one started, the rest of the file is read in one batch, and rows of a trip already built are dropped with a WARN. Each trip's consecutive stop pairs produce:
+4. **stop_times.txt**: streamed and buffered per trip (`TripRowBatcher`), rail trips only, and handed to the network in batches of `railradius.gtfs.trip-batch-size` (100k) trips. A batch is only cut where a new trip starts, so trips stay whole in files grouped by `trip_id`. If a trip shows up again after another one started, the rest of the file is read in one batch, and rows of a trip already built are dropped with a WARN. Each trip's consecutive stop pairs produce:
    - `neighbors`: stopId → neighbour stopIds
    - `connections`: `"from->to"` → list of `Connection`
    - `tripStops`: tripId → ordered stop list; `tripInfos`: tripId → `TripInfo`; `tripServiceDays`: tripId → its service's shared `ServiceDays`; `stopTrips`: stopId → tripIds
@@ -266,10 +266,10 @@ What the search must keep, so a rewrite gives the same result as `SearchSnapshot
 | GET | `/coverage` | `Coverage`: home countries of the loaded feeds (`CoverageService`). The frontend's info button (`js/about.js`, added under the zoom buttons via `addMapButton` in `js/map.js`) lists them by name with a data-accuracy disclaimer |
 | GET | `/health` | UP/DOWN depending on whether data is loaded. The frontend checks it on page load and whenever a station search, stream or journey fails or finds nothing; while it is DOWN (reload) or unreachable (restart) it shows "Updating timetables" instead of the error and polls every 5 s until UP |
 
-**Admin (`/api/admin`)**: every call needs the header `X-Admin-Token: <railreach.admin.token>` (see `AdminTokenInterceptor`). `scripts/api.sh` sends `RAILREACH_ADMIN_TOKEN` (default `dev`). `api.sh reach` and `bench.sh` send it on searches too, so the rate limit never turns them away. In the browser, the "Dev login" at the bottom of the side panel (`js/dev-auth.js`) checks the token against `/debug/status`, keeps it in `localStorage`, calls `POST /session` for the rate-limit cookie (`DELETE /session` on logout) and only then starts the debug polling and shows the "Admin panel" button. That opens a `<dialog>` (`js/admin-panel.js`) with three tabs. Below the title, a label shows the disk space of the zips in use and of the replaced ones in `previous/` (`/feeds/storage`, refreshed when the panel opens and whenever the Feeds tab reloads its list). "Tools" has buttons for the stats, debug-trigger, reload and cache-delete endpoints below; it prints the raw JSON response and asks for confirmation before reload and delete. "Feeds" (`js/feeds.js`) widens the panel to nearly the whole window and lists every zip and missing feed from `/feeds`: last service day (first day as a tooltip), days left, state with the early-ending main operators below it, size, download date, source host, and a download button for feeds in `gtfs-feeds.txt` ("manual" otherwise). "Download outdated" (missing, expired and expiring feeds) and "Download all" call `/feeds/{source}/download` for one feed after another, so each row shows its progress and the result of its last download. During a reload it shows a progress bar with phase, feeds, % parsed, elapsed time, ETA and graph size. "Alerts" (`js/feed-alerts.js`, also wide) shows `/feeds/alerts`: an "Email alerts: on/off" toggle, "Send test email", whether mail is configured and to whom, and the served feeds due within the alert days (trains end, days left, early-ending operators, last service day, paused or not) with a Pause/Resume button each.
+**Admin (`/api/admin`)**: every call needs the header `X-Admin-Token: <railradius.admin.token>` (see `AdminTokenInterceptor`). `scripts/api.sh` sends `RAILRADIUS_ADMIN_TOKEN` (default `dev`). `api.sh reach` and `bench.sh` send it on searches too, so the rate limit never turns them away. In the browser, the "Dev login" at the bottom of the side panel (`js/dev-auth.js`) checks the token against `/debug/status`, keeps it in `localStorage`, calls `POST /session` for the rate-limit cookie (`DELETE /session` on logout) and only then starts the debug polling and shows the "Admin panel" button. That opens a `<dialog>` (`js/admin-panel.js`) with three tabs. Below the title, a label shows the disk space of the zips in use and of the replaced ones in `previous/` (`/feeds/storage`, refreshed when the panel opens and whenever the Feeds tab reloads its list). "Tools" has buttons for the stats, debug-trigger, reload and cache-delete endpoints below; it prints the raw JSON response and asks for confirmation before reload and delete. "Feeds" (`js/feeds.js`) widens the panel to nearly the whole window and lists every zip and missing feed from `/feeds`: last service day (first day as a tooltip), days left, state with the early-ending main operators below it, size, download date, source host, and a download button for feeds in `gtfs-feeds.txt` ("manual" otherwise). "Download outdated" (missing, expired and expiring feeds) and "Download all" call `/feeds/{source}/download` for one feed after another, so each row shows its progress and the result of its last download. During a reload it shows a progress bar with phase, feeds, % parsed, elapsed time, ETA and graph size. "Alerts" (`js/feed-alerts.js`, also wide) shows `/feeds/alerts`: an "Email alerts: on/off" toggle, "Send test email", whether mail is configured and to whom, and the served feeds due within the alert days (trains end, days left, early-ending operators, last service day, paused or not) with a Pause/Resume button each.
 | Method | Path | Notes |
 |---|---|---|
-| POST / DELETE | `/session` | Sets / deletes the `railreach_admin` cookie (204), so the browser's searches skip the rate limit |
+| POST / DELETE | `/session` | Sets / deletes the `railradius_admin` cookie (204), so the browser's searches skip the rate limit |
 | GET | `/cache-stats` | Warming jobs, rawPathCache size and keys |
 | POST | `/reload-gtfs` | Full reparse of the zips (minutes), rewrite of the binary cache, clears the raw reachability cache |
 | DELETE | `/gtfs-cache` | Deletes the binary cache file |
@@ -287,18 +287,18 @@ What the search must keep, so a rewrite gives the same result as `SearchSnapshot
 | GET | `/debug/status` | Polled every 2 s by a browser logged in as dev; also used to check a dev login |
 | GET | `/debug/stations` | All connected stations with edge counts |
 
-## Configuration (`application.yml`, prefix `railreach.`)
+## Configuration (`application.yml`, prefix `railradius.`)
 
 - `gtfs.directory` (`./data/gtfs`, env `GTFS_DIRECTORY`), `gtfs.auto-load-from-files` (false: a start without the binary cache starts empty), `gtfs.store-file` (`data/gtfs-store.bin`; the binary cache, S20)
-- `feeds.expiring-days` (30): feeds that end, or whose first early-ending main operator stops, within this many days are `EXPIRING`; `feeds.check-interval` (`PT24H`): how often the missing/expired/expiring feeds are logged; `feeds.sources` (empty = every feed in `gtfs-feeds.txt`): comma-separated feeds expected in the GTFS directory, listed as `MISSING` without a zip; `feeds.auth.<source>` (no default, never in git): credentials that `gtfs-feeds.txt` headers refer to, e.g. `feeds.auth.hungary` = base64 of `user:password` for MÁV's Basic auth. Set it in `backend/config/application.yml` (gitignored; Spring Boot reads `config/` in the working directory on top of the bundled file) or as env var `RAILREACH_FEEDS_AUTH_HUNGARY`
-- `feeds.alerts.days` (14): served feeds whose trains end within this many days, or already have, are in the alert mail; `feeds.alerts.cron` (`0 0 8 * * *`): when it is sent; `feeds.alerts.settings-file` (`data/feed-alerts.json`, dev `data/feed-alerts-dev.json`): on/off and the pauses; `feeds.alerts.to` (empty, env `RAILREACH_ALERTS_TO`): recipient, nothing is mailed without one; `feeds.alerts.from` (env `RAILREACH_ALERTS_FROM`, default the SMTP login)
+- `feeds.expiring-days` (30): feeds that end, or whose first early-ending main operator stops, within this many days are `EXPIRING`; `feeds.check-interval` (`PT24H`): how often the missing/expired/expiring feeds are logged; `feeds.sources` (empty = every feed in `gtfs-feeds.txt`): comma-separated feeds expected in the GTFS directory, listed as `MISSING` without a zip; `feeds.auth.<source>` (no default, never in git): credentials that `gtfs-feeds.txt` headers refer to, e.g. `feeds.auth.hungary` = base64 of `user:password` for MÁV's Basic auth. Set it in `backend/config/application.yml` (gitignored; Spring Boot reads `config/` in the working directory on top of the bundled file) or as env var `RAILRADIUS_FEEDS_AUTH_HUNGARY`
+- `feeds.alerts.days` (14): served feeds whose trains end within this many days, or already have, are in the alert mail; `feeds.alerts.cron` (`0 0 8 * * *`): when it is sent; `feeds.alerts.settings-file` (`data/feed-alerts.json`, dev `data/feed-alerts-dev.json`): on/off and the pauses; `feeds.alerts.to` (empty, env `RAILRADIUS_ALERTS_TO`): recipient, nothing is mailed without one; `feeds.alerts.from` (env `RAILRADIUS_ALERTS_FROM`, default the SMTP login)
 - `spring.mail.*`: SMTP server of the alert mail. Port 587 with STARTTLS and auth and 10 s timeouts are preset; `host`, `username` and `password` (env `SPRING_MAIL_HOST`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`) go in `backend/config/application.yml` or env vars, never in git. Without a host nothing is mailed
 - `algorithm.max-transfer-time-minutes` (180)
 - `cache.predictive-enabled` (true), `cache.predictive-max-transfers` (5), `cache.raw-max-entries` (30)
 - `search.gate.permits` (2): searches that run at once; `search.gate.max-queued` (6): searches that may wait for a permit before the next one is turned away
 - `search.rate-limit.capacity` (200), `search.rate-limit.refill-per-second` (1): the per-IP search budget; the capacity must cover the biggest search's cost (65)
-- `admin.token` (empty, env `RAILREACH_ADMIN_TOKEN`): shared secret for the admin API and the rate-limit exemption; empty disables both. The live server sets one, since the feed alerts are managed in the admin panel (`docs/HOSTING.md`)
-- `server.forward-headers-strategy` (`none`, env `RAILREACH_FORWARD_HEADERS_STRATEGY`): set `native` behind a reverse proxy, so the rate limit sees the client's IP from `X-Forwarded-For` instead of the proxy's
+- `admin.token` (empty, env `RAILRADIUS_ADMIN_TOKEN`): shared secret for the admin API and the rate-limit exemption; empty disables both. The live server sets one, since the feed alerts are managed in the admin panel (`docs/HOSTING.md`)
+- `server.forward-headers-strategy` (`none`, env `RAILRADIUS_FORWARD_HEADERS_STRATEGY`): set `native` behind a reverse proxy, so the rate limit sees the client's IP from `X-Forwarded-For` instead of the proxy's
 
 `application-dev.yml` overrides the GTFS directory, store file and alert settings file, sets `auto-load-from-files: true` and `feeds.sources: austria,hungary,slovakia`, turns predictive warming off and defaults `admin.token` to `dev`.
 

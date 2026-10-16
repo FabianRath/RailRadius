@@ -2,18 +2,18 @@
 # Memory and speed baselines against a running backend (docs/HOSTING.md -> Baselines). Run from the repo root.
 # Start the app with the warmer off, or its background searches skew every number:
 #   mvn -q -f backend/pom.xml spring-boot:run -Dspring-boot.run.jvmArguments="-Xmx12g -XX:+UseCompactObjectHeaders -Xlog:gc*:file=<log>" \
-#       -Dspring-boot.run.arguments=--railreach.cache.predictive-enabled=false
+#       -Dspring-boot.run.arguments=--railradius.cache.predictive-enabled=false
 # <log> must be relative (to backend/): -Xlog splits at the colon of "C:". jcmd/jfr come from $JAVA_HOME/bin, else PATH;
-# alloc and held write their files to $BENCH_OUT (default: the current directory). Searches send RAILREACH_ADMIN_TOKEN
+# alloc and held write their files to $BENCH_OUT (default: the current directory). Searches send RAILRADIUS_ADMIN_TOKEN
 # (default "dev"): without the dev profile, start the app with the same env var, or the rate limit turns them away.
 # Usage: scripts/bench.sh <command> [args]
 set -euo pipefail
-BASE="${RAILREACH_URL:-http://localhost:8080}"
+BASE="${RAILRADIUS_URL:-http://localhost:8080}"
 JDK_BIN="${JAVA_HOME:+$JAVA_HOME/bin/}"
 OUT="${BENCH_OUT:-.}"
 
 # PID of the running backend (not Maven's own JVM)
-app_pid() { "${JDK_BIN}jcmd" -l | grep -E 'com\.railreach\.RailReachBackendApplication|railreach-backend-[^ ]*\.jar' | awk '{print $1}' | head -n 1; }
+app_pid() { "${JDK_BIN}jcmd" -l | grep -E 'com\.railradius\.RailRadiusBackendApplication|railradius-backend-[^ ]*\.jar' | awk '{print $1}' | head -n 1; }
 
 # Live heap in MB after a full GC
 live_heap_mb() {
@@ -28,7 +28,7 @@ histogram_bytes() { "${JDK_BIN}jcmd" "$(app_pid)" GC.class_histogram | awk '/^To
 # Streams a search and prints "<stations> <calculationTimeMs>" from its done event. It sends the admin token, so the
 # search rate limit never turns a run away
 stream() {
-  curl -sN -H "X-Admin-Token: ${RAILREACH_ADMIN_TOKEN:-dev}" "$BASE/api/reachability/stream?stationId=$1&maxTransfers=$2" \
+  curl -sN -H "X-Admin-Token: ${RAILRADIUS_ADMIN_TOKEN:-dev}" "$BASE/api/reachability/stream?stationId=$1&maxTransfers=$2" \
     | grep -A1 '^event:done' | sed -nE 's/.*"(calculationTimeMs|total)":([0-9]+).*"(calculationTimeMs|total)":([0-9]+).*/\1 \2 \3 \4/p' \
     | awk '{v[$1]=$2; v[$3]=$4; print v["total"], v["calculationTimeMs"]}'
 }

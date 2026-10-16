@@ -1,7 +1,7 @@
 # Small-dataset profile for fast local runs (Austria + Hungary + Slovakia, ~8 MB of feeds).
 # Run: ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 # The first start parses the zips (~1 min) and writes data/gtfs-dev-store.bin; later starts load that cache.
-railreach:
+railradius:
   gtfs:
     directory: ./data/gtfs-dev
     auto-load-from-files: true
@@ -18,4 +18,4 @@ railreach:
 
   # Fixed token for local runs only (scripts/api.sh sends it by default); never use the dev profile when deployed
   admin:
-    token: ${RAILREACH_ADMIN_TOKEN:dev}
+    token: ${RAILRADIUS_ADMIN_TOKEN:dev}

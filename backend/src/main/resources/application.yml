@@ -1,13 +1,13 @@
 server:
   port: 8080
   # Where the client IP for the search rate limit comes from. "none": the connection's address. Behind a reverse
-  # proxy set "native" (RAILREACH_FORWARD_HEADERS_STRATEGY), or every visitor shares the proxy's budget. Never set it
+  # proxy set "native" (RAILRADIUS_FORWARD_HEADERS_STRATEGY), or every visitor shares the proxy's budget. Never set it
   # without a proxy that overwrites X-Forwarded-For: clients could then pick any IP
-  forward-headers-strategy: ${RAILREACH_FORWARD_HEADERS_STRATEGY:none}
+  forward-headers-strategy: ${RAILRADIUS_FORWARD_HEADERS_STRATEGY:none}
 
 spring:
   application:
-    name: railreach-backend
+    name: railradius-backend
   threads:
     # Tomcat requests and Spring's task executor (used for SSE streams) run on virtual threads
     virtual:
@@ -15,13 +15,13 @@ spring:
   web:
     resources:
       # The UI is served at http://localhost:8080/ straight from the repo's frontend/ folder (relative to backend/,
-      # where the app is started), so edits show on reload without a rebuild. Override with RAILREACH_FRONTEND_DIR.
-      static-locations: ${RAILREACH_FRONTEND_DIR:file:../frontend/}
+      # where the app is started), so edits show on reload without a rebuild. Override with RAILRADIUS_FRONTEND_DIR.
+      static-locations: ${RAILRADIUS_FRONTEND_DIR:file:../frontend/}
       cache:
         cachecontrol:
           # Browsers revalidate on every load, so they never run a stale copy of an edited file
           no-cache: true
-  # SMTP server for the feed alert mail (railreach.feeds.alerts). Without a host nothing is mailed. Never set the login
+  # SMTP server for the feed alert mail (railradius.feeds.alerts). Without a host nothing is mailed. Never set the login
   # here: use the gitignored backend/config/application.yml or env vars (SPRING_MAIL_HOST, SPRING_MAIL_USERNAME,
   # SPRING_MAIL_PASSWORD; for Gmail: host smtp.gmail.com and an app password)
   mail:
@@ -34,7 +34,7 @@ spring:
       "[mail.smtp.timeout]": 10000
       "[mail.smtp.writetimeout]": 10000
 
-railreach:
+railradius:
   gtfs:
     directory: ${GTFS_DIRECTORY:./data/gtfs}
     # Whether a start without the binary cache parses the ZIP files (minutes on the full data) or starts empty
@@ -55,7 +55,7 @@ railreach:
     # update center, ready to download. Empty = every feed in gtfs-feeds.txt
     sources:
     # Credentials that header placeholders in gtfs-feeds.txt refer to, e.g. auth.hungary (base64 of "user:password").
-    # Never set them here: use the gitignored backend/config/application.yml or env vars (RAILREACH_FEEDS_AUTH_HUNGARY).
+    # Never set them here: use the gitignored backend/config/application.yml or env vars (RAILRADIUS_FEEDS_AUTH_HUNGARY).
     # A feed whose setting is missing is rejected when downloaded.
     alerts:
       # One mail a day (at cron, server time) listing the served feeds whose trains end within this many days or
@@ -65,8 +65,8 @@ railreach:
       cron: "0 0 8 * * *"
       settings-file: data/feed-alerts.json
       # Recipient; nothing is mailed while empty. Sender: empty = the SMTP login (spring.mail.username)
-      to: ${RAILREACH_ALERTS_TO:}
-      from: ${RAILREACH_ALERTS_FROM:${spring.mail.username:}}
+      to: ${RAILRADIUS_ALERTS_TO:}
+      from: ${RAILRADIUS_ALERTS_FROM:${spring.mail.username:}}
 
   algorithm:
     max-transfer-time-minutes: 180
@@ -96,11 +96,11 @@ railreach:
 
   admin:
     # Shared secret for /api/admin/** (sent as X-Admin-Token). Empty = admin API disabled (403), so a deployment
-    # without RAILREACH_ADMIN_TOKEN never exposes it. The live server sets it (feed alerts are managed in the admin
+    # without RAILRADIUS_ADMIN_TOKEN never exposes it. The live server sets it (feed alerts are managed in the admin
     # panel, docs/HOSTING.md). Use a long random value, e.g. 32+ random bytes in hex
-    token: ${RAILREACH_ADMIN_TOKEN:}
+    token: ${RAILRADIUS_ADMIN_TOKEN:}
 
 logging:
   level:
     root: INFO
-    com.railreach: INFO
+    com.railradius: INFO

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Shortcuts for the RailReach backend API (default http://localhost:8080).
+# Shortcuts for the RailRadius backend API (default http://localhost:8080).
 # Usage: scripts/api.sh <command> [args]     e.g. scripts/api.sh search wien
 set -euo pipefail
-BASE="${RAILREACH_URL:-http://localhost:8080}"
-# Admin calls send RAILREACH_ADMIN_TOKEN; "dev" matches the dev profile's default. reach sends it too, so it is never
+BASE="${RAILRADIUS_URL:-http://localhost:8080}"
+# Admin calls send RAILRADIUS_ADMIN_TOKEN; "dev" matches the dev profile's default. reach sends it too, so it is never
 # rate limited
-admin() { curl -s -H "X-Admin-Token: ${RAILREACH_ADMIN_TOKEN:-dev}" "$@"; }
+admin() { curl -s -H "X-Admin-Token: ${RAILRADIUS_ADMIN_TOKEN:-dev}" "$@"; }
 
 case "${1:-help}" in
   health)        curl -s "$BASE/api/health" ;;

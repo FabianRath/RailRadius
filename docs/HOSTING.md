@@ -1,6 +1,6 @@
 # Hosting
 
-How much server RailReach needs, measured on the full data. Re-measure when the data or the search changes a lot.
+How much server RailRadius needs, measured on the full data. Re-measure when the data or the search changes a lot.
 
 ## Plan
 
@@ -8,9 +8,9 @@ How much server RailReach needs, measured on the full data. Re-measure when the 
 - Updating data: parse locally (a reload writes the binary cache), upload it, restart the app. It is read only at startup, which takes ~3 s, so that is the downtime of an update. The log line `Binary cache read …` names the SHA-256 of the zips it was built from.
 - Rollback: the git tag `pre-compact` with its JSON cache `data/gtfs-cache.json` (the legacy engine, `-Xmx9g`).
 - The server needs the jar, `frontend/` and `data/gtfs-store.bin`. No zips, so a small disk is enough.
-- Set `RAILREACH_ADMIN_TOKEN` to a long random value (e.g. 32+ random bytes in hex): the feed alerts (F29) are turned on and paused in the admin panel, which needs it. It also exempts its holder from the search rate limit and opens the whole admin API (reload, cache delete, feed download) to them, so keep it secret. Unset, `/api/admin/**` answers 403.
-- Feed alert mail (F29): set `SPRING_MAIL_HOST`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` and `RAILREACH_ALERTS_TO` (for Gmail: `smtp.gmail.com` and an app password), then open the admin panel → Alerts, send a test email and turn alerts on. They stay off until then, so a server that isn't live yet sends nothing. On/off and the pauses are kept in `data/feed-alerts.json`, so `data/` must be writable. The alerts read how long each feed runs from `gtfs-store.bin`, not from zips; a store written before format version 2 is not read at all, so build it again from the zips before deploying this version.
-- The search rate limit (F26) is per client IP. Behind a reverse proxy (nginx, Caddy, Cloudflare) set `RAILREACH_FORWARD_HEADERS_STRATEGY=native`, or every visitor shares the proxy's budget. Without one, leave it unset: clients could otherwise fake their IP with `X-Forwarded-For`.
+- Set `RAILRADIUS_ADMIN_TOKEN` to a long random value (e.g. 32+ random bytes in hex): the feed alerts (F29) are turned on and paused in the admin panel, which needs it. It also exempts its holder from the search rate limit and opens the whole admin API (reload, cache delete, feed download) to them, so keep it secret. Unset, `/api/admin/**` answers 403.
+- Feed alert mail (F29): set `SPRING_MAIL_HOST`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` and `RAILRADIUS_ALERTS_TO` (for Gmail: `smtp.gmail.com` and an app password), then open the admin panel → Alerts, send a test email and turn alerts on. They stay off until then, so a server that isn't live yet sends nothing. On/off and the pauses are kept in `data/feed-alerts.json`, so `data/` must be writable. The alerts read how long each feed runs from `gtfs-store.bin`, not from zips; a store written before format version 2 is not read at all, so build it again from the zips before deploying this version.
+- The search rate limit (F26) is per client IP. Behind a reverse proxy (nginx, Caddy, Cloudflare) set `RAILRADIUS_FORWARD_HEADERS_STRATEGY=native`, or every visitor shares the proxy's budget. Without one, leave it unset: clients could otherwise fake their IP with `X-Forwarded-For`.
 - Without zips, the feed update center logs all feeds as missing at startup and once a day. That is expected.
 
 ## Size
@@ -196,7 +196,7 @@ Full data, compact engine, `-Xmx3g`, compact object headers, warmer off, started
 | Startup peak | `gc.log` (largest heap before a GC until `Started`), and a start at `-Xmx440m` (1.5 × 294 MB) | 365 MB, 1.24 × live. At `-Xmx440m` it starts without a full GC and answers a 1-transfer search. Peak working set 657 MB |
 
 ## Journeys and result cache on the store (S19, 2026-10-10)
-Full data, compact engine (`--railreach.search.engine=compact`), `-Xmx3g`, compact object headers, warmer off. Results are byte-identical to S18 (`SearchSnapshot`, gtfs-mini, dev and full).
+Full data, compact engine (`--railradius.search.engine=compact`), `-Xmx3g`, compact object headers, warmer off. Results are byte-identical to S18 (`SearchSnapshot`, gtfs-mini, dev and full).
 | Measure | How | Result |
 |---|---|---|
 | Startup | log `Started … in` | 38–39 s at `-Xmx3g`: only the timetable store (13 s) is built, no `SearchTimetables` |
@@ -207,7 +207,7 @@ Full data, compact engine (`--railreach.search.engine=compact`), `-Xmx3g`, compa
 
 ## Compact search engine (S18, 2026-10-09)
 
-The compact engine against the S16 baselines below, measured the same way with `--railreach.search.engine=compact` (warmer off, `-Xmx12g`, compact object headers). Results are byte-identical to the legacy engine (`SearchSnapshot`, gtfs-mini, dev and full), so the average station counts per transfer count match S16 exactly.
+The compact engine against the S16 baselines below, measured the same way with `--railradius.search.engine=compact` (warmer off, `-Xmx12g`, compact object headers). Results are byte-identical to the legacy engine (`SearchSnapshot`, gtfs-mini, dev and full), so the average station counts per transfer count match S16 exactly.
 
 | Measure | How | Result |
 |---|---|---|
@@ -258,7 +258,7 @@ Search time per transfer count, measured as in S13:
 
 ## Baselines (S13, 2026-10-09)
 
-The numbers before the compact search store; S16 replaces them as the reference. Full data as above, same machine, `-Xmx12g`, G1, no compact object headers, warmer off (`--railreach.cache.predictive-enabled=false`), one search at a time. Repeat with `scripts/bench.sh` (its header has the start command):
+The numbers before the compact search store; S16 replaces them as the reference. Full data as above, same machine, `-Xmx12g`, G1, no compact object headers, warmer off (`--railradius.cache.predictive-enabled=false`), one search at a time. Repeat with `scripts/bench.sh` (its header has the start command):
 
 | Measure | How | Result |
 |---|---|---|
