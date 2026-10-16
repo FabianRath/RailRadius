@@ -46,7 +46,7 @@ RailRadius/
 ├── frontend/index.html               # markup; served at / by Spring (static-locations: file:../frontend/)
 ├── frontend/css/app.css              # all styles and the map palette (CSS variables)
 ├── frontend/js/                      # ES modules: main (entry), api, map (only MapLibre user), search, query-form,
-│                                     #   reachability (SSE; fetches a station's journey on click), coverage (Turf), station-details (clicked station's journey, shown over the side panel), journey (its lines on the map), debug, dev-auth (dev login), admin-panel (admin
+│                                     #   reachability (SSE; pins the start station, whose coordinates come from the station search since the stream never sends it, F30; fetches a station's journey on click), coverage (Turf), station-details (clicked station's journey, shown over the side panel), journey (its lines on the map), debug, dev-auth (dev login), admin-panel (admin
 │                                     #   endpoints as buttons), feeds (Feeds tab of the admin panel), about (info button under the zoom buttons: disclaimer + covered countries), intro-hint (first-visit hint above the search, dismissal kept in `localStorage`), server-status ("updating timetables" notice while `/health` is not UP or unreachable, F28), feed-alerts (Alerts tab of the admin panel), sidebar (collapse toggle), icons (vendored Lucide SVGs;
 │                                     #   `<span data-icon>` in the markup), util, config
 ├── frontend/vendor/                  # MapLibre GL JS 6.11.2 (ESM: main, shared, worker + CSS) and Turf 6.5.0, copied from

@@ -1,6 +1,6 @@
 import { fetchJourney, openReachabilityStream } from './api.js';
-import { addReachableStations, clearReachableStations, fitToPoints, getZoom, hasCoordinates, setCoverage }
-    from './map.js';
+import { addReachableStations, clearReachableStations, fitToPoints, getZoom, hasCoordinates, setCoverage,
+    setStartStation } from './map.js';
 import { buildCoverage } from './coverage.js';
 import { coverageEnabled, readQuery } from './query-form.js';
 import { clearStatus, showStatus } from './util.js';
@@ -19,13 +19,14 @@ const results = new Map();
 const localResultsCache = new Map();
 // The shown query's stream parameters, and its stations' journeys fetched so far (stopId -> station)
 let shownParams = null;
+let shownStart = null;
 let journeys = new Map();
 let activeStream = null;
 // Until the first round's stations arrive, the overlay shows elapsed time
 let elapsedTimer = null;
 const ELAPSED_TICK_MS = 1000;
 
-/** getSelectedStation returns { id, name } or null. */
+/** getSelectedStation returns a station search result (id, latitude, longitude, …) or null. */
 export function initReachability(getSelectedStation) {
     calculateBtn.addEventListener('click', () => {
         if (activeStream) {
@@ -36,7 +37,9 @@ export function initReachability(getSelectedStation) {
     });
 }
 
+/** A reachable station, or the start station: journeys begin there though the stream never sends it. */
 export function getStation(stopId) {
+    if (stopId === shownStart?.id) return shownStart;
     return results.get(stopId);
 }
 
@@ -71,6 +74,8 @@ function calculate(station) {
     journeys = new Map();
     results.clear();
     clearReachableStations();
+    setStartStation(station);
+    shownStart = station;
     setCoverage(null);
     resultsSection.hidden = false;
     maxTransfersUsed.textContent = query.maxTransfers;
@@ -138,7 +143,8 @@ function addResults(stations) {
 }
 
 function fitToResults(stations) {
-    const points = stations
+    // The start too, so a search that reaches nothing still shows where it started
+    const points = [shownStart, ...stations]
         .filter(s => hasCoordinates(s.latitude, s.longitude))
         .map(s => [s.longitude, s.latitude]);
     fitToPoints(points);
