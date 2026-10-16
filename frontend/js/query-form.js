@@ -5,7 +5,6 @@ const DEFAULT_MAX_TRANSFER_MINUTES = 180;
 // Sent when the wait-time limit is switched off; large enough to never constrain a search
 const UNLIMITED_TRANSFER_MINUTES = 99999;
 
-const calculateSection = document.getElementById('calculateSection');
 const calculateBtn = document.getElementById('calculateBtn');
 const transferSlider = document.getElementById('transferSlider');
 const transferValue = document.getElementById('transferValue');
@@ -29,7 +28,6 @@ export function initQueryForm(onCoverageToggle) {
 }
 
 export function showQueryForm() {
-    calculateSection.hidden = false;
     calculateBtn.disabled = false;
 }
 

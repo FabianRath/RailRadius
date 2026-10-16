@@ -1,4 +1,4 @@
-// The first-visit hint above the search: what the map shows. Once dismissed, it stays hidden in this browser.
+// The first-visit hint over the map: what the map shows. Once dismissed, it stays hidden in this browser.
 const DISMISSED_KEY = 'railradius.introHintDismissed';
 
 export function initIntroHint() {

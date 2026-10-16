@@ -2,7 +2,6 @@ import { isUpdatingTimetables } from './server-status.js';
 import { initMap, LAYERS, onEmptyMapClick, onPointClick, onZoomEnd } from './map.js';
 import { closeStationDetails, initStationDetails, showStationDetails } from './station-details.js';
 import { initSearch, prefillStation } from './search.js';
-import { initSidebarToggle } from './sidebar.js';
 import { initQueryForm, showQueryForm } from './query-form.js';
 import { getJourney, initReachability, refreshCoverage } from './reachability.js';
 import { initDebugOverlay, startDebugPolling, stopDebugPolling } from './debug.js';
@@ -22,7 +21,6 @@ let selectedStation = null;
 isUpdatingTimetables();
 
 renderStaticIcons();
-initSidebarToggle();
 await initMap('map');
 initAbout();
 initStationDetails();

@@ -1,9 +1,8 @@
-// The selected station's journey, shown over the side panel so it never covers the route drawn on the map (F22).
+// The selected station's journey, in its own column beside the map so it never covers the route drawn on it (F22).
 import { countryBadgeHtml, escapeHtml, fmtGtfsClock } from './util.js';
 import { icon } from './icons.js';
-import { clearJourney, showJourney } from './map.js';
+import { clearJourney, resizeMap, showJourney } from './map.js';
 import { journeyRoute } from './journey.js';
-import { expandSidebar } from './sidebar.js';
 
 const panel = document.getElementById('stationDetails');
 const body = document.getElementById('stationDetailsBody');
@@ -16,20 +15,21 @@ export function initStationDetails() {
     });
 }
 
-/** Lists the journey in the side panel and draws it on the map, hiding all stations not on it. */
+/** Lists the journey in the journey column and draws it on the map, hiding all stations not on it. */
 export function showStationDetails(station) {
     body.innerHTML = stationDetailsHtml(station);
     body.scrollTop = 0;
     panel.hidden = false;
-    expandSidebar();
     closeButton.focus();
     showJourney(journeyRoute(station));
+    resizeMap();
 }
 
 export function closeStationDetails() {
     if (panel.hidden) return;
     panel.hidden = true;
     clearJourney();
+    resizeMap();
 }
 
 function stationDetailsHtml(station) {

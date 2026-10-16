@@ -49,6 +49,11 @@ export function initMap(containerId) {
     }));
 }
 
+/** Call after the space around the map changed: its own ResizeObserver catches up only a frame later. */
+export function resizeMap() {
+    map.resize();
+}
+
 export function getZoom() {
     return map.getZoom();
 }
