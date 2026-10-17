@@ -21,12 +21,11 @@ import java.util.stream.Collectors;
 
 import static com.railradius.service.GtfsTestFixtures.VISITOR;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 class ReachabilityServiceTest {
 
-    private static final int A_DAY_MINUTES = 24 * 60;
-    private static final int LONGEST_MIN_WAIT_MINUTES = 1300;
     // What SearchRateLimiter charges for a 5-transfer search
     private static final int BIG_SEARCH_COST = 65;
 
@@ -144,15 +143,44 @@ class ReachabilityServiceTest {
                 .containsExactly("NJ", null, "EN");
     }
 
-    // V1 reaches D1 at 08:30, W1 leaves it at 08:00: under an hour earlier is no 23.5 h wait past midnight. The
-    // minimum wait rules out V2 (10:30) → W1 (21.5 h) but not V2 → W2 at 09:00 (22.5 h).
     @Test
-    void trainLeavingLessThanAnHourBeforeTheArrivalIsNotCaughtTheNextDay(@TempDir Path dir) throws Exception {
-        Search search = query(GtfsTestFixtures.load(dir, "gamma", "delta"), "gamma:G3", 1,
-                LONGEST_MIN_WAIT_MINUTES, A_DAY_MINUTES);
+    void waitUpToTheCeilingIsAllowed() {
+        int ceiling = SearchRequestValidator.MAX_TRANSFER_WAIT_MINUTES;
 
-        assertThat(find(search, "delta:D3")).isPresent();
-        assertThat(find(search, "delta:D2")).isEmpty();
+        assertThat(find(query(gtfs, "alpha:A1", 1, ceiling, ceiling), "alpha:A2")).isPresent();
+        assertThat(find(query(gtfs, "alpha:A1", 1, 0, ceiling), "beta:B2")).isPresent();
+    }
+
+    // B41, B42: a request outside the API's bounds costs no budget, searches nothing and stores nothing
+    @Test
+    void invalidRequestsAreRejectedBeforeTheyAreChargedOrStored() {
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
+        ReachabilityService service = serviceWithBudgetForOneBigSearch(cache);
+        List<ReachabilityRequest> invalid = List.of(
+                request("alpha:A1", -1, 0, 180, null),
+                request("alpha:A1", 6, 0, 180, null),
+                request("alpha:A1", 1, -1, 180, null),
+                request("alpha:A1", 1, 0, 361, null),
+                request("alpha:A1", 1, 30, 20, null),
+                request("alpha:A1", 1, 0, 180, Double.NaN),
+                request("alpha:A1", 1, 0, 180, 0.0),
+                request("alpha:A1", 1, 0, 180, 25.0),
+                request("alpha:NOPE", 1, 0, 180, null),
+                request(null, 1, 0, 180, null));
+
+        for (ReachabilityRequest request : invalid) {
+            RecordingEmitter emitter = new RecordingEmitter();
+            service.calculateReachabilityStreaming(VISITOR, request, emitter);
+
+            assertThat(emitter.texts).as("%s", request).anyMatch(text -> text.contains("event:error"));
+            assertThat(emitter.completed).isTrue();
+            assertThatThrownBy(() -> service.journey(VISITOR, request, "alpha:A2"))
+                    .isInstanceOf(SearchRequestValidator.InvalidSearchException.class);
+        }
+        assertThat(cache.contains(new SearchKey("alpha:NOPE", 1, 0, 180))).isFalse();
+        RecordingEmitter fullBudget = new RecordingEmitter();
+        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 5), fullBudget);
+        assertThat(fullBudget.done().get("total")).isEqualTo(fullBudget.streamedStopIds().size());
     }
 
     // B2: the faster T6 evening train must not hide the T1 -> U1 connection
@@ -176,24 +204,24 @@ class ReachabilityServiceTest {
                 .extracting(ReachableStation::getTotalDurationMinutes).isEqualTo(90); // Y1, 20 min wait, Y3
     }
 
-    // B4: without a wait limit, E6 is reached with 1 transfer and an 11.5 h wait, which is over the time limit
+    // B4: with the longest allowed wait, E6 is reached with 1 transfer and a 4.5 h wait, which is over the time limit
     @Test
     void stationOverTheTimeLimitWithFewestTransfersShowsTheFasterPathWithMoreTransfers(@TempDir Path dir)
             throws Exception {
         ReachabilityService service = service(GtfsTestFixtures.load(dir, "epsilon"));
-        ReachabilityRequest.ReachabilityRequestBuilder unlimitedWait = ReachabilityRequest.builder()
+        ReachabilityRequest.ReachabilityRequestBuilder longestWait = ReachabilityRequest.builder()
                 .startStationId("epsilon:E1")
                 .maxTransfers(2)
                 .minTransferTimeMinutes(0)
-                .maxTransferTimeMinutes(99999);
+                .maxTransferTimeMinutes(SearchRequestValidator.MAX_TRANSFER_WAIT_MINUTES);
 
-        ReachableStation anyTime = service.journey(VISITOR, unlimitedWait.build(), "epsilon:E6").orElseThrow();
-        ReachableStation withinTwoHours = service.journey(VISITOR, unlimitedWait.maxJourneyTimeHours(2.0).build(),
+        ReachableStation anyTime = service.journey(VISITOR, longestWait.build(), "epsilon:E6").orElseThrow();
+        ReachableStation withinTwoHours = service.journey(VISITOR, longestWait.maxJourneyTimeHours(2.0).build(),
                         "epsilon:E6")
                 .orElseThrow();
 
         assertThat(anyTime.getTransfers()).isEqualTo(1);
-        assertThat(anyTime.getTotalDurationMinutes()).isEqualTo(750); // X1, wait until 22:00, X4
+        assertThat(anyTime.getTotalDurationMinutes()).isEqualTo(330); // X1, wait until 15:00, X4
         assertThat(withinTwoHours.getTransfers()).isEqualTo(2);
         assertThat(withinTwoHours.getTotalDurationMinutes()).isEqualTo(90); // X1, X2, X3
     }
@@ -402,7 +430,7 @@ class ReachabilityServiceTest {
                 .startStationId("epsilon:E1")
                 .maxTransfers(2)
                 .minTransferTimeMinutes(0)
-                .maxTransferTimeMinutes(99999)
+                .maxTransferTimeMinutes(SearchRequestValidator.MAX_TRANSFER_WAIT_MINUTES)
                 .maxJourneyTimeHours(2.0)
                 .build();
 
@@ -600,11 +628,17 @@ class ReachabilityServiceTest {
     }
 
     private static ReachabilityRequest streamRequest(String start, int maxTransfers) {
+        return request(start, maxTransfers, 0, 180, null);
+    }
+
+    private static ReachabilityRequest request(String start, int maxTransfers, int minTransferMins,
+                                               int maxTransferMins, Double maxJourneyHours) {
         return ReachabilityRequest.builder()
                 .startStationId(start)
                 .maxTransfers(maxTransfers)
-                .minTransferTimeMinutes(0)
-                .maxTransferTimeMinutes(180)
+                .minTransferTimeMinutes(minTransferMins)
+                .maxTransferTimeMinutes(maxTransferMins)
+                .maxJourneyTimeHours(maxJourneyHours)
                 .build();
     }
 

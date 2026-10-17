@@ -44,27 +44,27 @@ epsilon:E7	2	60	epsilon:E1 epsilon:E3 epsilon:E4 epsilon:E7	epsilon:Y2 epsilon:E
 ## epsilon:E2 maxTransfers 0
 epsilon:E2	0	0	epsilon:E2		every day	-
 epsilon:E5	0	20	epsilon:E2 epsilon:E5	epsilon:X2 epsilon:E2 38400 epsilon:E5 39600	every day	-
-epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:X4 epsilon:E2 79200 epsilon:E6 81000	every day	-
+epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:X4 epsilon:E2 54000 epsilon:E6 55800	every day	-
 ## epsilon:E2 maxTransfers 1
 epsilon:E2	0	0	epsilon:E2		every day	-
 epsilon:E5	0	20	epsilon:E2 epsilon:E5	epsilon:X2 epsilon:E2 38400 epsilon:E5 39600	every day	-
-epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:X4 epsilon:E2 79200 epsilon:E6 81000	every day	-
+epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:X4 epsilon:E2 54000 epsilon:E6 55800	every day	-
 ## epsilon:E2 maxTransfers 2
 epsilon:E2	0	0	epsilon:E2		every day	-
 epsilon:E5	0	20	epsilon:E2 epsilon:E5	epsilon:X2 epsilon:E2 38400 epsilon:E5 39600	every day	-
-epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:X4 epsilon:E2 79200 epsilon:E6 81000	every day	-
+epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:X4 epsilon:E2 54000 epsilon:E6 55800	every day	-
 ## epsilon:E2 maxTransfers 3
 epsilon:E2	0	0	epsilon:E2		every day	-
 epsilon:E5	0	20	epsilon:E2 epsilon:E5	epsilon:X2 epsilon:E2 38400 epsilon:E5 39600	every day	-
-epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:X4 epsilon:E2 79200 epsilon:E6 81000	every day	-
+epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:X4 epsilon:E2 54000 epsilon:E6 55800	every day	-
 ## epsilon:E2 maxTransfers 4
 epsilon:E2	0	0	epsilon:E2		every day	-
 epsilon:E5	0	20	epsilon:E2 epsilon:E5	epsilon:X2 epsilon:E2 38400 epsilon:E5 39600	every day	-
-epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:X4 epsilon:E2 79200 epsilon:E6 81000	every day	-
+epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:X4 epsilon:E2 54000 epsilon:E6 55800	every day	-
 ## epsilon:E2 maxTransfers 5
 epsilon:E2	0	0	epsilon:E2		every day	-
 epsilon:E5	0	20	epsilon:E2 epsilon:E5	epsilon:X2 epsilon:E2 38400 epsilon:E5 39600	every day	-
-epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:X4 epsilon:E2 79200 epsilon:E6 81000	every day	-
+epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:X4 epsilon:E2 54000 epsilon:E6 55800	every day	-
 ## epsilon:E3 maxTransfers 0
 epsilon:E3	0	0	epsilon:E3		every day	-
 epsilon:E4	0	30	epsilon:E3 epsilon:E4	epsilon:Y3 epsilon:E3 32400 epsilon:E4 34200	every day	-

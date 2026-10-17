@@ -39,6 +39,8 @@ final class GtfsTestFixtures {
     // Tests that are not about the rate limit search as this client, with a budget no test can use up
     static final SearchRateLimiter.Client VISITOR = new SearchRateLimiter.Client("192.0.2.1", false);
     private static final int UNLIMITED_SEARCH_BUDGET = 1_000_000;
+    // railradius.algorithm.max-transfer-time-minutes
+    private static final int DEFAULT_MAX_TRANSFER_MINUTES = 180;
 
     static TransitGraph load(Path tempDir, String... feedFolders) throws IOException {
         return load(tempDir, TRIP_BATCH_SIZE, TODAY, feedFolders);
@@ -145,10 +147,8 @@ final class GtfsTestFixtures {
 
     static ReachabilityService reachabilityService(TransitGraph graph, ReachabilityCache cache,
                                                    SearchRateLimiter rateLimiter) {
-        ReachabilityService service = new ReachabilityService(cache, new ReachabilityWarmer(cache),
-                new JourneyLegBuilder(graph), rateLimiter);
-        ReflectionTestUtils.setField(service, "maxTransferTimeMinutes", 180);
-        return service;
+        return new ReachabilityService(cache, new ReachabilityWarmer(cache), new JourneyLegBuilder(graph), rateLimiter,
+                new SearchRequestValidator(graph, DEFAULT_MAX_TRANSFER_MINUTES));
     }
 
     static ReachabilityCache reachabilityCache(TransitGraph graph) {
