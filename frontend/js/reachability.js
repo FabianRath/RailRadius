@@ -5,6 +5,7 @@ import { buildCoverage } from './coverage.js';
 import { coverageEnabled, readQuery } from './query-form.js';
 import { clearStatus, showStatus } from './util.js';
 import { isUpdatingTimetables } from './server-status.js';
+import { dismissIntroHint } from './intro-hint.js';
 
 const calculateBtn = document.getElementById('calculateBtn');
 const reachableCount = document.getElementById('reachableCount');
@@ -69,6 +70,7 @@ function calculate(station) {
     console.log('Reachability query:', key);
 
     clearStatus();
+    dismissIntroHint();
     shownParams = streamParams(station.id, query);
     journeys = new Map();
     results.clear();
