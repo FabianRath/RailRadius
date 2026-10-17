@@ -31,7 +31,6 @@ From the security council of 2026-10-17 (`council-report-2026-10-17.html`), all 
 - [ ] **F32** (Decide first) The "Show merged coverage areas (slower)" option (`frontend/js/coverage.js`) merges a buffer circle around every reached station into one area per transfer level. The user doesn't like how the merged areas look, and the cost is too high for it to be useful beyond a few hundred stations anyway: it runs one `turf.union` per station, sequentially on the main thread, after every search and again after every zoom (the buffer radius depends on the zoom). Decide with the user whether to redesign it (different look and a much cheaper approach) or remove it.
 
 - [ ] **F45** (Before launch, legal) Impressum and privacy notice (Datenschutzerklärung), required for a public site run from Germany. The notice covers: client IPs in the search rate limiter (B50) and in the proxy's access logs, with retention; the map tiles loaded from OpenFreeMap (a third party that sees visitor IPs); no cookies except the admin one. Link both from the About dialog, next to the source attribution page (S27 follow-up). Check the wording with a generator or a lawyer.
-- [ ] **F49** (Decide first) Night-train and direct-only filters, suggested by the 2026-10-17 council. Decide whether they are wanted and how night trains are recognised (train categories, departure times).
 
 ## Structure
 Recommended order (2026-10-13): judge **S24** on the server picked in S25 (`HOSTING.md`: 4 vCores, 8 GB, `-Xmx1280m`).
