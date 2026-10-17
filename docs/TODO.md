@@ -12,8 +12,7 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (caching / infrastructure)
 
 ## Bugs (security)
-From the security council of 2026-10-17 (`council-report-2026-10-17.html`), all reproduced on the dev data. Recommended order before launch: B47, then B49, B50.
-- [ ] **B47** No security response headers on any response (`curl -I /`): no CSP, `X-Content-Type-Options`, `frame-ancestors`/`X-Frame-Options`, `Referrer-Policy`. Add them in a small servlet filter (no Spring Security): CSP `default-src 'self'`, the OpenFreeMap hosts in `connect-src`/`img-src`, `worker-src blob:` for MapLibre; then check the map, popups and admin panel in Chrome for CSP errors. HSTS belongs on the proxy (S38).
+From the security council of 2026-10-17 (`council-report-2026-10-17.html`), all reproduced on the dev data. Recommended order before launch: B49, then B50.
 - [ ] **B48** `frontend/backend_test.html`, an old dev test page (inline styles, calls the API by hand), is served publicly at `/backend_test.html`. Delete it.
 - [ ] **B49** The search rate limit is keyed per full IP (`SearchRateLimiter`), so an IPv6 client rotates through its /64 and gets a fresh budget per address. Key IPv6 clients by their /64 prefix.
 - [ ] **B50** (GDPR) The rate limiter logs the client IP at INFO each time it turns a search away (`SearchRateLimiter.java:75`). Log without the IP (or at DEBUG), and name the IP use and its retention in the privacy notice (F45).
