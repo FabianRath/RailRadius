@@ -12,8 +12,8 @@ import java.io.IOException;
 /**
  * Guards the admin API with the {@link AdminToken} in the {@value AdminToken#HEADER} header. Without a configured
  * token every admin call is refused, so a deployment that forgets to set one never exposes reloads or cache deletion.
- * Failed logins are throttled per client IP by {@link AdminLoginThrottle}; a blocked IP is refused before its token
- * is checked, so even a correct guess tells it nothing.
+ * Failed logins are throttled per client (IPv6: per /64) by {@link AdminLoginThrottle}; a blocked client is refused
+ * before its token is checked, so even a correct guess tells it nothing.
  */
 @Component
 @RequiredArgsConstructor

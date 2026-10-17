@@ -56,6 +56,16 @@ class SearchRateLimiterTest {
     }
 
     @Test
+    void ipv6AddressesInOneSlash64ShareABudget() {
+        SearchRateLimiter limiter = new SearchRateLimiter(BIG_COST, 1, nowNanos::get);
+        limiter.charge("2001:db8:1:2::1", 5);
+
+        assertThatThrownBy(() -> limiter.charge("2001:db8:1:2::2", 5))
+                .isInstanceOf(SearchRateLimiter.TooManySearchesException.class);
+        assertThatCode(() -> limiter.charge("2001:db8:1:3::1", 5)).doesNotThrowAnyException();
+    }
+
+    @Test
     void transferCountsAboveFiveCostAsMuchAsFive() {
         SearchRateLimiter limiter = new SearchRateLimiter(BIG_COST, 1, nowNanos::get);
 

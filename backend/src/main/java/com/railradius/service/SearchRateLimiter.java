@@ -2,6 +2,7 @@ package com.railradius.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.railradius.util.ClientKeys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,8 +14,9 @@ import java.time.Duration;
 import java.util.function.LongSupplier;
 
 /**
- * A search budget per client IP that refills over time (token bucket). A search costs more the more transfers it
- * has, since that is what makes it slow; one served from the result cache is free (see {@link ReachabilityService}).
+ * A search budget per client ({@link ClientKeys#rateLimitKey}, so IPv6 per /64) that refills over time (token
+ * bucket). A search costs more the more transfers it has, since that is what makes it slow; one served from the
+ * result cache is free (see {@link ReachabilityService}).
  */
 @Component
 @Slf4j
@@ -70,7 +72,7 @@ public class SearchRateLimiter {
      */
     public void charge(String clientIp, int maxTransfers) {
         int cost = costOf(maxTransfers);
-        long waitSeconds = buckets.get(clientIp, ip -> new Bucket()).take(cost);
+        long waitSeconds = buckets.get(ClientKeys.rateLimitKey(clientIp), clientKey -> new Bucket()).take(cost);
         if (waitSeconds > 0) {
             log.info("Search from {} turned away by the rate limit, {} s until it fits", clientIp, waitSeconds);
             throw new TooManySearchesException(waitSeconds);
