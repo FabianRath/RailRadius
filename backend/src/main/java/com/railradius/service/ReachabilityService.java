@@ -4,6 +4,7 @@ import com.railradius.dto.ReachabilityRequest;
 import com.railradius.dto.ReachableStation;
 import com.railradius.dto.ReachableStationSummary;
 import com.railradius.service.ReachabilityCache.SearchKey;
+import com.railradius.service.SearchRequestValidator.ValidSearch;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,24 +21,20 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 
-/** Answers reachability requests: resolves defaults, gets the (cached) search result and maps it to DTOs. */
+/** Answers reachability requests: validates them, gets the (cached) search result and maps it to DTOs. */
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class ReachabilityService {
 
     private static final int STREAM_BATCH_SIZE = 30;
-    private static final int DEFAULT_MAX_TRANSFERS = 5;
-    private static final int MINUTES_PER_HOUR = 60;
     private static final String OUT_OF_MEMORY_MESSAGE = "The server is too busy for this search, please try again later";
 
     private final ReachabilityCache cache;
     private final ReachabilityWarmer warmer;
     private final JourneyLegBuilder legBuilder;
     private final SearchRateLimiter rateLimiter;
-
-    @Value("${railradius.algorithm.max-transfer-time-minutes:180}")
-    private int maxTransferTimeMinutes;
+    private final SearchRequestValidator validator;
 
     @Value("${railradius.cache.predictive-enabled:true}")
     private boolean predictiveEnabled;
@@ -47,14 +44,15 @@ public class ReachabilityService {
      * request's limits. The search result is usually stored by the stream that showed the station.
      *
      * @throws SearchRateLimiter.TooManySearchesException if it would have to search and the client's budget is too low
+     * @throws SearchRequestValidator.InvalidSearchException if the station is unknown or a parameter out of range
      */
     public Optional<ReachableStation> journey(SearchRateLimiter.Client client, ReachabilityRequest request,
                                               String targetId) {
-        if (targetId.equals(request.getStartStationId())) return Optional.empty();
-        SearchKey key = searchKey(request);
-        chargeUnlessStored(client, key);
-        CompactResult result = cache.getOrCompute(key);
-        return fewestTransfersWithin(result.paths(targetId), maxJourneyMinutes(request))
+        ValidSearch search = validator.validate(request);
+        if (targetId.equals(search.key().startId())) return Optional.empty();
+        chargeUnlessStored(client, search.key());
+        CompactResult result = cache.getOrCompute(search.key());
+        return fewestTransfersWithin(result.paths(targetId), search.maxJourneyMinutes())
                 .flatMap(path -> legBuilder.toReachableStation(targetId, result.journey(targetId, path.transfers())));
     }
 
@@ -68,13 +66,13 @@ public class ReachabilityService {
     public void calculateReachabilityStreaming(SearchRateLimiter.Client client, ReachabilityRequest request,
                                                SseEmitter emitter) {
         long startMs = System.currentTimeMillis();
-        SearchKey key = searchKey(request);
         try {
-            chargeUnlessStored(client, key);
-            StreamedStations streamed = new StreamedStations(request, emitter, startMs);
+            ValidSearch search = validator.validate(request);
+            chargeUnlessStored(client, search.key());
+            StreamedStations streamed = new StreamedStations(search, emitter, startMs);
             // A station is sent once, with its first path within the time limit. Rounds add paths by ascending
             // transfers, so that is the path its journey shows too (B4).
-            streamed.sendNew(cache.getOrCompute(key, streamed));
+            streamed.sendNew(cache.getOrCompute(search.key(), streamed));
             log.info("Streamed {} stations in {} ms, the first after {} ms", streamed.sent.size(),
                     System.currentTimeMillis() - startMs, streamed.firstSentMs);
             emitter.send(SseEmitter.event()
@@ -86,12 +84,13 @@ public class ReachabilityService {
             emitter.complete();
 
             if (predictiveEnabled) {
-                warmer.warmHigherTransferCounts(key);
+                warmer.warmHigherTransferCounts(search.key());
             }
         } catch (CancellationException e) {
             log.info("Stream stopped after {} ms: {}", System.currentTimeMillis() - startMs, e.getMessage());
             emitter.complete();
-        } catch (SearchGate.BusyException | SearchRateLimiter.TooManySearchesException e) {
+        } catch (SearchRequestValidator.InvalidSearchException | SearchGate.BusyException
+                 | SearchRateLimiter.TooManySearchesException e) {
             sendError(emitter, e.getMessage());
         } catch (Exception e) {
             log.error("Streaming BFS error", e);
@@ -99,7 +98,8 @@ public class ReachabilityService {
         } catch (OutOfMemoryError e) {
             // The failed search's memory is garbage once it has unwound, and its permit is free, so the app goes on;
             // without this the client would wait for an event forever (B38)
-            log.error("Search from {} x{} ran out of memory", key.startId(), key.maxTransfers(), e);
+            log.error("Search from {} x{} ran out of memory", request.getStartStationId(), request.getMaxTransfers(),
+                    e);
             sendError(emitter, OUT_OF_MEMORY_MESSAGE);
         }
     }
@@ -131,34 +131,21 @@ public class ReachabilityService {
         return stats;
     }
 
-    private SearchKey searchKey(ReachabilityRequest request) {
-        return new SearchKey(request.getStartStationId(),
-                request.getMaxTransfers() != null ? request.getMaxTransfers() : DEFAULT_MAX_TRANSFERS,
-                request.getMinTransferTimeMinutes() != null ? request.getMinTransferTimeMinutes() : 0,
-                request.getMaxTransferTimeMinutes() != null ? request.getMaxTransferTimeMinutes() : maxTransferTimeMinutes);
-    }
-
-    /** No limit when the request has no maximum journey time. */
-    private static int maxJourneyMinutes(ReachabilityRequest request) {
-        Double hours = request.getMaxJourneyTimeHours();
-        return hours != null ? (int) (hours * MINUTES_PER_HOUR) : Integer.MAX_VALUE;
-    }
-
     /** The stations a stream has sent so far. The start station is not a destination, so it is never sent. */
     private final class StreamedStations implements ReachabilityCache.SearchListener {
 
-        private final ReachabilityRequest request;
+        private final String startId;
         private final SseEmitter emitter;
         private final long startMs;
         private final int maxJourneyMins;
         private final Set<String> sent = new HashSet<>();
         private long firstSentMs = -1;
 
-        StreamedStations(ReachabilityRequest request, SseEmitter emitter, long startMs) {
-            this.request = request;
+        StreamedStations(ValidSearch search, SseEmitter emitter, long startMs) {
+            this.startId = search.key().startId();
             this.emitter = emitter;
             this.startMs = startMs;
-            this.maxJourneyMins = maxJourneyMinutes(request);
+            this.maxJourneyMins = search.maxJourneyMinutes();
         }
 
         @Override
@@ -185,7 +172,7 @@ public class ReachabilityService {
 
         private void addIfNew(List<ReachableStationSummary> stations, String stopId,
                               List<CompactResult.PathSummary> paths) {
-            if (stopId.equals(request.getStartStationId()) || sent.contains(stopId)) return;
+            if (stopId.equals(startId) || sent.contains(stopId)) return;
             fewestTransfersWithin(paths, maxJourneyMins)
                     .flatMap(path -> legBuilder.toSummary(stopId, path))
                     .ifPresent(station -> {

@@ -15,6 +15,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CompactReachabilitySearchTest {
 
     private static final String START_ID = "alpha:A1";
+    private static final int A_DAY_MINUTES = 24 * 60;
+    private static final int LONGEST_MIN_WAIT_MINUTES = 1300;
 
     @Test
     void pathsHandedOutAfterEachRoundAddUpToTheResult(@TempDir Path tempDir) throws IOException {
@@ -38,6 +40,20 @@ class CompactReachabilitySearchTest {
         result.forEachStation(found::put);
         found.remove(START_ID);
         assertThat(handedOut).isEqualTo(found);
+    }
+
+    // V1 reaches D1 at 08:30, W1 leaves it at 08:00: under an hour earlier is no 23.5 h wait past midnight. The
+    // minimum wait rules out V2 (10:30) → W1 (21.5 h) but not V2 → W2 at 09:00 (22.5 h). Waits this long are beyond
+    // the API's ceiling (SearchRequestValidator), so this calls the search directly.
+    @Test
+    void trainLeavingLessThanAnHourBeforeTheArrivalIsNotCaughtTheNextDay(@TempDir Path tempDir) throws IOException {
+        CompactReachabilitySearch search =
+                new CompactReachabilitySearch(GtfsTestFixtures.load(tempDir, "gamma", "delta"));
+
+        CompactResult result = search.search("gamma:G3", 1, LONGEST_MIN_WAIT_MINUTES, A_DAY_MINUTES, round -> { });
+
+        assertThat(result.paths("delta:D3")).isNotEmpty();
+        assertThat(result.paths("delta:D2")).isEmpty();
     }
 
     // OT2 runs back into O1, but the start is no arrival to transfer from or to hand out
