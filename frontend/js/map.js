@@ -217,6 +217,11 @@ export function fitToPoints(points) {
     map.fitBounds(bounds, { padding: FIT_PADDING_PX, maxZoom: FIT_MAX_ZOOM });
 }
 
+/** Moves straight to the bounds ([[west, south], [east, north]]), without the fly animation. */
+export function jumpToBounds(bounds) {
+    map.fitBounds(bounds, { padding: FIT_PADDING_PX, maxZoom: FIT_MAX_ZOOM, animate: false });
+}
+
 /** Shows a popup with buildHtml(featureProperties) when a point of the layer is clicked. */
 export function bindPopup(layerId, buildHtml) {
     bindClick(layerId, feature => {
