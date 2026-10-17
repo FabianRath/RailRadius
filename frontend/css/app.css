@@ -142,7 +142,8 @@ body {
     background: var(--board-2);
 }
 
-.board-label {
+.board-label,
+.feed-table th {
     font: 600 12px var(--font-ui);
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -473,16 +474,6 @@ body {
 
 .intro-hint[hidden] {
     display: none;
-}
-
-.section-title {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--accent-rail);
-    margin-bottom: 16px;
 }
 
 /* ── Search ── */
@@ -1023,22 +1014,43 @@ input[type="number"]::-webkit-inner-spin-button {
     gap: 12px;
 }
 
+/* ── Dialogs (About, admin panel) ── */
+.about-panel,
+.admin-panel {
+    background: var(--board-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--amber);
+    border-radius: var(--radius);
+    padding: 24px;
+    font: 15px var(--font-ui);
+}
+
+.about-panel::backdrop,
+.admin-panel::backdrop {
+    background: var(--overlay);
+}
+
+.about-title,
+.admin-title {
+    font: 700 18px var(--font-ui);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text);
+}
+
+.about-panel .board-label,
+.admin-panel .board-label {
+    margin-bottom: 8px;
+}
+
 /* ── Admin panel ── */
 .admin-panel {
     margin: auto;
     width: min(560px, calc(100vw - 32px));
     max-height: calc(100vh - 32px);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--accent-warm-line);
-    border-radius: 12px;
-    padding: 24px;
-    font-family: var(--font-mono);
-    font-size: 12px;
-}
-
-.admin-panel::backdrop {
-    background: var(--bg-overlay);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
 }
 
 .admin-header {
@@ -1048,28 +1060,10 @@ input[type="number"]::-webkit-inner-spin-button {
     margin-bottom: 20px;
 }
 
-.admin-title {
-    font-size: 16px;
-    color: var(--accent-warm);
-}
-
 .admin-storage {
     margin: -12px 0 16px;
-    font-size: 12px;
-    color: var(--text-secondary);
-}
-
-.admin-close {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    font-size: 24px;
-    line-height: 1;
-    cursor: pointer;
-}
-
-.admin-close:hover {
-    color: var(--text-primary);
+    font-size: 13px;
+    color: var(--muted);
 }
 
 .admin-group {
@@ -1083,17 +1077,17 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .admin-btn {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text-primary);
-    font: inherit;
+    background: var(--board-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    color: var(--text);
+    font: 600 14px var(--font-ui);
     padding: 8px 12px;
     cursor: pointer;
 }
 
 .admin-btn:hover:not(:disabled) {
-    border-color: var(--accent-rail);
+    border-color: var(--amber);
 }
 
 .admin-btn-danger:hover:not(:disabled) {
@@ -1102,8 +1096,8 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .admin-btn[aria-pressed="true"] {
-    border-color: var(--accent-rail);
-    color: var(--accent-rail);
+    border-color: var(--amber);
+    color: var(--amber);
 }
 
 .admin-btn:disabled {
@@ -1131,31 +1125,33 @@ input[type="number"]::-webkit-inner-spin-button {
     display: flex;
     gap: 4px;
     margin-bottom: 16px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--line);
 }
 
 .admin-tab {
     background: none;
     border: none;
     border-bottom: 2px solid transparent;
-    color: var(--text-secondary);
-    font: inherit;
+    font: 600 13px var(--font-ui);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
     padding: 8px 12px;
     cursor: pointer;
 }
 
 .admin-tab:hover {
-    color: var(--text-primary);
+    color: var(--text);
 }
 
 .admin-tab.is-active {
-    border-bottom-color: var(--accent-rail);
-    color: var(--accent-rail);
+    border-bottom-color: var(--amber);
+    color: var(--amber);
 }
 
 .feed-summary {
     margin: 12px 0;
-    color: var(--text-secondary);
+    color: var(--muted);
 }
 
 .feed-summary.is-error {
@@ -1166,8 +1162,8 @@ input[type="number"]::-webkit-inner-spin-button {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    border: 1px solid var(--border);
-    border-radius: 6px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
 }
 
 .feed-table {
@@ -1178,16 +1174,18 @@ input[type="number"]::-webkit-inner-spin-button {
 .feed-table th {
     position: sticky;
     top: 0;
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
-    font-weight: 600;
+    background: var(--board-3);
     text-align: left;
 }
 
 .feed-table th,
 .feed-table td {
     padding: 6px 8px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--line);
+}
+
+.feed-table tbody tr:hover {
+    background: var(--board-3);
 }
 
 /* Headers, states, hosts and download messages wrap, so the table fits the panel without scrolling sideways */
@@ -1203,17 +1201,17 @@ input[type="number"]::-webkit-inner-spin-button {
 .feed-state-not-yet-valid,
 .feed-state-no-calendar,
 .feed-result-pending {
-    color: var(--text-secondary);
+    color: var(--muted);
 }
 
 .feed-state-ok,
 .feed-result-replaced {
-    color: var(--accent-rail);
+    color: var(--ok);
 }
 
 .feed-state-expiring,
 .feed-result-busy {
-    color: var(--warning);
+    color: var(--amber);
 }
 
 .feed-state-missing,
@@ -1233,37 +1231,37 @@ input[type="number"]::-webkit-inner-spin-button {
     height: 8px;
     appearance: none;
     border: none;
-    border-radius: 4px;
-    background: var(--bg-primary);
+    border-radius: var(--radius);
+    background: var(--board);
     overflow: hidden;
 }
 
 .admin-progress-bar::-webkit-progress-bar {
-    background: var(--bg-primary);
+    background: var(--board);
 }
 
 .admin-progress-bar::-webkit-progress-value {
-    background: var(--accent-rail);
-    transition: width 0.3s;
+    background: var(--amber);
 }
 
 .admin-progress-bar::-moz-progress-bar {
-    background: var(--accent-rail);
+    background: var(--amber);
 }
 
 .admin-progress-text {
     margin-top: 6px;
-    color: var(--text-secondary);
+    color: var(--muted);
 }
 
 .admin-output {
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    border-radius: 6px;
+    background: var(--board);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
     padding: 12px;
     max-height: 300px;
     overflow: auto;
-    color: var(--text-secondary);
+    color: var(--muted);
+    font-family: var(--font-mono);
     white-space: pre-wrap;
     word-break: break-word;
 }
@@ -1277,16 +1275,16 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--bg-primary);
+    background: var(--board);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 4px;
+    background: var(--line);
+    border-radius: var(--radius);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-rail);
+    background: var(--muted);
 }
 
 /* ── About dialog (info button under the zoom buttons) ── */
@@ -1301,17 +1299,6 @@ input[type="number"]::-webkit-inner-spin-button {
     margin: auto;
     width: min(480px, calc(100vw - 32px));
     max-height: calc(100vh - 32px);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--accent-rail-line);
-    border-radius: 12px;
-    padding: 24px;
-    font-family: var(--font-sans);
-    font-size: 14px;
-}
-
-.about-panel::backdrop {
-    background: var(--bg-overlay);
 }
 
 .about-header {
@@ -1321,16 +1308,10 @@ input[type="number"]::-webkit-inner-spin-button {
     margin-bottom: 16px;
 }
 
-.about-title {
-    font-family: var(--font-mono);
-    font-size: 16px;
-    color: var(--accent-rail);
-}
-
 .about-text {
     margin-bottom: 12px;
     line-height: 1.5;
-    color: var(--text-secondary);
+    color: var(--muted);
 }
 
 .about-countries {
@@ -1339,4 +1320,5 @@ input[type="number"]::-webkit-inner-spin-button {
     margin-top: 8px;
     padding-left: 18px;
     line-height: 1.6;
+    color: var(--text);
 }
