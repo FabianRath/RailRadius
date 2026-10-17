@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B51 · F50 · S40
+**Next free IDs:** B54 · F50 · S41
 
 ## Bugs (data loading)
 - [ ] **B36** Bosnia has no current rail feed, and Northern Ireland's can't be refreshed. State on 2026-10-07 (`gtfs-sources.md` has the details). Bosnia: the only source ends on 2025-12-13, so no Bosnian trains. Northern Ireland: the zip on disk (GTFS.pro copy from transitpdf, 2026-07-27) has NI Railways until mid-2027, but transitpdf is gone and Translink publishes only TransXChange, so no download URL is left in `gtfs-feeds.txt`. Check for a new GTFS source before mid-2027.
@@ -24,6 +24,9 @@ From the security council of 2026-10-17 (`council-report-2026-10-17.html`), all 
 
 ## Bugs (frontend)
 - [ ] **B40** Search list shows station ids: each result line shows the id instead of "N connections". The search response (`StationSearchResult` in `RailRadiusController`) has no `connections` field, so that branch in `stationItemHtml` (`frontend/js/search.js`) never runs.
+- [ ] **B51** The Wait cell shows "5–… min" when the minimum wait is 0, but the search uses 0. `updateTransferTimeHint` (`frontend/js/query-form.js`) reads the field with `parseInt(…) || HINT_MIN_TRANSFER_MINUTES`, so 0 falls back to 5. Show 0; only an empty field should fall back.
+- [ ] **B52** The form (and a deep link, F46) accepts a minimum wait above the maximum, e.g. 200–100 min. The backend rejects it (`SearchRequestValidator`) and the user only sees "Search failed: The wait at changes must be …". Show a clear message at the wait fields before the search is sent.
+- [ ] **B53** (Check first, full data) Possible: a stop ID that contains `/` can't be looked up through `GET /api/stations/{id}`. The frontend encodes it as `%2F`, which Tomcat rejects by default, so a deep link (F46) to that station would say "Station from the link not found". Check whether any feed in the full dataset has such stop IDs (capped peeks only, e.g. `unzip -p <zip> stops.txt | grep -m 5 …`, see CLAUDE.md hard rules); if yes, reproduce and fix, if no, delete this item.
 
 ## Features / UX
 - [ ] **F23** (Decide first) While a station's journey is shown (F21), the dots of the stations it passes through keep their own transfer-level colour, so they don't always match the line colour of the train passing them (first train green, second cyan, …): a stop on the third train can be green because another train reaches it directly. The route looks inconsistent, but the colour also tells the user that this stop can be reached with fewer transfers, and clicking it shows that shorter journey. Options: (1) recolour the path's dots by the train they are on while the journey is shown; (2) keep the station's own colour (current behaviour), maybe explained in the details panel; (3) both, e.g. the train's colour as fill and the station's own level as outline. Decide with the user, then implement.
@@ -62,4 +65,5 @@ Recommended order (2026-10-13): judge **S24** on the server picked in S25 (`HOST
 - [ ] **S36** The SSE stream timeout is 30 minutes (`RailRadiusController.java:78`) although a search takes seconds. Shorten it to a few minutes, so dead connections don't linger.
 - [ ] **S37** Two identical searches that start at the same moment with free permits both run (a queued one re-checks the cache, these don't). Let the second wait for the first's result instead, so a shared link opened by many at once costs one search.
 - [ ] **S38** Ops checklist in `HOSTING.md`, before launch: proxy settings for SSE (buffering off, read timeout above the longest search), HSTS, connection caps, `RAILRADIUS_FORWARD_HEADERS_STRATEGY=native`; `-XX:+ExitOnOutOfMemoryError` and an automatic restart (systemd); firewall open only for 80/443 and SSH, SSH by key only; an external uptime check on `/api/health`; keep the previous store file for rollback.
+- [ ] **S40** A passing `mvn -q -f backend/pom.xml test` prints ~5,600 lines (1.2 MB), almost all our own INFO logs from loading the fixture (`GtfsFeedLoader`, `GtfsDataService`, `RailTripReader`, …), plus Spring's startup for `RailRadiusBackendApplicationTests`. It buries real failures and contradicts CLAUDE.md ("prints nothing on success"). Set test logging to WARN (e.g. a `logback-test.xml` in `src/test/resources`, which also covers the plain unit tests outside Spring) and keep the deliberate WARNs quiet in tests if they are expected.
 - [ ] **S39** Abuse probe script (`scripts/`): the requests from the 2026-10-17 review (invalid and oversized parameters, unknown stations, `limit=-1`, path tricks on `/api/admin`, header check), run against the full data before launch and after security changes. Each must get the expected status.
