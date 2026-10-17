@@ -49,13 +49,13 @@ RailRadius/
 │                                     #   journey column on the right, shown while a station's journey is open
 ├── frontend/css/tokens.css           # design tokens (colours incl. map palette, fonts, radius, sizes) and the
 │                                     #   @font-face rules for the self-hosted fonts; loaded before app.css
-├── frontend/css/app.css              # all other styles (its :root maps the old variable names onto the tokens).
+├── frontend/css/app.css              # all other styles, using only the tokens (no colour literals, CODING_GUIDELINES §8).
 │                                     #   Breakpoints, each also applying below it: < 1280px compacts the bar cells (no
 │                                     #   tagline); < 1024px wraps the bar into a 3-column grid (brand+count, From, changes/
 │                                     #   max journey/wait, Go) with the station dropdown and options panel at full bar width
 │                                     #   and 40×40px touch targets; < 768px turns the journey column into a bottom sheet over
 │                                     #   the full-size map and stretches the map overlays to 8px from the edges
-├── frontend/js/                      # ES modules: main (entry), api, map (only MapLibre user), search, query-form,
+├── frontend/js/                      # ES modules: main (entry), api, map (only MapLibre user; recolours the OpenFreeMap dark style with the `--map-*` tokens and shows railways from z8; dots coloured by transfer level `--transfer-0…5`, radius 6px for direct down to 3px at 5+ transfers), search, query-form,
 │                                     #   reachability (SSE; pins the start station, whose coordinates come from the station search since the stream never sends it, F30; fetches a station's journey on click), coverage (Turf), station-details (clicked station's journey, in the journey column; resizes the map when it opens or closes), journey (its lines on the map), debug, dev-auth (dev login), admin-panel (admin
 │                                     #   endpoints as buttons), feeds (Feeds tab of the admin panel), about (info button under the zoom buttons: disclaimer + covered countries), intro-hint (first-visit hint over the map, dismissal kept in `localStorage`), server-status ("updating timetables" notice while `/health` is not UP or unreachable, F28), feed-alerts (Alerts tab of the admin panel), icons (vendored Lucide SVGs;
 │                                     #   `<span data-icon>` in the markup), util, config

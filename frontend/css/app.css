@@ -1,27 +1,3 @@
-/* Bridge from the old palette to tokens.css until the redesign replaces these names */
-:root {
-    --bg-primary: var(--board);
-    --bg-secondary: var(--board-2);
-    --bg-tertiary: var(--board-3);
-    --bg-overlay: var(--overlay);
-    --accent-rail: var(--amber);
-    --accent-rail-strong: var(--amber);
-    --accent-rail-faint: var(--board-3);
-    --accent-rail-soft: var(--board-3);
-    --accent-rail-line: var(--line);
-    --accent-warm: var(--amber);
-    --accent-warm-soft: var(--board-3);
-    --accent-warm-line: var(--line);
-    --accent-train-soft: var(--board-3);
-    --warning: var(--amber);
-    --danger-bg: var(--board-2);
-    --text-primary: var(--text);
-    --text-secondary: var(--muted);
-    --border: var(--line);
-    --divider: var(--line);
-    --font-sans: var(--font-ui);
-}
-
 * {
     margin: 0;
     padding: 0;
@@ -774,7 +750,7 @@ input[type="number"]::-webkit-inner-spin-button {
 .station-popup .maplibregl-popup-content {
     background: var(--board-2);
     color: var(--text);
-    font-family: var(--font-sans);
+    font-family: var(--font-ui);
     border-radius: var(--radius);
     border: 1px solid var(--line);
     padding: 12px 16px;
@@ -824,11 +800,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .popup-meta {
     font-size: 12px;
-    color: var(--text-secondary);
-}
-
-.popup-warning {
-    color: var(--warning);
+    color: var(--muted);
 }
 
 .popup-mono {
