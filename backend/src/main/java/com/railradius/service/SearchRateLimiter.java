@@ -74,7 +74,7 @@ public class SearchRateLimiter {
         int cost = costOf(maxTransfers);
         long waitSeconds = buckets.get(ClientKeys.rateLimitKey(clientIp), clientKey -> new Bucket()).take(cost);
         if (waitSeconds > 0) {
-            log.info("Search from {} turned away by the rate limit, {} s until it fits", clientIp, waitSeconds);
+            log.info("Search turned away by the rate limit, {} s until it fits", waitSeconds);
             throw new TooManySearchesException(waitSeconds);
         }
     }
