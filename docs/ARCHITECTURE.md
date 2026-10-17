@@ -62,7 +62,6 @@ RailRadius/
 ├── frontend/vendor/                  # MapLibre GL JS 6.11.2 (ESM: main, shared, worker + CSS) and Turf 6.5.0, copied from
 │                                     #   npm with their licences, so the page loads no scripts from a CDN; fonts/: Barlow Semi
 │                                     #   Condensed 400–700 (latin, latin-ext) and Doto 900 (latin) as woff2 with their OFL licences
-├── frontend/backend_test.html        # small manual API test page
 └── backend/
     ├── pom.xml
     ├── src/main/java/com/railradius/{controller,service,dto,model,config}/
