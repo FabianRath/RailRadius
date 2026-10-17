@@ -162,6 +162,7 @@ Package `com.railradius.<sub>` lives in `backend/src/main/java/com/railradius/<s
 | `AdminTokenInterceptor` | config | Guards `/api/admin/**`: the `X-Admin-Token` header (never the cookie, which a cross-site request would carry) must match `AdminToken`; 401 if wrong or missing, 403 for every call when no token is configured, 429 for every call from an IP that `AdminLoginThrottle` blocks (checked before the token) |
 | `AdminLoginThrottle` | config | Failed admin logins (wrong or missing token) per client IP (`getRemoteAddr()`) in a Caffeine cache: after 5 within 15 min of the first, the IP is blocked until that window ends; at most 10,000 IPs tracked. Each failure is logged at WARN with the IP and count, never the token |
 | `WebConfig` | config | Registers `AdminTokenInterceptor` on `/api/admin/**` (same path matching as the controllers) |
+| `SecurityHeadersFilter` | config | Servlet filter that sets `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer` on every response (static files and API). The CSP allows only the own origin plus `https://tiles.openfreemap.org` (`connect-src`, `img-src`), `data:`/`blob:` images, `'unsafe-eval'` for Turf 6, no framing (`frame-ancestors 'none'`); see `decisions.md`. HSTS is set by the TLS proxy (S38) |
 | `Station` | model | id, name, latitude, longitude, parentStation, country (ISO code from the coordinates, null if outside every border) |
 | `Connection` | model | One leg of one trip: tripId, routeName, from/to, dep/arr times as **int seconds since midnight** (string getters for display) |
 | `JourneyPath` | model | One found path: stationIds, connections, transfers, totalDurationMinutes. A `CompactResult` builds one when a journey is asked for |
@@ -268,6 +269,8 @@ What the search must keep, so a rewrite gives the same result as `SearchSnapshot
   - `StationCandidatesFlat` keeps rides in the order they were offered. `RegularJourneyChooser` takes the first of equally fast candidates.
 
 ## REST API
+
+Every response, API and static files, carries the security headers of `SecurityHeadersFilter`.
 
 **Public (`/api`)**, same-origin only (no CORS headers; the backend serves the frontend):
 | Method | Path | Notes |
