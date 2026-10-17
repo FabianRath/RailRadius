@@ -32,7 +32,6 @@ From the security council of 2026-10-17 (`council-report-2026-10-17.html`), all 
 
 - [ ] **F45** (Before launch, legal) Impressum and privacy notice (Datenschutzerklärung), required for a public site run from Germany. The notice covers: client IPs in the search rate limiter (B50) and in the proxy's access logs, with retention; the map tiles loaded from OpenFreeMap (a third party that sees visitor IPs); no cookies except the admin one. Link both from the About dialog, next to the source attribution page (S27 follow-up). Check the wording with a generator or a lawyer.
 - [ ] **F46** Deep links: put the start station, max transfers and the options (wait, max journey) into the URL, and run that search when the page opens with them, so a result can be shared and bookmarked. Today the URL never changes. URL values go through the same validation as the API (B41). Shared links mostly hit the result cache, so they are cheap to serve. Highest-value feature from the 2026-10-17 council.
-- [ ] **F47** The first view is all of Europe, even when the loaded data covers only a few countries (dev: AT/HU/SK). Fit the initial view to the coverage (`/api/coverage`).
 - [ ] **F49** (Decide first) Night-train and direct-only filters, suggested by the 2026-10-17 council. Decide whether they are wanted and how night trains are recognised (train categories, departure times).
 
 ## Structure

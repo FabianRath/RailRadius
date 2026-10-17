@@ -1,5 +1,5 @@
 import { isUpdatingTimetables } from './server-status.js';
-import { initMap, LAYERS, onEmptyMapClick, onPointClick, onZoomEnd } from './map.js';
+import { initMap, jumpToBounds, LAYERS, onEmptyMapClick, onPointClick, onZoomEnd } from './map.js';
 import { closeStationDetails, initStationDetails, showStationDetails } from './station-details.js';
 import { initSearch, prefillStation } from './search.js';
 import { initQueryForm, showQueryForm } from './query-form.js';
@@ -11,6 +11,8 @@ import { showStatus } from './util.js';
 import { renderStaticIcons } from './icons.js';
 import { initAbout } from './about.js';
 import { initIntroHint } from './intro-hint.js';
+import { fetchCoverage } from './api.js';
+import { boundsOfCountries } from './country-bounds.js';
 
 const COVERAGE_REDRAW_DEBOUNCE_MS = 300;
 // Pre-filled for new visitors: small enough that its 1-transfer map isn't cluttered
@@ -21,7 +23,17 @@ let selectedStation = null;
 isUpdatingTimetables();
 
 renderStaticIcons();
+// Requested alongside the map load; until it answers, the map shows the default view
+const coverageBounds = fetchCoverage()
+    .then(({ countries }) => boundsOfCountries(countries))
+    .catch(error => {
+        console.error('Coverage request failed:', error);
+        return null;
+    });
 await initMap('map');
+coverageBounds.then(bounds => {
+    if (bounds) jumpToBounds(bounds);
+});
 initAbout();
 initStationDetails();
 onPointClick(LAYERS.reachable, async ({ stopId }) => {
