@@ -2,6 +2,7 @@ import { fmtMins } from './util.js';
 
 const HINT_MIN_TRANSFER_MINUTES = 5;
 const DEFAULT_MAX_TRANSFER_MINUTES = 180;
+const TRANSFER_TIME_LIMIT_DEFAULT = true;
 
 const calculateBtn = document.getElementById('calculateBtn');
 const transferInput = document.getElementById('transferInput');
@@ -18,7 +19,7 @@ const optionsCell = document.querySelector('.board-options');
 const optionsToggle = document.getElementById('optionsToggle');
 const optionsPanel = document.getElementById('optionsPanel');
 
-let transferTimeLimitEnabled = true;
+let transferTimeLimitEnabled = TRANSFER_TIME_LIMIT_DEFAULT;
 
 export function initQueryForm(onCoverageToggle) {
     transferMinus.addEventListener('click', () => { transferInput.stepDown(); updateStepperButtons(); });
@@ -44,16 +45,42 @@ export function coverageEnabled() {
 // The backend rejects values outside the fields' min/max (B41), so typed values are clamped to them. With the wait
 // limit off, the whole range the backend allows is searched.
 export function readQuery() {
+    return queryFromFields(input => input.value, transferTimeLimitEnabled);
+}
+
+/** The query the untouched form sends. */
+export function defaultQuery() {
+    return queryFromFields(input => input.defaultValue, TRANSFER_TIME_LIMIT_DEFAULT);
+}
+
+/**
+ * Sets the fields from untrusted text, e.g. a link's parameters (null for a missing one). A value that is no number
+ * keeps the field's default; the others are clamped to the field's bounds like typed values.
+ */
+export function applyQuery(query) {
+    setField(transferInput, parseInt(query.maxTransfers, 10));
+    setField(maxJourneyTimeInput, parseFloat(query.maxJourneyHours));
+    setField(minTransferTimeInput, parseInt(query.minTransferMinutes, 10));
+    setField(maxTransferTimeInput, parseInt(query.maxTransferMinutes, 10));
+    updateStepperButtons();
+    updateTransferTimeHint();
+}
+
+function setField(input, value) {
+    input.value = Number.isNaN(value) ? input.defaultValue : clampToField(input, value);
+}
+
+function queryFromFields(valueOf, limitEnabled) {
+    const journeyHours = valueOf(maxJourneyTimeInput);
     return {
-        maxTransfers: clampTransfers(transferInput.value),
-        maxJourneyHours: maxJourneyTimeInput.value
-            ? clampToField(maxJourneyTimeInput, parseFloat(maxJourneyTimeInput.value))
-            : null,
-        minTransferMinutes: transferTimeLimitEnabled
-            ? clampToField(minTransferTimeInput, parseInt(minTransferTimeInput.value) || 0)
+        maxTransfers: clampTransfers(valueOf(transferInput)),
+        maxJourneyHours: journeyHours ? clampToField(maxJourneyTimeInput, parseFloat(journeyHours)) : null,
+        minTransferMinutes: limitEnabled
+            ? clampToField(minTransferTimeInput, parseInt(valueOf(minTransferTimeInput)) || 0)
             : 0,
-        maxTransferMinutes: transferTimeLimitEnabled
-            ? clampToField(maxTransferTimeInput, parseInt(maxTransferTimeInput.value) || DEFAULT_MAX_TRANSFER_MINUTES)
+        maxTransferMinutes: limitEnabled
+            ? clampToField(maxTransferTimeInput,
+                parseInt(valueOf(maxTransferTimeInput)) || DEFAULT_MAX_TRANSFER_MINUTES)
             : Number(maxTransferTimeInput.max)
     };
 }

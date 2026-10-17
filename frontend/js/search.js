@@ -24,10 +24,9 @@ export function initSearch(onSelect) {
     stationResults.addEventListener('click', e => {
         const item = e.target.closest('.station-item');
         if (!item) return;
-        searchInput.value = item.dataset.name;
         stationResults.innerHTML = '';
         const station = stationsById.get(item.dataset.id);
-        if (station) chooseStation(station, onSelect);
+        if (station) setStation(station, onSelect);
     });
     // The list covers the map, so it closes like a dropdown; stopPropagation keeps Escape from also closing the journey
     searchInput.addEventListener('keydown', e => {
@@ -45,14 +44,15 @@ export async function prefillStation(name, onSelect) {
     try {
         const station = (await searchStations(name)).find(s => s.name === name);
         if (!station || searchInput.value) return;
-        searchInput.value = station.name;
-        chooseStation(station, onSelect);
+        setStation(station, onSelect);
     } catch (error) {
         console.error('Example station lookup failed:', error);
     }
 }
 
-function chooseStation(station, onSelect) {
+/** Shows the station in the search field and selects it, as if it had been picked from the results. */
+export function setStation(station, onSelect) {
+    searchInput.value = station.name;
     searchCountry.textContent = station.country ?? '';
     onSelect(station);
 }
