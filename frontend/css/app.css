@@ -155,7 +155,7 @@ body {
     white-space: nowrap;
 }
 
-/* Zero specificity, so classes on the input (.board-value, .search-input) override this reset */
+/* Zero specificity, so classes on the input (.board-value) override this reset */
 :where(.board-field input) {
     background: transparent;
     border: 0;
@@ -469,11 +469,6 @@ body {
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    padding: 12px;
-    background: var(--accent-rail-soft);
-    border-radius: 8px;
-    font-size: 13px;
-    line-height: 1.5;
 }
 
 .intro-hint[hidden] {
@@ -491,29 +486,6 @@ body {
 }
 
 /* ── Search ── */
-.search-input {
-    width: 100%;
-    padding: 14px 16px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text-primary);
-    font-family: var(--font-sans);
-    font-size: 14px;
-    transition: all 0.2s;
-}
-
-.search-input:focus {
-    outline: none;
-    border-color: var(--accent-rail);
-    box-shadow: 0 0 0 3px var(--accent-rail-soft);
-}
-
-.search-input:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
 input[type="number"] {
     -moz-appearance: textfield;
 }
@@ -577,24 +549,29 @@ input[type="number"]::-webkit-inner-spin-button {
     text-align: left;
 }
 
-/* ── Status ── */
-.status {
+/* ── Notices ── */
+.notice {
+    background: var(--board-2);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--muted);
+    border-radius: var(--radius);
     padding: 10px 14px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--bg-primary);
-    color: var(--text-secondary);
-    font-size: 13px;
+    font-size: 14px;
+    color: var(--text);
 }
 
-.status-warning {
-    border-color: var(--warning);
-    color: var(--warning);
+.status-info {
+    border-left-color: var(--muted);
+}
+
+.status-warning,
+#updatingNotice,
+.intro-hint {
+    border-left-color: var(--amber);
 }
 
 .status-error {
-    border-color: var(--danger);
-    background: var(--danger-bg);
+    border-left-color: var(--danger);
     color: var(--danger);
 }
 
@@ -614,7 +591,8 @@ input[type="number"]::-webkit-inner-spin-button {
     color: var(--amber);
 }
 
-#stationDetailsClose {
+.board-close {
+    flex: none;
     width: 28px;
     height: 28px;
     background: transparent;
@@ -626,7 +604,7 @@ input[type="number"]::-webkit-inner-spin-button {
     cursor: pointer;
 }
 
-#stationDetailsClose:hover {
+.board-close:hover {
     color: var(--text);
     border-color: var(--amber);
 }
@@ -898,10 +876,10 @@ input[type="number"]::-webkit-inner-spin-button {
     bottom: 28px;
     left: 50%;
     transform: translateX(-50%);
-    background: var(--bg-overlay);
-    border: 1px solid var(--accent-rail-line);
-    border-radius: 12px;
-    padding: 14px 22px;
+    background: var(--board-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 10px 18px;
     display: none;
     align-items: center;
     gap: 14px;
@@ -925,7 +903,7 @@ input[type="number"]::-webkit-inner-spin-button {
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    background: var(--accent-rail);
+    background: var(--amber);
 }
 
 .loading-pulse::after {
@@ -933,7 +911,7 @@ input[type="number"]::-webkit-inner-spin-button {
     position: absolute;
     inset: -4px;
     border-radius: 50%;
-    border: 2px solid var(--accent-rail);
+    border: 2px solid var(--amber);
     animation: pulse-ring 1.2s ease-out infinite;
 }
 
@@ -945,15 +923,15 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .loading-text {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--accent-rail);
+    font: 600 12px var(--font-ui);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--amber);
 }
 
 .loading-count {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--text-secondary);
+    font: 500 15px var(--font-ui);
+    color: var(--text);
 }
 
 /* ── Debug banner ── */
@@ -962,13 +940,12 @@ input[type="number"]::-webkit-inner-spin-button {
     top: 16px;
     left: 50%;
     transform: translateX(-50%);
-    background: var(--bg-overlay);
-    border: 1px solid var(--accent-warm);
-    color: var(--accent-warm);
-    font-family: var(--font-mono);
-    font-size: 12px;
-    padding: 10px 18px;
-    border-radius: 8px;
+    background: var(--board-2);
+    border: 1px dashed var(--amber);
+    color: var(--amber);
+    border-radius: var(--radius);
+    padding: 8px 16px;
+    font: 13px var(--font-mono);
     z-index: 7;
     display: flex;
     align-items: center;
@@ -1001,28 +978,25 @@ input[type="number"]::-webkit-inner-spin-button {
     left: 16px;
     bottom: 16px;
     z-index: 5;
-    padding: 8px 12px;
     background: var(--overlay);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    font-family: var(--font-mono);
-    font-size: 11px;
+    padding: 6px 10px;
+    font: 12px var(--font-ui);
 }
 
 .dev-toggle {
     background: none;
     border: none;
-    color: var(--text-secondary);
+    color: var(--muted);
     font: inherit;
     cursor: pointer;
-    opacity: 0.6;
     padding: 0;
 }
 
 .dev-toggle:hover,
 .dev-toggle.is-active {
-    color: var(--accent-warm);
-    opacity: 1;
+    color: var(--amber);
 }
 
 .dev-login {
@@ -1032,9 +1006,10 @@ input[type="number"]::-webkit-inner-spin-button {
     margin-top: 10px;
 }
 
-.dev-login .search-input {
-    padding: 8px 12px;
-    font-size: 12px;
+.dev-login .panel-input {
+    width: 180px;
+    text-align: left;
+    font-size: 13px;
 }
 
 .dev-error {
@@ -1045,6 +1020,7 @@ input[type="number"]::-webkit-inner-spin-button {
 .dev-actions {
     display: flex;
     justify-content: space-between;
+    gap: 12px;
 }
 
 /* ── Admin panel ── */
