@@ -59,12 +59,13 @@ Binding for every change. Existing code does not always follow them yet. New and
 - Need new data? Extend `gtfs-mini` and document it in its README. Don't create a parallel fixture.
 
 ## 8. Frontend (`frontend/`)
-- Vanilla, no build step. `index.html` holds markup only, `css/tokens.css` the design tokens and fonts, `css/app.css` all other styles, `js/` one ES module per concern (`api`, `map`, `search`, `query-form`, `reachability`, `coverage`, `station-details`, `journey`, `debug`, `dev-auth`, `admin-panel`, `about`, `icons`, `util`; `main.js` wires them up). New logic goes into the module it belongs to, or a new one.
+- Vanilla, no build step. `index.html` holds markup only, `css/tokens.css` the design tokens and fonts, `css/app.css` all other styles, `js/` one ES module per concern (`api`, `map`, `search`, `query-form`, `reachability`, `coverage`, `station-details`, `journey`, `debug`, `dev-auth`, `admin-panel`, `feeds`, `feed-alerts`, `about`, `intro-hint`, `server-status`, `icons`, `util`, `config`; `main.js` wires them up). New logic goes into the module it belongs to, or a new one.
 - Icons: no emojis. Use `icon(name)` from `js/icons.js` (in markup: `<span data-icon="name"></span>`). A missing icon is copied from Lucide into that file.
 - Only `js/map.js` talks to MapLibre. Other modules call its functions and never touch the map object.
 - Use `const` by default, `let` only when reassigned, never `var`. Use `async`/`await` with `fetch`. Declare functions with `function name() {}`.
 - Reuse existing helpers (`fmtMins`, `escapeHtml`, `showStatus`, `cssVar`, …) before writing new ones.
-- Styling: add classes to `css/app.css` and use the `--` CSS variables. No inline `style="…"` and no hardcoded colours, also not in JS: map colours are CSS variables read with `cssVar()`.
+- Styling: add classes to `css/app.css` and use the `--` CSS variables. No inline `style="…"` and no hardcoded colours, also not in JS: map colours are CSS variables read with `cssVar()`. Colour literals live only in `css/tokens.css`; this must print nothing (the hex part also matches id selectors that look like hex, such as `#add`, so check any hit by eye):
+  `` grep -rnE "(^|[:(, '\"\`])#[0-9a-fA-F]{3,8}\b|(rgba?|hsla?)\(\s*[0-9.]" frontend/css frontend/js --include=*.css --include=*.js | grep -v "css/tokens.css" ``
 - The page only works over HTTP (ES modules): open it via the backend at `http://localhost:8080/`, not as a file.
 - Escape GTFS/user text before inserting it via `innerHTML`, or use `textContent`.
 

@@ -37,7 +37,7 @@ export function countryBadgeHtml(country) {
     return country ? ` <span class="country-badge">${escapeHtml(country)}</span>` : '';
 }
 
-/** Reads a colour or size defined as a CSS variable in app.css, so the map uses the same palette as the UI. */
+/** Reads a colour or size defined as a CSS variable in tokens.css, so the map uses the same palette as the UI. */
 export function cssVar(name) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
