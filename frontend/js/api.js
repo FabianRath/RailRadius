@@ -67,6 +67,11 @@ export function searchStations(query) {
     return requestJson(`/api/stations/search?q=${encodeURIComponent(query)}&limit=${SEARCH_LIMIT}`);
 }
 
+/** One station by its canonical stop ID (id, name, latitude, longitude, country); fails with HTTP 404 if unknown. */
+export function fetchStation(stationId) {
+    return requestJson(`/api/stations/${encodeURIComponent(stationId)}`);
+}
+
 /** Opens the SSE stream; the caller attaches the 'stations', 'done' and 'error' listeners. */
 export function openReachabilityStream(params) {
     return new EventSource(`${API_BASE}/api/reachability/stream?${new URLSearchParams(params)}`);

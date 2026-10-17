@@ -6,6 +6,7 @@ import { coverageEnabled, readQuery } from './query-form.js';
 import { clearStatus, showStatus } from './util.js';
 import { isUpdatingTimetables } from './server-status.js';
 import { dismissIntroHint } from './intro-hint.js';
+import { writeDeepLink } from './deep-link.js';
 
 const calculateBtn = document.getElementById('calculateBtn');
 const reachableCount = document.getElementById('reachableCount');
@@ -64,13 +65,15 @@ function cacheKey(stationId, query) {
         query.maxJourneyHours].join('|');
 }
 
-function calculate(station) {
+/** Runs a search from the station with the form's query, as the GO button does. */
+export function calculate(station) {
     const query = readQuery();
     const key = cacheKey(station.id, query);
     console.log('Reachability query:', key);
 
     clearStatus();
     dismissIntroHint();
+    writeDeepLink(station.id, query);
     shownParams = streamParams(station.id, query);
     journeys = new Map();
     results.clear();
