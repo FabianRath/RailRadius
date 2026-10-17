@@ -50,27 +50,6 @@ The user picked concept 5, "Abfahrt", from the design council of 2026-10-16. The
 - F32 (merged coverage areas, "decide first") may rework or remove the "Show reach as areas" option. If F32 is decided before F38, follow its outcome in F38 (keep, change or drop the checkbox). Otherwise build F38 as written.
 - `frontend/backend_test.html` is a dev test page and is not part of this redesign.
 
-- [ ] **F42** Dialogs: About and the admin panel in board style.
-  1. Shared dialog look for `.about-panel` and `.admin-panel`:
-     - `background: var(--board-2); color: var(--text); border: 1px solid var(--line); border-top: 3px solid var(--amber); border-radius: var(--radius); padding: 24px; font: 15px var(--font-ui);` and `::backdrop { background: var(--overlay); }`
-     - Titles (`.about-title`, `.admin-title`): `font: 700 18px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text);`
-     - The × buttons (`.admin-close`, used by both dialogs) get the `board-close` look (F41).
-     - Section headings inside ("Covered countries", "Inspect", "Debug overlay", "GTFS cache") change from `.section-title` to `.board-label` with `margin-bottom: 8px`. Then delete `.section-title` if nothing else uses it.
-  2. About: `.about-text` 15px, `--muted`, line-height 1.5. The country list keeps its content and columns, text `--text`.
-  3. Admin panel:
-     - Font 14px `--font-ui` with tabular figures (was `--font-mono`). `.admin-storage` 13px `--muted`.
-     - `.admin-tabs`: bottom border `--line`. `.admin-tab`: `font: 600 13px var(--font-ui); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);`. `.is-active`: `color: var(--amber); border-bottom: 2px solid var(--amber);`.
-     - `.admin-btn`: `background: var(--board-3); border: 1px solid var(--line); border-radius: var(--radius); color: var(--text); font: 600 14px var(--font-ui); padding: 8px 12px;`. Hover border `--amber`. `.admin-btn-danger` hover: border and text `--danger`. `[aria-pressed="true"]`: border and text `--amber`.
-     - Progress bar: track `--board`, value `--amber`, radius `--radius`.
-     - `.admin-output` stays `--font-mono` (it shows JSON), with `background: var(--board); border: 1px solid var(--line); border-radius: var(--radius); color: var(--muted);`. `.is-error` is `--danger`.
-  4. Feed and alert tables (`.feed-table`):
-     - `th` is sticky with `background: var(--board-3)` and the `.board-label` look.
-     - Cells: `padding: 6px 8px; border-bottom: 1px solid var(--line);`. A hovered row gets `--board-3`.
-     - State and result colours, set dynamically by `feeds.js` and `feed-alerts.js`: `feed-state-ok` and `feed-result-replaced` → `--ok`; `feed-state-expiring` and `feed-result-busy` → `--amber`; `feed-state-missing`, `-expired`, `-unreadable`, `feed-result-rejected` and `-failed` → `--danger`; `feed-muted`, `feed-state-not-yet-valid`, `-no-calendar` and `feed-result-pending` → `--muted`.
-     - `.feed-summary` is `--muted`, and its `.is-error` is `--danger`. The wide Feeds layout (`.admin-panel-wide`) keeps its sizing.
-  5. Scrollbars: track `--board`, thumb `--line`, thumb hover `--muted`.
-  Done when: the smoke check passes, and About and all three admin tabs (Tools, Feeds, Alerts) look like the board. Every admin button and table still works; use only the harmless buttons against dev data, per CLAUDE.md.
-
 - [ ] **F43** Narrower screens. The current app has none of this; the phone part follows the mockup's phone frame.
   1. **Decision**, 1024–1279px (laptops): `.board-tagline` hidden, `.board-brand` `width: auto; padding: 16px;`, `.board-from` `flex-basis: 200px`, `.board-field` `padding: 12px 14px`, `.board-value` 20px, `.board-digits` 32px, `.board-count` `padding: 10px 16px`. Check that the bar fits at 1024px with a long station name in the From field (e.g. "Wiener Neustadt Hauptbahnhof"), which gets cut with an ellipsis.
   2. Below 1024px, the bar wraps into rows:
