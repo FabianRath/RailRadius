@@ -1322,3 +1322,169 @@ input[type="number"]::-webkit-inner-spin-button {
     line-height: 1.6;
     color: var(--text);
 }
+
+/* ── Narrower screens: each block also applies to all widths below it ── */
+@media (width < 1280px) {
+    .board-tagline {
+        display: none;
+    }
+
+    .board-brand {
+        width: auto;
+        padding: 16px;
+    }
+
+    .board-from {
+        flex-basis: 200px;
+    }
+
+    .board-field {
+        padding: 12px 14px;
+    }
+
+    .board-value {
+        font-size: 20px;
+    }
+
+    .board-digits {
+        font-size: 32px;
+    }
+
+    .board-count {
+        padding: 10px 16px;
+    }
+}
+
+/* The bar wraps into rows; the dropdown and options panel anchor to the bar so they span its width */
+@media (width < 1024px) {
+    .app {
+        grid-template-rows: auto 1fr;
+    }
+
+    .board-bar {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-areas:
+            "brand brand count"
+            "from from from"
+            "changes maxtime options"
+            "go go go";
+        gap: 0;
+    }
+
+    .board-brand { grid-area: brand; }
+    .board-count { grid-area: count; }
+    .board-from { grid-area: from; }
+    .board-changes { grid-area: changes; }
+    .board-maxtime { grid-area: maxtime; }
+    .board-options { grid-area: options; }
+    .board-go { grid-area: go; }
+
+    .board-brand,
+    .board-field,
+    .board-count {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+        padding: 10px 14px;
+    }
+
+    .board-count {
+        margin-left: 0;
+        border-left: 0;
+        text-align: right;
+    }
+
+    .board-wordmark {
+        font-size: 18px;
+    }
+
+    .board-digits {
+        font-size: 28px;
+    }
+
+    .board-go {
+        height: 44px;
+        border-radius: 0;
+    }
+
+    .board-field {
+        position: static;
+    }
+
+    #stationResults,
+    #optionsPanel {
+        left: 0;
+        right: 0;
+        width: auto;
+        top: 100%;
+    }
+
+    .stepper-btn,
+    .board-close,
+    .board-options-toggle {
+        min-width: 40px;
+        min-height: 40px;
+    }
+
+    /* With 40px buttons the stepper is wider than a third of a phone-wide bar: the cells of that row
+       keep their content width so the 1fr columns make room, and a narrower gap keeps it fitting at 360px */
+    .board-changes,
+    .board-maxtime,
+    .board-options {
+        min-width: auto;
+    }
+
+    .stepper {
+        gap: 4px;
+    }
+
+    .stepper-value {
+        flex: none;
+    }
+}
+
+/* The journey column becomes a bottom sheet over the full-size map */
+@media (width < 768px) {
+    .board-main {
+        grid-template-columns: 1fr;
+    }
+
+    .journey {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: auto;
+        max-height: 60%;
+        border-left: 0;
+        border-top: 3px solid var(--amber);
+        z-index: 8;
+    }
+
+    .map-notices {
+        left: 8px;
+        right: 8px;
+        top: 8px;
+        max-width: none;
+    }
+
+    #loadingOverlay {
+        left: 8px;
+        right: 8px;
+        transform: none;
+        justify-content: center;
+        bottom: 16px;
+    }
+
+    .dev-footer {
+        left: 8px;
+        bottom: 8px;
+    }
+
+    #debugBanner {
+        left: 8px;
+        right: 8px;
+        transform: none;
+        white-space: normal;
+    }
+}

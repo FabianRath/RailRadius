@@ -50,24 +50,6 @@ The user picked concept 5, "Abfahrt", from the design council of 2026-10-16. The
 - F32 (merged coverage areas, "decide first") may rework or remove the "Show reach as areas" option. If F32 is decided before F38, follow its outcome in F38 (keep, change or drop the checkbox). Otherwise build F38 as written.
 - `frontend/backend_test.html` is a dev test page and is not part of this redesign.
 
-- [ ] **F43** Narrower screens. The current app has none of this; the phone part follows the mockup's phone frame.
-  1. **Decision**, 1024–1279px (laptops): `.board-tagline` hidden, `.board-brand` `width: auto; padding: 16px;`, `.board-from` `flex-basis: 200px`, `.board-field` `padding: 12px 14px`, `.board-value` 20px, `.board-digits` 32px, `.board-count` `padding: 10px 16px`. Check that the bar fits at 1024px with a long station name in the From field (e.g. "Wiener Neustadt Hauptbahnhof"), which gets cut with an ellipsis.
-  2. Below 1024px, the bar wraps into rows:
-     - `.app { grid-template-rows: auto 1fr; }`
-     - `.board-bar { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-areas: "brand brand count" "from from from" "changes maxtime options" "go go go"; gap: 0; }`, giving each cell its `grid-area`.
-     - Cells: `border-right: 0; border-bottom: 1px solid var(--line); padding: 10px 14px;`.
-     - Wordmark 18px, tagline hidden, count digits 28px.
-     - GO is 44px high with `border-radius: 0`.
-     - So the dropdown and the options panel span the full width: set `.board-field { position: static; }` at this width, so their `position: absolute` anchors to `.board-bar` (which is `position: relative`). Then `#stationResults` and `#optionsPanel` get `left: 0; right: 0; width: auto; top: 100%;`.
-  3. Below 768px, the journey column becomes a bottom sheet over the map: `.board-main { grid-template-columns: 1fr; }`, `.journey { position: absolute; left: 0; right: 0; bottom: 0; width: auto; max-height: 60%; border-left: 0; border-top: 3px solid var(--amber); z-index: 8; }`. The map keeps its full size behind it. Calling `resizeMap()` does no harm here.
-  4. Below 768px, things over the map:
-     - `.map-notices { left: 8px; right: 8px; top: 8px; max-width: none; }`
-     - `#loadingOverlay { left: 8px; right: 8px; transform: none; justify-content: center; bottom: 16px; }`
-     - `.dev-footer { left: 8px; bottom: 8px; }`
-     - `#debugBanner { left: 8px; right: 8px; transform: none; white-space: normal; }`
-  5. Touch targets below 1024px: the stepper buttons, close buttons and the options toggle are at least 40×40px.
-  Done when: the smoke check passes at 1280×800, 1024×768 and 390×844. Nothing scrolls sideways, every control can be reached and used, and a journey opens and closes on the phone layout.
-
 - [ ] **F44** Clean-up and final check.
   1. Remove the bridge (F33 step 5): replace every remaining use of an old variable name (`--bg-*`, `--accent-*`, `--warning`, `--danger-bg`, `--text-primary`, `--text-secondary`, `--border`, `--divider`, `--font-sans`) with the token itself, then delete the old `:root` block in `app.css`.
   2. Delete CSS rules whose class or id appears nowhere in `index.html` or `js/`. Grep each selector. Keep:
