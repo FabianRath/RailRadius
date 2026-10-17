@@ -529,7 +529,9 @@ class ReachabilityServiceTest {
     void streamThatRunsOutOfMemorySendsAnErrorAndFreesItsPermit() {
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs,
                 GtfsTestFixtures.reachabilityCache(gtfs, new SearchGate(1, 0)));
-        OutOfMemoryEmitter emitter = new OutOfMemoryEmitter();
+        FailingStationsEmitter emitter = new FailingStationsEmitter(() -> {
+            throw new OutOfMemoryError("Java heap space");
+        });
 
         service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 3), emitter);
 
@@ -540,6 +542,22 @@ class ReachabilityServiceTest {
         service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 3), next);
         assertThat(next.error).isNull();
         assertThat(next.done().get("total")).isEqualTo(next.streamedStopIds().size());
+    }
+
+    @Test
+    void streamThatFailsUnexpectedlySendsAGenericErrorWithoutTheExceptionText() {
+        ReachabilityService service = service(gtfs);
+        // Not an IllegalStateException: from a send, that means the client is gone
+        FailingStationsEmitter emitter = new FailingStationsEmitter(() -> {
+            throw new IllegalArgumentException("Journey too long for the search: -36 minutes");
+        });
+
+        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 1), emitter);
+
+        assertThat(emitter.texts).anyMatch(text -> text.contains("event:error"));
+        assertThat(emitter.texts).noneMatch(text -> text.contains("-36 minutes"));
+        assertThat(emitter.completed).isTrue();
+        assertThat(emitter.error).isNull();
     }
 
     @Test
@@ -599,12 +617,18 @@ class ReachabilityServiceTest {
         }
     }
 
-    /** Sending the first stations throws OutOfMemoryError, as an allocation of the search would. */
-    private static class OutOfMemoryEmitter extends RecordingEmitter {
+    /** Sending the first stations runs failure, which throws as a failing search would. */
+    private static class FailingStationsEmitter extends RecordingEmitter {
+        private final Runnable failure;
+
+        FailingStationsEmitter(Runnable failure) {
+            this.failure = failure;
+        }
+
         @Override
         public void send(SseEventBuilder event) {
             if (text(event.build().stream().map(DataWithMediaType::getData).toList()).contains("event:stations")) {
-                throw new OutOfMemoryError("Java heap space");
+                failure.run();
             }
             super.send(event);
         }

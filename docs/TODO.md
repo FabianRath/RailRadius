@@ -12,8 +12,7 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (caching / infrastructure)
 
 ## Bugs (security)
-From the security council of 2026-10-17 (`council-report-2026-10-17.html`), all reproduced on the dev data. Recommended order before launch: B43, B45 + B46, B47, then B44, B49, B50.
-- [ ] **B43** Internal exception text reaches the client. The generic catch in `ReachabilityService.calculateReachabilityStreaming` (`ReachabilityService.java:98`) sends `e.getMessage()` as the SSE error event, e.g. "Journey too long for the search: -36 minutes". Send a fixed text and log the exception; keep the deliberate busy / rate-limit / out-of-memory messages.
+From the security council of 2026-10-17 (`council-report-2026-10-17.html`), all reproduced on the dev data. Recommended order before launch: B45 + B46, B47, then B44, B49, B50.
 - [ ] **B44** `/api/stations/search` limit and query are unchecked. `limit=-1` throws in `IntStream.limit` (HTTP 500); `q=&limit=100000` returns every station (~4 MB on the full data); `q` has no length cap. Fix: reject `limit` outside 1–50 and over-long queries with 400.
 - [ ] **B45** The admin cookie's value is the raw admin token, and the frontend keeps the token in localStorage (`frontend/js/api.js`, `railradius.adminToken`), where any XSS can read it. The cookie's Secure flag is `request.isSecure()`, so behind a TLS proxy with the default `forward-headers-strategy=none` it is sent without Secure. Fix: `POST /api/admin/session` issues a random session id held server-side (expiring), the cookie carries that id; the token stays in page memory only (re-enter after reload); Secure always set outside localhost.
 - [ ] **B46** Failed admin logins are neither throttled nor logged: `AdminTokenInterceptor` answers 401 and forgets, so a guesser gets unlimited, invisible attempts. Fix: count failures per client IP (Caffeine, like the rate limiter), 429 after a few, and a WARN log per failure.

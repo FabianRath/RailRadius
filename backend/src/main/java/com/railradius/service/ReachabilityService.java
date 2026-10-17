@@ -29,6 +29,8 @@ public class ReachabilityService {
 
     private static final int STREAM_BATCH_SIZE = 30;
     private static final String OUT_OF_MEMORY_MESSAGE = "The server is too busy for this search, please try again later";
+    // An unexpected exception's text is internal detail, so the client gets this instead (B43)
+    private static final String INTERNAL_ERROR_MESSAGE = "Something went wrong on the server, please try again later";
 
     private final ReachabilityCache cache;
     private final ReachabilityWarmer warmer;
@@ -93,8 +95,8 @@ public class ReachabilityService {
                  | SearchRateLimiter.TooManySearchesException e) {
             sendError(emitter, e.getMessage());
         } catch (Exception e) {
-            log.error("Streaming BFS error", e);
-            sendError(emitter, e.getMessage());
+            log.error("Search from {} x{} failed", request.getStartStationId(), request.getMaxTransfers(), e);
+            sendError(emitter, INTERNAL_ERROR_MESSAGE);
         } catch (OutOfMemoryError e) {
             // The failed search's memory is garbage once it has unwound, and its permit is free, so the app goes on;
             // without this the client would wait for an event forever (B38)
