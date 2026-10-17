@@ -66,6 +66,14 @@ class AdminTokenInterceptorTest {
     }
 
     @Test
+    void failuresSpreadAcrossOneIpv6Slash64BlockIt() throws Exception {
+        AdminTokenInterceptor interceptor = interceptor("secret");
+        for (int i = 1; i <= 5; i++) statusOf(interceptor, requestWithToken("guess", "2001:db8:1:2::" + i));
+        assertThat(statusOf(interceptor, requestWithToken("secret", "2001:db8:1:2::ff"))).isEqualTo(429);
+        assertThat(statusOf(interceptor, requestWithToken("secret", "2001:db8:1:3::1"))).isEqualTo(200);
+    }
+
+    @Test
     void rightTokenUnderTheLimitIsLetThrough() throws Exception {
         AdminTokenInterceptor interceptor = interceptor("secret");
         for (int i = 0; i < 4; i++) statusOf(interceptor, requestWithToken("guess", GUESSER_IP));

@@ -12,8 +12,7 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (caching / infrastructure)
 
 ## Bugs (security)
-From the security council of 2026-10-17 (`council-report-2026-10-17.html`), all reproduced on the dev data. Recommended order before launch: B49, then B50.
-- [ ] **B49** The search rate limit is keyed per full IP (`SearchRateLimiter`), so an IPv6 client rotates through its /64 and gets a fresh budget per address. Key IPv6 clients by their /64 prefix.
+From the security council of 2026-10-17 (`council-report-2026-10-17.html`), all reproduced on the dev data. Recommended order before launch: B50.
 - [ ] **B50** (GDPR) The rate limiter logs the client IP at INFO each time it turns a search away (`SearchRateLimiter.java:75`). Log without the IP (or at DEBUG), and name the IP use and its retention in the privacy notice (F45).
 
 ## Bugs (frontend)
