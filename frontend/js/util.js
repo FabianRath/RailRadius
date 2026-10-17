@@ -68,7 +68,7 @@ export function showStatus(type, message) {
     STATUS_LOGGERS[type]('Status:', message);
     const statusMessage = document.getElementById('statusMessage');
     statusMessage.textContent = message;
-    statusMessage.className = `status status-${type}`;
+    statusMessage.className = `notice status-${type}`;
     statusMessage.hidden = false;
 }
 

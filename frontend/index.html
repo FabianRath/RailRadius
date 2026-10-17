@@ -99,14 +99,14 @@
                 <div id="map"></div>
 
                 <div class="map-notices">
-                    <div class="intro-hint" id="introHint" hidden>
+                    <div class="notice intro-hint" id="introHint" hidden>
                         <p>Pick a station and a number of transfers: the map shows every station you can reach by train.</p>
-                        <button type="button" class="admin-close" id="introHintClose" aria-label="Dismiss hint">×</button>
+                        <button type="button" class="board-close" id="introHintClose" aria-label="Dismiss hint">×</button>
                     </div>
-                    <div class="status status-warning" id="updatingNotice" role="status" hidden>
+                    <div class="notice" id="updatingNotice" role="status" hidden>
                         Updating timetables. Search works again in a moment.
                     </div>
-                    <div class="status" id="statusMessage" role="status" hidden></div>
+                    <div class="notice" id="statusMessage" role="status" hidden></div>
                 </div>
 
                 <div id="loadingOverlay">
@@ -130,7 +130,7 @@
                         <button type="button" class="dev-toggle" id="adminOpen" hidden>Admin panel</button>
                     </div>
                     <form class="dev-login" id="devLoginForm" hidden>
-                        <input type="password" class="search-input" id="devToken" placeholder="Admin token"
+                        <input type="password" class="panel-input" id="devToken" placeholder="Admin token"
                                aria-label="Admin token" autocomplete="current-password" required>
                         <button type="submit" class="dev-toggle">Log in</button>
                     </form>
@@ -141,7 +141,7 @@
             <section class="journey" id="stationDetails" aria-label="Connection details" hidden>
                 <div class="journey-head">
                     <div class="journey-eyebrow">Connection</div>
-                    <button type="button" id="stationDetailsClose" aria-label="Close connection details">×</button>
+                    <button type="button" class="board-close" id="stationDetailsClose" aria-label="Close connection details">×</button>
                 </div>
                 <div id="stationDetailsBody"></div>
             </section>
