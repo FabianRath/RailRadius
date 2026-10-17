@@ -1,6 +1,6 @@
 // Dev login: the admin token unlocks dev features (debug overlay, admin panel) and exempts this browser's searches
-// from the rate limit (via a cookie). It is checked against the backend before it is kept, and a stored token that no
-// longer works is dropped on page load.
+// from the rate limit (via a session cookie). It is checked against the backend before it is kept, and lives in page
+// memory only, so a reload logs out.
 import { endAdminSession, fetchDebugStatus, hasAdminToken, setAdminToken, startAdminSession } from './api.js';
 
 const toggle = document.getElementById('devToggle');
@@ -11,16 +11,11 @@ const error = document.getElementById('devError');
 let callbacks;
 
 /** onLogin/onLogout run whenever dev mode switches on or off. */
-export async function initDevAuth(onLogin, onLogout) {
+export function initDevAuth(onLogin, onLogout) {
     callbacks = { onLogin, onLogout };
     toggle.addEventListener('click', onToggleClick);
     form.addEventListener('submit', onSubmit);
-    if (hasAdminToken() && await tokenIsValid()) {
-        await enterDevMode();
-    } else {
-        setAdminToken(null);
-        render(false);
-    }
+    render(false);
 }
 
 async function onToggleClick() {

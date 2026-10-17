@@ -1,9 +1,9 @@
 import { API_BASE } from './config.js';
 
 const SEARCH_LIMIT = 50;
-const ADMIN_TOKEN_KEY = 'railradius.adminToken';
 
-let adminToken = readStoredAdminToken();
+// Page memory only, not localStorage, where any injected script could read it; a reload logs out
+let adminToken = null;
 
 async function request(path, init = {}) {
     const response = await fetch(API_BASE + path, init);
@@ -13,14 +13,6 @@ async function request(path, init = {}) {
 
 async function requestJson(path, init = {}) {
     return (await request(path, init)).json();
-}
-
-function readStoredAdminToken() {
-    try {
-        return localStorage.getItem(ADMIN_TOKEN_KEY);
-    } catch {
-        return null;
-    }
 }
 
 function adminInit(method) {
@@ -35,18 +27,15 @@ export function hasAdminToken() {
     return adminToken !== null;
 }
 
-/** Stores the dev token for admin calls (null logs out); kept across reloads when the browser allows it. */
+/** Sets the dev token for admin calls (null logs out); it lasts until the page is reloaded. */
 export function setAdminToken(token) {
     adminToken = token;
-    try {
-        if (token === null) localStorage.removeItem(ADMIN_TOKEN_KEY);
-        else localStorage.setItem(ADMIN_TOKEN_KEY, token);
-    } catch {
-        // Storage blocked (private mode): the login lasts until the page is reloaded
-    }
 }
 
-/** Sets the admin cookie, so this browser's searches skip the rate limit (EventSource cannot send the header). */
+/**
+ * Starts an admin session, whose cookie lets this browser's searches skip the rate limit (EventSource cannot send
+ * the header).
+ */
 export async function startAdminSession() {
     await request('/api/admin/session', adminInit('POST'));
 }

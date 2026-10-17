@@ -36,7 +36,7 @@ class AdminTokenInterceptorTest {
     }
 
     private static AdminTokenInterceptor interceptor(String token) {
-        return new AdminTokenInterceptor(new AdminToken(token));
+        return new AdminTokenInterceptor(new AdminToken(token, new AdminSessions()));
     }
 
     private static MockHttpServletRequest requestWithToken(String token) {
