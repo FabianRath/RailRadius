@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class StationSearchIndexTest {
 
@@ -47,6 +48,25 @@ class StationSearchIndexTest {
     @Test
     void searchReturnsAtMostTheLimit() {
         assertThat(index.search("alpha", 2)).hasSize(2);
+    }
+
+    @Test
+    void limitOutsideTheApiBoundsIsRejected() {
+        assertThatThrownBy(() -> index.search("alpha", 0))
+                .isInstanceOf(SearchRequestValidator.InvalidSearchException.class);
+        assertThatThrownBy(() -> index.search("alpha", -1))
+                .isInstanceOf(SearchRequestValidator.InvalidSearchException.class);
+        assertThatThrownBy(() -> index.search("", StationSearchIndex.MAX_LIMIT + 1))
+                .isInstanceOf(SearchRequestValidator.InvalidSearchException.class);
+        assertThat(index.search("alpha", StationSearchIndex.MAX_LIMIT)).isNotEmpty();
+    }
+
+    @Test
+    void queryLongerThanTheMaximumIsRejected() {
+        String longest = "a".repeat(StationSearchIndex.MAX_QUERY_LENGTH);
+        assertThat(index.search(longest, 10)).isEmpty();
+        assertThatThrownBy(() -> index.search(longest + "a", 10))
+                .isInstanceOf(SearchRequestValidator.InvalidSearchException.class);
     }
 
     @Test

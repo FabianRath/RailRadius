@@ -1,6 +1,7 @@
 package com.railradius.service;
 
 import com.railradius.model.Station;
+import com.railradius.service.SearchRequestValidator.InvalidSearchException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,9 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 public class StationSearchIndex {
 
+    public static final int MAX_LIMIT = 50;
+    // The longest stop name in the full data has 78 characters, so only made-up queries are turned away
+    public static final int MAX_QUERY_LENGTH = 100;
     private static final int GRAM_LENGTH = 3;
     // Folded queries contain no newline, so a match never spans two variants.
     private static final String VARIANT_SEPARATOR = "\n";
@@ -71,8 +75,17 @@ public class StationSearchIndex {
         return String.join(VARIANT_SEPARATOR, variants);
     }
 
-    /** Stations with a name variant that contains the query and that have outgoing edges, best connected first. */
+    /**
+     * Stations with a name variant that contains the query and that have outgoing edges, best connected first.
+     * @throws InvalidSearchException if the limit is outside 1–{@value #MAX_LIMIT} or the query is too long (B44)
+     */
     public List<Station> search(String query, int limit) {
+        if (limit < 1 || limit > MAX_LIMIT) {
+            throw new InvalidSearchException("The limit must be between 1 and " + MAX_LIMIT);
+        }
+        if (query.length() > MAX_QUERY_LENGTH) {
+            throw new InvalidSearchException("The query must be at most " + MAX_QUERY_LENGTH + " characters");
+        }
         Index current = index;
         String q = StationNameVariants.fold(query);
         return candidates(current, q)
