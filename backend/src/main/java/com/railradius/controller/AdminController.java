@@ -52,21 +52,21 @@ public class AdminController {
     private final AdminToken adminToken;
 
     /**
-     * Sets the admin cookie, so this browser's searches skip the rate limit: its EventSource cannot send the
-     * {@value AdminToken#HEADER} header. Called on dev login.
+     * Starts an admin session and sets its id as the admin cookie, so this browser's searches skip the rate limit: its
+     * EventSource cannot send the {@value AdminToken#HEADER} header. Called on dev login.
      */
     @PostMapping("/session")
     public ResponseEntity<Void> startSession(HttpServletRequest request) {
         return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, adminToken.cookie(request.isSecure()).toString())
+                .header(HttpHeaders.SET_COOKIE, adminToken.startSession(request).toString())
                 .build();
     }
 
-    /** Deletes the admin cookie again (dev logout). */
+    /** Ends the session in the request's admin cookie, if it carries one, and deletes the cookie (dev logout). */
     @DeleteMapping("/session")
-    public ResponseEntity<Void> endSession() {
+    public ResponseEntity<Void> endSession(HttpServletRequest request) {
         return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, adminToken.clearedCookie().toString())
+                .header(HttpHeaders.SET_COOKIE, adminToken.endSession(request).toString())
                 .build();
     }
 
