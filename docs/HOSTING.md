@@ -20,7 +20,7 @@ The admin API and the actuator stay off the public internet. The proxy refuses t
 - No proxy is chosen yet; the snippet is for Caddy (automatic TLS, short config). nginx needs the same three rules.
 - The proxy refuses `/api/admin` and `/actuator` with everything below them, except `/actuator/health`. `/api/health` stays open for the uptime check.
 - Match on the normalized path, not the raw one, or `/api//admin/…`, `/api/x/../admin/…`, `/api/%61dmin/…` or `/API/admin/…` slip past. Caddy's `path` matcher cleans dot segments and double slashes, decodes escapes and ignores case. The app uses no `;` path parameters, but Tomcat strips them (`/api;x/admin/…` reaches `/api/admin/…`), so the proxy refuses any path with `;`.
-- The app port must not be reachable directly: keep 8080 closed in the firewall (S38), and bind the app to loopback with `SERVER_ADDRESS=127.0.0.1`.
+- The app port must not be reachable directly: keep 8080 closed in the firewall ([Launch checklist](#launch-checklist-s38)), and bind the app to loopback with `SERVER_ADDRESS=127.0.0.1`.
 
 ```
 railradius.example.org {
@@ -38,6 +38,74 @@ railradius.example.org {
 After each proxy change, every one of these must get 404 or 400 from the public host, and `/api/health` 200: `/api/admin/debug/status`, `/api//admin/debug/status`, `/api/x/../admin/debug/status`, `/api/%61dmin/debug/status`, `/api%2Fadmin/debug/status`, `/API/admin/debug/status`, `/api;x/admin/debug/status`, `/actuator/env`. Use `curl --path-as-is` so curl sends the dots and slashes unchanged.
 
 Admin panel through the tunnel: `ssh -L 8080:localhost:8080 user@server`, then open `http://localhost:8080/`. The "Dev login" at the bottom left of the map is shown only when the page is opened from a loopback host (`localhost`, `127.0.0.1`, `[::1]`), so the public site has no login form. Log in with `RAILRADIUS_ADMIN_TOKEN`. If 8080 is taken locally, use another local port (`-L 8090:localhost:8080`, then `http://localhost:8090/`).
+
+## Launch checklist (S38)
+
+In order, before the site goes public. Paths are examples (`/opt/railradius`, Debian/Ubuntu with systemd and ufw). Items marked *verify* are not tested on a real server yet.
+
+**SSH and firewall**
+- [ ] SSH by key only. Log in with a key as a non-root user with sudo, then set in `/etc/ssh/sshd_config`: `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `PermitRootLogin no`. Check with `sudo sshd -t`, `sudo systemctl reload ssh`, and open a second session before closing the first.
+- [ ] Firewall open only for SSH, 80 and 443; 8080 stays closed. Add the SSH rule before enabling, or you lock yourself out:
+  ```
+  sudo ufw default deny incoming
+  sudo ufw default allow outgoing
+  sudo ufw limit 22/tcp
+  sudo ufw allow 80/tcp
+  sudo ufw allow 443/tcp
+  sudo ufw allow 443/udp   # HTTP/3, which Caddy serves by default; leave out to use only TCP
+  sudo ufw enable
+  ```
+  `ufw limit` refuses an IP after 6 SSH connections in 30 s. Check with `sudo ufw status verbose`.
+
+**App**
+- [ ] Files: `/opt/railradius/railradius.jar`, `/opt/railradius/frontend/`, `/opt/railradius/data/gtfs-store.bin`, owned by a system user `railradius`. `data/` must be writable for it (`feed-alerts.json`, see [Plan](#plan)).
+- [ ] Secrets and settings in `/etc/railradius.env`, `root:root`, mode `600` (systemd reads it as root before switching user):
+  ```
+  RAILRADIUS_ADMIN_TOKEN=<64 hex characters>
+  RAILRADIUS_FORWARD_HEADERS_STRATEGY=native
+  SERVER_ADDRESS=127.0.0.1
+  RAILRADIUS_FRONTEND_DIR=file:/opt/railradius/frontend/
+  SPRING_MAIL_HOST=...
+  SPRING_MAIL_USERNAME=...
+  SPRING_MAIL_PASSWORD=...
+  RAILRADIUS_ALERTS_TO=...
+  ```
+  `native` is right only because Caddy is in front and replaces any `X-Forwarded-For` the client sends (it trusts incoming forwarded headers only from its `trusted_proxies`, none by default). Tomcat trusts the header only from loopback and private addresses, so Caddy must reach the app on `127.0.0.1`. The frontend path is needed because its default (`../frontend/`) is relative to `backend/` in the repo.
+- [ ] systemd unit `/etc/systemd/system/railradius.service`, then `sudo systemctl daemon-reload && sudo systemctl enable --now railradius`:
+  ```
+  [Unit]
+  Description=RailRadius
+  After=network-online.target
+  Wants=network-online.target
+
+  [Service]
+  User=railradius
+  WorkingDirectory=/opt/railradius
+  EnvironmentFile=/etc/railradius.env
+  ExecStart=/usr/bin/java -Xmx1280m -XX:+UseCompactObjectHeaders -XX:+ExitOnOutOfMemoryError -jar /opt/railradius/railradius.jar
+  Restart=always
+  RestartSec=5
+
+  [Install]
+  WantedBy=multi-user.target
+  ```
+  `-XX:+ExitOnOutOfMemoryError`: at `-Xmx1280m` and 2 permits no search ran out of memory (S25), so an OutOfMemoryError means something unexpected; the JVM exits and systemd starts it again (~3 s from the store) instead of running on in an unknown state. Running streams are lost then. Logs: `journalctl -u railradius`.
+
+**Proxy (Caddy)**
+- [ ] The site block from [Admin surface](#admin-surface-s35), with HSTS added inside it: `header Strict-Transport-Security "max-age=31536000"`. The app sets the other security headers itself (B47) but not HSTS, since it doesn't know it is behind TLS. Caddy gets the certificate and redirects HTTP to HTTPS on its own. Add `includeSubDomains` only if every subdomain of the domain serves HTTPS.
+- [ ] SSE not buffered: Caddy's `reverse_proxy` flushes `text/event-stream` responses immediately, so no `flush_interval` is needed. *Verify*: `curl -N "https://<host>/api/reachability/stream?…"` must print each round's event as it comes, not all at the end.
+- [ ] No proxy timeout below 6 min on a stream. Longest legitimate stream: ~2 min (90 s queued behind a full queue + a 30 s search, S36); the app ends any stream after 5 min (`STREAM_TIMEOUT`). The proxy must not end one first, so if a timeout is set anywhere (`timeouts { write }` in the global `servers` options, `read_timeout`/`write_timeout` in `transport http`, `stream_timeout`), use `6m` or more. Caddy sets none of these by default (*verify* against the installed version's docs). The longest gap between two events is under ~30 s (the `:queued` comment every second while queued, then a round's stations at least every deadline), so an idle-read timeout like nginx's `proxy_read_timeout` would need only > 30 s, but a total time limit needs > 5 min. With nginx instead: `proxy_buffering off; proxy_read_timeout 360s;`.
+- [ ] Connection caps. What already limits load: the search rate limit per IP (F26), the search gate (2 running, 6 queued, then 503), the 30 s deadline and the 5-min stream timeout. Caddy has no per-IP connection or request limit of its own; a request rate limit needs a custom build with the `caddy-ratelimit` plugin (`xcaddy`), which the app's own limit makes unnecessary for now. A cap on open connections per IP belongs in the firewall, e.g. in `/etc/ufw/before.rules` before `COMMIT` (*verify*; the value is a guess and must leave room for many users behind one NAT):
+  `-A ufw-before-input -p tcp --syn --dport 443 -m connlimit --connlimit-above 100 --connlimit-mask 32 -j REJECT --reject-with tcp-reset`
+  This covers TCP only, not HTTP/3 over UDP.
+- [ ] Log retention, to state in the privacy notice (F45): the app logs to stdout, so journald keeps it; cap it in `/etc/systemd/journald.conf` (e.g. `MaxRetentionSec=14d`, then `sudo systemctl restart systemd-journald`). Caddy writes no access log unless the site block has a `log` directive.
+
+**After each deploy**
+- [ ] The path tests from [Admin surface](#admin-surface-s35) and the abuse probe (S39) against the public host.
+- [ ] External uptime check (any free monitor, e.g. every 5 min, alert by mail) on `https://<host>/api/health`. It answers 200 even while no data is loaded, so match the body for `"status":"UP"`, not only the status code.
+
+**Each update of the store or jar**
+- [ ] Keep the previous ones for rollback: upload as `*.new`, then `mv data/gtfs-store.bin data/gtfs-store.bin.prev`, `mv railradius.jar railradius.jar.prev` and move the new files in place, then `sudo systemctl restart railradius`. Roll back by moving the `.prev` files back and restarting. Roll back jar and store together: a jar does not read a store of another format version.
 
 ## Size
 
