@@ -12,7 +12,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 - `backend/src/test/`: unit tests on the `gtfs-mini` fixture (see `src/test/resources/gtfs-mini/README.md`)
 - `frontend/`: `index.html` (markup), `css/app.css`, `js/*.js` (one ES module per concern, entry `main.js`). See guidelines §8.
 - `docs/TODO.md` (backlog + known bugs), `docs/decisions.md` (why things are the way they are), `docs/HOSTING.md` (server size, memory measurements)
-- `scripts/api.sh`: curl shortcuts (`scripts/api.sh help`); `scripts/bench.sh`: memory and speed baselines (`docs/HOSTING.md`)
+- `scripts/api.sh`: curl shortcuts (`scripts/api.sh help`); `scripts/bench.sh`: memory and speed baselines (`docs/HOSTING.md`); `scripts/probe.sh`: abuse probe (hostile requests, expected statuses)
 
 ## Environment: Windows, not Linux
 - Dev machine is Windows 10. Claude's Bash tool is Git Bash; the user's own terminal is PowerShell 5.1.
