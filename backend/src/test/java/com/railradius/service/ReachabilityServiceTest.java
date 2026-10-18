@@ -26,8 +26,8 @@ import static org.assertj.core.api.Assertions.tuple;
 
 class ReachabilityServiceTest {
 
-    // What SearchRateLimiter charges for a 5-transfer search
-    private static final int BIG_SEARCH_COST = 65;
+    // What SearchRateLimiter charges for the biggest search: 5 transfers at the 360-min max wait
+    private static final int BIG_SEARCH_COST = 87;
 
     @TempDir
     static Path tempDir;
@@ -484,7 +484,7 @@ class ReachabilityServiceTest {
     void streamOverTheSearchBudgetEndsWithAnErrorEventAndSearchesNothing() {
         ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         ReachabilityService service = serviceWithBudgetForOneBigSearch(cache);
-        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 5),
+        service.calculateReachabilityStreaming(VISITOR, request("alpha:A1", 5, 0, 360, null),
                 new RecordingEmitter());
 
         RecordingEmitter emitter = new RecordingEmitter();

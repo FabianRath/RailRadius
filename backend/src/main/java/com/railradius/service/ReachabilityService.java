@@ -122,7 +122,7 @@ public class ReachabilityService {
     // A stored result costs no search, so it costs no budget either
     private void chargeUnlessStored(SearchRateLimiter.Client client, SearchKey key) {
         if (client.admin() || cache.contains(key)) return;
-        rateLimiter.charge(client.ip(), key.maxTransfers());
+        rateLimiter.charge(client.ip(), key.maxTransfers(), key.maxTransferMins());
     }
 
     public Map<String, Object> getCacheStats() {

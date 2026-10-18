@@ -86,7 +86,25 @@ Full data, `-Xmx3g`, compact object headers, warmer off, admin token, dev machin
 
 The slowest search is 5 transfers at the maximum wait (360 min) from a big hub (Bruxelles-Midi, Stockholm, Paris, London): 2.7–3.5 s alone, 3.6–4.5 s of search time with both permits busy. A higher minimum wait makes it faster (Bruxelles-Midi, 5 transfers, min 30 / 120 / 300 min: 2.6 / 2.0 / 1.1 s). On the server's 4 vCores that is ~7–9 s at worst (S25's CPU table: ~1.4× slower), so `search.deadline-ms` is 30 s.
 
-## Minutes as chars, boardings released once ridden (S23 done, 2026-10-13)
+## Search cost and the wait at changes (S34, 2026-10-18)
+The rate-limit costs (1, 1, 5, 17, 40, 65 for 0..5 transfers) are the S13 baselines' stream p50 at the default 0–180 min wait in ~100 ms units, measured on the engine before S18 (`-Xmx12g`, same dev machine). Today's engine is ~4.5× faster, but its S33 p50s at 0–180 (7, 38, 147, 392, 922, 1,457 ms) in units of 1,457 / 65 ≈ 22 ms give 0.3, 1.7, 6.6, 17.5, 41, 65: the same shape, so the table stays as relative weights and the budget keeps its meaning. Only the wait was re-priced.
+
+Measured like S33 (same server settings, the 20 `full` starts, a fresh search each, `calculationTimeMs`), 3–5 transfers per wait window; p50 / p95 in ms, and the mean relative to 0–180:
+
+| Wait (min) | 3 transfers | 4 transfers | 5 transfers | Mean vs 0–180 (3 / 4 / 5) |
+|---|---|---|---|---|
+| 0–60 | 301 / 583 | 654 / 1,036 | 1,089 / 1,600 | 0.75 / 0.70 / 0.70 |
+| 0–120 | 382 / 644 | 832 / 1,268 | 1,286 / 1,959 | 0.89 / 0.86 / 0.86 |
+| 0–180 | 445 / 803 | 992 / 1,499 | 1,460 / 2,311 | 1 |
+| 0–240 | 492 / 861 | 1,058 / 1,647 | 1,551 / 2,435 | 1.11 / 1.11 / 1.07 |
+| 0–300 | 528 / 950 | 1,136 / 1,926 | 1,661 / 2,780 | 1.21 / 1.21 / 1.17 |
+| 0–360 | 562 / 1,072 | 1,201 / 2,045 | 1,839 / 3,153 | 1.30 / 1.29 / 1.29 |
+| 60–360 | 488 / 867 | 962 / 1,711 | 1,385 / 2,460 | 1.06 / 1.05 / 1.04 |
+| 120–360 | 419 / 769 | 855 / 1,424 | 1,245 / 2,070 | 0.95 / 0.92 / 0.89 |
+| 180–360 | 364 / 694 | 750 / 1,239 | 1,071 / 1,722 | 0.81 / 0.77 / 0.74 |
+
+The time grows about linearly with the max wait, the same for 3–5 transfers (fit: ×(max + 340) / 520), so a search costs the table's value × (max wait + 360) / 540, rounded, at least 1: 1, 1, 7, 23, 53, 87 at 0–360 (measured p50 in 22 ms units: –, –, 8, 25, 53, 82) and 1, 1, 3, 11, 27, 43 at 0–0. A higher minimum wait is faster too (180–360: ~0.77), but not linearly (most of the drop is in the first hour); it is not priced in, which only overcharges.
+
 Full data (fresh-parse store), `-Xmx3g`, compact object headers, warmer off, port 8081, both builds run from their classes on a fresh app, alternating (HEAD = the growth step below). Results are byte-identical to the goldens (`SearchSnapshot`, gtfs-mini, dev and full).
 
 | Measure | How | Result |

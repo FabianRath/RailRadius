@@ -93,7 +93,9 @@ railradius:
     deadline-ms: 30000
     rate-limit:
       # Search budget per client (IPv4 address or IPv6 /64), refilled continuously. A search costs its p50 time on the
-      # full data in units of about 100 ms: 1, 1, 5, 17, 40, 65 for 0..5 transfers. A stored result is free, so is an
+      # full data in units of about 100 ms of the engine before S18: 1, 1, 5, 17, 40, 65 for 0..5 transfers at a 180-min
+      # max wait at changes, scaled by (max wait + 360) / 540, so 2/3 at 0 min and 4/3 at 360 (1, 1, 7, 23, 53, 87).
+      # Must be at least the biggest search's cost (87). A stored result is free, so is an
       # admin (token header or the cookie set at dev login). Over budget: "try again in N s" (SSE error event, 429
       # otherwise)
       capacity: 200
