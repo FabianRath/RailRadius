@@ -4,6 +4,7 @@ import com.railradius.service.ReachabilityWarmer;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.actuate.endpoint.web.PathMappedEndpoints;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -16,6 +17,9 @@ class RailRadiusBackendApplicationTests {
 	@Autowired
 	ReachabilityWarmer warmer;
 
+	@Autowired
+	PathMappedEndpoints actuatorEndpoints;
+
 	@Test
 	void contextLoads() {
 	}
@@ -24,6 +28,11 @@ class RailRadiusBackendApplicationTests {
 	void warmingIsCalledThroughTheAsyncProxy() {
 		// B7: @Async only takes effect when the call goes through Spring's proxy, not from inside the same bean
 		assertThat(AopUtils.isAopProxy(warmer)).isTrue();
+	}
+
+	@Test
+	void onlyTheHealthActuatorEndpointIsExposedOverHttp() {
+		assertThat(actuatorEndpoints.getAllPaths()).containsExactly("/actuator/health");
 	}
 
 }
