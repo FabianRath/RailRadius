@@ -1,8 +1,12 @@
 // Dev login: the admin token unlocks dev features (debug overlay, admin panel) and exempts this browser's searches
 // from the rate limit (via a session cookie). It is checked against the backend before it is kept, and lives in page
-// memory only, so a reload logs out.
+// memory only, so a reload logs out. Offered only on a loopback host: in production the proxy blocks the admin API
+// and the admin reaches it through an SSH tunnel to localhost:8080 (see HOSTING.md).
 import { endAdminSession, fetchDebugStatus, hasAdminToken, setAdminToken, startAdminSession } from './api.js';
 
+const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
+
+const footer = document.getElementById('devFooter');
 const toggle = document.getElementById('devToggle');
 const form = document.getElementById('devLoginForm');
 const tokenInput = document.getElementById('devToken');
@@ -12,6 +16,8 @@ let callbacks;
 
 /** onLogin/onLogout run whenever dev mode switches on or off. */
 export function initDevAuth(onLogin, onLogout) {
+    if (!LOOPBACK_HOSTS.includes(location.hostname)) return;
+    footer.hidden = false;
     callbacks = { onLogin, onLogout };
     toggle.addEventListener('click', onToggleClick);
     form.addEventListener('submit', onSubmit);
