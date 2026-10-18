@@ -35,7 +35,7 @@ railradius.example.org {
 }
 ```
 
-After each proxy change, every one of these must get 404 or 400 from the public host, and `/api/health` 200: `/api/admin/debug/status`, `/api//admin/debug/status`, `/api/x/../admin/debug/status`, `/api/%61dmin/debug/status`, `/api%2Fadmin/debug/status`, `/API/admin/debug/status`, `/api;x/admin/debug/status`, `/actuator/env`. Use `curl --path-as-is` so curl sends the dots and slashes unchanged.
+After each proxy change, every one of these must get 404 or 400 from the public host, and `/api/health` 200: `/api/admin/debug/status`, `/api//admin/debug/status`, `/api/x/../admin/debug/status`, `/api/%61dmin/debug/status`, `/api%2Fadmin/debug/status`, `/API/admin/debug/status`, `/api;x/admin/debug/status`, `/actuator/env`. Use `curl --path-as-is` so curl sends the dots and slashes unchanged. `scripts/probe.sh --public` runs all of them and more.
 
 Admin panel through the tunnel: `ssh -L 8080:localhost:8080 user@server`, then open `http://localhost:8080/`. The "Dev login" at the bottom left of the map is shown only when the page is opened from a loopback host (`localhost`, `127.0.0.1`, `[::1]`), so the public site has no login form. Log in with `RAILRADIUS_ADMIN_TOKEN`. If 8080 is taken locally, use another local port (`-L 8090:localhost:8080`, then `http://localhost:8090/`).
 
@@ -101,7 +101,7 @@ In order, before the site goes public. Paths are examples (`/opt/railradius`, De
 - [ ] Log retention, to state in the privacy notice (F45): the app logs to stdout, so journald keeps it; cap it in `/etc/systemd/journald.conf` (e.g. `MaxRetentionSec=14d`, then `sudo systemctl restart systemd-journald`). Caddy writes no access log unless the site block has a `log` directive.
 
 **After each deploy**
-- [ ] The path tests from [Admin surface](#admin-surface-s35) and the abuse probe (S39) against the public host.
+- [ ] The abuse probe against the public host: `RAILRADIUS_URL=https://<host> scripts/probe.sh --public` (Git Bash or Linux). It covers the path tests from [Admin surface](#admin-surface-s35), invalid and oversized parameters, unknown stations and the security headers including HSTS, prints PASS/FAIL per request and must end with `0 failed`. Without `--public` it checks the app itself on `localhost:8080`; with an admin token configured, that run blocks admin logins from the server's own address for 15 min (the failed-login throttle).
 - [ ] External uptime check (any free monitor, e.g. every 5 min, alert by mail) on `https://<host>/api/health`. It answers 200 even while no data is loaded, so match the body for `"status":"UP"`, not only the status code.
 
 **Each update of the store or jar**

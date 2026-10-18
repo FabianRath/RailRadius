@@ -42,7 +42,7 @@ Run from `backend/`; the cache paths are relative to the working directory. The 
 
 ```
 RailRadius/
-├── CLAUDE.md, docs/ (ARCHITECTURE, TODO, decisions, HOSTING, bench-stations.txt), scripts/ (api.sh, bench.sh)
+├── CLAUDE.md, docs/ (ARCHITECTURE, TODO, decisions, HOSTING, bench-stations.txt), scripts/ (api.sh, bench.sh, probe.sh)
 ├── frontend/index.html               # markup; served at / by Spring (static-locations: file:../frontend/). Layout: a
 │                                     #   board bar across the top (search, query fields, result count, button), the map
 │                                     #   below it (notices, loading overlay, debug banner and dev login over it) and the
