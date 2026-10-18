@@ -63,7 +63,8 @@ public class ReachabilityService {
      * each round's stations when the round ends; a stored result is sent at once. Runs on a worker thread; the HTTP
      * response stays open until it completes. A search that waits for a {@link SearchGate} permit sends SSE comments
      * meanwhile, and the search stops when a send fails because the client is gone, which frees its permit. A client
-     * over its {@link SearchRateLimiter} budget gets an error event instead.
+     * over its {@link SearchRateLimiter} budget gets an error event instead, and so does one whose search ran past its
+     * deadline.
      */
     public void calculateReachabilityStreaming(SearchRateLimiter.Client client, ReachabilityRequest request,
                                                SseEmitter emitter) {
@@ -92,7 +93,7 @@ public class ReachabilityService {
             log.info("Stream stopped after {} ms: {}", System.currentTimeMillis() - startMs, e.getMessage());
             emitter.complete();
         } catch (SearchRequestValidator.InvalidSearchException | SearchGate.BusyException
-                 | SearchRateLimiter.TooManySearchesException e) {
+                 | SearchRateLimiter.TooManySearchesException | CompactReachabilitySearch.DeadlineExceededException e) {
             sendError(emitter, e.getMessage());
         } catch (Exception e) {
             log.error("Search from {} x{} failed", request.getStartStationId(), request.getMaxTransfers(), e);

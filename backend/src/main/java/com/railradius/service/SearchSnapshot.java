@@ -51,7 +51,8 @@ final class SearchSnapshot {
 
     SearchSnapshot(TransitGraph graph) {
         this.graph = graph;
-        this.search = new CompactReachabilitySearch(graph);
+        // No deadline: the oracle must answer every search, however slow the machine
+        this.search = new CompactReachabilitySearch(graph, Long.MAX_VALUE);
     }
 
     /** Today first, then one section per start and transfer limit 0 to {@link #MAX_TRANSFERS}. */

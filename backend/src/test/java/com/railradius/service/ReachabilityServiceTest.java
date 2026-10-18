@@ -545,6 +545,33 @@ class ReachabilityServiceTest {
     }
 
     @Test
+    void streamPastTheSearchDeadlineSendsAnErrorStoresNothingAndFreesItsPermit() {
+        SearchGate gate = new SearchGate(1, 0);
+        ReachabilityCache cache = new ReachabilityCache(new CompactReachabilitySearch(gtfs, 0), gate, 1);
+        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs, cache);
+        RecordingEmitter emitter = new RecordingEmitter();
+
+        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 3), emitter);
+
+        assertThat(emitter.texts).anyMatch(text -> text.contains("event:error") && text.contains("took too long"));
+        assertThat(emitter.completed).isTrue();
+        assertThat(emitter.error).isNull();
+        assertThat(cache.contains(new SearchKey("alpha:A1", 3, 0, 180))).isFalse();
+        assertThat(gate.runIfFree(() -> true)).isPresent();
+    }
+
+    @Test
+    void journeyPastTheSearchDeadlineIsRefusedAndFreesItsPermit() {
+        SearchGate gate = new SearchGate(1, 0);
+        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs,
+                new ReachabilityCache(new CompactReachabilitySearch(gtfs, 0), gate, 1));
+
+        assertThatThrownBy(() -> service.journey(VISITOR, streamRequest("alpha:A1", 3), "beta:B2"))
+                .isInstanceOf(CompactReachabilitySearch.DeadlineExceededException.class);
+        assertThat(gate.runIfFree(() -> true)).isPresent();
+    }
+
+    @Test
     void streamThatFailsUnexpectedlySendsAGenericErrorWithoutTheExceptionText() {
         ReachabilityService service = service(gtfs);
         // Not an IllegalStateException: from a send, that means the client is gone

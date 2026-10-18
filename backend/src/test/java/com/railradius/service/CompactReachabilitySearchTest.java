@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CompactReachabilitySearchTest {
 
@@ -21,7 +22,7 @@ class CompactReachabilitySearchTest {
     @Test
     void pathsHandedOutAfterEachRoundAddUpToTheResult(@TempDir Path tempDir) throws IOException {
         CompactReachabilitySearch search =
-                new CompactReachabilitySearch(GtfsTestFixtures.load(tempDir, "alpha", "beta"));
+                GtfsTestFixtures.search(GtfsTestFixtures.load(tempDir, "alpha", "beta"));
         List<Map<String, CompactResult.PathSummary>> rounds = new ArrayList<>();
 
         CompactResult result = search.search(START_ID, 3, 0, 180, rounds::add);
@@ -48,7 +49,7 @@ class CompactReachabilitySearchTest {
     @Test
     void trainLeavingLessThanAnHourBeforeTheArrivalIsNotCaughtTheNextDay(@TempDir Path tempDir) throws IOException {
         CompactReachabilitySearch search =
-                new CompactReachabilitySearch(GtfsTestFixtures.load(tempDir, "gamma", "delta"));
+                GtfsTestFixtures.search(GtfsTestFixtures.load(tempDir, "gamma", "delta"));
 
         CompactResult result = search.search("gamma:G3", 1, LONGEST_MIN_WAIT_MINUTES, A_DAY_MINUTES, round -> { });
 
@@ -56,10 +57,21 @@ class CompactReachabilitySearchTest {
         assertThat(result.paths("delta:D2")).isEmpty();
     }
 
+    @Test
+    void searchPastItsDeadlineStopsBeforeItsNextRound(@TempDir Path tempDir) throws IOException {
+        CompactReachabilitySearch search =
+                new CompactReachabilitySearch(GtfsTestFixtures.load(tempDir, "alpha", "beta"), 0);
+        List<Map<String, CompactResult.PathSummary>> rounds = new ArrayList<>();
+
+        assertThatThrownBy(() -> search.search(START_ID, 3, 0, 180, rounds::add))
+                .isInstanceOf(CompactReachabilitySearch.DeadlineExceededException.class);
+        assertThat(rounds).allMatch(round -> round.values().stream().allMatch(path -> path.transfers() == 0));
+    }
+
     // OT2 runs back into O1, but the start is no arrival to transfer from or to hand out
     @Test
     void startStationKeepsOnlyItsEmptyPathThoughATrainReturnsToIt(@TempDir Path tempDir) throws IOException {
-        CompactReachabilitySearch search = new CompactReachabilitySearch(GtfsTestFixtures.load(tempDir, "omega"));
+        CompactReachabilitySearch search = GtfsTestFixtures.search(GtfsTestFixtures.load(tempDir, "omega"));
         List<Map<String, CompactResult.PathSummary>> rounds = new ArrayList<>();
 
         CompactResult result = search.search("omega:O1", 2, 0, 180, rounds::add);

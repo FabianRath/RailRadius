@@ -168,7 +168,12 @@ final class GtfsTestFixtures {
     }
 
     private static ReachabilityCache reachabilityCache(TransitGraph graph, SearchGate gate, int rawMaxEntries) {
-        return new ReachabilityCache(new CompactReachabilitySearch(graph), gate, rawMaxEntries);
+        return new ReachabilityCache(search(graph), gate, rawMaxEntries);
+    }
+
+    /** A search without a deadline, so a slow test machine never stops one. */
+    static CompactReachabilitySearch search(TransitGraph graph) {
+        return new CompactReachabilitySearch(graph, Long.MAX_VALUE);
     }
 
     /** Zips the gtfs-mini feed folder to {@code zipFile}. */
