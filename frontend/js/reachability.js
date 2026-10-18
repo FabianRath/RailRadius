@@ -1,8 +1,6 @@
 import { fetchJourney, openReachabilityStream } from './api.js';
-import { addReachableStations, clearReachableStations, fitToPoints, getZoom, hasCoordinates, setCoverage,
-    setStartStation } from './map.js';
-import { buildCoverage } from './coverage.js';
-import { coverageEnabled, readQuery } from './query-form.js';
+import { addReachableStations, clearReachableStations, fitToPoints, hasCoordinates, setStartStation } from './map.js';
+import { readQuery } from './query-form.js';
 import { clearStatus, showStatus } from './util.js';
 import { isUpdatingTimetables } from './server-status.js';
 import { dismissIntroHint } from './intro-hint.js';
@@ -56,10 +54,6 @@ export async function getJourney(stopId) {
     return journey;
 }
 
-export function refreshCoverage() {
-    setCoverage(coverageEnabled() ? buildCoverage(results.values(), getZoom()) : null);
-}
-
 function cacheKey(stationId, query) {
     return [stationId, query.maxTransfers, query.minTransferMinutes, query.maxTransferMinutes,
         query.maxJourneyHours].join('|');
@@ -80,14 +74,12 @@ export function calculate(station) {
     clearReachableStations();
     setStartStation(station);
     shownStart = station;
-    setCoverage(null);
     maxTransfersUsed.textContent = query.maxTransfers;
 
     const cached = localResultsCache.get(key);
     if (cached) {
         addResults(cached);
         fitToResults(cached);
-        refreshCoverage();
         return;
     }
     streamResults(shownParams, key);
@@ -124,7 +116,6 @@ function streamResults(params, key) {
         localResultsCache.set(key, all);
         // Fit once at the end, so the view doesn't jump with every round of the search
         fitToResults(all);
-        refreshCoverage();
         console.log('Stream done:', info.total, 'stations in', `${info.calculationTimeMs}ms`,
             info.fromCache ? '(from server cache)' : '');
     });

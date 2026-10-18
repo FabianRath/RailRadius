@@ -12,8 +12,16 @@ const RAILWAY_MIN_ZOOM = 8;
 const POPUP_MAX_WIDTH = '360px';
 const JOURNEY_LINE_WIDTH_PX = 5;
 const JOURNEY_CASING_WIDTH_PX = 9;
+// Every station's kernel this wide; above the density threshold the kernels of nearby stations join into one area
+const AREA_RADIUS_PX = 30;
+const AREA_DENSITY_THRESHOLD = 0.05;
+const AREA_OPACITY = 0.45;
 // Index = transfer level; direct destinations stand out
 const DOT_RADIUS_BY_LEVEL_PX = [6, 5, 4.5, 4, 3.5, 3];
+// With the areas shown, the dots shrink so the areas carry the map
+const AREA_DOT_SCALE = 0.5;
+const DOT_STROKE_WIDTH_PX = 1;
+const AREA_DOT_STROKE_WIDTH_PX = 0.5;
 const LAND_FILL_LAYERS = ['landcover_ice_shelf', 'landcover_glacier', 'landuse_residential', 'landcover_wood',
     'landuse_park', 'building', 'aeroway-area'];
 const RAIL_LAYERS = ['railway', 'railway_minor', 'railway_transit'];
@@ -52,14 +60,6 @@ export function initMap(containerId) {
 /** Call after the space around the map changed: its own ResizeObserver catches up only a frame later. */
 export function resizeMap() {
     map.resize();
-}
-
-export function getZoom() {
-    return map.getZoom();
-}
-
-export function onZoomEnd(callback) {
-    map.on('zoomend', callback);
 }
 
 export function hasCoordinates(lat, lon) {
@@ -104,19 +104,18 @@ function colorByLevelExpression() {
 }
 
 /** ['match', level, 0, radius0, 1, radius1, …, radiusOfMaxLevel] */
-function radiusByLevelExpression() {
-    const pairs = DOT_RADIUS_BY_LEVEL_PX.slice(0, -1).flatMap((radius, level) => [level, radius]);
-    return ['match', ['get', 'level'], ...pairs, DOT_RADIUS_BY_LEVEL_PX.at(-1)];
+function radiusByLevelExpression(scale) {
+    const radii = DOT_RADIUS_BY_LEVEL_PX.map(radius => radius * scale);
+    const pairs = radii.slice(0, -1).flatMap((radius, level) => [level, radius]);
+    return ['match', ['get', 'level'], ...pairs, radii.at(-1)];
 }
 
 function addDataLayers() {
     const colorByLevel = colorByLevelExpression();
 
-    map.addSource('coverage', { type: 'geojson', data: EMPTY_COLLECTION });
-    map.addLayer({ id: 'coverage-fill', type: 'fill', source: 'coverage',
-        paint: { 'fill-color': colorByLevel, 'fill-opacity': 0.45 } });
-    map.addLayer({ id: 'coverage-outline', type: 'line', source: 'coverage',
-        paint: { 'line-color': colorByLevel, 'line-opacity': 0.9, 'line-width': 1 } });
+    map.addSource('reachable', { type: 'geojson', data: EMPTY_COLLECTION });
+    addAreaLayers();
+
 
     map.addSource('debug', { type: 'geojson', data: EMPTY_COLLECTION });
     map.addLayer({ id: LAYERS.debug, type: 'circle', source: 'debug',
@@ -131,16 +130,47 @@ function addDataLayers() {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': colorByLevel, 'line-width': JOURNEY_LINE_WIDTH_PX } });
 
-    map.addSource('reachable', { type: 'geojson', data: EMPTY_COLLECTION });
     map.addLayer({ id: LAYERS.reachable, type: 'circle', source: 'reachable',
         // Direct connections (level 0) are drawn on top
         layout: { 'circle-sort-key': ['-', MAX_TRANSFER_LEVEL, ['get', 'level']] },
         paint: {
             'circle-color': colorByLevel,
-            'circle-radius': radiusByLevelExpression(),
+            'circle-radius': radiusByLevelExpression(1),
             'circle-stroke-color': cssVar('--marker-stroke'),
-            'circle-stroke-width': 1
+            'circle-stroke-width': DOT_STROKE_WIDTH_PX
         } });
+}
+
+/**
+ * One heatmap per transfer level, cut off at a density step so it reads as a solid area. The GPU redraws it on every
+ * frame, so zooming costs nothing. Direct connections (level 0) are drawn on top.
+ */
+function addAreaLayers() {
+    for (let level = MAX_TRANSFER_LEVEL; level >= 0; level--) {
+        map.addLayer({ id: areaLayerId(level), type: 'heatmap', source: 'reachable',
+            filter: ['==', ['get', 'level'], level],
+            layout: { visibility: 'none' },
+            paint: {
+                'heatmap-radius': AREA_RADIUS_PX,
+                'heatmap-opacity': AREA_OPACITY,
+                'heatmap-color': ['step', ['heatmap-density'],
+                    'transparent', AREA_DENSITY_THRESHOLD, cssVar(`--transfer-${level}`)]
+            } });
+    }
+}
+
+function areaLayerId(level) {
+    return `reach-area-${level}`;
+}
+
+/** Shows or hides the reach areas drawn around the reachable stations, with smaller dots while they are shown. */
+export function setAreasVisible(visible) {
+    for (let level = 0; level <= MAX_TRANSFER_LEVEL; level++) {
+        map.setLayoutProperty(areaLayerId(level), 'visibility', visible ? 'visible' : 'none');
+    }
+    map.setPaintProperty(LAYERS.reachable, 'circle-radius', radiusByLevelExpression(visible ? AREA_DOT_SCALE : 1));
+    map.setPaintProperty(LAYERS.reachable, 'circle-stroke-width',
+        visible ? AREA_DOT_STROKE_WIDTH_PX : DOT_STROKE_WIDTH_PX);
 }
 
 function pointFeature(lon, lat, properties) {
@@ -204,10 +234,6 @@ export function clearJourney() {
 export function setDebugStations(stations) {
     const features = stations.map(s => pointFeature(s.lon, s.lat, s));
     map.getSource('debug').setData({ type: 'FeatureCollection', features });
-}
-
-export function setCoverage(featureCollection) {
-    map.getSource('coverage').setData(featureCollection ?? EMPTY_COLLECTION);
 }
 
 /** Points are [lon, lat] pairs. */

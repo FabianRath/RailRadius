@@ -1,9 +1,9 @@
 import { isUpdatingTimetables } from './server-status.js';
-import { initMap, jumpToBounds, LAYERS, onEmptyMapClick, onPointClick, onZoomEnd } from './map.js';
+import { initMap, jumpToBounds, LAYERS, onEmptyMapClick, onPointClick, setAreasVisible } from './map.js';
 import { closeStationDetails, initStationDetails, showStationDetails } from './station-details.js';
 import { initSearch, prefillStation, setStation } from './search.js';
 import { applyQuery, initQueryForm, showQueryForm } from './query-form.js';
-import { calculate, getJourney, initReachability, refreshCoverage } from './reachability.js';
+import { calculate, getJourney, initReachability } from './reachability.js';
 import { initDebugOverlay, startDebugPolling, stopDebugPolling } from './debug.js';
 import { initDevAuth } from './dev-auth.js';
 import { hideAdminPanel, initAdminPanel, showAdminEntry } from './admin-panel.js';
@@ -15,7 +15,6 @@ import { fetchCoverage, fetchStation } from './api.js';
 import { boundsOfCountries } from './country-bounds.js';
 import { readDeepLink } from './deep-link.js';
 
-const COVERAGE_REDRAW_DEBOUNCE_MS = 300;
 // Pre-filled for new visitors: small enough that its 1-transfer map isn't cluttered
 const EXAMPLE_STATION_NAME = 'Krems Bahnhof';
 
@@ -52,7 +51,7 @@ function selectStation(station) {
 
 initIntroHint();
 initSearch(selectStation);
-initQueryForm(refreshCoverage);
+initQueryForm(setAreasVisible);
 initReachability(() => selectedStation);
 
 const deepLink = readDeepLink();
@@ -80,13 +79,6 @@ async function searchFromLink({ stationId, query }) {
     calculate(station);
     return true;
 }
-
-// Coverage buffers depend on the zoom level
-let zoomTimer;
-onZoomEnd(() => {
-    clearTimeout(zoomTimer);
-    zoomTimer = setTimeout(refreshCoverage, COVERAGE_REDRAW_DEBOUNCE_MS);
-});
 
 initDebugOverlay();
 initAdminPanel();
