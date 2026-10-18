@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B54 · F50 · S41
+**Next free IDs:** B56 · F50 · S41
 
 ## Bugs (data loading)
 - [ ] **B36** Bosnia has no current rail feed, and Northern Ireland's can't be refreshed. State on 2026-10-07 (`gtfs-sources.md` has the details). Bosnia: the only source ends on 2025-12-13, so no Bosnian trains. Northern Ireland: the zip on disk (GTFS.pro copy from transitpdf, 2026-07-27) has NI Railways until mid-2027, but transitpdf is gone and Translink publishes only TransXChange, so no download URL is left in `gtfs-feeds.txt`. Check for a new GTFS source before mid-2027.
@@ -10,6 +10,8 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (algorithm)
 
 ## Bugs (caching / infrastructure)
+- [ ] **B54** `/api/health` answers HTTP 200 even when its `status` is `DOWN` (no data loaded, e.g. during a reload; `RailRadiusController.health`). An uptime check on the status code alone never fires; the launch checklist in `HOSTING.md` works around it by matching `"status":"UP"` in the body. Answering 503 when DOWN changes the public API (ask first) and needs the frontend's health check (`js/server-status.js` via `fetchHealth`) checked, since it may rely on the 200 to read the body.
+- [ ] **B55** If a stream's client leaves (or the stream times out, S36) between the last round and the final `done` event, `ReachabilityService.calculateReachabilityStreaming` sends `done` directly instead of through `StreamedStations.send`, so the failed send lands in the generic `catch (Exception e)`: an ERROR "Search from … failed" with a stack trace for what is just a gone client, then a `sendError` attempt. Only log noise, the result was already stored. Route the `done` send through the same gone-client handling.
 
 ## Bugs (security)
 
