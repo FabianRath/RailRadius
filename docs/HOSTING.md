@@ -8,10 +8,36 @@ How much server RailRadius needs, measured on the full data. Re-measure when the
 - Updating data: parse locally (a reload writes the binary cache), upload it, restart the app. It is read only at startup, which takes ~3 s, so that is the downtime of an update. The log line `Binary cache read …` names the SHA-256 of the zips it was built from.
 - Rollback: the git tag `pre-compact` with its JSON cache `data/gtfs-cache.json` (the legacy engine, `-Xmx9g`).
 - The server needs the jar, `frontend/` and `data/gtfs-store.bin`. No zips, so a small disk is enough.
-- Set `RAILRADIUS_ADMIN_TOKEN` to a long random value (e.g. 32+ random bytes in hex): the feed alerts (F29) are turned on and paused in the admin panel, which needs it. It also exempts its holder from the search rate limit and opens the whole admin API (reload, cache delete, feed download) to them, so keep it secret. Unset, `/api/admin/**` answers 403.
+- Set `RAILRADIUS_ADMIN_TOKEN` to a long random value (e.g. 32+ random bytes in hex): the feed alerts (F29) are turned on and paused in the admin panel, which needs it. It also exempts its holder from the search rate limit and opens the whole admin API (reload, cache delete, feed download) to them, so keep it secret. Unset, `/api/admin/**` answers 403. The proxy keeps the admin API off the internet anyway: see [Admin surface](#admin-surface-s35).
 - Feed alert mail (F29): set `SPRING_MAIL_HOST`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` and `RAILRADIUS_ALERTS_TO` (for Gmail: `smtp.gmail.com` and an app password), then open the admin panel → Alerts, send a test email and turn alerts on. They stay off until then, so a server that isn't live yet sends nothing. On/off and the pauses are kept in `data/feed-alerts.json`, so `data/` must be writable. The alerts read how long each feed runs from `gtfs-store.bin`, not from zips; a store written before format version 2 is not read at all, so build it again from the zips before deploying this version.
 - The search rate limit (F26) is per client IP. Behind a reverse proxy (nginx, Caddy, Cloudflare) set `RAILRADIUS_FORWARD_HEADERS_STRATEGY=native`, or every visitor shares the proxy's budget. Without one, leave it unset: clients could otherwise fake their IP with `X-Forwarded-For`.
 - Without zips, the feed update center logs all feeds as missing at startup and once a day. That is expected.
+
+## Admin surface (S35)
+
+The admin API and the actuator stay off the public internet. The proxy refuses them, and the admin uses the panel through an SSH tunnel. The admin token (B45: server-side session cookie, token in page memory only) and the failed-login throttle (B46: 5 failures per client in 15 min, then 429) stay as defence in depth.
+
+- No proxy is chosen yet; the snippet is for Caddy (automatic TLS, short config). nginx needs the same three rules.
+- The proxy refuses `/api/admin` and `/actuator` with everything below them, except `/actuator/health`. `/api/health` stays open for the uptime check.
+- Match on the normalized path, not the raw one, or `/api//admin/…`, `/api/x/../admin/…`, `/api/%61dmin/…` or `/API/admin/…` slip past. Caddy's `path` matcher cleans dot segments and double slashes, decodes escapes and ignores case. The app uses no `;` path parameters, but Tomcat strips them (`/api;x/admin/…` reaches `/api/admin/…`), so the proxy refuses any path with `;`.
+- The app port must not be reachable directly: keep 8080 closed in the firewall (S38), and bind the app to loopback with `SERVER_ADDRESS=127.0.0.1`.
+
+```
+railradius.example.org {
+    @admin {
+        path /api/admin /api/admin/* /actuator /actuator/*
+        not path /actuator/health
+    }
+    respond @admin 404
+    @pathParams path_regexp ;
+    respond @pathParams 400
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+After each proxy change, every one of these must get 404 or 400 from the public host, and `/api/health` 200: `/api/admin/debug/status`, `/api//admin/debug/status`, `/api/x/../admin/debug/status`, `/api/%61dmin/debug/status`, `/api%2Fadmin/debug/status`, `/API/admin/debug/status`, `/api;x/admin/debug/status`, `/actuator/env`. Use `curl --path-as-is` so curl sends the dots and slashes unchanged.
+
+Admin panel through the tunnel: `ssh -L 8080:localhost:8080 user@server`, then open `http://localhost:8080/`. The "Dev login" at the bottom left of the map is shown only when the page is opened from a loopback host (`localhost`, `127.0.0.1`, `[::1]`), so the public site has no login form. Log in with `RAILRADIUS_ADMIN_TOKEN`. If 8080 is taken locally, use another local port (`-L 8090:localhost:8080`, then `http://localhost:8090/`).
 
 ## Size
 
