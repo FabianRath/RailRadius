@@ -463,6 +463,21 @@ class ReachabilityServiceTest {
     }
 
     @Test
+    void streamThatTimedOutStopsSearchingAndFreesItsPermit() {
+        SearchGate gate = new SearchGate(1, 0);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs, gate);
+        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs, cache);
+        // Spring's timeout marks the emitter complete just like this, so every later send fails
+        SseEmitter emitter = new SseEmitter();
+        emitter.complete();
+
+        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 3), emitter);
+
+        assertThat(cache.contains(new SearchKey("alpha:A1", 3, 0, 180))).isFalse();
+        assertThat(gate.runIfFree(() -> true)).isPresent();
+    }
+
+    @Test
     void streamTurnedAwayWhenTheSearchQueueIsFullEndsWithAnErrorEvent() throws Exception {
         SearchGate gate = new SearchGate(1, 0);
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs,
