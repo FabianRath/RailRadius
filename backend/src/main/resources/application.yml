@@ -101,6 +101,13 @@ railradius:
     # panel, docs/HOSTING.md). Use a long random value, e.g. 32+ random bytes in hex
     token: ${RAILRADIUS_ADMIN_TOKEN:}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        # Spring's default too, set explicitly so nothing else (env, beans, heapdump, ...) is opened by accident
+        include: health
+
 logging:
   level:
     root: INFO

@@ -48,7 +48,6 @@ Recommended order (2026-10-13): judge **S24** on the server picked in S25 (`HOST
     - Turkey: the generator is MIT, but the data comes from TCDD's website; ask the maintainer, or drop it.
     - Croatia, EAV: their licences (CC0, CC BY 4.0) come only from Transitous; confirm them with the publishers.
   - **Follow-up:** almost every licence requires attribution, so the site needs a page naming every source.
-- [ ] **S30** Set the actuator web exposure to `health` explicitly in `application.yml`. Today only Spring's default keeps the other endpoints closed (council report, Phase 0).
 - [ ] **S33** Per-search deadline: a search that runs longer than a fixed wall-clock limit stops (the way a disconnect cancels it) and frees its permit, as a backstop for any parameter combination the cost table prices wrong. Measure the slowest legitimate search on the full data first, then set the limit well above it.
 - [ ] **S34** Now that waits are capped at 360 min (B41), re-measure the rate-limit cost table (`SearchRateLimiter.COST_BY_MAX_TRANSFERS`) on the full data at the new maximum wait, and price the wait in if it changes the time a lot.
 - [ ] **S35** (Decide first, hosting) Keep the admin surface off the public internet: the proxy denies `/api/admin/**` and `/actuator/**` (except health), and the admin panel is used through an SSH tunnel to `localhost:8080`. The "Dev login" button (`frontend/index.html:129`) is then shown only when the page is opened from localhost. B45/B46 stay as defence in depth.
