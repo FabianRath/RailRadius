@@ -14,21 +14,23 @@ const transferTimeHint = document.getElementById('transferTimeToggleHint');
 const transferTimeWrap = document.getElementById('transferTimeInputWrap');
 const minTransferTimeInput = document.getElementById('minTransferTime');
 const maxTransferTimeInput = document.getElementById('maxTransferTime');
-const coverageToggle = document.getElementById('showMergedZones');
+const areasToggle = document.getElementById('showMergedZones');
 const optionsCell = document.querySelector('.board-options');
 const optionsToggle = document.getElementById('optionsToggle');
 const optionsPanel = document.getElementById('optionsPanel');
 
 let transferTimeLimitEnabled = TRANSFER_TIME_LIMIT_DEFAULT;
 
-export function initQueryForm(onCoverageToggle) {
+/** onAreasToggle(visible) runs now and whenever the "areas" option changes; the browser may restore it on reload. */
+export function initQueryForm(onAreasToggle) {
     transferMinus.addEventListener('click', () => { transferInput.stepDown(); updateStepperButtons(); });
     transferPlus.addEventListener('click', () => { transferInput.stepUp(); updateStepperButtons(); });
     transferInput.addEventListener('input', updateStepperButtons);
     transferTimeToggle.addEventListener('click', toggleTransferTimeLimit);
     minTransferTimeInput.addEventListener('input', updateTransferTimeHint);
     maxTransferTimeInput.addEventListener('input', updateTransferTimeHint);
-    coverageToggle.addEventListener('change', onCoverageToggle);
+    areasToggle.addEventListener('change', () => onAreasToggle(areasToggle.checked));
+    onAreasToggle(areasToggle.checked);
     initOptionsPanel();
     updateStepperButtons();
     updateTransferTimeHint();
@@ -36,10 +38,6 @@ export function initQueryForm(onCoverageToggle) {
 
 export function showQueryForm() {
     calculateBtn.disabled = false;
-}
-
-export function coverageEnabled() {
-    return coverageToggle.checked;
 }
 
 // The backend rejects values outside the fields' min/max (B41), so typed values are clamped to them. With the wait

@@ -17,12 +17,11 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
 
     private static final String MAP_HOST = "https://tiles.openfreemap.org";
 
-    // 'unsafe-eval': Turf 6 builds functions with `new Function` when it loads; without it the global stays empty.
     // Images: data: for MapLibre's control icons in its CSS, blob: for the sprite and raster tiles it decodes.
     // MapLibre starts its worker from the same-origin worker file, so 'self' suffices for workers.
     private static final String CONTENT_SECURITY_POLICY = String.join("; ",
             "default-src 'self'",
-            "script-src 'self' 'unsafe-eval'",
+            "script-src 'self'",
             "connect-src 'self' " + MAP_HOST,
             "img-src 'self' data: blob: " + MAP_HOST,
             "worker-src 'self'",
