@@ -119,7 +119,9 @@ public class ReachabilityService {
         emitter.complete();
     }
 
-    // A stored result costs no search, so it costs no budget either
+    // A stored result costs no search, so it costs no budget either. One that waits for an equal running search is
+    // charged all the same: it searches itself if that one's client leaves, and a free wait would let a client that
+    // starts a search and leaves hand out searches nobody paid for (S37)
     private void chargeUnlessStored(SearchRateLimiter.Client client, SearchKey key) {
         if (client.admin() || cache.contains(key)) return;
         rateLimiter.charge(client.ip(), key.maxTransfers(), key.maxTransferMins());
