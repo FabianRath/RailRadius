@@ -87,6 +87,10 @@ railradius:
       permits: 2
       # Searches that wait for a permit; the next one is turned away as busy (SSE error event, 503 otherwise)
       max-queued: 6
+    # A search running longer than this (ms, not counting its wait for a permit) stops, stores nothing and frees its
+    # permit (SSE error event, 503 otherwise): a backstop for parameters the rate limit prices too low. The slowest
+    # full-data search measured took 4.5 s with both permits busy, so this is ~6x that (docs/decisions.md)
+    deadline-ms: 30000
     rate-limit:
       # Search budget per client (IPv4 address or IPv6 /64), refilled continuously. A search costs its p50 time on the
       # full data in units of about 100 ms: 1, 1, 5, 17, 40, 65 for 0..5 transfers. A stored result is free, so is an

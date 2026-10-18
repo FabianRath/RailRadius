@@ -72,6 +72,20 @@ CPU (`-Xmx1280m`, warmer off, `-XX:ActiveProcessorCount` set, `bench.sh times fu
 | 4 | 574 / 1,084 | 1,274 / 2,375 | 2,010 / 3,444 | 12.9 s |
 | 12 | 462 / 867 | 1,018 / 1,642 | 1,479 / 2,456 | 9.2 s |
 
+## Slowest search and the search deadline (S33, 2026-10-18)
+Full data, `-Xmx3g`, compact object headers, warmer off, admin token, dev machine (12 processors). Every start of the `full` set in `bench-stations.txt`, 0–5 transfers, a fresh search each; the `done` event's `calculationTimeMs`, ms:
+
+| Transfers | wait 0–180 p50 / p95 / max | wait 0–360 p50 / p95 / max |
+|---|---|---|
+| 0 | 7 / 18 / 245 (first search, cold JIT) | 6 / 13 / 17 |
+| 1 | 38 / 126 / 274 | 42 / 91 / 97 |
+| 2 | 147 / 325 / 561 | 178 / 365 / 566 |
+| 3 | 392 / 807 / 860 | 526 / 1,178 / 1,239 |
+| 4 | 922 / 1,482 / 1,618 | 1,234 / 2,067 / 2,297 |
+| 5 | 1,457 / 2,174 / 2,384 | 1,755 / 3,332 / 3,459 |
+
+The slowest search is 5 transfers at the maximum wait (360 min) from a big hub (Bruxelles-Midi, Stockholm, Paris, London): 2.7–3.5 s alone, 3.6–4.5 s of search time with both permits busy. A higher minimum wait makes it faster (Bruxelles-Midi, 5 transfers, min 30 / 120 / 300 min: 2.6 / 2.0 / 1.1 s). On the server's 4 vCores that is ~7–9 s at worst (S25's CPU table: ~1.4× slower), so `search.deadline-ms` is 30 s.
+
 ## Minutes as chars, boardings released once ridden (S23 done, 2026-10-13)
 Full data (fresh-parse store), `-Xmx3g`, compact object headers, warmer off, port 8081, both builds run from their classes on a fresh app, alternating (HEAD = the growth step below). Results are byte-identical to the goldens (`SearchSnapshot`, gtfs-mini, dev and full).
 

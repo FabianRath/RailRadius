@@ -26,7 +26,7 @@ class ReachabilityCacheTest {
     // B20, B21: a shortcut must return exactly what the search returns
     @Test
     void lowerTransferCountsCutFromAStoredResultEqualTheirOwnSearch() {
-        CompactReachabilitySearch search = new CompactReachabilitySearch(gtfs);
+        CompactReachabilitySearch search = GtfsTestFixtures.search(gtfs);
         ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         cache.getOrCompute(key(MAX_TRANSFERS));
 

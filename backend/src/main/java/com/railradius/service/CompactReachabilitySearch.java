@@ -2,7 +2,10 @@ package com.railradius.service;
 
 import com.railradius.util.GtfsTime;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,28 +27,46 @@ import java.util.stream.IntStream;
  * Stations choose what to board in parallel and the boarded trips are ridden afterwards in station order, so the
  * result is the same as on one thread. Choosing paths needs the exact days of candidates ({@link LabelDays}), worked
  * out in parallel too.
+ * <p>
+ * A search that runs past its deadline stops (S33): a backstop for parameters the rate limit prices too low, since it
+ * holds a {@link SearchGate} permit and its memory all the while.
  */
 @Component
 @Slf4j
 public class CompactReachabilitySearch {
 
     private final TransitGraph graph;
+    private final long deadlineNanos;
     // One per search running at once. A scratch fits one store, so after a reload the old ones are dropped
     private final Queue<SearchScratch> idleScratches = new ConcurrentLinkedQueue<>();
 
-    public CompactReachabilitySearch(TransitGraph graph) {
+    public CompactReachabilitySearch(TransitGraph graph,
+                                     @Value("${railradius.search.deadline-ms:30000}") long deadlineMs) {
         this.graph = graph;
+        // Saturates, so Long.MAX_VALUE means no deadline
+        this.deadlineNanos = TimeUnit.MILLISECONDS.toNanos(deadlineMs);
     }
 
-    /** One running search: what it searches and its scratch. */
+    /** Thrown when a search runs past its deadline; the message is safe to show to the client. */
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public static class DeadlineExceededException extends RuntimeException {
+        DeadlineExceededException() {
+            super("This search took too long and was stopped, please try fewer changes or a shorter wait");
+        }
+    }
+
+    /** One running search: what it searches, its scratch and when it started. */
     private record Run(TimetableStore store, SearchScratch scratch, String startId, int startIndex, int maxTransfers,
-                       long[] patternDays, CompactTransferRound.Parameters parameters, SearchCounters counters) {}
+                       long[] patternDays, CompactTransferRound.Parameters parameters, SearchCounters counters,
+                       long startNanos) {}
 
     /**
      * Per station: the fastest path for each transfer count that is faster than every path with fewer transfers,
      * ordered by ascending transfers. So the first path has the fewest transfers and the last one is the fastest.
      * The start station has an empty path. After each round, roundPaths gets the path that round added to each
      * station it added one to (never the start station).
+     *
+     * @throws DeadlineExceededException if the search runs past its deadline; it returns nothing then
      */
     public CompactResult search(String startId, int maxTransfers, int minTransferMins, int maxTransferMins,
                                 Consumer<Map<String, CompactResult.PathSummary>> roundPaths) {
@@ -58,7 +79,7 @@ public class CompactReachabilitySearch {
                     maxTransfers, patternDays,
                     new CompactTransferRound.Parameters(patternDays, minTransferMins * GtfsTime.SECONDS_PER_MINUTE,
                             maxTransferMins * GtfsTime.SECONDS_PER_MINUTE),
-                    new SearchCounters());
+                    new SearchCounters(), System.nanoTime());
             CompactResult result = search(run, roundPaths);
             idleScratches.offer(scratch);
             return result;
@@ -71,7 +92,7 @@ public class CompactReachabilitySearch {
     }
 
     private CompactResult search(Run run, Consumer<Map<String, CompactResult.PathSummary>> roundPaths) {
-        long startNanos = System.nanoTime();
+        long startNanos = run.startNanos();
         SearchScratch scratch = run.scratch();
         SearchCounters counters = run.counters();
         scratch.startSearch();
@@ -81,6 +102,7 @@ public class CompactReachabilitySearch {
         for (int transfers = 1; transfers <= run.maxTransfers() && scratch.rides().size() > 0; transfers++) {
             long roundStartNanos = System.nanoTime();
             long arrivalsBefore = counters.stopArrivals;
+            checkDeadline(run, transfers);
             transferRound(run, transfers);
             finishRound(run, transfers, roundPaths);
             logRound(transfers, counters.stopArrivals - arrivalsBefore, run, roundStartNanos);
@@ -155,6 +177,8 @@ public class CompactReachabilitySearch {
         round.labelBoardedFrom(stations);
         run.scratch().rides().clear();
         for (CompactTransferRound.StationBoardings station : stations) {
+            // Riding takes most of a round, so a round that runs far over stops here too
+            checkDeadline(run, transfers);
             counters.departuresScanned += station.departureCount;
             counters.boardings += station.count;
             counters.fallbackScans += station.fallbackScans;
@@ -167,6 +191,17 @@ public class CompactReachabilitySearch {
             }
             station.release();
         }
+    }
+
+    private void checkDeadline(Run run, int transfers) {
+        long elapsedNanos = System.nanoTime() - run.startNanos();
+        if (elapsedNanos < deadlineNanos) return;
+        CompactTransferRound.Parameters parameters = run.parameters();
+        log.warn("  Search {} x{} (waits {}-{} min) stopped in round {} after {} ms, over its {} ms deadline",
+                run.startId(), run.maxTransfers(), parameters.minWaitSeconds() / GtfsTime.SECONDS_PER_MINUTE,
+                parameters.maxWaitSeconds() / GtfsTime.SECONDS_PER_MINUTE, transfers,
+                TimeUnit.NANOSECONDS.toMillis(elapsedNanos), TimeUnit.NANOSECONDS.toMillis(deadlineNanos));
+        throw new DeadlineExceededException();
     }
 
     /**
