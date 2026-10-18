@@ -40,7 +40,7 @@ public class ReachabilityWarmer {
         try {
             long startMs = System.currentTimeMillis();
             if (!cache.computeIfPermitFree(key)) {
-                log.info("  Predictive cache: {} x{} skipped, no free search permit",
+                log.info("  Predictive cache: {} x{} skipped, no free search permit or an equal search runs",
                         key.startId(), key.maxTransfers());
                 return;
             }

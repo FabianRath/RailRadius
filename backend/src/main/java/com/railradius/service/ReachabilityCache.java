@@ -20,6 +20,7 @@ public class ReachabilityCache {
 
     private final CompactReachabilitySearch search;
     private final SearchGate gate;
+    private final InFlightSearches inFlight = new InFlightSearches();
     // One full-data result holds paths to every reachable station, so the count must stay small
     private final Cache<SearchKey, CompactResult> rawPaths;
 
@@ -46,7 +47,10 @@ public class ReachabilityCache {
 
         SearchListener NONE = new SearchListener() {};
 
-        /** Runs about every second while the search waits for a {@link SearchGate} permit; may throw to give up. */
+        /**
+         * Runs about every second while the search waits for a {@link SearchGate} permit or for an equal search;
+         * may throw to give up.
+         */
         default void queued() {}
 
         /** Each round's new path per station, as the search goes. */
@@ -55,7 +59,8 @@ public class ReachabilityCache {
 
     /**
      * The search's result (see {@link CompactReachabilitySearch#search}). Taken from the stored
-     * result, else cut down from a stored result with more transfers, else searched and stored.
+     * result, else cut down from a stored result with more transfers, else from the equal search running now (see
+     * {@link InFlightSearches#joinOrRun}), else searched and stored.
      *
      * @throws SearchGate.BusyException if it would have to search and too many searches wait already
      */
@@ -67,12 +72,17 @@ public class ReachabilityCache {
     public CompactResult getOrCompute(SearchKey key, SearchListener listener) {
         Optional<CompactResult> stored = stored(key);
         if (stored.isPresent()) return stored.get();
-        return gate.run(() -> storedOrSearched(key, listener), listener::queued);
+        return inFlight.joinOrRun(key, () -> gate.run(() -> storedOrSearched(key, listener), listener::queued),
+                listener::queued);
     }
 
-    /** Searches and stores the result only if a search permit is free right now; true if the result is stored. */
+    /**
+     * Searches and stores the result only if a search permit is free right now and no equal search runs; true if the
+     * result is stored.
+     */
     public boolean computeIfPermitFree(SearchKey key) {
-        return gate.runIfFree(() -> storedOrSearched(key, SearchListener.NONE)).isPresent();
+        return inFlight.runUnlessRunning(key, () -> gate.runIfFree(() -> storedOrSearched(key, SearchListener.NONE)))
+                .isPresent();
     }
 
     // Checked again with the permit: an equal search may have finished while this one waited

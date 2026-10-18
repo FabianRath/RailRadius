@@ -22,8 +22,8 @@ import java.util.function.Supplier;
 @Slf4j
 public class SearchGate {
 
-    // How often a queued search checks whether its client still waits for it
-    private static final long QUEUE_CHECK_MS = 1000;
+    // How often a waiting search (queued, or waiting for an equal one) checks whether its client still waits for it
+    static final long QUEUE_CHECK_MS = 1000;
 
     private final Semaphore permits;
     private final int maxQueued;
@@ -96,9 +96,9 @@ public class SearchGate {
         }
     }
 
-    private static CancellationException interrupted(InterruptedException e) {
+    static CancellationException interrupted(InterruptedException e) {
         Thread.currentThread().interrupt();
-        CancellationException cancelled = new CancellationException("Interrupted while waiting for a search slot");
+        CancellationException cancelled = new CancellationException("Interrupted while waiting for a search");
         cancelled.initCause(e);
         return cancelled;
     }
