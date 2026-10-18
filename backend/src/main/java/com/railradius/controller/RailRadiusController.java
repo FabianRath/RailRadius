@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -31,7 +32,12 @@ import java.util.stream.Collectors;
 @RequestMapping("/api")
 @Slf4j
 public class RailRadiusController {
-    
+
+    // The longest legitimate stream waits behind the full queue (6 searches on 2 permits, so 3 x the 30 s deadline)
+    // and then runs its own search (30 s): 2 min. This is 2.5x that, for sending the result to a slow client. A timed
+    // out stream fails its next send, so its search stops and frees its permit like a gone client's (S36)
+    private static final Duration STREAM_TIMEOUT = Duration.ofMinutes(5);
+
     private final ReachabilityService reachabilityService;
     private final TransitGraph transitGraph;
     private final StationSearchIndex stationSearchIndex;
@@ -74,8 +80,7 @@ public class RailRadiusController {
             @RequestParam(value = "maxJourneyHours", required = false) Double maxJourneyHours,
             HttpServletRequest httpRequest) {
 
-        // 30-minute timeout — enough for any realistic BFS
-        SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
+        SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT.toMillis());
 
         ReachabilityRequest req = ReachabilityRequest.builder()
                 .startStationId(stationId)
