@@ -64,6 +64,29 @@ class TimetableStoreTest {
     }
 
     @Test
+    void eachStationCountsTheTripsThatStopThereOnceEvenIfTheyStopTwice() {
+        RailNetwork network = new RailNetwork();
+        addTrip(network, "x:T1", null, 0);
+        network.addTrip("x:T2", List.of("x:A", "x:B", "x:A"), NO_INFO, null);
+        network.addConnection(connection("x:T2", "x:A", "x:B", 1000, 1100));
+        network.addConnection(connection("x:T2", "x:B", "x:A", 1200, 1300));
+
+        TimetableStore store = TimetableStore.build(network);
+
+        assertThat(IntStream.range(0, store.stations().size()).map(store::stoppingTripCount))
+                .containsExactly(2, 2, 1);
+    }
+
+    @Test
+    void aStationCountsTheTripsOfEveryStopMergedIntoIt(@TempDir Path dir) throws IOException {
+        TransitGraph graph = GtfsTestFixtures.load(dir, "alpha", "beta");
+
+        assertThat(graph.stoppingTripCount("beta:B1")).isEqualTo(5);
+        assertThat(graph.stoppingTripCount("alpha:A1")).isEqualTo(1);
+        assertThat(graph.stoppingTripCount("x:unknown")).isZero();
+    }
+
+    @Test
     void stationTableFindsEachStationByItsIdAndNoOther() {
         StationTable table = StationTable.of(List.of("x:A", "x:Bé", "y:A"));
 

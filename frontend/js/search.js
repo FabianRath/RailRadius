@@ -85,9 +85,7 @@ async function runSearch(query) {
 }
 
 function stationItemHtml(station) {
-    const detail = station.connections != null
-        ? `${station.connections} connection${station.connections !== 1 ? 's' : ''}`
-        : station.id;
+    const detail = `${station.connections} connection${station.connections !== 1 ? 's' : ''}`;
     return `<div class="station-item" data-id="${escapeHtml(station.id)}" data-name="${escapeHtml(station.name)}">`
         + `<div class="station-name">${escapeHtml(station.name)}${countryBadgeHtml(station.country)}</div>`
         + `<div class="station-id">${escapeHtml(detail)}</div>`

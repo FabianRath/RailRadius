@@ -49,6 +49,8 @@ final class TimetableStore {
     private final long[] regularDeparture;
     // Derived: per station, how many stations its trips run to without a stop between
     private final int[] nextStationCount;
+    // Derived: per station, how many trips stop there
+    private final int[] stoppingTripCount;
 
     private TimetableStore(TimetableStoreBuilder.Parts parts, int[] evTrip, long[] regularDeparture) {
         this.stations = parts.stations();
@@ -68,6 +70,7 @@ final class TimetableStore {
         this.depEvent = parts.depEvent();
         this.regularDeparture = regularDeparture;
         this.nextStationCount = nextStationCounts(stations.size(), depStart, depEvent, evStation);
+        this.stoppingTripCount = stoppingTripCounts(stations.size(), tripFirstEvent, evStation);
     }
 
     static TimetableStore build(RailNetwork network) {
@@ -222,6 +225,11 @@ final class TimetableStore {
         return nextStationCount[station];
     }
 
+    /** How many trips stop at the station, each once even if it stops there twice; 0 if none. */
+    int stoppingTripCount(int station) {
+        return stoppingTripCount[station];
+    }
+
     /** First position of the station's departures. */
     int departuresStart(int station) {
         return depStart[station];
@@ -276,7 +284,8 @@ final class TimetableStore {
     long sizeBytes() {
         long intArrays = (long) tripFirstEvent.length + evTrip.length + evStation.length + evDepSec.length
                 + evArrSec.length + tripDayPattern.length + tripRouteName.length + tripMemberStart.length
-                + depStart.length + depSec.length + depEvent.length + nextStationCount.length;
+                + depStart.length + depSec.length + depEvent.length + nextStationCount.length
+                + stoppingTripCount.length;
         return intArrays * Integer.BYTES + (long) regularDeparture.length * Long.BYTES + stations.sizeBytes()
                 + dayPatterns.sizeBytes() + routeNames.sizeBytes() + memberTripIds.sizeBytes();
     }
@@ -299,6 +308,22 @@ final class TimetableStore {
                 int next = evStation[depEvent[position] + 1];
                 if (countedBy[next] == station) continue;
                 countedBy[next] = station;
+                counts[station]++;
+            }
+        }
+        return counts;
+    }
+
+    private static int[] stoppingTripCounts(int stationCount, int[] tripFirstEvent, int[] evStation) {
+        int[] counts = new int[stationCount];
+        // The trip that last counted each station, so a trip that stops there twice counts once
+        int[] countedBy = new int[stationCount];
+        Arrays.fill(countedBy, NOT_SEEN);
+        for (int trip = 0; trip + 1 < tripFirstEvent.length; trip++) {
+            for (int event = tripFirstEvent[trip]; event < tripFirstEvent[trip + 1]; event++) {
+                int station = evStation[event];
+                if (countedBy[station] == trip) continue;
+                countedBy[station] = trip;
                 counts[station]++;
             }
         }
