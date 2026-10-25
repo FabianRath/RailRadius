@@ -123,18 +123,23 @@ function updateStepperButtons() {
 
 // The field accepts any typed text; empty or invalid input means the minimum
 function clampTransfers(value) {
-    const transfers = parseInt(value, 10);
-    if (Number.isNaN(transfers)) return Number(transferInput.min);
-    return clampToField(transferInput, transfers);
+    return fieldNumberOf(transferInput, value, Number(transferInput.min));
 }
 
 // The search and the hint both read the wait fields through these, so the hint shows what the search will use
 function minTransferMinutesOf(text) {
-    return clampToField(minTransferTimeInput, parseInt(text, 10) || 0);
+    return fieldNumberOf(minTransferTimeInput, text, 0);
 }
 
+// A typed 0 is out of range like any other number, so it is clamped rather than read as empty (B57)
 function maxTransferMinutesOf(text) {
-    return clampToField(maxTransferTimeInput, parseInt(text, 10) || DEFAULT_MAX_TRANSFER_MINUTES);
+    return fieldNumberOf(maxTransferTimeInput, text, DEFAULT_MAX_TRANSFER_MINUTES);
+}
+
+// Empty or invalid text gives the fallback; a number, also 0, is clamped to the field's bounds
+function fieldNumberOf(input, text, fallback) {
+    const value = parseInt(text, 10);
+    return Number.isNaN(value) ? fallback : clampToField(input, value);
 }
 
 // With the limit off, the search sends the whole range, which is always valid

@@ -16,7 +16,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (security)
 
 ## Bugs (frontend)
-- [ ] **B57** Typing 0 into the Max wait field sends 180 min, not the field's minimum of 1: `maxTransferMinutesOf` (`frontend/js/query-form.js`) treats 0 like an empty field (`parseInt(…) || DEFAULT_MAX_TRANSFER_MINUTES`). Minor; old behaviour.
 
 ## Features / UX
 - [ ] **F23** (Decide first) While a station's journey is shown (F21), the dots of the stations it passes through keep their own transfer-level colour, so they don't always match the line colour of the train passing them (first train green, second cyan, …): a stop on the third train can be green because another train reaches it directly. The route looks inconsistent, but the colour also tells the user that this stop can be reached with fewer transfers, and clicking it shows that shorter journey. Options: (1) recolour the path's dots by the train they are on while the journey is shown; (2) keep the station's own colour (current behaviour), maybe explained in the details panel; (3) both, e.g. the train's colour as fill and the station's own level as outline. Decide with the user, then implement.
