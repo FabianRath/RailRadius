@@ -46,5 +46,3 @@ Recommended order (2026-10-13): judge **S24** on the server picked in S25 (`HOST
     - Turkey: the generator is MIT, but the data comes from TCDD's website; ask the maintainer, or drop it.
     - Croatia, EAV: their licences (CC0, CC BY 4.0) come only from Transitous; confirm them with the publishers.
   - **Follow-up:** almost every licence requires attribution, so the site needs a page naming every source.
-
-- [ ] **S41** `AdminController` breaks the guidelines in untouched code: `debugStations` uses `Collectors.toList()` (§4: `stream().toList()`), and the debug-overlay and debug-stations logs start with an emoji (`🐛`).
