@@ -46,5 +46,3 @@ Recommended order (2026-10-13): judge **S24** on the server picked in S25 (`HOST
     - Turkey: the generator is MIT, but the data comes from TCDD's website; ask the maintainer, or drop it.
     - Croatia, EAV: their licences (CC0, CC BY 4.0) come only from Transitous; confirm them with the publishers.
   - **Follow-up:** almost every licence requires attribution, so the site needs a page naming every source.
-
-- [ ] **S43** `FeedRegistry.parseAll` collects each source's URLs with `Collectors.mapping(…, Collectors.toList())` and then copies them with `List.copyOf`. Plain `.toList()` doesn't fit inside a grouping collector, so this is only a borderline guideline break (§4); `Collectors.toUnmodifiableList()` would make the copy unnecessary. Small, optional.
