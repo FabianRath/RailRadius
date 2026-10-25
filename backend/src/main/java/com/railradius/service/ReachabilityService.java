@@ -78,12 +78,7 @@ public class ReachabilityService {
             streamed.sendNew(cache.getOrCompute(search.key(), streamed));
             log.info("Streamed {} stations in {} ms, the first after {} ms", streamed.sent.size(),
                     System.currentTimeMillis() - startMs, streamed.firstSentMs);
-            emitter.send(SseEmitter.event()
-                    .name("done")
-                    .data(Map.of(
-                        "total", streamed.sent.size(),
-                        "calculationTimeMs", System.currentTimeMillis() - startMs
-                    )));
+            streamed.sendDone();
             emitter.complete();
 
             if (predictiveEnabled) {
@@ -173,6 +168,12 @@ public class ReachabilityService {
             List<ReachableStationSummary> stations = new ArrayList<>();
             result.forEachStation((stopId, paths) -> addIfNew(stations, stopId, paths));
             sendBatches(stations);
+        }
+
+        void sendDone() {
+            send(SseEmitter.event().name("done").data(Map.of(
+                    "total", sent.size(),
+                    "calculationTimeMs", System.currentTimeMillis() - startMs)));
         }
 
         private void addIfNew(List<ReachableStationSummary> stations, String stopId,
