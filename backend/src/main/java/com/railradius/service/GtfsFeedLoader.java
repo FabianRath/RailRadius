@@ -105,7 +105,7 @@ public class GtfsFeedLoader {
             progress.feedStarted(zipFile);
             try {
                 if (loadFeed(zipFile, source, network) == 0) {
-                    log.warn("!!! {} added no rail connections to the graph; see the messages above",
+                    log.warn("{} added no rail connections to the graph; see the messages above",
                             zipFile.getName());
                 }
             } catch (Exception e) {

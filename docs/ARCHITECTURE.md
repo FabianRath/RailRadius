@@ -197,7 +197,7 @@ Everything below fills a load-time `RailNetwork`, which is dropped once the serv
 
    Then `translations.txt` (optional, `StopNameTranslations`): each stop's translated `stop_name`s go to its canonical station in `translatedNames` (stopId → names), minus the station's own name, for stations that a rail trip added. Only search uses them; the API returns the original name.
 
-A feed that adds no connections at all (e.g. unreadable headers) is logged as a `!!!` WARN.
+A feed that adds no connections at all (e.g. unreadable headers) is logged as a WARN.
 
 After all feeds are loaded (`StationDeduplicator`, then `RailNetwork.mergeStations`), every station first gets its `country` from `CountryLocator`; a merge keeps the canonical station's country.
 5. **Within-country dedup**: same exact name, same source, within ~200 m.
