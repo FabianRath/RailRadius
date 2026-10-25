@@ -1,6 +1,6 @@
 import { fetchJourney, openReachabilityStream } from './api.js';
 import { addReachableStations, clearReachableStations, fitToPoints, hasCoordinates, setStartStation } from './map.js';
-import { readQuery } from './query-form.js';
+import { checkQuery, readQuery } from './query-form.js';
 import { clearStatus, showStatus } from './util.js';
 import { isUpdatingTimetables } from './server-status.js';
 import { dismissIntroHint } from './intro-hint.js';
@@ -59,8 +59,12 @@ function cacheKey(stationId, query) {
         query.maxJourneyHours].join('|');
 }
 
-/** Runs a search from the station with the form's query, as the GO button does. */
+/**
+ * Runs a search from the station with the form's query, as the GO button does. Answers whether it ran: an invalid
+ * form shows its message instead.
+ */
 export function calculate(station) {
+    if (!checkQuery()) return false;
     const query = readQuery();
     const key = cacheKey(station.id, query);
     console.log('Reachability query:', key);
@@ -80,9 +84,10 @@ export function calculate(station) {
     if (cached) {
         addResults(cached);
         fitToResults(cached);
-        return;
+        return true;
     }
     streamResults(shownParams, key);
+    return true;
 }
 
 function streamParams(stationId, query) {
