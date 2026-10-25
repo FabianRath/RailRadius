@@ -11,7 +11,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 
 ## Bugs (caching / infrastructure)
 - [ ] **B54** `/api/health` answers HTTP 200 even when its `status` is `DOWN` (no data loaded, e.g. during a reload; `RailRadiusController.health`). An uptime check on the status code alone never fires; the launch checklist in `HOSTING.md` works around it by matching `"status":"UP"` in the body. Answering 503 when DOWN changes the public API (ask first) and needs the frontend's health check (`js/server-status.js` via `fetchHealth`) checked, since it may rely on the 200 to read the body.
-- [ ] **B55** If a stream's client leaves (or the stream times out, S36) between the last round and the final `done` event, `ReachabilityService.calculateReachabilityStreaming` sends `done` directly instead of through `StreamedStations.send`, so the failed send lands in the generic `catch (Exception e)`: an ERROR "Search from … failed" with a stack trace for what is just a gone client, then a `sendError` attempt. Only log noise, the result was already stored. Route the `done` send through the same gone-client handling.
 
 ## Bugs (security)
 

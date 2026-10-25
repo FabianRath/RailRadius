@@ -463,6 +463,28 @@ class ReachabilityServiceTest {
     }
 
     @Test
+    void clientGoneBeforeTheDoneEventEndsTheStreamWithoutAnErrorEvent() {
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
+        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs, cache);
+        // Spring's send after a timeout or a gone client fails like this
+        RecordingEmitter emitter = new RecordingEmitter() {
+            @Override
+            public void send(SseEventBuilder event) {
+                if (text(event.build().stream().map(DataWithMediaType::getData).toList()).contains("event:done")) {
+                    throw new IllegalStateException("ResponseBodyEmitter has already completed");
+                }
+                super.send(event);
+            }
+        };
+
+        service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 3), emitter);
+
+        assertThat(emitter.texts).noneMatch(text -> text.contains("event:error"));
+        assertThat(emitter.completed).isTrue();
+        assertThat(cache.contains(new SearchKey("alpha:A1", 3, 0, 180))).isTrue();
+    }
+
+    @Test
     void streamThatTimedOutStopsSearchingAndFreesItsPermit() {
         SearchGate gate = new SearchGate(1, 0);
         ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs, gate);
