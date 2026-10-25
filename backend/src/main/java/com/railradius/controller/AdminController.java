@@ -32,7 +32,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 
 @RestController
@@ -203,7 +202,7 @@ public class AdminController {
     @PostMapping("/debug/trigger")
     public ResponseEntity<Map<String, Object>> triggerDebug() {
         debugShowAllStations.set(true);
-        log.info("🐛 Debug overlay triggered — frontend will render all stations");
+        log.info("Debug overlay triggered — frontend will render all stations");
         return ResponseEntity.ok(Map.of(
             "message", "Debug overlay activated. The browser will pick this up within 2 seconds.",
             "showAllStations", true,
@@ -219,7 +218,7 @@ public class AdminController {
     @DeleteMapping("/debug/trigger")
     public ResponseEntity<Map<String, String>> clearDebug() {
         debugShowAllStations.set(false);
-        log.info("🐛 Debug overlay cleared");
+        log.info("Debug overlay cleared");
         return ResponseEntity.ok(Map.of("message", "Debug overlay cleared."));
     }
 
@@ -260,9 +259,9 @@ public class AdminController {
             })
             .sorted(Comparator.comparingInt((Map<String, Object> m) ->
                     (Integer) m.get("edges")).reversed())
-            .collect(Collectors.toList());
+            .toList();
 
-        log.info("🐛 Debug stations requested — returning {} connected rail stations", stations.size());
+        log.info("Debug stations requested — returning {} connected rail stations", stations.size());
         return ResponseEntity.ok(Map.of("stations", stations));
     }
 }
