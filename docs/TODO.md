@@ -16,7 +16,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (security)
 
 ## Bugs (frontend)
-- [ ] **B52** The form (and a deep link, F46) accepts a minimum wait above the maximum, e.g. 200–100 min. The backend rejects it (`SearchRequestValidator`) and the user only sees "Search failed: The wait at changes must be …". Show a clear message at the wait fields before the search is sent.
 - [ ] **B53** (Check first, full data) Possible: a stop ID that contains `/` can't be looked up through `GET /api/stations/{id}`. The frontend encodes it as `%2F`, which Tomcat rejects by default, so a deep link (F46) to that station would say "Station from the link not found". Check whether any feed in the full dataset has such stop IDs (capped peeks only, e.g. `unzip -p <zip> stops.txt | grep -m 5 …`, see CLAUDE.md hard rules); if yes, reproduce and fix, if no, delete this item.
 
 ## Features / UX

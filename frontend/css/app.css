@@ -344,8 +344,18 @@ body {
     text-align: center;
 }
 
+.panel-input.is-invalid {
+    border-color: var(--danger);
+}
+
 .panel-muted {
     color: var(--muted);
+}
+
+.panel-error {
+    margin: 0;
+    font-size: 13px;
+    color: var(--danger);
 }
 
 .panel-rule {

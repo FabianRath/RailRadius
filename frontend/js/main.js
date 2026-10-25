@@ -55,29 +55,30 @@ initQueryForm(setAreasVisible);
 initReachability(() => selectedStation);
 
 const deepLink = readDeepLink();
-const searchedFromLink = deepLink ? searchFromLink(deepLink) : Promise.resolve(false);
-searchedFromLink.then(searched => {
-    if (!searched) prefillStation(EXAMPLE_STATION_NAME, selectStation);
+const linkedStation = deepLink ? fillFormFromLink(deepLink) : Promise.resolve(null);
+linkedStation.then(station => {
+    if (!station) prefillStation(EXAMPLE_STATION_NAME, selectStation);
 });
+// The form may be invalid (B52), so the link's search may not run
+const searchedFromLink = linkedStation.then(station => station != null && calculate(station));
 // A linked search fits the view to its results, so a late coverage reply must not jump away from them
 Promise.all([coverageBounds, searchedFromLink]).then(([bounds, searched]) => {
     if (bounds && !searched) jumpToBounds(bounds);
 });
 
-/** Runs the search a shared link describes; answers whether it could, i.e. whether its station exists. */
-async function searchFromLink({ stationId, query }) {
+/** Fills the form with the search a shared link describes; answers its station, or null if it doesn't exist. */
+async function fillFormFromLink({ stationId, query }) {
     let station;
     try {
         station = await fetchStation(stationId);
     } catch (error) {
         console.error('Linked station lookup failed:', error);
         if (!await isUpdatingTimetables()) showStatus('error', 'Station from the link not found');
-        return false;
+        return null;
     }
     applyQuery(query);
     setStation(station, selectStation);
-    calculate(station);
-    return true;
+    return station;
 }
 
 initDebugOverlay();

@@ -13,6 +13,7 @@ const transferTimeHint = document.getElementById('transferTimeToggleHint');
 const transferTimeWrap = document.getElementById('transferTimeInputWrap');
 const minTransferTimeInput = document.getElementById('minTransferTime');
 const maxTransferTimeInput = document.getElementById('maxTransferTime');
+const transferTimeError = document.getElementById('transferTimeError');
 const areasToggle = document.getElementById('showMergedZones');
 const optionsCell = document.querySelector('.board-options');
 const optionsToggle = document.getElementById('optionsToggle');
@@ -26,8 +27,10 @@ export function initQueryForm(onAreasToggle) {
     transferPlus.addEventListener('click', () => { transferInput.stepUp(); updateStepperButtons(); });
     transferInput.addEventListener('input', updateStepperButtons);
     transferTimeToggle.addEventListener('click', toggleTransferTimeLimit);
-    minTransferTimeInput.addEventListener('input', updateTransferTimeHint);
-    maxTransferTimeInput.addEventListener('input', updateTransferTimeHint);
+    [minTransferTimeInput, maxTransferTimeInput].forEach(input => input.addEventListener('input', () => {
+        updateTransferTimeHint();
+        clearWaitRangeErrorIfValid();
+    }));
     areasToggle.addEventListener('change', () => onAreasToggle(areasToggle.checked));
     onAreasToggle(areasToggle.checked);
     initOptionsPanel();
@@ -43,6 +46,17 @@ export function showQueryForm() {
 // limit off, the whole range the backend allows is searched.
 export function readQuery() {
     return queryFromFields(input => input.value, transferTimeLimitEnabled);
+}
+
+/**
+ * Whether readQuery() is a search the backend accepts. If not, opens the Wait panel at the message saying why, since
+ * the backend would only answer with its validation error (B52).
+ */
+export function checkQuery() {
+    const valid = waitRangeIsValid();
+    showWaitRangeError(!valid);
+    if (!valid) setOptionsOpen(true);
+    return valid;
 }
 
 /** The query the untouched form sends. */
@@ -102,6 +116,24 @@ function maxTransferMinutesOf(text) {
     return clampToField(maxTransferTimeInput, parseInt(text, 10) || DEFAULT_MAX_TRANSFER_MINUTES);
 }
 
+// With the limit off, the search sends the whole range, which is always valid
+function waitRangeIsValid() {
+    return !transferTimeLimitEnabled
+        || minTransferMinutesOf(minTransferTimeInput.value) <= maxTransferMinutesOf(maxTransferTimeInput.value);
+}
+
+function showWaitRangeError(shown) {
+    transferTimeError.hidden = !shown;
+    [minTransferTimeInput, maxTransferTimeInput].forEach(input => {
+        input.classList.toggle('is-invalid', shown);
+        input.setAttribute('aria-invalid', String(shown));
+    });
+}
+
+function clearWaitRangeErrorIfValid() {
+    if (waitRangeIsValid()) showWaitRangeError(false);
+}
+
 function clampToField(input, value) {
     return Math.min(Number(input.max), Math.max(Number(input.min), value));
 }
@@ -131,6 +163,7 @@ function toggleTransferTimeLimit() {
     transferTimeToggle.setAttribute('aria-checked', String(transferTimeLimitEnabled));
     transferTimeWrap.hidden = !transferTimeLimitEnabled;
     updateTransferTimeHint();
+    clearWaitRangeErrorIfValid();
 }
 
 function updateTransferTimeHint() {
