@@ -1,6 +1,5 @@
 import { fmtMins } from './util.js';
 
-const HINT_MIN_TRANSFER_MINUTES = 5;
 const DEFAULT_MAX_TRANSFER_MINUTES = 180;
 const TRANSFER_TIME_LIMIT_DEFAULT = true;
 
@@ -73,12 +72,9 @@ function queryFromFields(valueOf, limitEnabled) {
     return {
         maxTransfers: clampTransfers(valueOf(transferInput)),
         maxJourneyHours: journeyHours ? clampToField(maxJourneyTimeInput, parseFloat(journeyHours)) : null,
-        minTransferMinutes: limitEnabled
-            ? clampToField(minTransferTimeInput, parseInt(valueOf(minTransferTimeInput)) || 0)
-            : 0,
+        minTransferMinutes: limitEnabled ? minTransferMinutesOf(valueOf(minTransferTimeInput)) : 0,
         maxTransferMinutes: limitEnabled
-            ? clampToField(maxTransferTimeInput,
-                parseInt(valueOf(maxTransferTimeInput)) || DEFAULT_MAX_TRANSFER_MINUTES)
+            ? maxTransferMinutesOf(valueOf(maxTransferTimeInput))
             : Number(maxTransferTimeInput.max)
     };
 }
@@ -95,6 +91,15 @@ function clampTransfers(value) {
     const transfers = parseInt(value, 10);
     if (Number.isNaN(transfers)) return Number(transferInput.min);
     return clampToField(transferInput, transfers);
+}
+
+// The search and the hint both read the wait fields through these, so the hint shows what the search will use
+function minTransferMinutesOf(text) {
+    return clampToField(minTransferTimeInput, parseInt(text, 10) || 0);
+}
+
+function maxTransferMinutesOf(text) {
+    return clampToField(maxTransferTimeInput, parseInt(text, 10) || DEFAULT_MAX_TRANSFER_MINUTES);
 }
 
 function clampToField(input, value) {
@@ -135,7 +140,7 @@ function updateTransferTimeHint() {
         transferTimeHint.textContent = `max ${fmtMins(Number(maxTransferTimeInput.max))}`;
         return;
     }
-    const minMins = parseInt(minTransferTimeInput.value) || HINT_MIN_TRANSFER_MINUTES;
-    const maxMins = parseInt(maxTransferTimeInput.value) || DEFAULT_MAX_TRANSFER_MINUTES;
+    const minMins = minTransferMinutesOf(minTransferTimeInput.value);
+    const maxMins = maxTransferMinutesOf(maxTransferTimeInput.value);
     transferTimeHint.textContent = `${minMins}–${maxMins} min`;
 }
