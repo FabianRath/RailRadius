@@ -26,7 +26,7 @@ export function initQueryForm(onAreasToggle) {
     transferMinus.addEventListener('click', () => { transferInput.stepDown(); updateStepperButtons(); });
     transferPlus.addEventListener('click', () => { transferInput.stepUp(); updateStepperButtons(); });
     transferInput.addEventListener('input', updateStepperButtons);
-    transferTimeToggle.addEventListener('click', toggleTransferTimeLimit);
+    transferTimeToggle.addEventListener('click', () => setTransferTimeLimitEnabled(!transferTimeLimitEnabled));
     [minTransferTimeInput, maxTransferTimeInput].forEach(input => input.addEventListener('input', () => {
         updateTransferTimeHint();
         clearWaitRangeErrorIfValid();
@@ -66,15 +66,28 @@ export function defaultQuery() {
 
 /**
  * Sets the fields from untrusted text, e.g. a link's parameters (null for a missing one). A value that is no number
- * keeps the field's default; the others are clamped to the field's bounds like typed values.
+ * keeps the field's default; the others are clamped to the field's bounds like typed values. The wait range the
+ * limit off sends turns the limit off.
  */
 export function applyQuery(query) {
     setField(transferInput, parseInt(query.maxTransfers, 10));
     setField(maxJourneyTimeInput, parseFloat(query.maxJourneyHours));
     setField(minTransferTimeInput, parseInt(query.minTransferMinutes, 10));
     setField(maxTransferTimeInput, parseInt(query.maxTransferMinutes, 10));
+    restoreTransferTimeLimit();
     updateStepperButtons();
-    updateTransferTimeHint();
+}
+
+// A link holds no toggle state (B56). Turned off, the fields go back to their defaults, so turning the limit on
+// again gives the usual range rather than the whole one.
+function restoreTransferTimeLimit() {
+    const unlimited = unlimitedWaitRange();
+    const limitOff = Number(minTransferTimeInput.value) === unlimited.minTransferMinutes
+        && Number(maxTransferTimeInput.value) === unlimited.maxTransferMinutes;
+    if (limitOff) {
+        [minTransferTimeInput, maxTransferTimeInput].forEach(input => { input.value = input.defaultValue; });
+    }
+    setTransferTimeLimitEnabled(!limitOff);
 }
 
 function setField(input, value) {
@@ -83,14 +96,22 @@ function setField(input, value) {
 
 function queryFromFields(valueOf, limitEnabled) {
     const journeyHours = valueOf(maxJourneyTimeInput);
+    const waitRange = limitEnabled
+        ? {
+            minTransferMinutes: minTransferMinutesOf(valueOf(minTransferTimeInput)),
+            maxTransferMinutes: maxTransferMinutesOf(valueOf(maxTransferTimeInput))
+        }
+        : unlimitedWaitRange();
     return {
         maxTransfers: clampTransfers(valueOf(transferInput)),
         maxJourneyHours: journeyHours ? clampToField(maxJourneyTimeInput, parseFloat(journeyHours)) : null,
-        minTransferMinutes: limitEnabled ? minTransferMinutesOf(valueOf(minTransferTimeInput)) : 0,
-        maxTransferMinutes: limitEnabled
-            ? maxTransferMinutesOf(valueOf(maxTransferTimeInput))
-            : Number(maxTransferTimeInput.max)
+        ...waitRange
     };
+}
+
+// With the limit off, the search sends the whole range the backend allows
+function unlimitedWaitRange() {
+    return { minTransferMinutes: 0, maxTransferMinutes: Number(maxTransferTimeInput.max) };
 }
 
 // stepUp()/stepDown() fire no input event, so the buttons call this themselves
@@ -157,8 +178,8 @@ function setOptionsOpen(open) {
     optionsToggle.setAttribute('aria-expanded', String(open));
 }
 
-function toggleTransferTimeLimit() {
-    transferTimeLimitEnabled = !transferTimeLimitEnabled;
+function setTransferTimeLimitEnabled(enabled) {
+    transferTimeLimitEnabled = enabled;
     transferTimeToggle.classList.toggle('is-on', transferTimeLimitEnabled);
     transferTimeToggle.setAttribute('aria-checked', String(transferTimeLimitEnabled));
     transferTimeWrap.hidden = !transferTimeLimitEnabled;

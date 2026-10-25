@@ -16,7 +16,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (security)
 
 ## Bugs (frontend)
-- [ ] **B56** A deep link loses whether the wait limit was off. With the limit off the search sends 0–360 min and writes `maxwait=360` without `minwait` (`frontend/js/deep-link.js` only writes values that differ from the form's default); opening that link turns the limit on with the default min 5, so it runs a different search (5–360 min).
 - [ ] **B57** Typing 0 into the Max wait field sends 180 min, not the field's minimum of 1: `maxTransferMinutesOf` (`frontend/js/query-form.js`) treats 0 like an empty field (`parseInt(…) || DEFAULT_MAX_TRANSFER_MINUTES`). Minor; old behaviour.
 
 ## Features / UX
