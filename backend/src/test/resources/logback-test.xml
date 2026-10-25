@@ -1,0 +1,15 @@
+<configuration>
+    <!-- A passing test run prints nothing. Our own WARN/ERROR logs in tests come from failures
+         the tests provoke on purpose; lower com.railradius here when debugging a test. -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} : %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="com.railradius" level="OFF"/>
+
+    <root level="WARN">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

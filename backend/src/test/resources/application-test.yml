@@ -6,3 +6,12 @@ railradius:
     store-file: target/test-gtfs-store-none.bin
   cache:
     predictive-enabled: false
+
+# Same levels as logback-test.xml; application.yml would otherwise raise them back to INFO.
+spring:
+  main:
+    banner-mode: off
+logging:
+  level:
+    root: WARN
+    com.railradius: OFF
