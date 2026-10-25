@@ -54,6 +54,16 @@ export function closeOnBackdropClick(dialog) {
     });
 }
 
+/** Shows the [data-view] panel named like the clicked [data-tab] button and hides the others. */
+export function selectTab(tabs, views, name) {
+    tabs.forEach(tab => {
+        const active = tab.dataset.tab === name;
+        tab.classList.toggle('is-active', active);
+        tab.setAttribute('aria-selected', String(active));
+    });
+    views.forEach(view => { view.hidden = view.dataset.view !== name; });
+}
+
 function isOutsideDialog(dialog, event) {
     if (event.target !== dialog) return false;
     const rect = dialog.getBoundingClientRect();

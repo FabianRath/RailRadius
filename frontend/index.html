@@ -156,16 +156,133 @@
                 <h2 class="about-title" id="aboutTitle">About the data</h2>
                 <button type="button" class="board-close" id="aboutClose" aria-label="Close">×</button>
             </div>
-            <p class="about-text">
-                RailRadius only shows rail connections in the countries listed below, built from the operators' public
-                GTFS timetables. Trains outside these countries, or missing from the data, are not shown.
-            </p>
-            <p class="about-text">
-                Timetables change and the data can be incomplete or out of date, so I can't guarantee that a
-                displayed connection exists or runs as shown. Please check with the rail operator before you travel.
-            </p>
-            <div class="board-label">Covered countries</div>
-            <ul class="about-countries" id="aboutCountries"></ul>
+            <div class="dialog-tabs" role="tablist">
+                <button type="button" class="dialog-tab is-active" role="tab" aria-selected="true"
+                        data-tab="about">About</button>
+                <button type="button" class="dialog-tab" role="tab" aria-selected="false" data-tab="sources">Sources</button>
+            </div>
+            <section data-view="about" role="tabpanel">
+                <p class="about-text">
+                    RailRadius only shows rail connections in the countries listed below, built from the operators' public
+                    GTFS timetables. Trains outside these countries, or missing from the data, are not shown.
+                </p>
+                <p class="about-text">
+                    Timetables change and the data can be incomplete or out of date, so I can't guarantee that a
+                    displayed connection exists or runs as shown. Please check with the rail operator before you travel.
+                </p>
+                <div class="board-label">Covered countries</div>
+                <ul class="about-countries" id="aboutCountries"></ul>
+            </section>
+            <section data-view="sources" role="tabpanel" hidden>
+                <p class="about-text">
+                    Timetables by the publishers below. RailRadius keeps only their rail services, merges stations shared
+                    by several timetables and changes nothing else. Map data © OpenStreetMap contributors, map tiles by
+                    OpenFreeMap.
+                </p>
+                <ul class="about-sources">
+                    <li><b>Austria</b> <a href="https://data.oebb.at/" target="_blank" rel="noopener">ÖBB-Personenverkehr</a> ·
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></li>
+                    <li><b>Belgium</b> <a href="https://www.belgiantrain.be/" target="_blank" rel="noopener">SNCB/NMBS</a> ·
+                        <a href="https://www.belgiantrain.be/en/support/faq/faq-developers" target="_blank" rel="noopener">SNCB licence</a></li>
+                    <li><b>Bosnia and Herzegovina</b> <a href="https://www.zfbh.ba/" target="_blank" rel="noopener">ŽFBiH</a>, <a href="https://www.zrs-rs.com/" target="_blank" rel="noopener">ŽRS</a>,
+                        compiled by <a href="https://owncloud.cesnet.cz/index.php/s/yWJhi9wjUIc3IC2" target="_blank" rel="noopener">Petr Novák</a></li>
+                    <li><b>Bulgaria</b> <a href="https://www.bdz.bg/" target="_blank" rel="noopener">BDŽ</a>,
+                        compiled by <a href="https://jbb.ghsq.de/gtfs/" target="_blank" rel="noopener">Jonah Brüchert</a></li>
+                    <li><b>Croatia</b> <a href="https://data.gov.hr/ckan/dataset/vozni-red-h-putni-kog-prijevoza-u-gtfs-obliku" target="_blank" rel="noopener">HŽ Putnički prijevoz</a> ·
+                        <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a></li>
+                    <li><b>Czechia</b> <a href="https://www.spravazeleznic.cz/" target="_blank" rel="noopener">Správa železnic</a>,
+                        converted by <a href="https://obehy.cz/" target="_blank" rel="noopener">the Oběhy project</a> ·
+                        <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a></li>
+                    <li><b>Denmark</b> <a href="https://www.rejseplanen.dk/" target="_blank" rel="noopener">Rejseplanen</a> ·
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></li>
+                    <li><b>Estonia</b> <a href="https://agri.ee/" target="_blank" rel="noopener">Regionaal- ja Põllumajandusministeerium</a> ·
+                        <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a></li>
+                    <li><b>Finland</b> <a href="https://www.digitraffic.fi/rautatieliikenne/" target="_blank" rel="noopener">Fintraffic / digitraffic.fi</a> ·
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></li>
+                    <li><b>France</b> <a href="https://www.sncf.com/" target="_blank" rel="noopener">SNCF Voyageurs</a> ·
+                        <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL</a></li>
+                    <li><b>Germany</b> <a href="https://www.delfi.de/" target="_blank" rel="noopener">DELFI e.V.</a> ·
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></li>
+                    <li><b>Great Britain</b> Powered by
+                        <a href="https://www.nationalrail.co.uk/" target="_blank" rel="noopener">National Rail Enquiries</a>,
+                        compiled by <a href="https://aubin.app/" target="_blank" rel="noopener">Aubin</a></li>
+                    <li><b>Greece</b> <a href="https://www.hellenictrain.gr/" target="_blank" rel="noopener">Hellenic Train</a>,
+                        compiled by <a href="https://jbb.ghsq.de/gtfs/" target="_blank" rel="noopener">Jonah Brüchert</a></li>
+                    <li><b>Hungary</b> <a href="https://www.mavcsoport.hu/gtfs-igenybejelento" target="_blank" rel="noopener">MÁV</a></li>
+                    <li><b>Ireland</b> <a href="https://www.nationaltransport.ie/" target="_blank" rel="noopener">National Transport Authority</a> ·
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></li>
+                    <li><b>Italy</b> <a href="https://www.trenitalia.com/" target="_blank" rel="noopener">Trenitalia</a>,
+                        converted by <a href="https://github.com/deryclem/trenitalia-gtfs" target="_blank" rel="noopener">Clément Desouche</a> ·
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></li>
+                    <li><b>Italy</b> <a href="https://www.italotreno.com/" target="_blank" rel="noopener">Italo</a>,
+                        converted by <a href="https://github.com/deryclem/italo-gtfs" target="_blank" rel="noopener">Clément Desouche</a> ·
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></li>
+                    <li><b>Italy</b> <a href="https://www.dati.lombardia.it/d/3z4k-mxz9" target="_blank" rel="noopener">Trenord, Regione Lombardia</a> ·
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></li>
+                    <li><b>Italy</b> <a href="https://www.eavsrl.it/open-data/" target="_blank" rel="noopener">EAV</a> ·
+                        <a href="https://www.dati.gov.it/iodl/2.0/" target="_blank" rel="noopener">IODL 2.0</a></li>
+                    <li><b>Italy</b> <a href="https://cotralspa.it/open-data/" target="_blank" rel="noopener">Cotral</a></li>
+                    <li><b>Kosovo</b> <a href="https://www.trainkos.com/" target="_blank" rel="noopener">Trainkos</a>,
+                        compiled by <a href="https://github.com/hoermalmeister/gtfs-rehost" target="_blank" rel="noopener">Petr Novák</a></li>
+                    <li><b>Latvia</b> <a href="https://vivi.lv/" target="_blank" rel="noopener">Vivi</a> ·
+                        <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a></li>
+                    <li><b>Lithuania</b> <a href="https://ltglink.lt/" target="_blank" rel="noopener">LTG Link</a>,
+                        compiled by <a href="https://gitlab.spline.de/spline/transitous/ltg-link-gtfs" target="_blank" rel="noopener">Jonah Brüchert</a></li>
+                    <li><b>Luxembourg</b> <a href="https://www.cfl.lu/" target="_blank" rel="noopener">CFL</a> ·
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></li>
+                    <li><b>Moldova</b> <a href="http://www.cfm.md/" target="_blank" rel="noopener">CFM</a>,
+                        compiled by <a href="https://github.com/hoermalmeister/gtfs-rehost" target="_blank" rel="noopener">Petr Novák</a></li>
+                    <li><b>Montenegro</b> <a href="https://zpcg.me/" target="_blank" rel="noopener">ŽPCG</a>,
+                        compiled by <a href="https://jbb.ghsq.de/gtfs/" target="_blank" rel="noopener">Jonah Brüchert</a> ·
+                        <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL</a></li>
+                    <li><b>Netherlands</b> <a href="https://gtfs.ovapi.nl/" target="_blank" rel="noopener">OVapi</a> ·
+                        <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a></li>
+                    <li><b>North Macedonia</b> <a href="https://mzt.mk/" target="_blank" rel="noopener">MŽT</a>,
+                        compiled by <a href="https://github.com/hoermalmeister/gtfs-rehost" target="_blank" rel="noopener">Petr Novák</a></li>
+                    <li><b>Northern Ireland</b> <a href="https://www.translink.co.uk/" target="_blank" rel="noopener">Translink</a>,
+                        compiled by <a href="https://gtfs.pro/" target="_blank" rel="noopener">GTFS.pro</a></li>
+                    <li><b>Norway</b> <a href="https://developer.entur.org/" target="_blank" rel="noopener">Entur</a> ·
+                        <a href="https://data.norge.no/nlod/en/2.0" target="_blank" rel="noopener">NLOD 2.0</a></li>
+                    <li><b>Poland</b> <a href="https://mkuran.pl/gtfs/" target="_blank" rel="noopener">Mikołaj Kuranowski</a> ·
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></li>
+                    <li><b>Portugal</b> <a href="https://nap-portugal.imt-ip.pt/nap/multimodalsupplydetail/176" target="_blank" rel="noopener">CP</a></li>
+                    <li><b>Portugal</b> <a href="https://nap-portugal.imt-ip.pt/nap/multimodalsupplydetail/185" target="_blank" rel="noopener">Fertagus</a> ·
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></li>
+                    <li><b>Romania</b> <a href="https://data.gov.ro/" target="_blank" rel="noopener">data.gov.ro</a>,
+                        compiled by <a href="https://gitlab.spline.de/spline/transitous/gov-ro-gtfs" target="_blank" rel="noopener">Jonah Brüchert</a> ·
+                        <a href="https://data.gov.ro/base/images/logoinst/OGL-ROU-1.0.pdf" target="_blank" rel="noopener">OGL-ROU 1.0</a></li>
+                    <li><b>Serbia</b> <a href="https://srbijavoz.rs/" target="_blank" rel="noopener">Srbijavoz</a>,
+                        compiled by <a href="https://jbb.ghsq.de/gtfs/" target="_blank" rel="noopener">Jonah Brüchert</a></li>
+                    <li><b>Slovakia</b> <a href="https://data.europa.eu/data/datasets/https-data-gov-sk-set-ebeeedf1-aca2-451a-bdc0-35d536714888" target="_blank" rel="noopener">ŽSR</a>,
+                        compiled by <a href="https://itransys.eu/" target="_blank" rel="noopener">iTranSys</a></li>
+                    <li><b>Slovenia</b> <a href="https://www.slo-zeleznice.si/" target="_blank" rel="noopener">SŽ</a>,
+                        compiled by <a href="https://jbb.ghsq.de/gtfs/" target="_blank" rel="noopener">Jonah Brüchert</a> ·
+                        <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a></li>
+                    <li><b>Spain</b> <a href="https://data.renfe.com/" target="_blank" rel="noopener">Renfe</a> ·
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></li>
+                    <li><b>Spain</b> <a href="https://www.euskotren.eus/" target="_blank" rel="noopener">Euskotren</a> ·
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></li>
+                    <li><b>Spain</b> <a href="https://www.fgc.cat/" target="_blank" rel="noopener">FGC</a> ·
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></li>
+                    <li><b>Spain</b> <a href="https://www.ouigo.com/es/" target="_blank" rel="noopener">OUIGO España</a>, Powered by
+                        <a href="https://www.transportes.gob.es/" target="_blank" rel="noopener">MITRAMS</a> ·
+                        <a href="https://nap.transportes.gob.es/licencia-datos" target="_blank" rel="noopener">NAP licence</a></li>
+                    <li><b>Sweden</b> <a href="https://www.samtrafiken.se/" target="_blank" rel="noopener">Samtrafiken i Sverige</a> ·
+                        <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a></li>
+                    <li><b>Switzerland</b> <a href="https://opentransportdata.swiss/" target="_blank" rel="noopener">opentransportdata.swiss</a> ·
+                        <a href="https://opentransportdata.swiss/en/terms-of-use/" target="_blank" rel="noopener">terms of use</a></li>
+                    <li><b>Turkey</b> <a href="https://www.tcdd.gov.tr/" target="_blank" rel="noopener">TCDD</a>,
+                        converted by <a href="https://github.com/yasinkaraaslan/tcdd-gtfs" target="_blank" rel="noopener">Yasin Karaaslan</a></li>
+                    <li><b>Ukraine</b> <a href="https://www.uz.gov.ua/" target="_blank" rel="noopener">Ukrzaliznytsia</a>,
+                        compiled by <a href="https://jbb.ghsq.de/gtfs/" target="_blank" rel="noopener">Jonah Brüchert</a></li>
+                    <li><b>Eurostar</b> <a href="https://www.eurostar.com/" target="_blank" rel="noopener">Eurostar</a> ·
+                        <a href="https://www.etalab.gouv.fr/licence-ouverte-open-licence/" target="_blank" rel="noopener">Etalab 2.0</a></li>
+                    <li><b>European Sleeper</b> <a href="https://www.europeansleeper.eu/" target="_blank" rel="noopener">European Sleeper</a> ·
+                        <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL</a></li>
+                    <li><b>Trenitalia France</b> <a href="https://www.trenitalia.com/trenitalia-france.html" target="_blank" rel="noopener">Trenitalia France</a> ·
+                        <a href="https://www.etalab.gouv.fr/licence-ouverte-open-licence/" target="_blank" rel="noopener">Etalab 2.0</a></li>
+                </ul>
+            </section>
         </dialog>
 
         <dialog class="admin-panel" id="adminPanel" aria-labelledby="adminTitle">
@@ -174,11 +291,11 @@
                 <button type="button" class="board-close" id="adminClose" aria-label="Close">×</button>
             </div>
             <div class="admin-storage" id="feedStorage"></div>
-            <div class="admin-tabs" role="tablist">
-                <button type="button" class="admin-tab is-active" role="tab" aria-selected="true"
+            <div class="dialog-tabs" role="tablist">
+                <button type="button" class="dialog-tab is-active" role="tab" aria-selected="true"
                     data-tab="tools">Tools</button>
-                <button type="button" class="admin-tab" role="tab" aria-selected="false" data-tab="feeds">Feeds</button>
-                <button type="button" class="admin-tab" role="tab" aria-selected="false" data-tab="alerts">Alerts</button>
+                <button type="button" class="dialog-tab" role="tab" aria-selected="false" data-tab="feeds">Feeds</button>
+                <button type="button" class="dialog-tab" role="tab" aria-selected="false" data-tab="alerts">Alerts</button>
             </div>
             <section class="admin-view" data-view="tools" role="tabpanel">
                 <div class="admin-group">

@@ -7,7 +7,7 @@ import {
 } from './api.js';
 import { initFeeds, refreshFeedStorage, refreshFeeds } from './feeds.js';
 import { initFeedAlerts, refreshFeedAlerts } from './feed-alerts.js';
-import { closeOnBackdropClick, fmtSeconds } from './util.js';
+import { closeOnBackdropClick, fmtSeconds, selectTab } from './util.js';
 
 const JSON_INDENT = 2;
 const PROGRESS_POLL_INTERVAL_MS = 1000;
@@ -68,12 +68,7 @@ export function hideAdminPanel() {
 
 // The feed tables need more room, so the panel widens while the Feeds or Alerts tab is open
 function showTab(name) {
-    tabs.forEach(tab => {
-        const active = tab.dataset.tab === name;
-        tab.classList.toggle('is-active', active);
-        tab.setAttribute('aria-selected', String(active));
-    });
-    views.forEach(view => { view.hidden = view.dataset.view !== name; });
+    selectTab(tabs, views, name);
     dialog.classList.toggle('admin-panel-wide', name !== 'tools');
     if (name === 'feeds') refreshFeeds();
     if (name === 'alerts') refreshFeedAlerts();

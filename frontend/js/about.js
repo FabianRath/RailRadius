@@ -1,12 +1,15 @@
-// The info button under the zoom buttons: which countries the data covers, and that connections may be wrong.
+// The info button under the zoom buttons: which countries the data covers, that connections may be wrong, and a
+// Sources tab crediting every feed's publisher and licence.
 import { fetchCoverage } from './api.js';
 import { addMapButton } from './map.js';
-import { closeOnBackdropClick } from './util.js';
+import { closeOnBackdropClick, selectTab } from './util.js';
 
 const COUNTRY_NAMES = new Intl.DisplayNames(['en'], { type: 'region' });
 
 const dialog = document.getElementById('aboutPanel');
 const countryList = document.getElementById('aboutCountries');
+const tabs = dialog.querySelectorAll('[data-tab]');
+const views = dialog.querySelectorAll('[data-view]');
 
 let countriesLoaded = false;
 
@@ -20,6 +23,7 @@ export function initAbout() {
     });
     document.getElementById('aboutClose').addEventListener('click', () => dialog.close());
     closeOnBackdropClick(dialog);
+    tabs.forEach(tab => tab.addEventListener('click', () => selectTab(tabs, views, tab.dataset.tab)));
 }
 
 async function loadCountries() {

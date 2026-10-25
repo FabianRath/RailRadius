@@ -1103,14 +1103,14 @@ input[type="number"]::-webkit-inner-spin-button {
     min-height: 0;
 }
 
-.admin-tabs {
+.dialog-tabs {
     display: flex;
     gap: 4px;
     margin-bottom: 16px;
     border-bottom: 1px solid var(--line);
 }
 
-.admin-tab {
+.dialog-tab {
     background: none;
     border: none;
     border-bottom: 2px solid transparent;
@@ -1122,11 +1122,11 @@ input[type="number"]::-webkit-inner-spin-button {
     cursor: pointer;
 }
 
-.admin-tab:hover {
+.dialog-tab:hover {
     color: var(--text);
 }
 
-.admin-tab.is-active {
+.dialog-tab.is-active {
     border-bottom-color: var(--amber);
     color: var(--amber);
 }
@@ -1303,6 +1303,22 @@ input[type="number"]::-webkit-inner-spin-button {
     padding-left: 18px;
     line-height: 1.6;
     color: var(--text);
+}
+
+.about-sources {
+    list-style: none;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--muted);
+}
+
+.about-sources b {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.about-sources a {
+    color: var(--amber);
 }
 
 /* ── Narrower screens: each block also applies to all widths below it ── */
