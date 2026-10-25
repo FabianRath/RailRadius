@@ -1,6 +1,6 @@
 # GTFS sources
 
-Where the zips in `backend/data/gtfs/` come from. Name each download `gtfs_<country>.zip`.
+Where the zips in `backend/data/gtfs/` come from. Name each download `gtfs_<country>.zip`. The About dialog's Sources tab credits every feed (`frontend/index.html`): keep it in sync when a feed or its licence changes.
 
 The download URL of every feed with a direct download is in `backend/src/main/resources/gtfs-feeds.txt`, which the update center (admin panel → Feeds) downloads from; the table names that feed. A feed can list fallback URLs there, which are tried in order when one fails or is rejected. Only sources without a direct download (portal, login, fee, web page) keep their link here.
 
