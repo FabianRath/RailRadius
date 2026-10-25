@@ -16,7 +16,6 @@ Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer
 ## Bugs (security)
 
 ## Bugs (frontend)
-- [ ] **B53** (Check first, full data) Possible: a stop ID that contains `/` can't be looked up through `GET /api/stations/{id}`. The frontend encodes it as `%2F`, which Tomcat rejects by default, so a deep link (F46) to that station would say "Station from the link not found". Check whether any feed in the full dataset has such stop IDs (capped peeks only, e.g. `unzip -p <zip> stops.txt | grep -m 5 …`, see CLAUDE.md hard rules); if yes, reproduce and fix, if no, delete this item.
 
 ## Features / UX
 - [ ] **F23** (Decide first) While a station's journey is shown (F21), the dots of the stations it passes through keep their own transfer-level colour, so they don't always match the line colour of the train passing them (first train green, second cyan, …): a stop on the third train can be green because another train reaches it directly. The route looks inconsistent, but the colour also tells the user that this stop can be reached with fewer transfers, and clicking it shows that shorter journey. Options: (1) recolour the path's dots by the train they are on while the journey is shown; (2) keep the station's own colour (current behaviour), maybe explained in the details panel; (3) both, e.g. the train's colour as fill and the station's own level as outline. Decide with the user, then implement.
