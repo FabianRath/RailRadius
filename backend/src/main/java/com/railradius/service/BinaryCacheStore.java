@@ -85,7 +85,7 @@ public class BinaryCacheStore {
         try (BinaryBlocks.Reader in = new BinaryBlocks.Reader(file, FORMAT_VERSION)) {
             BinaryCacheData data = read(in);
             in.checkAllRead();
-            log.info("✓ Binary cache read in {} ms ({} MB, built from the zips with {} {})",
+            log.info("Binary cache read in {} ms ({} MB, built from the zips with {} {})",
                     System.currentTimeMillis() - startMs, Files.size(file) / BYTES_PER_MB, HASH_ALGORITHM,
                     HexFormat.of().formatHex(in.hash()));
             return Optional.of(data);
@@ -106,18 +106,18 @@ public class BinaryCacheStore {
             }
             // A server never sees a half-written file
             Files.move(part, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            log.info("✓ Binary cache saved to {} in {} ms ({} MB)", file, System.currentTimeMillis() - startMs,
+            log.info("Binary cache saved to {} in {} ms ({} MB)", file, System.currentTimeMillis() - startMs,
                     Files.size(file) / BYTES_PER_MB);
         } catch (Exception e) {
-            log.error("❌ FAILED to save the binary cache to {}", file, e);
+            log.error("Failed to save the binary cache to {}", file, e);
         }
     }
 
     void delete() {
         try {
-            if (Files.deleteIfExists(file)) log.info("✓ Binary cache deleted");
+            if (Files.deleteIfExists(file)) log.info("Binary cache deleted");
         } catch (IOException e) {
-            log.error("❌ FAILED to delete the binary cache {}", file, e);
+            log.error("Failed to delete the binary cache {}", file, e);
         }
     }
 

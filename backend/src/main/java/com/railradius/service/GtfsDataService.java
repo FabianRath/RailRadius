@@ -43,7 +43,7 @@ public class GtfsDataService {
         if (cached.isPresent()) {
             graph.restore(cached.get());
             stationSearchIndex.rebuild();
-            log.info("✓ GTFS data loaded from the binary cache: {} stations, {} graph nodes, {} edges",
+            log.info("GTFS data loaded from the binary cache: {} stations, {} graph nodes, {} edges",
                     graph.stationCount(), graph.nodeCount(), graph.edgeCount());
             dataLoaded = true;
             return;
