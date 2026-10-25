@@ -50,4 +50,3 @@ Recommended order (2026-10-13): judge **S24** on the server picked in S25 (`HOST
     - Turkey: the generator is MIT, but the data comes from TCDD's website; ask the maintainer, or drop it.
     - Croatia, EAV: their licences (CC0, CC BY 4.0) come only from Transitous; confirm them with the publishers.
   - **Follow-up:** almost every licence requires attribution, so the site needs a page naming every source.
-- [ ] **S40** A passing `mvn -q -f backend/pom.xml test` prints ~5,600 lines (1.2 MB), almost all our own INFO logs from loading the fixture (`GtfsFeedLoader`, `GtfsDataService`, `RailTripReader`, …), plus Spring's startup for `RailRadiusBackendApplicationTests`. It buries real failures and contradicts CLAUDE.md ("prints nothing on success"). Set test logging to WARN (e.g. a `logback-test.xml` in `src/test/resources`, which also covers the plain unit tests outside Spring) and keep the deliberate WARNs quiet in tests if they are expected.
