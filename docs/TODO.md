@@ -2,7 +2,7 @@
 
 Rules: see CODING_GUIDELINES §9. In short: every item has a permanent ID. Refer to items by ID ("fix B2"). New bugs go in only after the user has agreed.
 
-**Next free IDs:** B58 · F50 · S42
+**Next free IDs:** B58 · F50 · S44
 
 ## Bugs (data loading)
 - [ ] **B36** Bosnia has no current rail feed, and Northern Ireland's can't be refreshed. State on 2026-10-07 (`gtfs-sources.md` has the details). Bosnia: the only source ends on 2025-12-13, so no Bosnian trains. Northern Ireland: the zip on disk (GTFS.pro copy from transitpdf, 2026-07-27) has NI Railways until mid-2027, but transitpdf is gone and Translink publishes only TransXChange, so no download URL is left in `gtfs-feeds.txt`. Check for a new GTFS source before mid-2027.
@@ -46,3 +46,6 @@ Recommended order (2026-10-13): judge **S24** on the server picked in S25 (`HOST
     - Turkey: the generator is MIT, but the data comes from TCDD's website; ask the maintainer, or drop it.
     - Croatia, EAV: their licences (CC0, CC BY 4.0) come only from Transitous; confirm them with the publishers.
   - **Follow-up:** almost every licence requires attribution, so the site needs a page naming every source.
+
+- [ ] **S42** Log messages start with symbols, against the guidelines (§3/§4, as cleaned up in `AdminController` by S41): `✓` in `BinaryCacheStore` (lines 88, 109, 118) and `GtfsDataService:46`, `❌ FAILED …` in `BinaryCacheStore` (lines 112, 120). Drop the symbols and keep the wording; a failure is already marked by its log level.
+- [ ] **S43** `FeedRegistry.parseAll` collects each source's URLs with `Collectors.mapping(…, Collectors.toList())` and then copies them with `List.copyOf`. Plain `.toList()` doesn't fit inside a grouping collector, so this is only a borderline guideline break (§4); `Collectors.toUnmodifiableList()` would make the copy unnecessary. Small, optional.
