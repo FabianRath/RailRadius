@@ -45,9 +45,9 @@ public class FeedRegistry {
         Map<String, List<FeedUrl>> urlsBySource = lines.stream()
                 .map(FeedRegistry::parse)
                 .collect(Collectors.groupingBy(FeedLine::source, LinkedHashMap::new,
-                        Collectors.mapping(FeedLine::url, Collectors.toList())));
+                        Collectors.mapping(FeedLine::url, Collectors.toUnmodifiableList())));
         return urlsBySource.entrySet().stream().collect(Collectors.toUnmodifiableMap(Map.Entry::getKey,
-                entry -> new FeedSource(entry.getKey(), List.copyOf(entry.getValue()))));
+                entry -> new FeedSource(entry.getKey(), entry.getValue())));
     }
 
     // Format: source;url[;Header: value|Header: value]
