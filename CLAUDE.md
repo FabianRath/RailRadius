@@ -25,6 +25,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 - Compile: `mvn -q -f backend/pom.xml compile`
 - Test: `mvn -q -f backend/pom.xml test` (~10 s; prints nothing on success)
 - One test class: `mvn -q -f backend/pom.xml test -Dtest=ReachabilityServiceTest`
+- "Unresolved compilation problem", `ClassFormatError` or a bean that fails to resolve while the source is fine: stale classes, because VS Code's Java compiler also writes into `backend/target/classes`. Run `mvn -q -f backend/pom.xml clean test` before debugging.
 - Run with small dev data: use the `/run-dev` skill. Then use `scripts/api.sh health`, `scripts/api.sh search wien`, etc.
 - Full data (3 GB heap, ~3 s to start from the binary cache): only when explicitly asked. See ARCHITECTURE.md.
 
