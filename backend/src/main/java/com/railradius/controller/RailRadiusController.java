@@ -25,7 +25,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 
 @RestController
@@ -138,9 +137,10 @@ public class RailRadiusController {
                         station.getName(),
                         station.getLatitude(),
                         station.getLongitude(),
-                        station.getCountry()
+                        station.getCountry(),
+                        transitGraph.stoppingTripCount(station.getId())
                 ))
-                .collect(Collectors.toList());
+                .toList();
         
         return ResponseEntity.ok(results);
     }
@@ -177,6 +177,8 @@ public class RailRadiusController {
             String name,
             Double latitude,
             Double longitude,
-            String country
+            String country,
+            // Trips that stop at the station
+            int connections
     ) {}
 }

@@ -86,6 +86,12 @@ public class TransitGraph {
         return store.stations().indexOf(stopId).stream().map(store::nextStationCount).findFirst().orElse(0);
     }
 
+    /** How many trips stop at the station; 0 for an unknown one. */
+    public int stoppingTripCount(String stopId) {
+        TimetableStore store = timetableStore;
+        return store.stations().indexOf(stopId).stream().map(store::stoppingTripCount).findFirst().orElse(0);
+    }
+
     public boolean isDataLoaded() {
         return !stations.isEmpty() && nodeCount() > 0;
     }
