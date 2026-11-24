@@ -26,6 +26,15 @@ final class CompactResult {
     /** A path's stations and connections, and the exact days on which the whole journey runs. */
     record Journey(JourneyPath path, ServiceDays runningDays) {}
 
+    /** A ride as positions in the store: its trip and the events it is boarded and left at. */
+    record Ride(int trip, int boardEvent, int alightEvent) {}
+
+    /**
+     * A path's rides in order and the exact days on which the whole journey runs: a journey without trip IDs, which
+     * a browser's store lacks (#10), and what a browser sends to have the server build the journey (#11).
+     */
+    record RideList(List<Ride> rides, ServiceDays runningDays) {}
+
     /** The columns of {@link LabelArena} that journeys need, as arrays of exact size. */
     record Labels(int[] trip, int[] previous, int[] durationMinutes, short[] boardIdx, short[] alightIdx,
                   byte[] transfers) {
@@ -76,15 +85,16 @@ final class CompactResult {
      * @throws IllegalArgumentException if the station has no such path
      */
     Journey journey(String stationId, int transfers) {
-        if (stationId.equals(startId) && transfers == 0) return journey(LabelArena.NONE);
-        OptionalInt station = store.stations().indexOf(stationId);
-        if (station.isPresent()) {
-            for (int i = chosen.start()[station.getAsInt()]; i < chosen.start()[station.getAsInt() + 1]; i++) {
-                int label = chosen.labels()[i];
-                if (labels.transfers()[label] == transfers && transfers <= maxTransfers) return journey(label);
-            }
-        }
-        throw new IllegalArgumentException("No path with " + transfers + " transfers to " + stationId);
+        return journey(label(stationId, transfers));
+    }
+
+    /**
+     * The rides of the station's path with this many transfers, one of {@link #paths}.
+     *
+     * @throws IllegalArgumentException if the station has no such path
+     */
+    RideList rideList(String stationId, int transfers) {
+        return rideList(label(stationId, transfers));
     }
 
     /**
@@ -130,24 +140,47 @@ final class CompactResult {
         return first < chosen.start()[station + 1] && labels.transfers()[chosen.labels()[first]] <= maxTransfers;
     }
 
+    /** The label of the station's path's last ride, or {@link LabelArena#NONE} for the start's empty path. */
+    private int label(String stationId, int transfers) {
+        if (stationId.equals(startId) && transfers == 0) return LabelArena.NONE;
+        OptionalInt station = store.stations().indexOf(stationId);
+        if (station.isPresent()) {
+            for (int i = chosen.start()[station.getAsInt()]; i < chosen.start()[station.getAsInt() + 1]; i++) {
+                int label = chosen.labels()[i];
+                if (labels.transfers()[label] == transfers && transfers <= maxTransfers) return label;
+            }
+        }
+        throw new IllegalArgumentException("No path with " + transfers + " transfers to " + stationId);
+    }
+
+    /** The rides up to and including the one of label; none for {@link LabelArena#NONE}. */
+    private RideList rideList(int last) {
+        List<Integer> backwards = new ArrayList<>();
+        for (int label = last; label != LabelArena.NONE; label = labels.previous()[label]) {
+            backwards.add(label);
+        }
+        List<Ride> rides = new ArrayList<>();
+        JourneyRunningDays.SoFar days = JourneyRunningDays.SoFar.START;
+        for (int label : backwards.reversed()) {
+            int firstEvent = store.firstEvent(labels.trip()[label]);
+            Ride ride = new Ride(labels.trip()[label], firstEvent + labels.boardIdx()[label],
+                    firstEvent + labels.alightIdx()[label]);
+            rides.add(ride);
+            days = JourneyRunningDays.withRide(days, store, ride.boardEvent(), ride.alightEvent(), graph);
+        }
+        return new RideList(rides, days.days());
+    }
+
     /** The journey ending with the ride of label, or the start's empty one for {@link LabelArena#NONE}. */
     private Journey journey(int last) {
-        List<Integer> rides = new ArrayList<>();
-        for (int label = last; label != LabelArena.NONE; label = labels.previous()[label]) {
-            rides.add(label);
-        }
+        RideList rideList = rideList(last);
         List<String> stationIds = new ArrayList<>(List.of(startId));
         List<Connection> connections = new ArrayList<>();
-        JourneyRunningDays.SoFar days = JourneyRunningDays.SoFar.START;
-        for (int label : rides.reversed()) {
-            int firstEvent = store.firstEvent(labels.trip()[label]);
-            int boardEvent = firstEvent + labels.boardIdx()[label];
-            int alightEvent = firstEvent + labels.alightIdx()[label];
-            for (int event = boardEvent; event < alightEvent; event++) {
+        for (Ride ride : rideList.rides()) {
+            for (int event = ride.boardEvent(); event < ride.alightEvent(); event++) {
                 connections.add(store.legConnection(event));
                 stationIds.add(store.stations().id(store.station(event + 1)));
             }
-            days = JourneyRunningDays.withRide(days, store, boardEvent, alightEvent, graph);
         }
         boolean start = last == LabelArena.NONE;
         JourneyPath path = JourneyPath.builder()
@@ -156,6 +189,6 @@ final class CompactResult {
                 .transfers(start ? 0 : (int) labels.transfers()[last])
                 .totalDurationMinutes(start ? 0 : labels.durationMinutes()[last])
                 .build();
-        return new Journey(path, days.days());
+        return new Journey(path, rideList.runningDays());
     }
 }

@@ -24,7 +24,9 @@ final class PackedStrings {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         int[] offsets = new int[strings.size() + 1];
         for (int i = 0; i < strings.size(); i++) {
-            bytes.writeBytes(strings.get(i).getBytes(StandardCharsets.UTF_8));
+            // Not writeBytes: the browser engine's class library has none (#10)
+            byte[] utf8 = strings.get(i).getBytes(StandardCharsets.UTF_8);
+            bytes.write(utf8, 0, utf8.length);
             offsets[i + 1] = bytes.size();
         }
         return new PackedStrings(bytes.toByteArray(), offsets);

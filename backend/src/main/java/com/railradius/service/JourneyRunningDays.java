@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.stream.LongStream;
 
 /**
  * The days on which a whole journey runs, and their weekday summary for the popup. The search compares days by
@@ -56,7 +57,9 @@ final class JourneyRunningDays {
         if (dates.size() >= MIN_PATTERN_DAYS) {
             for (DayOfWeek weekday : DayOfWeek.values()) {
                 long runs = dates.stream().filter(date -> date.getDayOfWeek() == weekday).count();
-                long occurrences = dates.getFirst().datesUntil(dates.getLast().plusDays(1))
+                // Not LocalDate.datesUntil: the browser engine's class library has none (#10)
+                long occurrences = LongStream.rangeClosed(dates.getFirst().toEpochDay(), dates.getLast().toEpochDay())
+                        .mapToObj(LocalDate::ofEpochDay)
                         .filter(date -> date.getDayOfWeek() == weekday).count();
                 if (runs > 0 && 2 * runs >= occurrences) weekdays.add(weekday);
             }

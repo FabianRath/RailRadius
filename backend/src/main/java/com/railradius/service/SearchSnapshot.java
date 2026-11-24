@@ -28,7 +28,9 @@ import java.util.zip.GZIPOutputStream;
  * with their label. Running days depend on today (B31), so the dump pins it.
  * <p>
  * The gtfs-mini dumps are checked by SearchSnapshotTest. For dev and full data, {@link #main} dumps the starts of one
- * set in {@code docs/bench-stations.txt} from a binary cache file.
+ * set in {@code docs/bench-stations.txt} from a binary cache file. The browser engine has no trip IDs, so it writes
+ * its rides as store positions ({@link RideFormat#STORE_POSITIONS}), which the build check compares with the JVM's
+ * (#10).
  */
 @Slf4j
 final class SearchSnapshot {
@@ -46,12 +48,22 @@ final class SearchSnapshot {
     private static final String NO_DAYS = "none";
     private static final String NO_LABEL = "-";
 
+    /** How a line names a path's rides. */
+    enum RideFormat {
+        /** Trip ID, board stop and departure, alight stop and arrival, and the path's stations: the goldens. */
+        TRIP_IDS,
+        /** Trip, board event and alight event as positions in the store: all a browser's store can say. */
+        STORE_POSITIONS
+    }
+
     private final TransitGraph graph;
     private final CompactReachabilitySearch search;
+    private final RideFormat rideFormat;
 
-    SearchSnapshot(TransitGraph graph) {
+    SearchSnapshot(TransitGraph graph, RideFormat rideFormat) {
         this.graph = graph;
         this.search = new CompactReachabilitySearch(graph);
+        this.rideFormat = rideFormat;
     }
 
     /** Today first, then one section per start and transfer limit 0 to {@link #MAX_TRANSFERS}. */
@@ -67,19 +79,44 @@ final class SearchSnapshot {
                 result.forEachStation(pathsByStation::put);
                 for (Map.Entry<String, List<CompactResult.PathSummary>> station : pathsByStation.entrySet()) {
                     for (CompactResult.PathSummary path : station.getValue()) {
-                        out.write(line(station.getKey(), result.journey(station.getKey(), path.transfers())) + "\n");
+                        out.write(line(result, station.getKey(), path) + "\n");
                     }
                 }
             }
         }
     }
 
-    private static String line(String stationId, CompactResult.Journey journey) {
+    /** {@link #write} from every station of the graph, by ID. */
+    void writeEveryStation(Writer out) throws IOException {
+        write(graph.getAllStations().keySet().stream().sorted().toList(), out);
+    }
+
+    private String line(CompactResult result, String stationId, CompactResult.PathSummary summary) {
+        if (rideFormat == RideFormat.STORE_POSITIONS) {
+            CompactResult.RideList rideList = result.rideList(stationId, summary.transfers());
+            return String.join(FIELD_SEPARATOR, stationId, String.valueOf(summary.transfers()),
+                    String.valueOf(summary.durationMinutes()), positions(rideList.rides()),
+                    days(rideList.runningDays()));
+        }
+        CompactResult.Journey journey = result.journey(stationId, summary.transfers());
         JourneyPath path = journey.path();
-        ServiceDays days = journey.runningDays();
         return String.join(FIELD_SEPARATOR, stationId, String.valueOf(path.getTransfers()),
                 String.valueOf(path.getTotalDurationMinutes()), String.join(" ", path.getStationIds()),
-                rides(path.getConnections()), dayRanges(days), JourneyRunningDays.describe(days).orElse(NO_LABEL));
+                rides(path.getConnections()), days(journey.runningDays()));
+    }
+
+    /** Each ride as trip, board event and alight event. */
+    private static String positions(List<CompactResult.Ride> rides) {
+        StringJoiner positions = new StringJoiner(RIDE_SEPARATOR);
+        for (CompactResult.Ride ride : rides) {
+            positions.add(ride.trip() + " " + ride.boardEvent() + " " + ride.alightEvent());
+        }
+        return positions.toString();
+    }
+
+    /** The day ranges and their label. */
+    private static String days(ServiceDays days) {
+        return dayRanges(days) + FIELD_SEPARATOR + JourneyRunningDays.describe(days).orElse(NO_LABEL);
     }
 
     /** Each ride as trip, board stop and departure, alight stop and arrival: consecutive connections on one trip. */
@@ -150,7 +187,7 @@ final class SearchSnapshot {
         List<String> unknown = startIds.stream().filter(id -> graph.getStation(id) == null).toList();
         if (!unknown.isEmpty()) throw new IllegalArgumentException("Not in the cache file: " + unknown);
         try (Writer out = writer(Path.of(args[3]))) {
-            new SearchSnapshot(graph).write(startIds, out);
+            new SearchSnapshot(graph, RideFormat.TRIP_IDS).write(startIds, out);
         }
         log.info("Wrote the snapshot of {} starts to {} in {} s", startIds.size(), args[3],
                 TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - startMs));

@@ -63,8 +63,12 @@ class SearchSnapshotTest {
     }
 
     static String dump(TransitGraph graph) throws IOException {
+        return dump(graph, SearchSnapshot.RideFormat.TRIP_IDS);
+    }
+
+    static String dump(TransitGraph graph, SearchSnapshot.RideFormat rideFormat) throws IOException {
         StringWriter out = new StringWriter();
-        new SearchSnapshot(graph).write(graph.getAllStations().keySet().stream().sorted().toList(), out);
+        new SearchSnapshot(graph, rideFormat).writeEveryStation(out);
         return out.toString();
     }
 }

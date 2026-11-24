@@ -1,0 +1,7 @@
+package org.teavm.classlib.java.util.concurrent;
+
+import java.util.ArrayDeque;
+
+/** Browser engine: java.util.concurrent.ConcurrentLinkedQueue, which TeaVM lacks; one thread needs no locking. */
+public class TConcurrentLinkedQueue<E> extends ArrayDeque<E> {
+}

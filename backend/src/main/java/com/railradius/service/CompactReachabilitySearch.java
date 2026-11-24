@@ -13,7 +13,6 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.stream.IntStream;
 
 /**
  * Finds every station reachable from a start with at most a number of transfers, on the flat {@link TimetableStore}
@@ -249,7 +248,7 @@ public class CompactReachabilitySearch {
         requestCandidateDays(scratch);
         scratch.days().resolve(run.store(), graph);
         // Choosing only reads the round's candidates and earlier paths, so stations do it in parallel
-        int[] newPaths = IntStream.range(0, stations.size()).parallel()
+        int[] newPaths = Parallel.range(stations.size())
                 .map(i -> newPath(run, stations.get(i)))
                 .toArray();
         Map<String, CompactResult.PathSummary> added = new HashMap<>();

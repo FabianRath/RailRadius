@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The browser engine (#7): the backend's search compiled to WebAssembly (Wasm GC) by TeaVM (decisions.md, #8), and
+  the build check that it finds exactly what the server finds (#10). Needs the backend's classes and its test output:
+  run `mvn -q -f backend/pom.xml test` first, then `mvn -q -f browser-engine/pom.xml verify` (Node on the PATH).
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.railradius</groupId>
+    <artifactId>railradius-browser-engine</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>RailRadius Browser Engine</name>
+
+    <properties>
+        <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <teavm.version>0.17.0</teavm.version>
+        <backend.dir>${project.basedir}/../backend</backend.dir>
+        <engine.dir>${project.build.directory}/engine</engine.dir>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.teavm</groupId>
+            <artifactId>teavm-classlib</artifactId>
+            <version>${teavm.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.teavm</groupId>
+            <artifactId>teavm-jso</artifactId>
+            <version>${teavm.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.teavm</groupId>
+            <artifactId>teavm-jso-apis</artifactId>
+            <version>${teavm.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>6.0.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.27.7</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- The backend's classes as they are, but for the stand-ins in src/main/java, which this module compiles -->
+            <plugin>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>backend-classes</id>
+                        <phase>process-resources</phase>
+                        <goals><goal>copy-resources</goal></goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${backend.dir}/target/classes</directory>
+                                    <includes><include>com/railradius/**/*.class</include></includes>
+                                    <excludes>
+                                        <exclude>com/railradius/service/BinaryBlocks*.class</exclude>
+                                        <exclude>com/railradius/service/Parallel.class</exclude>
+                                        <exclude>com/railradius/service/SearchRefusal*.class</exclude>
+                                    </excludes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- TeaVM's loader for the module, which ships inside its compiler -->
+            <plugin>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.9.0</version>
+                <executions>
+                    <execution>
+                        <id>wasm-runtime</id>
+                        <phase>process-classes</phase>
+                        <goals><goal>unpack</goal></goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>org.teavm</groupId>
+                                    <artifactId>teavm-core</artifactId>
+                                    <version>${teavm.version}</version>
+                                    <includes>org/teavm/backend/wasm/wasm-gc-module-runtime.js</includes>
+                                    <outputDirectory>${engine.dir}</outputDirectory>
+                                    <fileMappers>
+                                        <org.codehaus.plexus.components.io.filemappers.FlattenFileMapper/>
+                                    </fileMappers>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.teavm</groupId>
+                <artifactId>teavm-maven-plugin</artifactId>
+                <version>${teavm.version}</version>
+                <executions>
+                    <execution>
+                        <id>wasm-gc</id>
+                        <phase>process-classes</phase>
+                        <goals><goal>compile</goal></goals>
+                        <configuration>
+                            <mainClass>com.railradius.service.BrowserEngine</mainClass>
+                            <targetType>WEBASSEMBLY_GC</targetType>
+                            <targetDirectory>${engine.dir}</targetDirectory>
+                            <targetFileName>search.wasm</targetFileName>
+                            <optimizationLevel>FULL</optimizationLevel>
+                            <minifying>true</minifying>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.6</version>
+                <configuration>
+                    <systemPropertyVariables>
+                        <engine.dir>${engine.dir}</engine.dir>
+                        <check.dir>${backend.dir}/target/browser-engine-check</check.dir>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

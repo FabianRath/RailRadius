@@ -48,6 +48,11 @@ public class TransitGraph {
         served = ServedGraph.of(data);
     }
 
+    /** Serves what a browser reads from its timetable file (#10): the same search, no journeys by trip ID. */
+    void serve(BrowserDataFile.BrowserData data) {
+        served = ServedGraph.of(data);
+    }
+
     public Station getStation(String stopId) {
         return served.station(stopId);
     }

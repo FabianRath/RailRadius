@@ -7,7 +7,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +21,8 @@ class BrowserDataFileTest {
 
     // Coordinates travel as floats
     private static final double COORDINATE_TOLERANCE_DEG = 1e-5;
+    // Relative to backend/, where Maven runs the tests; the browser engine's build check reads it (browser-engine/)
+    private static final Path ENGINE_CHECK_DIR = Path.of("target/browser-engine-check");
 
     @TempDir
     Path tempDir;
@@ -35,6 +39,28 @@ class BrowserDataFileTest {
         BrowserDataFile.BrowserData read = writeAndRead(served);
 
         assertThat(searchView(read.store())).containsExactlyElementsOf(searchView(served.store()));
+    }
+
+    /**
+     * The file and the server's results are also left in {@link #ENGINE_CHECK_DIR}: the browser engine's build check
+     * searches the same file in WebAssembly and must find the same (#10).
+     */
+    @ParameterizedTest
+    @MethodSource("feedCombinations")
+    void searchingTheFileFindsWhatTheServerFinds(List<String> feeds) throws IOException {
+        TransitGraph server = GtfsTestFixtures.load(tempDir, feeds.toArray(String[]::new));
+        Path file = tempDir.resolve("browser-data.bin");
+        BrowserDataFile.write(server.served(), file);
+        TransitGraph browser = TransitGraph.withToday(GtfsTestFixtures.TODAY);
+        browser.serve(BrowserDataFile.read(file));
+
+        String serverDump = SearchSnapshotTest.dump(server, SearchSnapshot.RideFormat.STORE_POSITIONS);
+
+        assertThat(SearchSnapshotTest.dump(browser, SearchSnapshot.RideFormat.STORE_POSITIONS)).isEqualTo(serverDump);
+        String combination = String.join("+", feeds);
+        Files.createDirectories(ENGINE_CHECK_DIR);
+        Files.copy(file, ENGINE_CHECK_DIR.resolve(combination + ".bin"), StandardCopyOption.REPLACE_EXISTING);
+        Files.writeString(ENGINE_CHECK_DIR.resolve(combination + ".txt"), serverDump);
     }
 
     @Test

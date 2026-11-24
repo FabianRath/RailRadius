@@ -38,6 +38,17 @@ record ServedGraph(Map<String, Station> stations, Map<String, Set<String>> trans
                 StationSearchIndex.build(stations.values(), translatedNames, store));
     }
 
+    /**
+     * The graph a browser searches on: no translated names, trip infos, feeds or name index, which the server keeps.
+     * It builds no name index, so the browser engine never reaches the index's patterns, which it cannot compile.
+     */
+    static ServedGraph of(BrowserDataFile.BrowserData data) {
+        Map<String, Station> stations = new HashMap<>();
+        data.stations().forEach(station -> stations.put(station.getId(), station));
+        return new ServedGraph(Collections.unmodifiableMap(stations), Map.of(), Map.of(), data.store(), List.of(),
+                StationSearchIndex.Index.EMPTY);
+    }
+
     Station station(String stopId) {
         return stations.get(stopId);
     }

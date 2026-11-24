@@ -55,22 +55,27 @@ final class BrowserDataFile {
 
     static BrowserData read(Path file) throws IOException {
         try (BinaryBlocks.Reader in = new BinaryBlocks.Reader(file, FORMAT_VERSION)) {
-            String notice = new String(in.bytes(), StandardCharsets.UTF_8);
-            PackedStrings ids = PackedStrings.readFrom(in);
-            List<Station> stations = readStations(ids, in);
-            int[] tripFirstEvent = firstEvents(in.ints());
-            int[] evStation = in.ints();
-            int[] evArrSec = in.ints();
-            int[] evDepSec = in.ints();
-            undoDifferences(tripFirstEvent, evArrSec, evDepSec);
-            DayPatterns dayPatterns = DayPatterns.readFrom(in);
-            int[] tripDayPattern = in.ints();
-            in.checkAllRead();
-            StationTable stationTable = StationTable.of(stations.stream().map(Station::getId).toList());
-            TimetableStore store = TimetableStore.of(TimetableStoreBuilder.withoutTripNames(stationTable,
-                    tripFirstEvent, evStation, evDepSec, evArrSec, dayPatterns, tripDayPattern));
-            return new BrowserData(stations, store, notice);
+            return read(in);
         }
+    }
+
+    /** Reads every block of the reader; the browser engine's reader reads the file from memory. */
+    static BrowserData read(BinaryBlocks.Reader in) throws IOException {
+        String notice = new String(in.bytes(), StandardCharsets.UTF_8);
+        PackedStrings ids = PackedStrings.readFrom(in);
+        List<Station> stations = readStations(ids, in);
+        int[] tripFirstEvent = firstEvents(in.ints());
+        int[] evStation = in.ints();
+        int[] evArrSec = in.ints();
+        int[] evDepSec = in.ints();
+        undoDifferences(tripFirstEvent, evArrSec, evDepSec);
+        DayPatterns dayPatterns = DayPatterns.readFrom(in);
+        int[] tripDayPattern = in.ints();
+        in.checkAllRead();
+        StationTable stationTable = StationTable.of(stations.stream().map(Station::getId).toList());
+        TimetableStore store = TimetableStore.of(TimetableStoreBuilder.withoutTripNames(stationTable,
+                tripFirstEvent, evStation, evDepSec, evArrSec, dayPatterns, tripDayPattern));
+        return new BrowserData(stations, store, notice);
     }
 
     /** The ODbL notice and each feed with the days it covers. */
