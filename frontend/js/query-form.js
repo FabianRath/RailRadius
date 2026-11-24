@@ -1,7 +1,4 @@
-import { fmtMins } from './util.js';
-
-const DEFAULT_MAX_TRANSFER_MINUTES = 180;
-const TRANSFER_TIME_LIMIT_DEFAULT = true;
+import { defaultQuery, parseQuery, QUERY_BOUNDS, waitHint, waitRangeIsValid } from './query.js';
 
 const calculateBtn = document.getElementById('calculateBtn');
 const transferInput = document.getElementById('transferInput');
@@ -19,10 +16,19 @@ const optionsCell = document.querySelector('.board-options');
 const optionsToggle = document.getElementById('optionsToggle');
 const optionsPanel = document.getElementById('optionsPanel');
 
-let transferTimeLimitEnabled = TRANSFER_TIME_LIMIT_DEFAULT;
+// Each query number's field
+const FIELDS = {
+    maxTransfers: transferInput,
+    maxJourneyHours: maxJourneyTimeInput,
+    minWaitMinutes: minTransferTimeInput,
+    maxWaitMinutes: maxTransferTimeInput
+};
+
+let transferTimeLimitEnabled = defaultQuery().waitLimited;
 
 /** onAreasToggle(visible) runs now and whenever the "areas" option changes; the browser may restore it on reload. */
 export function initQueryForm(onAreasToggle) {
+    initFields();
     transferMinus.addEventListener('click', () => { transferInput.stepDown(); updateStepperButtons(); });
     transferPlus.addEventListener('click', () => { transferInput.stepUp(); updateStepperButtons(); });
     transferInput.addEventListener('input', updateStepperButtons);
@@ -42,10 +48,10 @@ export function showQueryForm() {
     calculateBtn.disabled = false;
 }
 
-// The backend rejects values outside the fields' min/max (B41), so typed values are clamped to them. With the wait
-// limit off, the whole range the backend allows is searched.
+/** The query the form holds; typed values are clamped to their bounds. */
 export function readQuery() {
-    return queryFromFields(input => input.value, transferTimeLimitEnabled);
+    const texts = Object.fromEntries(Object.entries(FIELDS).map(([key, input]) => [key, input.value]));
+    return parseQuery(texts, transferTimeLimitEnabled);
 }
 
 /**
@@ -53,99 +59,34 @@ export function readQuery() {
  * the backend would only answer with its validation error (B52).
  */
 export function checkQuery() {
-    const valid = waitRangeIsValid();
+    const valid = waitRangeIsValid(readQuery());
     showWaitRangeError(!valid);
     if (!valid) setOptionsOpen(true);
     return valid;
 }
 
-/** The query the untouched form sends. */
-export function defaultQuery() {
-    return queryFromFields(input => input.defaultValue, TRANSFER_TIME_LIMIT_DEFAULT);
-}
-
-/**
- * Sets the fields from untrusted text, e.g. a link's parameters (null for a missing one). A value that is no number
- * keeps the field's default; the others are clamped to the field's bounds like typed values. The wait range the
- * limit off sends turns the limit off.
- */
+/** Sets the fields and the wait-limit switch to a query, e.g. a link's. */
 export function applyQuery(query) {
-    setField(transferInput, parseInt(query.maxTransfers, 10));
-    setField(maxJourneyTimeInput, parseFloat(query.maxJourneyHours));
-    setField(minTransferTimeInput, parseInt(query.minTransferMinutes, 10));
-    setField(maxTransferTimeInput, parseInt(query.maxTransferMinutes, 10));
-    restoreTransferTimeLimit();
+    Object.entries(FIELDS).forEach(([key, input]) => { input.value = query[key] ?? ''; });
+    setTransferTimeLimitEnabled(query.waitLimited);
     updateStepperButtons();
 }
 
-// A link holds no toggle state (B56). Turned off, the fields go back to their defaults, so turning the limit on
-// again gives the usual range rather than the whole one.
-function restoreTransferTimeLimit() {
-    const unlimited = unlimitedWaitRange();
-    const limitOff = Number(minTransferTimeInput.value) === unlimited.minTransferMinutes
-        && Number(maxTransferTimeInput.value) === unlimited.maxTransferMinutes;
-    if (limitOff) {
-        [minTransferTimeInput, maxTransferTimeInput].forEach(input => { input.value = input.defaultValue; });
-    }
-    setTransferTimeLimitEnabled(!limitOff);
-}
-
-function setField(input, value) {
-    input.value = Number.isNaN(value) ? input.defaultValue : clampToField(input, value);
-}
-
-function queryFromFields(valueOf, limitEnabled) {
-    const journeyHours = valueOf(maxJourneyTimeInput);
-    const waitRange = limitEnabled
-        ? {
-            minTransferMinutes: minTransferMinutesOf(valueOf(minTransferTimeInput)),
-            maxTransferMinutes: maxTransferMinutesOf(valueOf(maxTransferTimeInput))
-        }
-        : unlimitedWaitRange();
-    return {
-        maxTransfers: clampTransfers(valueOf(transferInput)),
-        maxJourneyHours: journeyHours ? clampToField(maxJourneyTimeInput, parseFloat(journeyHours)) : null,
-        ...waitRange
-    };
-}
-
-// With the limit off, the search sends the whole range the backend allows
-function unlimitedWaitRange() {
-    return { minTransferMinutes: 0, maxTransferMinutes: Number(maxTransferTimeInput.max) };
+// Sets the default rather than the value, so a value the browser restores on reload stays
+function initFields() {
+    const defaults = defaultQuery();
+    Object.entries(FIELDS).forEach(([key, input]) => {
+        input.min = QUERY_BOUNDS[key].min;
+        input.max = QUERY_BOUNDS[key].max;
+        input.defaultValue = defaults[key] ?? '';
+    });
 }
 
 // stepUp()/stepDown() fire no input event, so the buttons call this themselves
 function updateStepperButtons() {
-    const transfers = clampTransfers(transferInput.value);
-    transferMinus.disabled = transfers <= Number(transferInput.min);
-    transferPlus.disabled = transfers >= Number(transferInput.max);
-}
-
-// The field accepts any typed text; empty or invalid input means the minimum
-function clampTransfers(value) {
-    return fieldNumberOf(transferInput, value, Number(transferInput.min));
-}
-
-// The search and the hint both read the wait fields through these, so the hint shows what the search will use
-function minTransferMinutesOf(text) {
-    return fieldNumberOf(minTransferTimeInput, text, 0);
-}
-
-// A typed 0 is out of range like any other number, so it is clamped rather than read as empty (B57)
-function maxTransferMinutesOf(text) {
-    return fieldNumberOf(maxTransferTimeInput, text, DEFAULT_MAX_TRANSFER_MINUTES);
-}
-
-// Empty or invalid text gives the fallback; a number, also 0, is clamped to the field's bounds
-function fieldNumberOf(input, text, fallback) {
-    const value = parseInt(text, 10);
-    return Number.isNaN(value) ? fallback : clampToField(input, value);
-}
-
-// With the limit off, the search sends the whole range, which is always valid
-function waitRangeIsValid() {
-    return !transferTimeLimitEnabled
-        || minTransferMinutesOf(minTransferTimeInput.value) <= maxTransferMinutesOf(maxTransferTimeInput.value);
+    const transfers = readQuery().maxTransfers;
+    transferMinus.disabled = transfers <= QUERY_BOUNDS.maxTransfers.min;
+    transferPlus.disabled = transfers >= QUERY_BOUNDS.maxTransfers.max;
 }
 
 function showWaitRangeError(shown) {
@@ -157,11 +98,7 @@ function showWaitRangeError(shown) {
 }
 
 function clearWaitRangeErrorIfValid() {
-    if (waitRangeIsValid()) showWaitRangeError(false);
-}
-
-function clampToField(input, value) {
-    return Math.min(Number(input.max), Math.max(Number(input.min), value));
+    if (waitRangeIsValid(readQuery())) showWaitRangeError(false);
 }
 
 function initOptionsPanel() {
@@ -194,12 +131,5 @@ function setTransferTimeLimitEnabled(enabled) {
 
 function updateTransferTimeHint() {
     transferTimeHint.classList.toggle('is-off', !transferTimeLimitEnabled);
-    if (!transferTimeLimitEnabled) {
-        // Off still has the backend's ceiling, the field's max (B41)
-        transferTimeHint.textContent = `max ${fmtMins(Number(maxTransferTimeInput.max))}`;
-        return;
-    }
-    const minMins = minTransferMinutesOf(minTransferTimeInput.value);
-    const maxMins = maxTransferMinutesOf(maxTransferTimeInput.value);
-    transferTimeHint.textContent = `${minMins}–${maxMins} min`;
+    transferTimeHint.textContent = waitHint(readQuery());
 }

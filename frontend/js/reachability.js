@@ -1,6 +1,7 @@
 import { fetchJourney, openReachabilityStream } from './api.js';
 import { addReachableStations, clearReachableStations, fitToPoints, hasCoordinates, setStartStation } from './map.js';
 import { checkQuery, readQuery } from './query-form.js';
+import { requestParamsOf } from './query.js';
 import { clearStatus, showStatus } from './util.js';
 import { isUpdatingTimetables } from './server-status.js';
 import { dismissIntroHint } from './intro-hint.js';
@@ -54,9 +55,8 @@ export async function getJourney(stopId) {
     return journey;
 }
 
-function cacheKey(stationId, query) {
-    return [stationId, query.maxTransfers, query.minTransferMinutes, query.maxTransferMinutes,
-        query.maxJourneyHours].join('|');
+function cacheKey(params) {
+    return Object.values(params).join('|');
 }
 
 /**
@@ -66,13 +66,14 @@ function cacheKey(stationId, query) {
 export function calculate(station) {
     if (!checkQuery()) return false;
     const query = readQuery();
-    const key = cacheKey(station.id, query);
+    const params = requestParamsOf(station.id, query);
+    const key = cacheKey(params);
     console.log('Reachability query:', key);
 
     clearStatus();
     dismissIntroHint();
     writeDeepLink(station.id, query);
-    shownParams = streamParams(station.id, query);
+    shownParams = params;
     journeys = new Map();
     results.clear();
     clearReachableStations();
@@ -88,17 +89,6 @@ export function calculate(station) {
     }
     streamResults(shownParams, key);
     return true;
-}
-
-function streamParams(stationId, query) {
-    const params = {
-        stationId,
-        maxTransfers: query.maxTransfers,
-        minTransferMinutes: query.minTransferMinutes,
-        maxTransferMinutes: query.maxTransferMinutes
-    };
-    if (query.maxJourneyHours != null) params.maxJourneyHours = query.maxJourneyHours;
-    return params;
 }
 
 function streamResults(params, key) {
