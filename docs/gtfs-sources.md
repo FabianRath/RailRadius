@@ -43,7 +43,7 @@ Feeds in backticks are in `gtfs-feeds.txt`. Rail routes, dates and operators wer
 | L | Moldova | `moldova` | **unclear** | CFM, volunteer rehost. |
 | L | Montenegro | `montenegro` | ODbL | ŽPCG. |
 | L | Netherlands | `netherlands` | CC0 | NS, Arriva, Keolis and others (OVapi). |
-| L | North Macedonia | `northmacedonia` | **unclear** | Macedonian Railways, volunteer rehost. |
+| L | North Macedonia | `northmacedonia` | CC0 | MŽT, community feed from the public timetable (github.com/deryclem/gtfs-north-macedonia; fallback MDB mirror `mdb-3461`). Stop names in Cyrillic, Latin ones in `translations.txt`. The previous volunteer rehost deleted its `mzi` feed on 2026-11-20. |
 | – | Northern Ireland | | **unclear** | Translink NI Railways. No GTFS source left (checked 2026-10-06): the transitpdf copy is gone, Translink publishes rail timetables only as TransXChange on https://www.opendatani.gov.uk/dataset/nir20160126v2 (monthly, OGL). The Irish Rail feed has the Dublin–Belfast Enterprise. The zip on disk, `gtfs_northern-ireland.zip` (GTFS.pro copy from transitpdf, 2026-07-27, downloaded on 2026-10-05), still runs until mid-2027 but can't be refreshed (B36). |
 | L | Norway | `norway` | NLOD 2.0 | Entur national feed (Vy, SJ, Go-Ahead, Flytoget). |
 | L | Poland | `poland` | CC BY 4.0 | All rail operators incl. PKP Intercity (mkuran.pl). Fallback `gtfs.kasznia.net/static/polish-trains.zip`, same feed. `gtfs.kasznia.net/static/pkp-ic.zip` has PKP Intercity alone. |
@@ -83,7 +83,7 @@ Not needed: Liechtenstein and Monaco (served by ÖBB / SNCF, so covered by the A
   - Spain (OUIGO): Spanish NAP licence (LDA). Commercial use is allowed, but it requires the credit "Powered by MITRAMS" with a link, and shares raw data alike. OUIGO's own licence is unknown.
   - Turkey: the generator is MIT, but the timetable is taken from TCDD's website, and TCDD has published no licence for it.
 - ² Only from Transitous; no licence page found at the publisher.
-- **unclear**: no licence found anywhere. These are the volunteer rehosts (Bosnia, Kosovo, Moldova, North Macedonia), the jbb feeds that Transitous lists without a licence (Bulgaria, Greece, Lithuania, Ukraine), Serbia's GitLab feed, Cotral, Slovakia (data.slovensko.sk only renders in a browser; an older Mobility Database entry said CC0) and Northern Ireland (a busmaps.com derivative whose licence page is gone).
+- **unclear**: no licence found anywhere. These are the volunteer rehosts (Bosnia, Kosovo, Moldova), the jbb feeds that Transitous lists without a licence (Bulgaria, Greece, Lithuania, Ukraine), Serbia's GitLab feed, Cotral, Slovakia (data.slovensko.sk only renders in a browser; an older Mobility Database entry said CC0) and Northern Ireland (a busmaps.com derivative whose licence page is gone).
 
 ## Survey: rail feeds not loaded yet (2026-10-05)
 

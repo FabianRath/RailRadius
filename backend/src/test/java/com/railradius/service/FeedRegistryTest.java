@@ -60,6 +60,16 @@ class FeedRegistryTest {
                 .containsEntry("User-Agent", "RailRadius");
     }
 
+    @Test
+    void northMacedoniaComesFromTheCommunityFeedWithTheMobilityDatabaseMirrorAsFallback() {
+        FeedRegistry registry = new FeedRegistry();
+
+        assertThat(registry.of("northmacedonia").orElseThrow().urls())
+                .extracting(FeedUrl::url)
+                .containsExactly("https://github.com/deryclem/gtfs-north-macedonia/raw/main/gtfs-north-macedonia.zip",
+                        "https://files.mobilitydatabase.org/mdb-3461/latest.zip");
+    }
+
     private static FeedSource parseOne(String line) {
         return FeedRegistry.parseAll(List.of(line)).values().iterator().next();
     }
