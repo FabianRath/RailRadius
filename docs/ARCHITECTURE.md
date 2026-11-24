@@ -11,7 +11,7 @@ It loads GTFS timetable feeds for ~25 European countries, keeps only **rail** ro
 
 ## Tech stack
 
-- Java 25 (JDK 25 required to build), Spring Boot 4.0.2 (`spring-boot-starter-webmvc`, actuator). Virtual threads are on (`spring.threads.virtual.enabled`): SSE streams run on Spring's task executor (`applicationTaskExecutor`, named explicitly because `@EnableScheduling` adds a task scheduler of the same type).
+- Java 25 (JDK 25 required to build), Spring Boot 4.0.10 (`spring-boot-starter-webmvc`, actuator). Virtual threads are on (`spring.threads.virtual.enabled`): SSE streams run on Spring's task executor (`applicationTaskExecutor`, named explicitly because `@EnableScheduling` adds a task scheduler of the same type).
 - Lombok (`@Data`, `@Builder`, `@Slf4j`, `@RequiredArgsConstructor`)
 - Caffeine for the in-memory search result cache (`ReachabilityCache`)
 - GTFS CSV parsing is hand-written (no GTFS library).
