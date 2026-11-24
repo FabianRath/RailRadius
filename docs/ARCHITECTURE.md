@@ -42,7 +42,7 @@ Run from `backend/`; the cache paths are relative to the working directory. The 
 
 ```
 RailRadius/
-├── CLAUDE.md, docs/ (ARCHITECTURE, TODO, decisions, HOSTING, bench-stations.txt), scripts/ (api.sh, bench.sh, probe.sh)
+├── README.md, LICENSE (AGPL-3.0), SECURITY.md, CLAUDE.md, docs/ (ARCHITECTURE, CODING_GUIDELINES, decisions, HOSTING, gtfs-sources, bench-stations.txt), scripts/ (api.sh, bench.sh, probe.sh)
 ├── frontend/index.html               # markup; served at / by Spring (static-locations: file:../frontend/). Layout: a
 │                                     #   board bar across the top (search, query fields, result count, button), the map
 │                                     #   below it (notices, loading overlay, debug banner and dev login over it) and the
@@ -323,4 +323,4 @@ Every response, API and static files, carries the security headers of `SecurityH
 
 ## Known issues and TODOs
 
-See `docs/TODO.md`.
+Tracked in the repo's GitHub Issues (`CODING_GUIDELINES.md` §9).

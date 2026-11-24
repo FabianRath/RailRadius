@@ -11,7 +11,8 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
   - `dto/`, `model/`, `config/`
 - `backend/src/test/`: unit tests on the `gtfs-mini` fixture (see `src/test/resources/gtfs-mini/README.md`)
 - `frontend/`: `index.html` (markup), `css/app.css`, `js/*.js` (one ES module per concern, entry `main.js`). See guidelines §8.
-- `docs/TODO.md` (backlog + known bugs), `docs/decisions.md` (why things are the way they are), `docs/HOSTING.md` (server size, memory measurements)
+- Backlog and known bugs: GitHub Issues, read and written with `gh` (guidelines §9)
+- `docs/decisions.md` (why things are the way they are), `docs/HOSTING.md` (server size, memory measurements)
 - `scripts/api.sh`: curl shortcuts (`scripts/api.sh help`); `scripts/bench.sh`: memory and speed baselines (`docs/HOSTING.md`); `scripts/probe.sh`: abuse probe (hostile requests, expected statuses)
 
 ## Environment: Windows, not Linux
@@ -47,5 +48,5 @@ All code changes must follow these. They cover allowed libraries, style, reuse a
 ## Workflow
 - Small, focused changes. Plan first when a change spans several files.
 - Keep `docs/ARCHITECTURE.md` in sync **in the same commit** as the code change. Update it when you add, remove, rename or re-scope a class or frontend module; change an endpoint, SSE event, DTO/model field, config key or default; change the data pipeline, cache file format, BFS/caching behaviour, or a documented constant (radii, batch sizes, thresholds); or change the directory layout or run commands. Before editing a section, check its claims against the code: the doc must describe the code as it is, not as planned. Pure internal refactors that touch none of these need no update.
-- Update `docs/TODO.md` when you finish an item. Ask the user before adding a newly found bug (guidelines §9). Add a line to `docs/decisions.md` for non-obvious choices.
+- Close an item's issue from its commit (`Fixes #12`). Ask the user before opening an issue for a newly found bug (guidelines §9). Add a line to `docs/decisions.md` for non-obvious choices.
 - Commit after each completed task. Use short imperative messages, and don't commit `backend/data/`.

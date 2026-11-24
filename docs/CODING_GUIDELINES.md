@@ -1,6 +1,6 @@
 # Coding Guidelines
 
-Binding for every change. Existing code does not always follow them yet. New and changed lines must; don't mass-rewrite untouched code (log it in `TODO.md` instead).
+Binding for every change. Existing code does not always follow them yet. New and changed lines must; don't mass-rewrite untouched code (propose an issue for it instead, §9).
 
 ## 1. Dependencies: closed list
 | Area | Use | Not this |
@@ -69,19 +69,19 @@ Binding for every change. Existing code does not always follow them yet. New and
 - The page only works over HTTP (ES modules): open it via the backend at `http://localhost:8080/`, not as a file.
 - Escape GTFS/user text before inserting it via `innerHTML`, or use `textContent`.
 
-## 9. Bugs and `TODO.md`
-- **Found a possible bug? Ask first.** Stop and describe it to the user: what you saw, where (`file:line`), how to reproduce it, and why you think it's a bug. Write it into `TODO.md` only after the user agrees, in the form and with the priority they confirm. Don't fix it on the side either.
-- **Every item has a permanent ID**: a category prefix plus a number.
-  - `B` = bug, `F` = feature/UX, `S` = structure/cleanup/refactor. Example: `- [ ] **B12** Short title. Details…`
-  - Take the number from the "Next free IDs" line at the top of `TODO.md`, then increase that counter in the same edit.
-  - IDs are never renumbered or reused, not even after an item is deleted.
-  - Refer to other items by ID ("caused by B2"), never by position ("the issue above").
-- **Finishing an item:** delete its line and name the ID in the commit message (e.g. `Fix BOM header parsing (B1)`). Reference the ID in the related test's `@Disabled` reason too, if there is one.
+## 9. Bugs and GitHub Issues
+The backlog is the repo's GitHub Issues (`gh issue list`, `gh issue view <n>`). There is no backlog file.
+- **Found a possible bug? Ask first.** Stop and describe it to the user: what you saw, where (`file:line`), how to reproduce it, and why you think it's a bug. Open an issue only after the user agrees, in the form and with the labels they confirm. Don't fix it on the side either.
+- **Security problems never go into a public issue.** Describe them to the user only; they decide whether to file a private advisory (`SECURITY.md`).
+- **Labels:** `bug`, `feature` (feature/UX), `structure` (structure/cleanup/refactor). Add `needs decision` when the user has to decide before work starts. Items that block the public launch go in the `Launch` milestone.
+- **Refer to items by issue number** (`#12`, "caused by #7"), never by position. Issues moved from the old `TODO.md` keep their old ID at the start of the title (`B54: …`); older commits and docs use those IDs (B, F, S plus a number).
+- **Finishing an item:** name the issue in the commit subject and close it from the body, e.g. subject `Fix BOM header parsing (#12)`, body line `Fixes #12`. GitHub closes it when the commit reaches `main`. Reference the issue in the related test's `@Disabled` reason too, if there is one.
+- Writing an issue: say what is wrong or wanted, where (`file:line`), how to reproduce, and what "done" means. Keep long research (tables, links) in the issue, not in the docs.
 
 ## 10. Before you call a change done
 1. `compile` and `test` pass (CLAUDE.md commands).
 2. The diff has no unused code, commented-out code, stray logs, debug leftovers or unrelated reformatting.
 3. Nothing you added duplicates existing logic (grep for it).
 4. No new dependency without approval.
-5. `TODO.md` updated (finished IDs removed, user-approved new items added) and `decisions.md` updated if relevant.
+5. The commit closes its issue (`Fixes #n`), user-approved new items are opened as issues, and `decisions.md` is updated if relevant.
 6. `ARCHITECTURE.md` still matches the code for everything the diff touches (triggers listed in CLAUDE.md → Workflow). Grep it for every class, field, endpoint, config key and constant you renamed, removed or changed.
