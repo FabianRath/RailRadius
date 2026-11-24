@@ -1,6 +1,7 @@
 package com.railradius.controller;
 
-import com.railradius.config.AdminToken;
+import com.railradius.config.AdminAccess;
+import com.railradius.config.AdminSessions;
 import com.railradius.dto.FeedAlertMailResult;
 import com.railradius.dto.FeedAlertStatus;
 import com.railradius.dto.FeedDownloadResult;
@@ -48,16 +49,16 @@ public class AdminController {
     private final ReachabilityService reachabilityService;
     private final FeedUpdateCenter feedUpdateCenter;
     private final FeedAlerts feedAlerts;
-    private final AdminToken adminToken;
+    private final AdminSessions adminSessions;
 
     /**
      * Starts an admin session and sets its id as the admin cookie, so this browser's searches skip the rate limit: its
-     * EventSource cannot send the {@value AdminToken#HEADER} header. Called on dev login.
+     * EventSource cannot send the {@value AdminAccess#HEADER} header. Called on dev login.
      */
     @PostMapping("/session")
     public ResponseEntity<Void> startSession(HttpServletRequest request) {
         return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, adminToken.startSession(request).toString())
+                .header(HttpHeaders.SET_COOKIE, adminSessions.start(request).toString())
                 .build();
     }
 
@@ -65,7 +66,7 @@ public class AdminController {
     @DeleteMapping("/session")
     public ResponseEntity<Void> endSession(HttpServletRequest request) {
         return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, adminToken.endSession(request).toString())
+                .header(HttpHeaders.SET_COOKIE, adminSessions.end(request).toString())
                 .build();
     }
 

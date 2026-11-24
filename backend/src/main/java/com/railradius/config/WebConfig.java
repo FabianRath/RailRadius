@@ -9,11 +9,11 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @RequiredArgsConstructor
 public class WebConfig implements WebMvcConfigurer {
 
-    private final AdminTokenInterceptor adminTokenInterceptor;
+    private final AdminAccessInterceptor adminAccessInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         // Matched like the controller mappings, so no path spelling can reach an admin handler unchecked
-        registry.addInterceptor(adminTokenInterceptor).addPathPatterns("/api/admin/**");
+        registry.addInterceptor(adminAccessInterceptor).addPathPatterns("/api/admin/**");
     }
 }

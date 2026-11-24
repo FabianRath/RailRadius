@@ -1,6 +1,6 @@
 package com.railradius.controller;
 
-import com.railradius.config.AdminToken;
+import com.railradius.config.AdminAccess;
 import com.railradius.dto.Coverage;
 import com.railradius.dto.ReachableStation;
 import com.railradius.model.Station;
@@ -41,20 +41,20 @@ public class RailRadiusController {
     private final StationSearchIndex stationSearchIndex;
     private final CoverageService coverageService;
     private final AsyncTaskExecutor taskExecutor;
-    private final AdminToken adminToken;
+    private final AdminAccess adminAccess;
     private final long streamTimeoutMs;
 
     // With @EnableScheduling the task scheduler is an AsyncTaskExecutor too; SSE streams use the task executor
     public RailRadiusController(ReachabilityService reachabilityService, TransitGraph transitGraph,
                                StationSearchIndex stationSearchIndex, CoverageService coverageService,
                                @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor,
-                               AdminToken adminToken, SearchAdmission admission) {
+                               AdminAccess adminAccess, SearchAdmission admission) {
         this.reachabilityService = reachabilityService;
         this.transitGraph = transitGraph;
         this.stationSearchIndex = stationSearchIndex;
         this.coverageService = coverageService;
         this.taskExecutor = taskExecutor;
-        this.adminToken = adminToken;
+        this.adminAccess = adminAccess;
         this.streamTimeoutMs = (long) (admission.longestWait().toMillis() * STREAM_TIMEOUT_FACTOR);
     }
     
@@ -112,7 +112,7 @@ public class RailRadiusController {
     }
 
     private SearchAdmission.Client client(HttpServletRequest request) {
-        return new SearchAdmission.Client(request.getRemoteAddr(), adminToken.sentWith(request));
+        return new SearchAdmission.Client(request.getRemoteAddr(), adminAccess.exemptsSearch(request));
     }
 
     @GetMapping("/stations/search")

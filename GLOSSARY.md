@@ -16,3 +16,6 @@ _Avoid_: rejection, error (an error is a server fault, and its details are never
 
 **Served graph**: the one snapshot of the merged rail network the app answers from: its stations, their translated names, the timetable store, the trip infos, the feed timespans and the station search index. A load replaces it whole, in one step, so a reader sees the old one or the new one, never a mix. A search finishes on the one it started on, and its result keeps it. In code: `ServedGraph`, held by `TransitGraph`.
 _Avoid_: graph (alone), network (the merged network a load is still building is `RailNetwork`).
+
+**Admin access**: how the app tells the admin from everyone else. The admin proves itself with the token in the `X-Admin-Token` header, or with the cookie of an admin session started by dev login. Only the header opens the admin API, because a cookie would also be sent by a forged cross-site request; either one exempts a search from the rate limit. A wrong token counts against the client wherever it is sent, and a client with too many is turned away from the admin API and loses its header's exemption. In code: `AdminAccess`.
+_Avoid_: admin token (the token is only one of the two proofs), admin identity.
