@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -17,8 +18,8 @@ import java.util.stream.IntStream;
 
 /**
  * Substring search over station names, their translations from the feeds and the variants of both
- * ({@link StationNameVariants}). A trigram index finds the candidates, so a search does not scan every station.
- * Must be rebuilt after the graph changes ({@link GtfsDataService} does so after each load).
+ * ({@link StationNameVariants}). A trigram index finds the candidates, so a search does not scan every station. The
+ * index is part of the {@link ServedGraph}: a load builds it ({@link #build}) along with the graph it indexes.
  */
 @Component
 @Slf4j
@@ -31,25 +32,26 @@ public class StationSearchIndex {
     private static final int GRAM_LENGTH = 3;
     // Folded queries contain no newline, so a match never spans two variants.
     private static final String VARIANT_SEPARATOR = "\n";
+    private static final StationNameVariants NAME_VARIANTS = new StationNameVariants();
 
     private final TransitGraph graph;
-    private final StationNameVariants nameVariants = new StationNameVariants();
-
-    private volatile Index index = new Index(List.of(), List.of(), Map.of());
 
     /**
      * Searchable stations best connected first, their joined name variants at the same positions, and per trigram
      * the ascending positions of the names that contain it. Ascending positions keep candidates in rank order.
      */
-    private record Index(List<Station> ranked, List<String> names, Map<String, int[]> positionsByGram) {}
+    record Index(List<Station> ranked, List<String> names, Map<String, int[]> positionsByGram) {
+        static final Index EMPTY = new Index(List.of(), List.of(), Map.of());
+    }
 
-    public void rebuild() {
-        List<Station> ranked = graph.stations().stream()
-                .filter(s -> s.getName() != null && graph.nextStationCount(s.getId()) > 0)
-                .sorted(Comparator.comparingInt((Station s) -> graph.nextStationCount(s.getId())).reversed()
+    /** The index of these stations, by the variants of their names and translated names. */
+    static Index build(Collection<Station> stations, Map<String, Set<String>> translatedNames, TimetableStore store) {
+        List<Station> ranked = stations.stream()
+                .filter(s -> s.getName() != null && store.nextStationCount(s.getId()) > 0)
+                .sorted(Comparator.comparingInt((Station s) -> store.nextStationCount(s.getId())).reversed()
                         .thenComparing(Station::getId))
                 .toList();
-        List<String> names = ranked.stream().map(this::joinedVariants).toList();
+        List<String> names = ranked.stream().map(station -> joinedVariants(station, translatedNames)).toList();
 
         Map<String, List<Integer>> positions = new HashMap<>();
         for (int i = 0; i < names.size(); i++) {
@@ -61,15 +63,15 @@ public class StationSearchIndex {
         positions.forEach((gram, list) ->
                 positionsByGram.put(gram, list.stream().mapToInt(Integer::intValue).toArray()));
 
-        index = new Index(ranked, names, positionsByGram);
         log.info("Station search index built: {} stations, {} trigrams", ranked.size(), positionsByGram.size());
+        return new Index(ranked, names, positionsByGram);
     }
 
     /** The variants of the station's name and of its translated names, without repeats. */
-    private String joinedVariants(Station station) {
-        Set<String> variants = new LinkedHashSet<>(nameVariants.variants(station.getName()));
-        for (String translatedName : graph.getTranslatedNames(station.getId())) {
-            variants.addAll(nameVariants.variants(translatedName));
+    private static String joinedVariants(Station station, Map<String, Set<String>> translatedNames) {
+        Set<String> variants = new LinkedHashSet<>(NAME_VARIANTS.variants(station.getName()));
+        for (String translatedName : translatedNames.getOrDefault(station.getId(), Set.of())) {
+            variants.addAll(NAME_VARIANTS.variants(translatedName));
         }
         return String.join(VARIANT_SEPARATOR, variants);
     }
@@ -85,7 +87,7 @@ public class StationSearchIndex {
         if (query.length() > MAX_QUERY_LENGTH) {
             throw SearchRefusal.invalid("The query must be at most " + MAX_QUERY_LENGTH + " characters");
         }
-        Index current = index;
+        Index current = graph.served().searchIndex();
         String q = StationNameVariants.fold(query);
         return candidates(current, q)
                 .filter(position -> current.names().get(position).contains(q))

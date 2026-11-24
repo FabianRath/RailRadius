@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** Fills the {@link TransitGraph} at startup (from the binary cache file, else from the zips) and on reload. */
+/** Serves a graph at startup (from the binary cache file, else from the zips) and on reload. */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -23,7 +23,6 @@ public class GtfsDataService {
     private final StationDeduplicator deduplicator;
     private final BinaryCacheStore binaryCacheStore;
     private final ReachabilityCache reachabilityCache;
-    private final StationSearchIndex stationSearchIndex;
     private final GtfsLoadProgress loadProgress;
 
     @Value("${railradius.gtfs.directory:./gtfs}")
@@ -32,7 +31,6 @@ public class GtfsDataService {
     @Value("${railradius.gtfs.auto-load-from-files:false}")
     private boolean autoLoadFromFiles;
 
-    private volatile boolean dataLoaded = false;
     // The network a load from the zips is building, for its progress; null when none runs
     private volatile RailNetwork loadingNetwork;
 
@@ -41,11 +39,9 @@ public class GtfsDataService {
         log.info("=== RailRadius GTFS Data Loader ===");
         Optional<BinaryCacheStore.BinaryCacheData> cached = binaryCacheStore.load();
         if (cached.isPresent()) {
-            graph.restore(cached.get());
-            stationSearchIndex.rebuild();
+            serve(cached.get());
             log.info("GTFS data loaded from the binary cache: {} stations, {} graph nodes, {} edges",
                     graph.stationCount(), graph.nodeCount(), graph.edgeCount());
-            dataLoaded = true;
             return;
         }
         if (!autoLoadFromFiles) {
@@ -74,7 +70,6 @@ public class GtfsDataService {
             loadingNetwork = null;
         }
         loadProgress.enter(GtfsLoadProgress.Phase.DONE);
-        dataLoaded = true;
     }
 
     private void buildGraphFromFiles() {
@@ -96,8 +91,12 @@ public class GtfsDataService {
         loadProgress.enter(GtfsLoadProgress.Phase.SAVING);
         BinaryCacheStore.BinaryCacheData data = network.servedData();
         binaryCacheStore.save(data, zips);
-        graph.restore(data);
-        stationSearchIndex.rebuild();
+        serve(data);
+    }
+
+    /** Makes the data the served graph and drops the stored results, which were searched on the one from before. */
+    private void serve(BinaryCacheStore.BinaryCacheData data) {
+        graph.serve(data);
         reachabilityCache.clear();
     }
 
@@ -110,7 +109,7 @@ public class GtfsDataService {
             "cacheFile", binaryCacheStore.path(),
             "cacheExists", binaryCacheStore.exists(),
             "cacheSizeMB", binaryCacheStore.sizeMb(),
-            "dataLoaded", dataLoaded,
+            "dataLoaded", graph.isDataLoaded(),
             "stationCount", graph.stationCount(),
             "graphNodeCount", graph.nodeCount(),
             "connectionCount", graph.edgeCount()

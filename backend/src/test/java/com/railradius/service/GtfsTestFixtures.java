@@ -60,7 +60,7 @@ final class GtfsTestFixtures {
     private static TransitGraph load(Path tempDir, int tripBatchSize, LocalDate today, String... feedFolders)
             throws IOException {
         TransitGraph graph = TransitGraph.withToday(today);
-        dataService(tempDir, graph, reachabilityCache(), new StationSearchIndex(graph), tripBatchSize,
+        dataService(tempDir, graph, reachabilityCache(), tripBatchSize,
                 feedFolders).loadFromFiles();
         return graph;
     }
@@ -92,22 +92,20 @@ final class GtfsTestFixtures {
 
     /** A GtfsDataService that loads the given feeds into the graph; nothing is loaded yet. */
     static GtfsDataService dataService(Path tempDir, TransitGraph graph, ReachabilityCache reachabilityCache,
-                                       StationSearchIndex stationSearchIndex, String... feedFolders)
-            throws IOException {
-        return dataService(tempDir, graph, reachabilityCache, stationSearchIndex, TRIP_BATCH_SIZE, feedFolders);
+                                       String... feedFolders) throws IOException {
+        return dataService(tempDir, graph, reachabilityCache, TRIP_BATCH_SIZE, feedFolders);
     }
 
-    /** Like {@link #dataService(Path, TransitGraph, ReachabilityCache, StationSearchIndex, String...)}. */
+    /** Like {@link #dataService(Path, TransitGraph, ReachabilityCache, String...)}. */
     static GtfsDataService dataService(Path tempDir, TransitGraph graph, String... feedFolders) throws IOException {
-        return dataService(tempDir, graph, reachabilityCache(), new StationSearchIndex(graph), feedFolders);
+        return dataService(tempDir, graph, reachabilityCache(), feedFolders);
     }
 
     private static GtfsDataService dataService(Path tempDir, TransitGraph graph, ReachabilityCache reachabilityCache,
-                                               StationSearchIndex stationSearchIndex, int tripBatchSize,
-                                               String... feedFolders) throws IOException {
+                                               int tripBatchSize, String... feedFolders) throws IOException {
         Path gtfsDir = zipFeeds(tempDir, feedFolders);
         GtfsDataService service = new GtfsDataService(graph, feedLoader(tripBatchSize), deduplicator(),
-                binaryCacheStore(tempDir), reachabilityCache, stationSearchIndex, new GtfsLoadProgress());
+                binaryCacheStore(tempDir), reachabilityCache, new GtfsLoadProgress());
         ReflectionTestUtils.setField(service, "gtfsDirectory", gtfsDir.toString());
         return service;
     }

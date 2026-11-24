@@ -6,30 +6,22 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
 /**
- * What the app serves of the merged rail network: stations, their translated names, the {@link TimetableStore} the
- * search runs on, the {@link TripInfo} of each store trip and how long each feed runs. Filled from the binary cache
- * or from a load of the zips ({@link RailNetwork#servedData}). All IDs are canonical stop/trip IDs.
+ * Holds the {@link ServedGraph}: stations, their translated names, the {@link TimetableStore} the search runs on, the
+ * {@link TripInfo} of each store trip, how long each feed runs and the station search index. Filled from the binary
+ * cache or from a load of the zips ({@link RailNetwork#servedData}). Each getter reads the served graph of that
+ * moment; a reader that needs several values from one graph takes {@link #served} once.
  */
 @Component
 public class TransitGraph {
 
-    private final Map<String, Station> stations = new ConcurrentHashMap<>();
-    // stop ID -> its names in other languages, from the feeds' translations.txt
-    private final Map<String, Set<String>> translatedNames = new ConcurrentHashMap<>();
-    // trip ID of a store trip -> train number, headsign and operator
-    private final Map<String, TripInfo> tripInfos = new ConcurrentHashMap<>();
-    private volatile TimetableStore timetableStore = TimetableStore.empty();
-    private volatile List<FeedTimespan> feedTimespans = List.of();
+    private volatile ServedGraph served = ServedGraph.EMPTY;
     private final Clock clock;
 
     public TransitGraph() {
@@ -46,20 +38,30 @@ public class TransitGraph {
         return new TransitGraph(Clock.fixed(today.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
     }
 
+    /** The served graph now; empty before a load. */
+    ServedGraph served() {
+        return served;
+    }
+
+    /** Makes what a load or the binary cache gives the served graph, in one step (#18). */
+    void serve(BinaryCacheStore.BinaryCacheData data) {
+        served = ServedGraph.of(data);
+    }
+
     public Station getStation(String stopId) {
-        return stations.get(stopId);
+        return served.station(stopId);
     }
 
     public Map<String, Station> getAllStations() {
-        return Collections.unmodifiableMap(stations);
+        return served.stations();
     }
 
     Set<String> getTranslatedNames(String stopId) {
-        return translatedNames.getOrDefault(stopId, Collections.emptySet());
+        return served.translatedNamesOf(stopId);
     }
 
     public Optional<TripInfo> getTripInfo(String tripId) {
-        return Optional.ofNullable(tripInfos.get(tripId));
+        return served.tripInfo(tripId);
     }
 
     /**
@@ -77,78 +79,61 @@ public class TransitGraph {
 
     /** The trips in flat arrays for the search; empty before a load. */
     TimetableStore timetableStore() {
-        return timetableStore;
+        return served.store();
     }
 
     /** How many stations the station's trips run to without a stop between: its edges. */
     public int nextStationCount(String stopId) {
-        TimetableStore store = timetableStore;
-        return store.stations().indexOf(stopId).stream().map(store::nextStationCount).findFirst().orElse(0);
+        return served.store().nextStationCount(stopId);
     }
 
     /** How many trips stop at the station; 0 for an unknown one. */
     public int stoppingTripCount(String stopId) {
-        TimetableStore store = timetableStore;
+        TimetableStore store = served.store();
         return store.stations().indexOf(stopId).stream().map(store::stoppingTripCount).findFirst().orElse(0);
     }
 
     public boolean isDataLoaded() {
-        return !stations.isEmpty() && nodeCount() > 0;
+        ServedGraph graph = served;
+        return !graph.stations().isEmpty() && nodeCount(graph.store()) > 0;
     }
 
     public Map<String, Object> getStats() {
+        ServedGraph graph = served;
         return Map.of(
-                "stations", stations.size(),
-                "graphNodes", nodeCount(),
-                "totalEdges", edgeCount()
+                "stations", graph.stations().size(),
+                "graphNodes", nodeCount(graph.store()),
+                "totalEdges", edgeCount(graph.store())
         );
     }
 
     int stationCount() {
-        return stations.size();
+        return served.stations().size();
     }
 
     /** Stations with an edge. */
     int nodeCount() {
-        return (int) nextStationCounts().filter(count -> count > 0).count();
+        return nodeCount(served.store());
     }
 
     int edgeCount() {
-        return nextStationCounts().sum();
+        return edgeCount(served.store());
     }
 
-    Collection<Station> stations() {
-        return stations.values();
+    private static int nodeCount(TimetableStore store) {
+        return (int) nextStationCounts(store).filter(count -> count > 0).count();
     }
 
-    private IntStream nextStationCounts() {
-        TimetableStore store = timetableStore;
+    private static int edgeCount(TimetableStore store) {
+        return nextStationCounts(store).sum();
+    }
+
+    private static IntStream nextStationCounts(TimetableStore store) {
         return IntStream.range(0, store.stations().size()).map(store::nextStationCount);
-    }
-
-    void clear() {
-        feedTimespans = List.of();
-        stations.clear();
-        translatedNames.clear();
-        tripInfos.clear();
-        timetableStore = TimetableStore.empty();
-    }
-
-    /** Replaces the graph's data with what a load or the binary cache gives. */
-    void restore(BinaryCacheStore.BinaryCacheData data) {
-        clear();
-        data.stations().forEach(station -> stations.put(station.getId(), station));
-        translatedNames.putAll(data.translatedNames());
-        TimetableStore store = data.store();
-        for (int trip = 0; trip < store.tripCount(); trip++) {
-            tripInfos.put(store.tripId(trip), data.tripInfos().get(trip));
-        }
-        timetableStore = store;
-        feedTimespans = data.feeds();
     }
 
     /** How long each served feed runs, sorted by source; empty before a load. */
     List<FeedTimespan> feedTimespans() {
-        return feedTimespans;
+        return served.feeds();
     }
 }

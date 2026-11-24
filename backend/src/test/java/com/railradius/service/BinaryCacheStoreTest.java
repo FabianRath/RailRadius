@@ -37,7 +37,7 @@ class BinaryCacheStoreTest {
         TransitGraph parsed = GtfsTestFixtures.load(tempDir, feeds.toArray(String[]::new));
 
         TransitGraph restored = TransitGraph.withToday(GtfsTestFixtures.TODAY);
-        restored.restore(store().load().orElseThrow());
+        restored.serve(store().load().orElseThrow());
 
         assertThat(SearchSnapshotTest.dump(restored)).isEqualTo(SearchSnapshotTest.dump(parsed));
         assertThat(restored.getAllStations()).isEqualTo(parsed.getAllStations());
@@ -57,7 +57,7 @@ class BinaryCacheStoreTest {
         TransitGraph parsed = GtfsTestFixtures.load(tempDir, "alpha", "zeta");
 
         TransitGraph restored = TransitGraph.withToday(GtfsTestFixtures.TODAY);
-        restored.restore(store().load().orElseThrow());
+        restored.serve(store().load().orElseThrow());
 
         assertThat(restored.feedTimespans()).isEqualTo(parsed.feedTimespans());
         // alpha has no calendar, so its trains run every day and never end

@@ -186,7 +186,7 @@ class FeedAlertsTest {
     }
 
     private void serve(FeedTimespan... feeds) {
-        graph.restore(new BinaryCacheStore.BinaryCacheData(List.of(), Map.of(), List.of(), List.of(feeds),
+        graph.serve(new BinaryCacheStore.BinaryCacheData(List.of(), Map.of(), List.of(), List.of(feeds),
                 TimetableStore.empty()));
     }
 }

@@ -59,8 +59,7 @@ class ReachabilityCacheTest {
     void reloadingGtfsDropsStoredResults(@TempDir Path dir) throws Exception {
         TransitGraph graph = new TransitGraph();
         ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
-        GtfsDataService dataService = GtfsTestFixtures.dataService(dir, graph, cache, new StationSearchIndex(graph),
-                "alpha", "beta");
+        GtfsDataService dataService = GtfsTestFixtures.dataService(dir, graph, cache, "alpha", "beta");
         dataService.loadFromFiles();
         store(graph, cache, key(1));
 

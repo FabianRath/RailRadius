@@ -143,7 +143,7 @@ final class SearchSnapshot {
         }
         long startMs = System.currentTimeMillis();
         TransitGraph graph = TransitGraph.withToday(LocalDate.parse(args[2]));
-        graph.restore(new BinaryCacheStore(args[0]).load()
+        graph.serve(new BinaryCacheStore(args[0]).load()
                 .orElseThrow(() -> new IllegalStateException("No usable binary cache file " + args[0])));
         List<String> startIds = benchStarts(ResourceLines.read(BENCH_FILE), args[1]);
         if (startIds.isEmpty()) throw new IllegalArgumentException("No starts in bench set " + args[1]);

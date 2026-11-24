@@ -21,7 +21,6 @@ class StationSearchIndexTest {
     @BeforeAll
     static void buildIndex() throws Exception {
         index = new StationSearchIndex(GtfsTestFixtures.load(tempDir, "alpha", "beta"));
-        index.rebuild();
     }
 
     @Test
@@ -70,12 +69,11 @@ class StationSearchIndexTest {
     }
 
     @Test
-    void loadingRebuildsTheIndex(@TempDir Path dir) throws Exception {
+    void aLoadServesTheIndexOfItsStations(@TempDir Path dir) throws Exception {
         TransitGraph graph = new TransitGraph();
         StationSearchIndex loadedIndex = new StationSearchIndex(graph);
 
-        GtfsTestFixtures.dataService(dir, graph, GtfsTestFixtures.reachabilityCache(), loadedIndex,
-                "alpha", "beta").loadFromFiles();
+        GtfsTestFixtures.dataService(dir, graph, "alpha", "beta").loadFromFiles();
 
         assertThat(ids(loadedIndex.search("central", 10))).containsExactly("alpha:A1");
     }
@@ -83,7 +81,6 @@ class StationSearchIndexTest {
     @Test
     void searchIgnoresAccentsAndFindsGermanSpellingAndTranslatedCityNames(@TempDir Path dir) throws Exception {
         StationSearchIndex omegaIndex = new StationSearchIndex(GtfsTestFixtures.load(dir, "omega"));
-        omegaIndex.rebuild();
 
         assertThat(ids(omegaIndex.search("koln", 10))).containsExactly("omega:O1");
         assertThat(ids(omegaIndex.search("Koeln Hbf", 10))).containsExactly("omega:O1");
@@ -95,7 +92,6 @@ class StationSearchIndexTest {
     @Test
     void searchFindsStationsByTheirTranslatedStopNames(@TempDir Path dir) throws Exception {
         StationSearchIndex omegaIndex = new StationSearchIndex(GtfsTestFixtures.load(dir, "omega"));
-        omegaIndex.rebuild();
 
         assertThat(ids(omegaIndex.search("main station", 10))).containsExactly("omega:O1");
         assertThat(ids(omegaIndex.search("factory", 10))).containsExactly("omega:O3");
@@ -110,7 +106,6 @@ class StationSearchIndexTest {
     @Test
     void queryDoesNotMatchAcrossTwoNameVariants(@TempDir Path dir) throws Exception {
         StationSearchIndex omegaIndex = new StationSearchIndex(GtfsTestFixtures.load(dir, "omega"));
-        omegaIndex.rebuild();
 
         assertThat(omegaIndex.search("hbf koeln", 10)).isEmpty();
     }

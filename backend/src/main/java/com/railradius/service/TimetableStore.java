@@ -225,6 +225,11 @@ final class TimetableStore {
         return nextStationCount[station];
     }
 
+    /** {@link #nextStationCount(int)} of the station with this ID; 0 for an unknown one. */
+    int nextStationCount(String stopId) {
+        return stations.indexOf(stopId).stream().map(this::nextStationCount).findFirst().orElse(0);
+    }
+
     /** How many trips stop at the station, each once even if it stops there twice; 0 if none. */
     int stoppingTripCount(int station) {
         return stoppingTripCount[station];

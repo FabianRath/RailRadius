@@ -13,3 +13,6 @@ _Avoid_: gate (`SearchGate` is only the permits and the queue), throttle.
 
 **Refusal**: the client-safe "no" to a search, with its reason: invalid (400), too many searches (429), busy (503) or too slow (503). It goes to the client as the stream's error event or as the HTTP status, with a message meant for the user. In code: `SearchRefusal`.
 _Avoid_: rejection, error (an error is a server fault, and its details are never shown to the client).
+
+**Served graph**: the one snapshot of the merged rail network the app answers from: its stations, their translated names, the timetable store, the trip infos, the feed timespans and the station search index. A load replaces it whole, in one step, so a reader sees the old one or the new one, never a mix. A search finishes on the one it started on, and its result keeps it. In code: `ServedGraph`, held by `TransitGraph`.
+_Avoid_: graph (alone), network (the merged network a load is still building is `RailNetwork`).
