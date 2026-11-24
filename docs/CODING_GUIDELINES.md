@@ -6,7 +6,7 @@ Binding for every change. Existing code does not always follow them yet. New and
 | Area | Use | Not this |
 |---|---|---|
 | Backend | Java 25, Spring Boot (webmvc, actuator), Lombok, Caffeine, Jackson, SLF4J via `@Slf4j` | Guava, Apache Commons, Gson, a second cache/JSON/logging lib |
-| Tests | JUnit 5, AssertJ, `gtfs-mini` fixture | Mockito (unless there is truly no real object), Hamcrest, Spring context in unit tests |
+| Tests | JUnit 5, AssertJ, `gtfs-mini` fixture; frontend: Node's built-in `node:test` and `node:assert` | Mockito (unless there is truly no real object), Hamcrest, Spring context in unit tests |
 | Frontend | Vanilla JS (native ES modules), MapLibre GL JS 6, copied into `frontend/vendor/`; OpenFreeMap tiles | Frameworks, jQuery, Leaflet, npm/build step, scripts/styles/fonts from a CDN, map tiles that need a key or forbid commercial use |
 
 - Adding a dependency: **ask first**, then add a line in `decisions.md`. Try the JDK, Spring, and the existing deps first.
@@ -59,7 +59,7 @@ Binding for every change. Existing code does not always follow them yet. New and
 - Need new data? Extend `gtfs-mini` and document it in its README. Don't create a parallel fixture.
 
 ## 8. Frontend (`frontend/`)
-- Vanilla, no build step. `index.html` holds markup only, `css/tokens.css` the design tokens and fonts, `css/app.css` all other styles, `js/` one ES module per concern (`api`, `map`, `search`, `query-form`, `reachability`, `station-details`, `journey`, `debug`, `dev-auth`, `admin-panel`, `feeds`, `feed-alerts`, `about`, `country-bounds`, `deep-link`, `intro-hint`, `server-status`, `icons`, `util`, `config`; `main.js` wires them up). New logic goes into the module it belongs to, or a new one.
+- Vanilla, no build step. `index.html` holds markup only, `css/tokens.css` the design tokens and fonts, `css/app.css` all other styles, `js/` one ES module per concern (`api`, `map`, `search`, `query`, `query-form`, `reachability`, `station-details`, `journey`, `debug`, `dev-auth`, `admin-panel`, `feeds`, `feed-alerts`, `about`, `country-bounds`, `deep-link`, `intro-hint`, `server-status`, `icons`, `util`, `config`; `main.js` wires them up). New logic goes into the module it belongs to, or a new one.
 - Icons: no emojis. Use `icon(name)` from `js/icons.js` (in markup: `<span data-icon="name"></span>`). A missing icon is copied from Lucide into that file.
 - Only `js/map.js` talks to MapLibre. Other modules call its functions and never touch the map object.
 - Use `const` by default, `let` only when reassigned, never `var`. Use `async`/`await` with `fetch`. Declare functions with `function name() {}`.
@@ -68,6 +68,7 @@ Binding for every change. Existing code does not always follow them yet. New and
   `` grep -rnE "(^|[:(, '\"\`])#[0-9a-fA-F]{3,8}\b|(rgba?|hsla?)\(\s*[0-9.]" frontend/css frontend/js --include=*.css --include=*.js | grep -v "css/tokens.css" ``
 - The page only works over HTTP (ES modules): open it via the backend at `http://localhost:8080/`, not as a file.
 - Escape GTFS/user text before inserting it via `innerHTML`, or use `textContent`.
+- Rules go into DOM-free modules (no `document`, `window`, `location` at module level or in the tested functions), so `node --test` can import them; a module touching the DOM is only the adapter that reads and writes the page. Tests sit in `frontend/test/<module>.test.js`.
 
 ## 9. Bugs and GitHub Issues
 The backlog is the repo's GitHub Issues (`gh issue list`, `gh issue view <n>`). There is no backlog file.
@@ -79,7 +80,7 @@ The backlog is the repo's GitHub Issues (`gh issue list`, `gh issue view <n>`). 
 - Writing an issue: say what is wrong or wanted, where (`file:line`), how to reproduce, and what "done" means. Keep long research (tables, links) in the issue, not in the docs.
 
 ## 10. Before you call a change done
-1. `compile` and `test` pass (CLAUDE.md commands).
+1. `compile` and `test` pass, and the frontend tests if `frontend/` changed (CLAUDE.md commands).
 2. The diff has no unused code, commented-out code, stray logs, debug leftovers or unrelated reformatting.
 3. Nothing you added duplicates existing logic (grep for it).
 4. No new dependency without approval.
