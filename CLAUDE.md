@@ -50,3 +50,17 @@ All code changes must follow these. They cover allowed libraries, style, reuse a
 - Keep `docs/ARCHITECTURE.md` in sync **in the same commit** as the code change. Update it when you add, remove, rename or re-scope a class or frontend module; change an endpoint, SSE event, DTO/model field, config key or default; change the data pipeline, cache file format, BFS/caching behaviour, or a documented constant (radii, batch sizes, thresholds); or change the directory layout or run commands. Before editing a section, check its claims against the code: the doc must describe the code as it is, not as planned. Pure internal refactors that touch none of these need no update.
 - Close an item's issue from its commit (`Fixes #12`). Ask the user before opening an issue for a newly found bug (guidelines §9). Add a line to `docs/decisions.md` for non-obvious choices.
 - Commit after each completed task. Use short imperative messages, and don't commit `backend/data/`.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on FabianRath/RailRadius via `gh`, under the rules in guidelines §9. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), next to the type labels `bug` / `feature` / `structure`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `GLOSSARY.md` (created lazily) and `docs/decisions.md` in place of ADRs. See `docs/agents/domain.md`.
