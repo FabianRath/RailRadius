@@ -17,7 +17,7 @@ Feeds in backticks are in `gtfs-feeds.txt`. Rail routes, dates and operators wer
 | Status | Country | Feed or source | Licence | Notes |
 |---|---|---|---|---|
 | L | Austria | `austria` | CC BY 4.0 | ÖBB's own feed (`static.web.oebb.at`: ÖBB, Montafonerbahn, CAT). The file name carries the timetable year (`GTFS_Fahrplan_2026.zip`), so the URL changes every December. Private railways (WESTbahn, GKB, Stern & Hafferl, Salzburger Lokalbahn, Zillertalbahn, NÖVOG) are only in the Verkehrsverbünde feeds at https://data.mobilitaetsverbuende.at/de/data-sets, which need a free login. |
-| L | Belgium | `belgien` | SNCB licence ¹ | SNCB. Saved as `gtfs_belgien.zip`. Fallbacks: iRail and `data.gtfs.be` (same data). |
+| L | Belgium | `belgien` | CC BY 4.0 | NMBS-SNCB via the Belgian Mobility Open Data Portal (https://data.belgianmobility.io, anonymous tier: 100 requests/day, 10/minute). Terms (https://data.belgianmobility.io/en/terms.html, effective 2026-01-01): CC BY 4.0 with each operator as licensor; credit "Source: NMBS-SNCB – Open Data – <date of dataset update>", or for modified data "Contains data originally published by NMBS-SNCB, modified by <user>". Replaced SNCB's HAFAS download (2026-11-24), whose licence banned redistributing the raw data. Saved as `gtfs_belgien.zip`. Fallbacks: iRail and `data.gtfs.be` (same data, from the old source). |
 | L | Bosnia and Herzegovina | `bosnia` | **unclear** | ŽFBiH and ŽRS (Republika Srpska), volunteer rehost. Ended on 2025-12-13 and not updated since (still the same file on 2026-10-06); no other source found (Transitous, Mobility Database, Transitland, transitpdf searched). |
 | L | Bulgaria | `bulgaria` | **unclear** (fallback: CC BY 4.0) | BDŽ (jbb also has the CFR and TCDD trains into Bulgaria). Fallback `gtfs.livetransport.eu` has BDŽ alone, 30 days ahead, and is a third of jbb's size, so the size check only accepts it when no zip is there. |
 | L | Croatia | `croatia` | CC0 ² | HŽPP's own download. The older `hzpp.hr/api/v1/repository/download/…` link and the transitpdf copy stop at 2025-12-14. The promet-info.hr national feed needs a fee. |
@@ -77,7 +77,6 @@ Not needed: Liechtenstein and Monaco (served by ÖBB / SNCF, so covered by the A
 **Licences** (checked 2026-10-13, S27). Taken from the publisher's own page where it could be read, otherwise from the Transitous source list (https://transitous.org/sources/) or the Mobility Database catalogue. CC BY, CC BY-SA, ODbL, NLOD, Etalab and OGL-ROU all allow public and commercial use with attribution, so the site needs a page naming every source.
 
 - ¹ Not a standard open licence:
-  - Belgium: SNCB's own royalty-free licence, which has to be accepted and bans redistributing the raw data. Its text couldn't be read (belgiantrain.be blocks non-browser requests).
   - Great Britain: the timetable comes from National Rail (NRE developer terms: publishing, including commercial use, is allowed with the credit "Powered by National Rail Enquiries"). Aubin's compilation states no licence of its own.
   - Hungary: MÁV gives the feed free to registered developers for building apps, but names no licence (Transitous lists CC0).
   - Portugal (CP, Fertagus): conditions are on the Portuguese NAP pages, which only render in a browser.
