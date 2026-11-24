@@ -36,6 +36,21 @@ class SecurityHeadersFilterTest {
     }
 
     @Test
+    void pageScriptsMayNotEval() throws Exception {
+        for (String path : new String[] {"/", "/js/main.js", "/js/engine-worker.js/../main.js"}) {
+            assertThat(filter(path).getHeader("Content-Security-Policy").split("; ")).contains("script-src 'self'");
+        }
+    }
+
+    @Test
+    void onlyTheEngineWorkerMayEvalForTeaVmsRuntime() throws Exception {
+        String csp = filter("/js/engine-worker.js").getHeader("Content-Security-Policy");
+
+        assertThat(csp.split("; ")).contains("script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'",
+                "default-src 'self'", "frame-ancestors 'none'");
+    }
+
+    @Test
     void requestStillReachesTheRestOfTheChain() throws Exception {
         MockFilterChain chain = new MockFilterChain();
         new SecurityHeadersFilter().doFilter(new MockHttpServletRequest("GET", "/"), new MockHttpServletResponse(),

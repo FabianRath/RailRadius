@@ -6,6 +6,9 @@ import { clearStatus, showStatus } from './util.js';
 import { isUpdatingTimetables } from './server-status.js';
 import { dismissIntroHint } from './intro-hint.js';
 import { writeDeepLink } from './deep-link.js';
+import {
+    fetchBrowserJourney, isBrowserDataCached, searchInBrowser, startBrowserEngine, waitForBrowserEngine
+} from './browser-engine.js';
 
 const calculateBtn = document.getElementById('calculateBtn');
 const reachableCount = document.getElementById('reachableCount');
@@ -15,13 +18,17 @@ const loadingCount = document.getElementById('loadingCount');
 
 // stopId -> station as sent by the stream: position, transfers and duration, without the journey
 const results = new Map();
-// Finished queries by cacheKey(); repeating one skips the backend entirely
+// Finished queries by cacheKey(): their stations and whether the browser searched them (#12); repeating one skips
+// the search entirely
 const localResultsCache = new Map();
-// The shown query's stream parameters, and its stations' journeys fetched so far (stopId -> station)
+// The shown query's stream parameters, whether the browser searched it, and its stations' journeys fetched so far
+// (stopId -> station)
 let shownParams = null;
+let shownInBrowser = false;
 let shownStart = null;
 let journeys = new Map();
-let activeStream = null;
+// The running search, in the browser or on the server: { cancel() }
+let activeSearch = null;
 // Until the first round's stations arrive, the overlay shows elapsed time
 let elapsedTimer = null;
 const ELAPSED_TICK_MS = 1000;
@@ -29,7 +36,7 @@ const ELAPSED_TICK_MS = 1000;
 /** getSelectedStation returns a station search result (id, latitude, longitude, …) or null. */
 export function initReachability(getSelectedStation) {
     calculateBtn.addEventListener('click', () => {
-        if (activeStream) {
+        if (activeSearch) {
             cancelQuery();
         } else if (getSelectedStation()) {
             calculate(getSelectedStation());
@@ -49,10 +56,21 @@ export async function getJourney(stopId) {
     const queryJourneys = journeys;
     let journey = queryJourneys.get(stopId);
     if (!journey) {
-        journey = await fetchJourney({ ...shownParams, targetId: stopId });
+        journey = await fetchShownJourney(stopId);
         queryJourneys.set(stopId, journey);
     }
     return journey;
+}
+
+async function fetchShownJourney(stopId) {
+    if (shownInBrowser) {
+        try {
+            return await fetchBrowserJourney(shownParams, stopId);
+        } catch (error) {
+            console.warn('Journey of the browser search failed, asking the server:', error);
+        }
+    }
+    return fetchJourney({ ...shownParams, targetId: stopId });
 }
 
 function cacheKey(params) {
@@ -61,9 +79,10 @@ function cacheKey(params) {
 
 /**
  * Runs a search from the station with the form's query, as the GO button does. Answers whether it ran: an invalid
- * form shows its message instead.
+ * form shows its message instead. A search from a shared link runs as soon as the page opens, so it runs in the
+ * browser only if the browser's data is already cached, else on the server at once.
  */
-export function calculate(station) {
+export function calculate(station, fromLink = false) {
     if (!checkQuery()) return false;
     const query = readQuery();
     const params = requestParamsOf(station.id, query);
@@ -74,6 +93,7 @@ export function calculate(station) {
     dismissIntroHint();
     writeDeepLink(station.id, query);
     shownParams = params;
+    shownInBrowser = false;
     journeys = new Map();
     results.clear();
     clearReachableStations();
@@ -83,46 +103,81 @@ export function calculate(station) {
 
     const cached = localResultsCache.get(key);
     if (cached) {
-        addResults(cached);
-        fitToResults(cached);
+        shownInBrowser = cached.inBrowser;
+        addResults(cached.stations);
+        fitToResults(cached.stations);
         return true;
     }
-    streamResults(shownParams, key);
+    setLoadingState(true);
+    reachableCount.textContent = '…';
+    runSearch(params, key, fromLink);
     return true;
 }
 
-function streamResults(params, key) {
-    setLoadingState(true);
-    reachableCount.textContent = '…';
-    const stream = openReachabilityStream(params);
-    activeStream = stream;
+/**
+ * Searches in the browser if its engine is ready or soon will be (waitForBrowserEngine), else on the server; a
+ * browser search that fails is searched again on the server from scratch.
+ */
+async function runSearch(params, key, fromLink) {
+    const search = { cancelled: false, cancel() { this.cancelled = true; } };
+    activeSearch = search;
+    const inBrowser = (!fromLink || await isBrowserDataCached()) && await waitForBrowserEngine();
+    if (search.cancelled) return;
+    if (!inBrowser) {
+        streamResults(params, key);
+        return;
+    }
+    try {
+        const info = await searchInBrowser(params, stations => {
+            if (!search.cancelled) addRoundStations(stations);
+        });
+        if (search.cancelled) return;
+        shownInBrowser = true;
+        finishSearch(key, info, true);
+    } catch (error) {
+        if (search.cancelled) return;
+        console.warn('Browser search failed, searching on the server:', error);
+        results.clear();
+        clearReachableStations();
+        streamResults(params, key);
+    }
+}
 
-    stream.addEventListener('stations', e => {
-        const batch = JSON.parse(e.data);
-        addResults(batch);
-        loadingCount.textContent = `${results.size.toLocaleString()} stations found`;
-    });
+function streamResults(params, key) {
+    const stream = openReachabilityStream(params);
+    activeSearch = { cancel: () => stream.close() };
+
+    stream.addEventListener('stations', e => addRoundStations(JSON.parse(e.data)));
 
     stream.addEventListener('done', e => {
-        const info = JSON.parse(e.data);
-        finishStream();
-        reachableCount.textContent = info.total.toLocaleString();
-        const all = [...results.values()];
-        localResultsCache.set(key, all);
-        // Fit once at the end, so the view doesn't jump with every round of the search
-        fitToResults(all);
-        console.log('Stream done:', info.total, 'stations in', `${info.calculationTimeMs}ms`,
-            info.fromCache ? '(from server cache)' : '');
+        finishSearch(key, JSON.parse(e.data), false);
+        startBrowserEngine();
     });
 
     // Fires for the backend's own 'error' event (message in e.data) and for a lost connection (no data)
     stream.addEventListener('error', async e => {
         console.error('SSE error:', e);
-        finishStream();
+        endSearch();
         reachableCount.textContent = results.size > 0 ? results.size.toLocaleString() : '—';
         if (await isUpdatingTimetables()) return;
         showStatus('error', e.data ? `Search failed: ${e.data}` : 'Search failed: backend not reachable');
     });
+}
+
+function addRoundStations(stations) {
+    addResults(stations);
+    loadingCount.textContent = `${results.size.toLocaleString()} stations found`;
+}
+
+function finishSearch(key, info, inBrowser) {
+    endSearch();
+    reachableCount.textContent = info.total.toLocaleString();
+    const all = [...results.values()];
+    localResultsCache.set(key, { stations: all, inBrowser });
+    // Fit once at the end, so the view doesn't jump with every round of the search
+    fitToResults(all);
+    console.log('Search done:', info.total, 'stations in', `${info.calculationTimeMs}ms`,
+        inBrowser ? '(in the browser)' : '(on the server)');
 }
 
 function addResults(stations) {
@@ -139,14 +194,14 @@ function fitToResults(stations) {
     fitToPoints(points);
 }
 
-function finishStream() {
-    activeStream?.close();
-    activeStream = null;
+function endSearch() {
+    activeSearch?.cancel();
+    activeSearch = null;
     setLoadingState(false);
 }
 
 function cancelQuery() {
-    finishStream();
+    endSearch();
     const found = results.size;
     reachableCount.textContent = found > 0 ? found.toLocaleString() : '—';
     showStatus('info', found > 0 ? `Cancelled — showing ${found.toLocaleString()} partial results` : 'Cancelled');

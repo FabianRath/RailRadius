@@ -6,11 +6,12 @@ import com.railradius.dto.Coverage;
 import com.railradius.dto.ReachableStation;
 import com.railradius.dto.RideListJourneyRequest;
 import com.railradius.model.Station;
-import com.railradius.service.BrowserDataStore;
+import com.railradius.service.BrowserDataManifest;
 import com.railradius.service.CoverageService;
 import com.railradius.service.ReachabilityService;
 import com.railradius.service.RideListJourneys;
 import com.railradius.service.SearchAdmission;
+import com.railradius.service.SearchCounts;
 import com.railradius.service.SearchRequestValidator.SearchRequest;
 import com.railradius.service.StationSearchIndex;
 import com.railradius.service.TransitGraph;
@@ -47,8 +48,6 @@ public class RailRadiusController {
     // sending the result to a slow client. A timed out stream fails its next send, so its search stops and frees its
     // permit like a gone client's (S36)
     private static final double STREAM_TIMEOUT_FACTOR = 2.5;
-    private static final String BROWSER_DATA_PATH = "/api/browser-data/";
-    private static final String BROWSER_DATA_SUFFIX = ".bin";
     // A version's file never changes, so browsers may keep it as long as caches allow
     private static final Duration BROWSER_DATA_MAX_AGE = Duration.ofDays(365);
     private static final String GZIP = "gzip";
@@ -59,8 +58,9 @@ public class RailRadiusController {
     private final CoverageService coverageService;
     private final AsyncTaskExecutor taskExecutor;
     private final AdminAccess adminAccess;
-    private final BrowserDataStore browserDataStore;
+    private final BrowserDataManifest browserDataManifest;
     private final RideListJourneys rideListJourneys;
+    private final SearchCounts searchCounts;
     private final long streamTimeoutMs;
 
     // With @EnableScheduling the task scheduler is an AsyncTaskExecutor too; SSE streams use the task executor
@@ -68,15 +68,17 @@ public class RailRadiusController {
                                StationSearchIndex stationSearchIndex, CoverageService coverageService,
                                @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor,
                                AdminAccess adminAccess, SearchAdmission admission,
-                               BrowserDataStore browserDataStore, RideListJourneys rideListJourneys) {
+                               BrowserDataManifest browserDataManifest, RideListJourneys rideListJourneys,
+                               SearchCounts searchCounts) {
         this.reachabilityService = reachabilityService;
         this.transitGraph = transitGraph;
         this.stationSearchIndex = stationSearchIndex;
         this.coverageService = coverageService;
         this.taskExecutor = taskExecutor;
         this.adminAccess = adminAccess;
-        this.browserDataStore = browserDataStore;
+        this.browserDataManifest = browserDataManifest;
         this.rideListJourneys = rideListJourneys;
+        this.searchCounts = searchCounts;
         this.streamTimeoutMs = (long) (admission.longestWait().toMillis() * STREAM_TIMEOUT_FACTOR);
     }
     
@@ -143,6 +145,13 @@ public class RailRadiusController {
         return ResponseEntity.of(rideListJourneys.journey(client(httpRequest), request));
     }
 
+    /** Counts a search a browser ran on its own copy of the data (#12), next to the server's streams. */
+    @PostMapping("/browser-searches")
+    public ResponseEntity<Void> browserSearch() {
+        searchCounts.countBrowserSearch();
+        return ResponseEntity.noContent().build();
+    }
+
     private SearchAdmission.Client client(HttpServletRequest request) {
         return new SearchAdmission.Client(request.getRemoteAddr(), adminAccess.exemptsSearch(request));
     }
@@ -187,20 +196,19 @@ public class RailRadiusController {
         return coverageService.coverage();
     }
 
-    /** The browser data of the served graph (#9); 404 while it is built, so the browser searches on the server. */
+    /**
+     * What a browser searches with (#9, #12); 404 while the data file is built or without a built engine, so the
+     * browser searches on the server.
+     */
     @GetMapping("/browser-data")
     public ResponseEntity<BrowserDataInfo> browserData() {
-        return browserDataStore.current()
-                .map(published -> ResponseEntity.ok(new BrowserDataInfo(published.version(),
-                        BROWSER_DATA_PATH + published.version() + BROWSER_DATA_SUFFIX, published.sizeBytes())))
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        return ResponseEntity.of(browserDataManifest.current());
     }
 
     /** The gzipped file of that version; 404 for any version but the served graph's. */
-    @GetMapping("/browser-data/{version}" + BROWSER_DATA_SUFFIX)
+    @GetMapping("/browser-data/{version}" + BrowserDataManifest.DATA_SUFFIX)
     public ResponseEntity<Resource> browserDataFile(@PathVariable String version) {
-        return browserDataStore.current()
-                .filter(published -> published.version().equals(version))
+        return browserDataManifest.file(version)
                 .map(published -> ResponseEntity.ok()
                         .header(HttpHeaders.CONTENT_ENCODING, GZIP)
                         .cacheControl(CacheControl.maxAge(BROWSER_DATA_MAX_AGE).cachePublic().immutable())

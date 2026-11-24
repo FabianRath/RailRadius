@@ -10,7 +10,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
   - `service/`: `GtfsDataService` (startup/reload) → `GtfsFeedLoader` and `StationDeduplicator` (into a load-time `RailNetwork`), `BinaryCacheStore`; `TransitGraph` (what is served: stations + `TimetableStore`), `StationSearchIndex`, `ReachabilityService` (orchestrator, SSE) → `ReachabilityCache` → `CompactReachabilitySearch` (round-based search), `ReachabilityWarmer`, `JourneyLegBuilder`
   - `dto/`, `model/`, `config/`
 - `backend/src/test/`: unit tests on the `gtfs-mini` fixture (see `src/test/resources/gtfs-mini/README.md`)
-- `browser-engine/`: the search compiled to WebAssembly with TeaVM, its browser stand-ins, and the check that it finds what the server finds (#10)
+- `browser-engine/`: the search compiled to WebAssembly with TeaVM, its browser stand-ins, and the check that it finds what the server finds (#10). Its build writes the engine to the gitignored `frontend/engine/`, where the page runs it (#12)
 - `frontend/`: `index.html` (markup), `css/app.css`, `js/*.js` (one ES module per concern, entry `main.js`), `test/` (tests of the DOM-free modules). See guidelines §8.
 - Backlog and known bugs: GitHub Issues, read and written with `gh` (guidelines §9)
 - `docs/decisions.md` (why things are the way they are), `docs/HOSTING.md` (server size, memory measurements)

@@ -7,7 +7,8 @@ dump.*
 # Local settings with secrets, e.g. feed credentials (Spring Boot reads config/ in the working directory)
 /backend/config/
 
-# Build output
+# Build output; frontend/engine/ is the browser engine, built by browser-engine/
+/frontend/engine/
 target/
 !**/src/main/**/target/
 !**/src/test/**/target/

@@ -71,6 +71,25 @@ export function fetchJourney(params) {
     return requestJson(`/api/reachability/journey?${new URLSearchParams(params)}`);
 }
 
+/** The server's browser data file: version, path and size; fails with HTTP 404 while it is built. */
+export function fetchBrowserData() {
+    return requestJson('/api/browser-data');
+}
+
+/** One reachable station with its journey, from the rides the browser's search found (#11). */
+export function fetchRideJourney(request) {
+    return requestJson('/api/reachability/ride-journey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request)
+    });
+}
+
+/** Tells the server a search ran in the browser, so it can count them next to its own. */
+export async function countBrowserSearch() {
+    await request('/api/browser-searches', { method: 'POST' });
+}
+
 export function fetchDebugStatus() {
     return adminJson('/api/admin/debug/status');
 }

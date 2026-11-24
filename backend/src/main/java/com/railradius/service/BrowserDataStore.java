@@ -1,5 +1,6 @@
 package com.railradius.service;
 
+import com.railradius.util.ContentVersion;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
@@ -14,9 +15,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
-import java.util.HexFormat;
 import java.util.Optional;
 import java.util.zip.Deflater;
 import java.util.zip.GZIPOutputStream;
@@ -35,9 +33,6 @@ public class BrowserDataStore {
     private static final String FILE_PREFIX = "browser-data-";
     private static final String FILE_SUFFIX = ".bin.gz";
     private static final String PART_SUFFIX = ".part";
-    private static final String HASH_ALGORITHM = "SHA-256";
-    // 64 bits: a version names one of a handful of files, it doesn't have to resist forgery
-    private static final int VERSION_BYTES = 8;
 
     /** A built file: its version, where it is and its gzipped size. */
     public record Published(String version, Path file, long sizeBytes) {}
@@ -100,8 +95,7 @@ public class BrowserDataStore {
         Path gzipped = Files.createTempFile(directory, FILE_PREFIX, FILE_SUFFIX + PART_SUFFIX);
         try {
             BrowserDataFile.write(served, raw);
-            byte[] hash = gzip(raw, gzipped);
-            String version = HexFormat.of().formatHex(Arrays.copyOf(hash, VERSION_BYTES));
+            String version = gzip(raw, gzipped);
             Path file = directory.resolve(FILE_PREFIX + version + FILE_SUFFIX);
             Files.move(gzipped, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             return new Published(version, file, Files.size(file));
@@ -111,14 +105,14 @@ public class BrowserDataStore {
         }
     }
 
-    /** Gzips from into to and returns the hash of the gzipped bytes. */
-    private static byte[] gzip(Path from, Path to) throws IOException {
-        MessageDigest digest = sha256();
+    /** Gzips from into to and returns the version of the gzipped bytes. */
+    private static String gzip(Path from, Path to) throws IOException {
+        MessageDigest digest = ContentVersion.digest();
         try (InputStream in = Files.newInputStream(from);
              OutputStream out = new BestGzipOutputStream(new DigestOutputStream(Files.newOutputStream(to), digest))) {
             in.transferTo(out);
         }
-        return digest.digest();
+        return ContentVersion.of(digest);
     }
 
     /** Deletes the files of earlier graphs. A file a client is still downloading may stay until the next build. */
@@ -134,14 +128,6 @@ public class BrowserDataStore {
             }
         } catch (IOException e) {
             log.warn("Could not delete old browser data in {}", directory, e);
-        }
-    }
-
-    private static MessageDigest sha256() {
-        try {
-            return MessageDigest.getInstance(HASH_ALGORITHM);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("Every JVM has " + HASH_ALGORITHM, e);
         }
     }
 

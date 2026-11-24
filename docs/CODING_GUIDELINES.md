@@ -59,7 +59,7 @@ Binding for every change. Existing code does not always follow them yet. New and
 - Need new data? Extend `gtfs-mini` and document it in its README. Don't create a parallel fixture.
 
 ## 8. Frontend (`frontend/`)
-- Vanilla, no build step. `index.html` holds markup only, `css/tokens.css` the design tokens and fonts, `css/app.css` all other styles, `js/` one ES module per concern (`api`, `map`, `search`, `query`, `query-form`, `reachability`, `station-details`, `journey`, `debug`, `dev-auth`, `admin-panel`, `feeds`, `feed-alerts`, `about`, `country-bounds`, `deep-link`, `intro-hint`, `server-status`, `icons`, `util`, `config`; `main.js` wires them up). New logic goes into the module it belongs to, or a new one.
+- Vanilla, no build step. `index.html` holds markup only, `css/tokens.css` the design tokens and fonts, `css/app.css` all other styles, `js/` one ES module per concern (`api`, `map`, `search`, `query`, `query-form`, `reachability`, `browser-engine`, `engine-worker`, `engine-rules`, `map-labels`, `station-details`, `journey`, `debug`, `dev-auth`, `admin-panel`, `feeds`, `feed-alerts`, `about`, `country-bounds`, `deep-link`, `intro-hint`, `server-status`, `icons`, `util`, `config`; `main.js` wires them up). New logic goes into the module it belongs to, or a new one.
 - Icons: no emojis. Use `icon(name)` from `js/icons.js` (in markup: `<span data-icon="name"></span>`). A missing icon is copied from Lucide into that file.
 - Only `js/map.js` talks to MapLibre. Other modules call its functions and never touch the map object.
 - Use `const` by default, `let` only when reassigned, never `var`. Use `async`/`await` with `fetch`. Declare functions with `function name() {}`.

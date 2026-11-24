@@ -17,7 +17,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <teavm.version>0.17.0</teavm.version>
         <backend.dir>${project.basedir}/../backend</backend.dir>
-        <engine.dir>${project.build.directory}/engine</engine.dir>
+        <!-- The page loads the engine from here (#12); gitignored, so a checkout without this build searches on the server -->
+        <engine.dir>${project.basedir}/../frontend/engine</engine.dir>
     </properties>
 
     <dependencies>

@@ -4,6 +4,11 @@ server:
   # proxy set "native" (RAILRADIUS_FORWARD_HEADERS_STRATEGY), or every visitor shares the proxy's budget. Never set it
   # without a proxy that overwrites X-Forwarded-For: clients could then pick any IP
   forward-headers-strategy: ${RAILRADIUS_FORWARD_HEADERS_STRATEGY:none}
+  # The browser engine's search.wasm (#12) goes out gzipped: 0.30 instead of 0.86 MB. Only that type, so nothing
+  # else changes; the browser data file is gzipped already
+  compression:
+    enabled: true
+    mime-types: application/wasm
 
 spring:
   application:

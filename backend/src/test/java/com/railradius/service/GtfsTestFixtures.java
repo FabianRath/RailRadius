@@ -158,7 +158,7 @@ final class GtfsTestFixtures {
     static ReachabilityService reachabilityService(TransitGraph graph, ReachabilityCache cache,
                                                    SearchAdmission admission) {
         return new ReachabilityService(cache, admission, new ReachabilityWarmer(cache, admission),
-                new JourneyLegBuilder(), new SearchRequestValidator(graph), graph);
+                new JourneyLegBuilder(), new SearchRequestValidator(graph), graph, new SearchCounts(graph));
     }
 
     /** A cache that serves only results searched on the graph's served graph now. */

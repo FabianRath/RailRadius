@@ -11,13 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CancellationException;
 
 /** Answers reachability requests: validates them, has the search admitted ({@link SearchAdmission}), maps results. */
@@ -37,6 +34,7 @@ public class ReachabilityService {
     private final JourneyLegBuilder legBuilder;
     private final SearchRequestValidator validator;
     private final TransitGraph graph;
+    private final SearchCounts searchCounts;
 
     @Value("${railradius.cache.predictive-enabled:true}")
     private boolean predictiveEnabled;
@@ -51,7 +49,7 @@ public class ReachabilityService {
         ValidSearch search = validator.validate(request);
         if (targetId.equals(search.options().startId())) return Optional.empty();
         CompactResult result = admission.admit(client, search.options(), SearchAdmission.SearchListener.NONE);
-        return fewestTransfersWithin(result.paths(targetId), search.maxJourneyMinutes())
+        return ShownStations.fewestTransfersWithin(result.paths(targetId), search.maxJourneyMinutes())
                 .flatMap(path -> legBuilder.toReachableStation(result, targetId, path.transfers()));
     }
 
@@ -67,11 +65,12 @@ public class ReachabilityService {
         long startMs = System.currentTimeMillis();
         try {
             ValidSearch search = validator.validate(request);
+            searchCounts.countServerSearch();
             StreamedStations streamed = new StreamedStations(search, emitter, startMs);
             // A station is sent once, with its first path within the time limit. Rounds add paths by ascending
             // transfers, so that is the path its journey shows too (B4).
             streamed.sendNew(admission.admit(client, search.options(), streamed));
-            log.info("Streamed {} stations in {} ms, the first after {} ms", streamed.sent.size(),
+            log.info("Streamed {} stations in {} ms, the first after {} ms", streamed.shown.count(),
                     System.currentTimeMillis() - startMs, streamed.firstSentMs);
             streamed.sendDone();
             emitter.complete();
@@ -114,24 +113,22 @@ public class ReachabilityService {
         stats.put("warmingInProgress", warming);
         stats.put("warmingCount", warming.size());
         stats.putAll(cache.getStats());
+        stats.put("searchesPerDay", searchCounts.perDay());
         return stats;
     }
 
-    /** The stations a stream has sent so far. The start station is not a destination, so it is never sent. */
+    /** Sends the stations a search shows ({@link ShownStations}) as they come. */
     private final class StreamedStations implements SearchAdmission.SearchListener {
 
-        private final String startId;
+        private final ShownStations shown;
         private final SseEmitter emitter;
         private final long startMs;
-        private final int maxJourneyMins;
-        private final Set<String> sent = new HashSet<>();
         private long firstSentMs = -1;
 
         StreamedStations(ValidSearch search, SseEmitter emitter, long startMs) {
-            this.startId = search.options().startId();
+            this.shown = new ShownStations(search.options().startId(), search.maxJourneyMinutes(), legBuilder);
             this.emitter = emitter;
             this.startMs = startMs;
-            this.maxJourneyMins = search.maxJourneyMinutes();
         }
 
         @Override
@@ -141,38 +138,22 @@ public class ReachabilityService {
 
         @Override
         public void roundPaths(Map<String, CompactResult.PathSummary> paths) {
-            List<ReachableStationSummary> stations = new ArrayList<>();
             // No result yet to name the graph: a station missing from the one served now is sent with the result
-            ServedGraph served = graph.served();
-            paths.forEach((stopId, path) -> addIfNew(served, stations, stopId, List.of(path)));
-            sendBatches(stations);
+            sendBatches(shown.newInRound(graph.served(), paths));
         }
 
         /**
-         * Sends the stations not sent yet that have a path within the time limit, as summaries: a station's journey
-         * is fetched when it is clicked ({@link #journey}).
+         * Sends the stations not sent yet, as summaries: a station's journey is fetched when it is clicked
+         * ({@link #journey}).
          */
         void sendNew(CompactResult result) {
-            List<ReachableStationSummary> stations = new ArrayList<>();
-            result.forEachStation((stopId, paths) -> addIfNew(result.served(), stations, stopId, paths));
-            sendBatches(stations);
+            sendBatches(shown.newInResult(result));
         }
 
         void sendDone() {
             send(SseEmitter.event().name("done").data(Map.of(
-                    "total", sent.size(),
+                    "total", shown.count(),
                     "calculationTimeMs", System.currentTimeMillis() - startMs)));
-        }
-
-        private void addIfNew(ServedGraph served, List<ReachableStationSummary> stations, String stopId,
-                              List<CompactResult.PathSummary> paths) {
-            if (stopId.equals(startId) || sent.contains(stopId)) return;
-            fewestTransfersWithin(paths, maxJourneyMins)
-                    .flatMap(path -> legBuilder.toSummary(served, stopId, path))
-                    .ifPresent(station -> {
-                        stations.add(station);
-                        sent.add(stopId);
-                    });
         }
 
         private void sendBatches(List<ReachableStationSummary> stations) {
@@ -193,12 +174,5 @@ public class ReachabilityService {
                 throw gone;
             }
         }
-    }
-
-    // The paths are ordered by ascending transfers, so a station whose fewest-transfer path is too long still shows
-    // up with a faster path that has more transfers (B4)
-    private static Optional<CompactResult.PathSummary> fewestTransfersWithin(List<CompactResult.PathSummary> paths,
-                                                                             int maxJourneyMins) {
-        return paths.stream().filter(path -> path.durationMinutes() <= maxJourneyMins).findFirst();
     }
 }
