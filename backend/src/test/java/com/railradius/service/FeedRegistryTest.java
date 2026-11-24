@@ -52,6 +52,14 @@ class FeedRegistryTest {
         assertThat(registry.of("albania")).isEmpty();
     }
 
+    @Test
+    void latviaSendsItsOwnUserAgentBecauseVivisServerRejectsJavasDefault() {
+        FeedRegistry registry = new FeedRegistry();
+
+        assertThat(registry.of("latvia").orElseThrow().urls().getFirst().headers())
+                .containsEntry("User-Agent", "RailRadius");
+    }
+
     private static FeedSource parseOne(String line) {
         return FeedRegistry.parseAll(List.of(line)).values().iterator().next();
     }

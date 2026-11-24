@@ -37,7 +37,7 @@ Feeds in backticks are in `gtfs-feeds.txt`. Rail routes, dates and operators wer
 | L | Italy | `italy-italo` | CC BY 4.0 | Italo high-speed (also has ItaloBus routes, which the rail filter drops). Saved as `gtfs_italy-italo.zip`. |
 | L | Italy | `italy-trenord` | CC BY 4.0 | Trenord (Lombardy, incl. Malpensa Express and the lines to Chiasso and Tirano), official (Regione Lombardia). Saved as `gtfs_italy-trenord.zip`. |
 | L | Kosovo | `kosovo` | **unclear** | Trainkos, volunteer rehost. |
-| L | Latvia | `latvia` | CC0 | Vivi. |
+| L | Latvia | `latvia` | CC0 | Vivi. Its server answers HTTP 403 to Java's default User-Agent, so `gtfs-feeds.txt` sends its own. |
 | L | Lithuania | `lithuania` | **unclear** | LTG Link rail. `data.public-transport.earth/gtfs/lt` has bus, ferry and trolleybus only. |
 | L | Luxembourg | `luxembourg` | CC BY 4.0 | CFL. |
 | L | Moldova | `moldova` | **unclear** | CFM, volunteer rehost. |
