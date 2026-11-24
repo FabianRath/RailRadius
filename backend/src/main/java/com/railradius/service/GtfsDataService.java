@@ -24,6 +24,7 @@ public class GtfsDataService {
     private final BinaryCacheStore binaryCacheStore;
     private final ReachabilityCache reachabilityCache;
     private final GtfsLoadProgress loadProgress;
+    private final BrowserDataStore browserDataStore;
 
     @Value("${railradius.gtfs.directory:./gtfs}")
     private String gtfsDirectory;
@@ -94,10 +95,14 @@ public class GtfsDataService {
         serve(data);
     }
 
-    /** Makes the data the served graph and drops the stored results, which were searched on the one from before. */
+    /**
+     * Makes the data the served graph, drops the stored results, which were searched on the one from before, and
+     * starts building its browser data.
+     */
     private void serve(BinaryCacheStore.BinaryCacheData data) {
         graph.serve(data);
         reachabilityCache.clear();
+        browserDataStore.buildServed();
     }
 
     public void clearCache() {

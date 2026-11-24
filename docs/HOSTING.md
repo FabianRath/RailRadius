@@ -218,6 +218,20 @@ Search time (`bench.sh times full`, two runs each, ms):
 | 4 | 914, 876 | 963, 904 | 1,451, 1,380 | 1,529, 1,362 |
 | 5 | 1,355, 1,420 | 1,581, 1,348 | 2,276, 2,158 | 2,242, 2,237 |
 
+## Browser data file (#9, 2026-11-24)
+The timetable browsers search on (`BrowserDataFile`), built from the served graph after each load and served gzipped (level 9, JDK). Dev machine, full data unless noted. Variants measured once with a throwaway program; Brotli with Node's zlib (window 24).
+| File | Raw | gzip -9 | Brotli 11 |
+|---|---|---|---|
+| `gtfs-store.bin` | 168.2 MB | 50.8 MB | 31.3 MB |
+| Trimmed: no trip IDs, route names, trip infos, translated names, parent stations | 121.1 MB | 39.8 MB | 25.1 MB |
+| + departures and regular departures derived on reading | 77.2 MB | 18.1 MB | 10.0 MB |
+| + times as differences within each trip (**the format**) | 77.5 MB | **7.8 MB** | 5.1 MB |
+
+- Brotli would save 2.7 MB more, but needs a library (the JDK has none) and took ~110 s at quality 11 on this file; gzip -9 takes ~9 s.
+- Built by `BrowserDataStore` in **16 s** after a start or reload, off the request path (the manifest answers 404 until then). It allocates the event arrays once more (~70 MB) while it writes.
+- Reading it back, departures and regular departures derived, takes **0.6 s** on one JVM thread (the store file: 0.15 s). TeaVM runs ~1.5× slower than one JVM thread (#8), so ~1 s in a browser.
+- Dev data: 0.3 MB gzipped (3.0 MB raw), built in 0.7 s.
+
 ## Scratch grows by an eighth, drop flags as bits (S23, partly done, 2026-10-10)
 Full data (fresh-parse store, S26), `-Xmx3g`, compact object headers, warmer off, port 8081, both builds run from their classes on a fresh app, alternating, two runs each (HEAD = the rides step below). Results are byte-identical to the goldens (`SearchSnapshot`, dev and full).
 

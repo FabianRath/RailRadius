@@ -45,6 +45,10 @@ railradius:
     # stop_times.txt is handed to the graph in batches of this many trips, so big feeds don't hold all of it in memory
     trip-batch-size: 100000
 
+  browser-data:
+    # Where the gzipped timetable for browsers (#9) is written after each load; only the newest file is kept
+    directory: data/browser-data
+
   feeds:
     # Update center: a feed whose last service day, or the last day of one of its main rail operators, is at most
     # this many days away counts as expiring

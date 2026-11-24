@@ -40,12 +40,27 @@ final class TimetableStoreBuilder {
             memberTripIds.addAll(trips.get(trip).memberTripIds());
             tripMemberStart[trip + 1] = memberTripIds.size();
         }
-        Departures departures = departures(merged.stationIndexes().size(), events);
+        Departures departures = departures(merged.stationIndexes().size(), events.station(), events.depSec());
         StationTable stations = StationTable.of(inIndexOrder(merged.stationIndexes()));
         return new Parts(stations, events.tripFirstEvent(), events.station(), events.depSec(), events.arrSec(),
                 dayPatterns.build(), tripDayPattern,
                 PackedStrings.of(inIndexOrder(routeNameIndexes)), tripRouteName, PackedStrings.of(memberTripIds),
                 tripMemberStart, departures.start(), departures.seconds(), departures.events());
+    }
+
+    /**
+     * The parts of a store that can search but has no route names or trip IDs (the browser's, {@link BrowserDataFile}):
+     * the departures are derived from the events.
+     */
+    static Parts withoutTripNames(StationTable stations, int[] tripFirstEvent, int[] evStation, int[] evDepSec,
+                                  int[] evArrSec, DayPatterns dayPatterns, int[] tripDayPattern) {
+        int tripCount = tripDayPattern.length;
+        int[] tripRouteName = new int[tripCount];
+        Arrays.fill(tripRouteName, TimetableStore.NO_ROUTE_NAME);
+        Departures departures = departures(stations.size(), evStation, evDepSec);
+        return new Parts(stations, tripFirstEvent, evStation, evDepSec, evArrSec, dayPatterns, tripDayPattern,
+                PackedStrings.of(List.of()), tripRouteName, PackedStrings.of(List.of()), new int[tripCount + 1],
+                departures.start(), departures.seconds(), departures.events());
     }
 
     private static Events events(List<MergedTrips.Trip> trips) {
@@ -82,19 +97,19 @@ final class TimetableStoreBuilder {
     }
 
     /** Each station's events with a leg, by departure time, equal times in event order. */
-    private static Departures departures(int stationCount, Events events) {
+    private static Departures departures(int stationCount, int[] evStation, int[] evDepSec) {
         int[] start = new int[stationCount + 1];
-        for (int event = 0; event < events.station().length; event++) {
-            if (events.depSec()[event] != TimetableStore.NO_LEG) start[events.station()[event] + 1]++;
+        for (int event = 0; event < evStation.length; event++) {
+            if (evDepSec[event] != TimetableStore.NO_LEG) start[evStation[event] + 1]++;
         }
         Arrays.parallelPrefix(start, Integer::sum);
         // Seconds in the high half, the event in the low half: sorting the keys sorts by time, then by event
         long[] keys = new long[start[stationCount]];
         int[] next = start.clone();
-        for (int event = 0; event < events.station().length; event++) {
-            int seconds = events.depSec()[event];
+        for (int event = 0; event < evStation.length; event++) {
+            int seconds = evDepSec[event];
             if (seconds == TimetableStore.NO_LEG) continue;
-            keys[next[events.station()[event]]++] = (long) seconds << SECONDS_SHIFT | event;
+            keys[next[evStation[event]]++] = (long) seconds << SECONDS_SHIFT | event;
         }
         int[] seconds = new int[keys.length];
         int[] departureEvents = new int[keys.length];

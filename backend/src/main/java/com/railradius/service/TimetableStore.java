@@ -87,7 +87,8 @@ final class TimetableStore {
         return of(TimetableStoreBuilder.parts(MergedTrips.of(new RailNetwork())));
     }
 
-    private static TimetableStore of(TimetableStoreBuilder.Parts parts) {
+    /** A store of the parts; it derives the trip of each event and the regular departures. */
+    static TimetableStore of(TimetableStoreBuilder.Parts parts) {
         int[] evTrip = eventTrips(parts.tripFirstEvent());
         return new TimetableStore(parts, evTrip, regularDepartures(parts, evTrip));
     }

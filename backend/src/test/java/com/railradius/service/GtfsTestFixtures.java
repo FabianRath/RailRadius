@@ -105,7 +105,7 @@ final class GtfsTestFixtures {
                                                int tripBatchSize, String... feedFolders) throws IOException {
         Path gtfsDir = zipFeeds(tempDir, feedFolders);
         GtfsDataService service = new GtfsDataService(graph, feedLoader(tripBatchSize), deduplicator(),
-                binaryCacheStore(tempDir), reachabilityCache, new GtfsLoadProgress());
+                binaryCacheStore(tempDir), reachabilityCache, new GtfsLoadProgress(), browserDataStore(tempDir, graph));
         ReflectionTestUtils.setField(service, "gtfsDirectory", gtfsDir.toString());
         return service;
     }
@@ -133,6 +133,11 @@ final class GtfsTestFixtures {
     /** The binary cache store that a {@link #dataService} in tempDir writes to. */
     static BinaryCacheStore binaryCacheStore(Path tempDir) {
         return new BinaryCacheStore(tempDir.resolve("gtfs-store.bin").toString());
+    }
+
+    /** The browser data store a {@link #dataService} in tempDir builds into, on the caller's thread (no Spring). */
+    static BrowserDataStore browserDataStore(Path tempDir, TransitGraph graph) {
+        return new BrowserDataStore(graph, tempDir.resolve("browser-data").toString());
     }
 
     /** A ReachabilityService wired like in the app, without warming. */
