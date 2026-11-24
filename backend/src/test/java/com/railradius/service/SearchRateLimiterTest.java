@@ -27,7 +27,7 @@ class SearchRateLimiterTest {
         nowNanos.addAndGet(2 * NANOS_PER_SECOND);
 
         assertThatThrownBy(() -> limiter.charge(IP, options(2, TABLE_WAIT_MINUTES)))
-                .isInstanceOf(SearchRateLimiter.TooManySearchesException.class)
+                .isInstanceOf(SearchRefusal.class)
                 .hasMessageContaining("try again in 3 s");
     }
 
@@ -46,7 +46,7 @@ class SearchRateLimiterTest {
         for (int i = 0; i < BIG_COST / TWO_TRANSFER_COST; i++) limiter.charge(IP, options(2, TABLE_WAIT_MINUTES));
 
         assertThatThrownBy(() -> limiter.charge(IP, options(2, TABLE_WAIT_MINUTES)))
-                .isInstanceOf(SearchRateLimiter.TooManySearchesException.class);
+                .isInstanceOf(SearchRefusal.class);
     }
 
     @Test
@@ -63,7 +63,7 @@ class SearchRateLimiterTest {
         limiter.charge("2001:db8:1:2::1", options(5, MAX_WAIT_MINUTES));
 
         assertThatThrownBy(() -> limiter.charge("2001:db8:1:2::2", options(5, MAX_WAIT_MINUTES)))
-                .isInstanceOf(SearchRateLimiter.TooManySearchesException.class);
+                .isInstanceOf(SearchRefusal.class);
         assertThatCode(() -> limiter.charge("2001:db8:1:3::1", options(5, MAX_WAIT_MINUTES)))
                 .doesNotThrowAnyException();
     }

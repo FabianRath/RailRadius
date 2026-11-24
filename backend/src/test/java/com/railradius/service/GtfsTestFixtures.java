@@ -8,6 +8,7 @@ import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -37,8 +38,10 @@ final class GtfsTestFixtures {
     // Before every fixture's first service day, so no day counts as past (B31)
     static final LocalDate TODAY = LocalDate.of(2026, 1, 1);
     // Tests that are not about the rate limit search as this client, with a budget no test can use up
-    static final SearchRateLimiter.Client VISITOR = new SearchRateLimiter.Client("192.0.2.1", false);
+    static final SearchAdmission.Client VISITOR = new SearchAdmission.Client("192.0.2.1", false);
     private static final int UNLIMITED_SEARCH_BUDGET = 1_000_000;
+    // Short, so tests that wait for a queued or joining search to check its client do not wait long
+    private static final Duration WAIT_CHECK = Duration.ofMillis(50);
 
     static TransitGraph load(Path tempDir, String... feedFolders) throws IOException {
         return load(tempDir, TRIP_BATCH_SIZE, TODAY, feedFolders);
@@ -57,7 +60,7 @@ final class GtfsTestFixtures {
     private static TransitGraph load(Path tempDir, int tripBatchSize, LocalDate today, String... feedFolders)
             throws IOException {
         TransitGraph graph = TransitGraph.withToday(today);
-        dataService(tempDir, graph, reachabilityCache(graph), new StationSearchIndex(graph), tripBatchSize,
+        dataService(tempDir, graph, reachabilityCache(), new StationSearchIndex(graph), tripBatchSize,
                 feedFolders).loadFromFiles();
         return graph;
     }
@@ -96,7 +99,7 @@ final class GtfsTestFixtures {
 
     /** Like {@link #dataService(Path, TransitGraph, ReachabilityCache, StationSearchIndex, String...)}. */
     static GtfsDataService dataService(Path tempDir, TransitGraph graph, String... feedFolders) throws IOException {
-        return dataService(tempDir, graph, reachabilityCache(graph), new StationSearchIndex(graph), feedFolders);
+        return dataService(tempDir, graph, reachabilityCache(), new StationSearchIndex(graph), feedFolders);
     }
 
     private static GtfsDataService dataService(Path tempDir, TransitGraph graph, ReachabilityCache reachabilityCache,
@@ -136,42 +139,61 @@ final class GtfsTestFixtures {
 
     /** A ReachabilityService wired like in the app, without warming. */
     static ReachabilityService reachabilityService(TransitGraph graph) {
-        return reachabilityService(graph, reachabilityCache(graph));
+        return reachabilityService(graph, reachabilityCache());
     }
 
     static ReachabilityService reachabilityService(TransitGraph graph, ReachabilityCache cache) {
-        return reachabilityService(graph, cache, new SearchRateLimiter(UNLIMITED_SEARCH_BUDGET, 1));
+        return reachabilityService(graph, cache, admission(graph, cache));
     }
 
     static ReachabilityService reachabilityService(TransitGraph graph, ReachabilityCache cache,
                                                    SearchRateLimiter rateLimiter) {
-        return new ReachabilityService(cache, new ReachabilityWarmer(cache), new JourneyLegBuilder(graph), rateLimiter,
-                new SearchRequestValidator(graph));
+        return reachabilityService(graph, cache,
+                admission(graph, cache, defaultGate(), rateLimiter, CompactReachabilitySearch.NO_DEADLINE));
     }
 
-    static ReachabilityCache reachabilityCache(TransitGraph graph) {
-        return reachabilityCache(graph, newGate(), RAW_CACHE_MAX_ENTRIES);
+    static ReachabilityService reachabilityService(TransitGraph graph, ReachabilityCache cache,
+                                                   SearchAdmission admission) {
+        return new ReachabilityService(cache, admission, new ReachabilityWarmer(cache, admission),
+                new JourneyLegBuilder(graph), new SearchRequestValidator(graph));
     }
 
-    static ReachabilityCache reachabilityCache(TransitGraph graph, int rawMaxEntries) {
-        return reachabilityCache(graph, newGate(), rawMaxEntries);
+    static ReachabilityCache reachabilityCache() {
+        return reachabilityCache(RAW_CACHE_MAX_ENTRIES);
     }
 
-    static ReachabilityCache reachabilityCache(TransitGraph graph, SearchGate gate) {
-        return reachabilityCache(graph, gate, RAW_CACHE_MAX_ENTRIES);
+    static ReachabilityCache reachabilityCache(int rawMaxEntries) {
+        return new ReachabilityCache(rawMaxEntries);
     }
 
-    private static SearchGate newGate() {
-        return new SearchGate(SEARCH_PERMITS, MAX_QUEUED_SEARCHES);
+    /** Admission with the app's gate, no deadline (so a slow test machine never stops a search) and no budget limit. */
+    static SearchAdmission admission(TransitGraph graph, ReachabilityCache cache) {
+        return admission(graph, cache, defaultGate());
     }
 
-    private static ReachabilityCache reachabilityCache(TransitGraph graph, SearchGate gate, int rawMaxEntries) {
-        return new ReachabilityCache(search(graph), gate, rawMaxEntries);
+    static SearchAdmission admission(TransitGraph graph, ReachabilityCache cache, SearchGate gate) {
+        return admission(graph, cache, gate, unlimitedRateLimiter(), CompactReachabilitySearch.NO_DEADLINE);
     }
 
-    /** A search without a deadline, so a slow test machine never stops one. */
+    static SearchAdmission admission(TransitGraph graph, ReachabilityCache cache, SearchGate gate,
+                                     SearchRateLimiter rateLimiter, Duration deadline) {
+        return new SearchAdmission(cache, search(graph), rateLimiter, gate, deadline, WAIT_CHECK);
+    }
+
+    static SearchGate gate(int permits, int maxQueued) {
+        return new SearchGate(permits, maxQueued, WAIT_CHECK);
+    }
+
+    private static SearchGate defaultGate() {
+        return gate(SEARCH_PERMITS, MAX_QUEUED_SEARCHES);
+    }
+
+    static SearchRateLimiter unlimitedRateLimiter() {
+        return new SearchRateLimiter(UNLIMITED_SEARCH_BUDGET, 1);
+    }
+
     static CompactReachabilitySearch search(TransitGraph graph) {
-        return new CompactReachabilitySearch(graph, Long.MAX_VALUE);
+        return new CompactReachabilitySearch(graph);
     }
 
     /** Zips the gtfs-mini feed folder to {@code zipFile}. */

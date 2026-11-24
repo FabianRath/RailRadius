@@ -32,7 +32,7 @@ class GtfsDataServiceTest {
     void startupWithoutZipsLoadsNothingInsteadOfFailing(@TempDir Path dir) throws Exception {
         TransitGraph graph = new TransitGraph();
         GtfsDataService service = GtfsTestFixtures.dataService(dir, graph,
-                GtfsTestFixtures.reachabilityCache(graph), new StationSearchIndex(graph));
+                GtfsTestFixtures.reachabilityCache(), new StationSearchIndex(graph));
         ReflectionTestUtils.setField(service, "gtfsDirectory", dir.resolve("missing").toString());
         ReflectionTestUtils.setField(service, "autoLoadFromFiles", true);
 
@@ -77,7 +77,7 @@ class GtfsDataServiceTest {
     void feedWithItsFilesInAFolderIsLoaded(@TempDir Path dir) throws Exception {
         TransitGraph graph = new TransitGraph();
         GtfsDataService service = GtfsTestFixtures.dataService(dir, graph,
-                GtfsTestFixtures.reachabilityCache(graph), new StationSearchIndex(graph), "zeta");
+                GtfsTestFixtures.reachabilityCache(), new StationSearchIndex(graph), "zeta");
         GtfsTestFixtures.zipFeedInFolder("zeta", dir.resolve("gtfs").resolve("gtfs_zeta.zip"), "zeta_feed");
 
         service.loadFromFiles();

@@ -13,13 +13,13 @@ public record SearchOptions(String startId, int maxTransfers, int minTransferMin
     private static final int DEFAULT_MIN_TRANSFER_MINUTES = 0;
     private static final int DEFAULT_MAX_TRANSFER_MINUTES = 180;
 
-    /** @throws InvalidSearchException if the changes or the waits are out of range */
+    /** @throws SearchRefusal if the changes or the waits are out of range */
     public SearchOptions {
         if (maxTransfers < 0 || maxTransfers > MAX_TRANSFERS) {
-            throw new InvalidSearchException("Changes must be between 0 and " + MAX_TRANSFERS);
+            throw SearchRefusal.invalid("Changes must be between 0 and " + MAX_TRANSFERS);
         }
         if (minTransferMins < 0 || minTransferMins > maxTransferMins || maxTransferMins > MAX_TRANSFER_WAIT_MINUTES) {
-            throw new InvalidSearchException("The wait at changes must be between 0 and " + MAX_TRANSFER_WAIT_MINUTES
+            throw SearchRefusal.invalid("The wait at changes must be between 0 and " + MAX_TRANSFER_WAIT_MINUTES
                     + " minutes, the minimum not above the maximum");
         }
     }

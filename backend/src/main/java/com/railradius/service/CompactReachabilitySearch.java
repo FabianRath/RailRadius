@@ -2,11 +2,9 @@ package com.railradius.service;
 
 import com.railradius.util.GtfsTime;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.ResponseStatus;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,36 +27,27 @@ import java.util.stream.IntStream;
  * out in parallel too.
  * <p>
  * A search that runs past its deadline stops (S33): a backstop for parameters the rate limit prices too low, since it
- * holds a {@link SearchGate} permit and its memory all the while.
+ * holds a {@link SearchGate} permit and its memory all the while. {@link SearchAdmission} sets the deadline.
  */
 @Component
 @Slf4j
 public class CompactReachabilitySearch {
 
+    // Long enough never to stop a search
+    public static final Duration NO_DEADLINE = Duration.ofNanos(Long.MAX_VALUE);
+
     private final TransitGraph graph;
-    private final long deadlineNanos;
     // One per search running at once. A scratch fits one store, so after a reload the old ones are dropped
     private final Queue<SearchScratch> idleScratches = new ConcurrentLinkedQueue<>();
 
-    public CompactReachabilitySearch(TransitGraph graph,
-                                     @Value("${railradius.search.deadline-ms:30000}") long deadlineMs) {
+    public CompactReachabilitySearch(TransitGraph graph) {
         this.graph = graph;
-        // Saturates, so Long.MAX_VALUE means no deadline
-        this.deadlineNanos = TimeUnit.MILLISECONDS.toNanos(deadlineMs);
     }
 
-    /** Thrown when a search runs past its deadline; the message is safe to show to the client. */
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    public static class DeadlineExceededException extends RuntimeException {
-        DeadlineExceededException() {
-            super("This search took too long and was stopped, please try fewer changes or a shorter wait");
-        }
-    }
-
-    /** One running search: what it searches, its scratch and when it started. */
+    /** One running search: what it searches, its scratch, when it started and how long it may run. */
     private record Run(TimetableStore store, SearchScratch scratch, String startId, int startIndex, int maxTransfers,
                        long[] patternDays, CompactTransferRound.Parameters parameters, SearchCounters counters,
-                       long startNanos) {}
+                       long startNanos, long deadlineNanos) {}
 
     /**
      * Per station: the fastest path for each transfer count that is faster than every path with fewer transfers,
@@ -66,10 +55,10 @@ public class CompactReachabilitySearch {
      * The start station has an empty path. After each round, roundPaths gets the path that round added to each
      * station it added one to (never the start station).
      *
-     * @throws DeadlineExceededException if the search runs past its deadline; it returns nothing then
+     * @throws SearchRefusal if the search runs past its deadline; it returns nothing then
      */
     public CompactResult search(String startId, int maxTransfers, int minTransferMins, int maxTransferMins,
-                                Consumer<Map<String, CompactResult.PathSummary>> roundPaths) {
+                                Duration deadline, Consumer<Map<String, CompactResult.PathSummary>> roundPaths) {
         if (maxTransfers > Byte.MAX_VALUE) throw new IllegalArgumentException("Too many transfers: " + maxTransfers);
         TimetableStore store = graph.timetableStore();
         SearchScratch scratch = acquire(store);
@@ -79,7 +68,7 @@ public class CompactReachabilitySearch {
                     maxTransfers, patternDays,
                     new CompactTransferRound.Parameters(patternDays, minTransferMins * GtfsTime.SECONDS_PER_MINUTE,
                             maxTransferMins * GtfsTime.SECONDS_PER_MINUTE),
-                    new SearchCounters(), System.nanoTime());
+                    new SearchCounters(), System.nanoTime(), deadline.toNanos());
             CompactResult result = search(run, roundPaths);
             idleScratches.offer(scratch);
             return result;
@@ -195,13 +184,13 @@ public class CompactReachabilitySearch {
 
     private void checkDeadline(Run run, int transfers) {
         long elapsedNanos = System.nanoTime() - run.startNanos();
-        if (elapsedNanos < deadlineNanos) return;
+        if (elapsedNanos < run.deadlineNanos()) return;
         CompactTransferRound.Parameters parameters = run.parameters();
         log.warn("  Search {} x{} (waits {}-{} min) stopped in round {} after {} ms, over its {} ms deadline",
                 run.startId(), run.maxTransfers(), parameters.minWaitSeconds() / GtfsTime.SECONDS_PER_MINUTE,
                 parameters.maxWaitSeconds() / GtfsTime.SECONDS_PER_MINUTE, transfers,
-                TimeUnit.NANOSECONDS.toMillis(elapsedNanos), TimeUnit.NANOSECONDS.toMillis(deadlineNanos));
-        throw new DeadlineExceededException();
+                TimeUnit.NANOSECONDS.toMillis(elapsedNanos), TimeUnit.NANOSECONDS.toMillis(run.deadlineNanos()));
+        throw SearchRefusal.tooSlow();
     }
 
     /**

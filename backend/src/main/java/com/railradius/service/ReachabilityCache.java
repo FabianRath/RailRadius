@@ -11,83 +11,22 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Raw search results per search, computed on demand. A stored result also answers every lower transfer count: it
- * holds each station's best path per transfer count.
+ * The stored search results, per search. A stored result also answers every lower transfer count: it holds each
+ * station's best path per transfer count. {@link SearchAdmission} fills it.
  */
 @Component
 @Slf4j
 public class ReachabilityCache {
 
-    private final CompactReachabilitySearch search;
-    private final SearchGate gate;
-    private final InFlightSearches inFlight = new InFlightSearches();
     // One full-data result holds paths to every reachable station, so the count must stay small
     private final Cache<SearchOptions, CompactResult> rawPaths;
 
-    public ReachabilityCache(CompactReachabilitySearch search, SearchGate gate,
-                             @Value("${railradius.cache.raw-max-entries:30}") int rawMaxEntries) {
-        this.search = search;
-        this.gate = gate;
+    public ReachabilityCache(@Value("${railradius.cache.raw-max-entries:30}") int rawMaxEntries) {
         this.rawPaths = Caffeine.newBuilder().maximumSize(rawMaxEntries).build();
     }
 
-    /** What a caller hears of a search it waits for. */
-    public interface SearchListener {
-
-        SearchListener NONE = new SearchListener() {};
-
-        /**
-         * Runs about every second while the search waits for a {@link SearchGate} permit or for an equal search;
-         * may throw to give up.
-         */
-        default void queued() {}
-
-        /** Each round's new path per station, as the search goes. */
-        default void roundPaths(Map<String, CompactResult.PathSummary> paths) {}
-    }
-
-    /**
-     * The search's result (see {@link CompactReachabilitySearch#search}). Taken from the stored
-     * result, else cut down from a stored result with more transfers, else from the equal search running now (see
-     * {@link InFlightSearches#joinOrRun}), else searched and stored.
-     *
-     * @throws SearchGate.BusyException if it would have to search and too many searches wait already
-     */
-    public CompactResult getOrCompute(SearchOptions key) {
-        return getOrCompute(key, SearchListener.NONE);
-    }
-
-    /** Like {@link #getOrCompute(SearchOptions)}, telling the listener about the queue and the rounds of a search. */
-    public CompactResult getOrCompute(SearchOptions key, SearchListener listener) {
-        Optional<CompactResult> stored = stored(key);
-        if (stored.isPresent()) return stored.get();
-        return inFlight.joinOrRun(key, () -> gate.run(() -> storedOrSearched(key, listener), listener::queued),
-                listener::queued);
-    }
-
-    /**
-     * Searches and stores the result only if a search permit is free right now and no equal search runs; true if the
-     * result is stored.
-     */
-    public boolean computeIfPermitFree(SearchOptions key) {
-        return inFlight.runUnlessRunning(key, () -> gate.runIfFree(() -> storedOrSearched(key, SearchListener.NONE)))
-                .isPresent();
-    }
-
-    // Checked again with the permit: an equal search may have finished while this one waited
-    private CompactResult storedOrSearched(SearchOptions key, SearchListener listener) {
-        return stored(key).orElseGet(() -> {
-            log.info("  Search: {} x{}", key.startId(), key.maxTransfers());
-            CompactResult result = search.search(key.startId(), key.maxTransfers(),
-                    key.minTransferMins(), key.maxTransferMins(), listener::roundPaths);
-            rawPaths.put(key, result);
-            log.info("  Cached raw result: {} x{} ({} stations)", key.startId(), key.maxTransfers(),
-                    result.stationCount());
-            return result;
-        });
-    }
-
-    private Optional<CompactResult> stored(SearchOptions key) {
+    /** The stored result, else one cut down from a stored result with more transfers. */
+    Optional<CompactResult> get(SearchOptions key) {
         CompactResult cached = rawPaths.getIfPresent(key);
         if (cached != null) {
             log.info("  Raw cache HIT: {} x{} ({} stations)", key.startId(), key.maxTransfers(),
@@ -101,7 +40,13 @@ public class ReachabilityCache {
         });
     }
 
-    /** True if {@link #getOrCompute} would not have to search. */
+    void put(SearchOptions key, CompactResult result) {
+        rawPaths.put(key, result);
+        log.info("  Cached raw result: {} x{} ({} stations)", key.startId(), key.maxTransfers(),
+                result.stationCount());
+    }
+
+    /** True if {@link #get} would find a result. */
     public boolean contains(SearchOptions key) {
         return rawPaths.getIfPresent(key) != null || storedWithMoreTransfers(key).isPresent();
     }

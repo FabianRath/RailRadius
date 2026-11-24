@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ReachabilityWarmer {
 
     private final ReachabilityCache cache;
+    private final SearchAdmission admission;
 
     @Value("${railradius.cache.predictive-max-transfers:5}")
     private int predictiveMaxTransfers;
@@ -38,7 +39,7 @@ public class ReachabilityWarmer {
         }
         try {
             long startMs = System.currentTimeMillis();
-            if (!cache.computeIfPermitFree(key)) {
+            if (!admission.warmIfIdle(key)) {
                 log.info("  Predictive cache: {} x{} skipped, no free search permit or an equal search runs",
                         key.startId(), key.maxTransfers());
                 return;

@@ -2,6 +2,7 @@ package com.railradius.service;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -18,12 +19,18 @@ import java.util.function.Supplier;
 @Slf4j
 final class InFlightSearches {
 
+    // How often a caller waiting for an equal search checks whether its own client still waits
+    private final long waitCheckMs;
     private final ConcurrentHashMap<SearchOptions, CompletableFuture<CompactResult>> running =
             new ConcurrentHashMap<>();
 
+    InFlightSearches(Duration waitCheck) {
+        this.waitCheckMs = waitCheck.toMillis();
+    }
+
     /**
      * The result of the equal search running now, else of search, which then runs as the key's only one. While it
-     * waits for another caller's search, whileWaiting runs about every second and may throw to stop waiting. Gets the
+     * waits for another caller's search, whileWaiting runs at each wait check and may throw to stop waiting. Gets the
      * other search's failure too, except when that one stopped because its own client is gone: then it searches itself.
      */
     CompactResult joinOrRun(SearchOptions key, Supplier<CompactResult> search, Runnable whileWaiting) {
@@ -68,7 +75,7 @@ final class InFlightSearches {
                                           Runnable whileWaiting) {
         while (true) {
             try {
-                return Optional.of(other.get(SearchGate.QUEUE_CHECK_MS, TimeUnit.MILLISECONDS));
+                return Optional.of(other.get(waitCheckMs, TimeUnit.MILLISECONDS));
             } catch (TimeoutException e) {
                 whileWaiting.run();
             } catch (CancellationException e) {

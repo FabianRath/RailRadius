@@ -51,8 +51,7 @@ final class SearchSnapshot {
 
     SearchSnapshot(TransitGraph graph) {
         this.graph = graph;
-        // No deadline: the oracle must answer every search, however slow the machine
-        this.search = new CompactReachabilitySearch(graph, Long.MAX_VALUE);
+        this.search = new CompactReachabilitySearch(graph);
     }
 
     /** Today first, then one section per start and transfer limit 0 to {@link #MAX_TRANSFERS}. */
@@ -61,8 +60,9 @@ final class SearchSnapshot {
         for (String startId : startIds) {
             for (int maxTransfers = 0; maxTransfers <= MAX_TRANSFERS; maxTransfers++) {
                 out.write("## " + startId + " maxTransfers " + maxTransfers + "\n");
+                // No deadline: the oracle must answer every search, however slow the machine
                 CompactResult result = search.search(startId, maxTransfers, MIN_TRANSFER_MINUTES,
-                        MAX_TRANSFER_MINUTES, roundPaths -> {});
+                        MAX_TRANSFER_MINUTES, CompactReachabilitySearch.NO_DEADLINE, roundPaths -> {});
                 Map<String, List<CompactResult.PathSummary>> pathsByStation = new TreeMap<>();
                 result.forEachStation(pathsByStation::put);
                 for (Map.Entry<String, List<CompactResult.PathSummary>> station : pathsByStation.entrySet()) {

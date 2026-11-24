@@ -11,6 +11,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +28,7 @@ class ReachabilityServiceTest {
 
     // What SearchRateLimiter charges for the biggest search: 5 transfers at the 360-min max wait
     private static final int BIG_SEARCH_COST = 87;
+    private static final int SERVICE_UNAVAILABLE = 503;
 
     @TempDir
     static Path tempDir;
@@ -153,7 +155,7 @@ class ReachabilityServiceTest {
     // B41, B42: a request outside the API's bounds costs no budget, searches nothing and stores nothing
     @Test
     void invalidRequestsAreRejectedBeforeTheyAreChargedOrStored() {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
         ReachabilityService service = serviceWithBudgetForOneBigSearch(cache);
         List<SearchRequest> invalid = List.of(
                 request("alpha:A1", -1, 0, 180, null),
@@ -174,7 +176,7 @@ class ReachabilityServiceTest {
             assertThat(emitter.texts).as("%s", request).anyMatch(text -> text.contains("event:error"));
             assertThat(emitter.completed).isTrue();
             assertThatThrownBy(() -> service.journey(VISITOR, request, "alpha:A2"))
-                    .isInstanceOf(InvalidSearchException.class);
+                    .isInstanceOf(SearchRefusal.class);
         }
         assertThat(cache.contains(new SearchOptions("alpha:NOPE", 1, 0, 180))).isFalse();
         RecordingEmitter fullBudget = new RecordingEmitter();
@@ -430,7 +432,7 @@ class ReachabilityServiceTest {
 
     @Test
     void streamStopsSearchingWhenTheClientIsGone() {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs, cache);
         GoneClientEmitter emitter = new GoneClientEmitter();
 
@@ -442,7 +444,7 @@ class ReachabilityServiceTest {
 
     @Test
     void clientGoneBeforeTheDoneEventEndsTheStreamWithoutAnErrorEvent() {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs, cache);
         // Spring's send after a timeout or a gone client fails like this
         RecordingEmitter emitter = new RecordingEmitter() {
@@ -464,9 +466,9 @@ class ReachabilityServiceTest {
 
     @Test
     void streamThatTimedOutStopsSearchingAndFreesItsPermit() {
-        SearchGate gate = new SearchGate(1, 0);
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs, gate);
-        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs, cache);
+        SearchGate gate = GtfsTestFixtures.gate(1, 0);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityService service = serviceWithGate(cache, gate, CompactReachabilitySearch.NO_DEADLINE);
         // Spring's timeout marks the emitter complete just like this, so every later send fails
         SseEmitter emitter = new SseEmitter();
         emitter.complete();
@@ -479,9 +481,9 @@ class ReachabilityServiceTest {
 
     @Test
     void streamTurnedAwayWhenTheSearchQueueIsFullEndsWithAnErrorEvent() throws Exception {
-        SearchGate gate = new SearchGate(1, 0);
-        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs,
-                GtfsTestFixtures.reachabilityCache(gtfs, gate));
+        SearchGate gate = GtfsTestFixtures.gate(1, 0);
+        ReachabilityService service = serviceWithGate(GtfsTestFixtures.reachabilityCache(), gate,
+                CompactReachabilitySearch.NO_DEADLINE);
         RecordingEmitter emitter = new RecordingEmitter();
 
         try (HeldPermit ignored = new HeldPermit(gate)) {
@@ -497,7 +499,7 @@ class ReachabilityServiceTest {
 
     @Test
     void streamOverTheSearchBudgetEndsWithAnErrorEventAndSearchesNothing() {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
         ReachabilityService service = serviceWithBudgetForOneBigSearch(cache);
         service.calculateReachabilityStreaming(VISITOR, request("alpha:A1", 5, 0, 360, null),
                 new RecordingEmitter());
@@ -513,7 +515,7 @@ class ReachabilityServiceTest {
 
     @Test
     void storedResultsCostNoSearchBudget() {
-        ReachabilityService service = serviceWithBudgetForOneBigSearch(GtfsTestFixtures.reachabilityCache(gtfs));
+        ReachabilityService service = serviceWithBudgetForOneBigSearch(GtfsTestFixtures.reachabilityCache());
         service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 5),
                 new RecordingEmitter());
 
@@ -529,8 +531,8 @@ class ReachabilityServiceTest {
 
     @Test
     void adminSearchesAreNeverRateLimited() {
-        ReachabilityService service = serviceWithBudgetForOneBigSearch(GtfsTestFixtures.reachabilityCache(gtfs));
-        SearchRateLimiter.Client admin = new SearchRateLimiter.Client(VISITOR.ip(), true);
+        ReachabilityService service = serviceWithBudgetForOneBigSearch(GtfsTestFixtures.reachabilityCache());
+        SearchAdmission.Client admin = new SearchAdmission.Client(VISITOR.ip(), true);
         service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 5),
                 new RecordingEmitter());
 
@@ -542,8 +544,8 @@ class ReachabilityServiceTest {
 
     @Test
     void streamThatRunsOutOfMemorySendsAnErrorAndFreesItsPermit() {
-        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs,
-                GtfsTestFixtures.reachabilityCache(gtfs, new SearchGate(1, 0)));
+        ReachabilityService service = serviceWithGate(GtfsTestFixtures.reachabilityCache(), GtfsTestFixtures.gate(1, 0),
+                CompactReachabilitySearch.NO_DEADLINE);
         FailingStationsEmitter emitter = new FailingStationsEmitter(() -> {
             throw new OutOfMemoryError("Java heap space");
         });
@@ -561,9 +563,9 @@ class ReachabilityServiceTest {
 
     @Test
     void streamPastTheSearchDeadlineSendsAnErrorStoresNothingAndFreesItsPermit() {
-        SearchGate gate = new SearchGate(1, 0);
-        ReachabilityCache cache = new ReachabilityCache(new CompactReachabilitySearch(gtfs, 0), gate, 1);
-        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs, cache);
+        SearchGate gate = GtfsTestFixtures.gate(1, 0);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityService service = serviceWithGate(cache, gate, Duration.ZERO);
         RecordingEmitter emitter = new RecordingEmitter();
 
         service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 3), emitter);
@@ -577,12 +579,12 @@ class ReachabilityServiceTest {
 
     @Test
     void journeyPastTheSearchDeadlineIsRefusedAndFreesItsPermit() {
-        SearchGate gate = new SearchGate(1, 0);
-        ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs,
-                new ReachabilityCache(new CompactReachabilitySearch(gtfs, 0), gate, 1));
+        SearchGate gate = GtfsTestFixtures.gate(1, 0);
+        ReachabilityService service = serviceWithGate(GtfsTestFixtures.reachabilityCache(), gate, Duration.ZERO);
 
         assertThatThrownBy(() -> service.journey(VISITOR, streamRequest("alpha:A1", 3), "beta:B2"))
-                .isInstanceOf(CompactReachabilitySearch.DeadlineExceededException.class);
+                .isInstanceOfSatisfying(SearchRefusal.class, refusal -> assertThat(refusal.getStatusCode().value())
+                        .isEqualTo(SERVICE_UNAVAILABLE));
         assertThat(gate.runIfFree(() -> true)).isPresent();
     }
 
@@ -701,6 +703,11 @@ class ReachabilityServiceTest {
     private ReachabilityService serviceWithBudgetForOneBigSearch(ReachabilityCache cache) {
         return GtfsTestFixtures.reachabilityService(gtfs, cache,
                 new SearchRateLimiter(BIG_SEARCH_COST, 1, () -> 0L));
+    }
+
+    private static ReachabilityService serviceWithGate(ReachabilityCache cache, SearchGate gate, Duration deadline) {
+        return GtfsTestFixtures.reachabilityService(gtfs, cache, GtfsTestFixtures.admission(gtfs, cache, gate,
+                GtfsTestFixtures.unlimitedRateLimiter(), deadline));
     }
 
     private static ReachabilityService service(TransitGraph graph) {

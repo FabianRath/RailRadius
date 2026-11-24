@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -25,7 +26,8 @@ class CompactReachabilitySearchTest {
                 GtfsTestFixtures.search(GtfsTestFixtures.load(tempDir, "alpha", "beta"));
         List<Map<String, CompactResult.PathSummary>> rounds = new ArrayList<>();
 
-        CompactResult result = search.search(START_ID, 3, 0, 180, rounds::add);
+        CompactResult result = search.search(START_ID, 3, 0, 180,
+                CompactReachabilitySearch.NO_DEADLINE, rounds::add);
 
         Map<String, List<CompactResult.PathSummary>> handedOut = new HashMap<>();
         int previousTransfers = -1;
@@ -51,7 +53,8 @@ class CompactReachabilitySearchTest {
         CompactReachabilitySearch search =
                 GtfsTestFixtures.search(GtfsTestFixtures.load(tempDir, "gamma", "delta"));
 
-        CompactResult result = search.search("gamma:G3", 1, LONGEST_MIN_WAIT_MINUTES, A_DAY_MINUTES, round -> { });
+        CompactResult result = search.search("gamma:G3", 1, LONGEST_MIN_WAIT_MINUTES, A_DAY_MINUTES,
+                CompactReachabilitySearch.NO_DEADLINE, round -> { });
 
         assertThat(result.paths("delta:D3")).isNotEmpty();
         assertThat(result.paths("delta:D2")).isEmpty();
@@ -60,11 +63,12 @@ class CompactReachabilitySearchTest {
     @Test
     void searchPastItsDeadlineStopsBeforeItsNextRound(@TempDir Path tempDir) throws IOException {
         CompactReachabilitySearch search =
-                new CompactReachabilitySearch(GtfsTestFixtures.load(tempDir, "alpha", "beta"), 0);
+                GtfsTestFixtures.search(GtfsTestFixtures.load(tempDir, "alpha", "beta"));
         List<Map<String, CompactResult.PathSummary>> rounds = new ArrayList<>();
 
-        assertThatThrownBy(() -> search.search(START_ID, 3, 0, 180, rounds::add))
-                .isInstanceOf(CompactReachabilitySearch.DeadlineExceededException.class);
+        assertThatThrownBy(() -> search.search(START_ID, 3, 0, 180, Duration.ZERO, rounds::add))
+                .isInstanceOfSatisfying(SearchRefusal.class,
+                        refusal -> assertThat(refusal.refusalReason()).isEqualTo(SearchRefusal.Reason.TOO_SLOW));
         assertThat(rounds).allMatch(round -> round.values().stream().allMatch(path -> path.transfers() == 0));
     }
 
@@ -74,7 +78,8 @@ class CompactReachabilitySearchTest {
         CompactReachabilitySearch search = GtfsTestFixtures.search(GtfsTestFixtures.load(tempDir, "omega"));
         List<Map<String, CompactResult.PathSummary>> rounds = new ArrayList<>();
 
-        CompactResult result = search.search("omega:O1", 2, 0, 180, rounds::add);
+        CompactResult result = search.search("omega:O1", 2, 0, 180,
+                CompactReachabilitySearch.NO_DEADLINE, rounds::add);
 
         assertThat(rounds).noneMatch(round -> round.containsKey("omega:O1"));
         assertThat(result.paths("omega:O1")).containsExactly(new CompactResult.PathSummary(0, 0));

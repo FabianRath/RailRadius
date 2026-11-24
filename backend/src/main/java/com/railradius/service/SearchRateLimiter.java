@@ -6,9 +6,7 @@ import com.railradius.util.ClientKeys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.ResponseStatus;
 
 import java.time.Duration;
 import java.util.function.LongSupplier;
@@ -16,7 +14,7 @@ import java.util.function.LongSupplier;
 /**
  * A search budget per client ({@link ClientKeys#rateLimitKey}, so IPv6 per /64) that refills over time (token
  * bucket). A search costs more the more transfers and the longer a max wait at changes it has, since that is what
- * makes it slow; one served from the result cache is free (see {@link ReachabilityService}).
+ * makes it slow; one served from the result cache is free (see {@link SearchAdmission}).
  */
 @Component
 @Slf4j
@@ -31,17 +29,6 @@ public class SearchRateLimiter {
     private static final int WAIT_COST_OFFSET_MINUTES = 360;
     private static final int TABLE_WAIT_MINUTES = 180;
     private static final double NANOS_PER_SECOND = 1e9;
-
-    /** Who asks for a search; admins are never limited. */
-    public record Client(String ip, boolean admin) {}
-
-    /** Thrown when the client's budget is too low for the search. */
-    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
-    public static class TooManySearchesException extends RuntimeException {
-        TooManySearchesException(long waitSeconds) {
-            super("Too many searches, please try again in " + waitSeconds + " s");
-        }
-    }
 
     private final int capacity;
     private final double refillPerSecond;
@@ -74,14 +61,14 @@ public class SearchRateLimiter {
     /**
      * Takes the cost of a search, by its max transfers and max wait at changes, from the client's budget.
      *
-     * @throws TooManySearchesException if the budget is too low; nothing is taken then
+     * @throws SearchRefusal if the budget is too low; nothing is taken then
      */
     public void charge(String clientIp, SearchOptions options) {
         int cost = costOf(options.maxTransfers(), options.maxTransferMins());
         long waitSeconds = buckets.get(ClientKeys.rateLimitKey(clientIp), clientKey -> new Bucket()).take(cost);
         if (waitSeconds > 0) {
             log.info("Search turned away by the rate limit, {} s until it fits", waitSeconds);
-            throw new TooManySearchesException(waitSeconds);
+            throw SearchRefusal.tooManySearches(waitSeconds);
         }
     }
 

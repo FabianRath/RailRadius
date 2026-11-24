@@ -6,7 +6,7 @@ import com.railradius.dto.ReachableStation;
 import com.railradius.model.Station;
 import com.railradius.service.CoverageService;
 import com.railradius.service.ReachabilityService;
-import com.railradius.service.SearchRateLimiter;
+import com.railradius.service.SearchAdmission;
 import com.railradius.service.SearchRequestValidator.SearchRequest;
 import com.railradius.service.StationSearchIndex;
 import com.railradius.service.TransitGraph;
@@ -22,7 +22,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -32,10 +31,10 @@ import java.util.Map;
 @Slf4j
 public class RailRadiusController {
 
-    // The longest legitimate stream waits behind the full queue (6 searches on 2 permits, so 3 x the 30 s deadline)
-    // and then runs its own search (30 s): 2 min. This is 2.5x that, for sending the result to a slow client. A timed
-    // out stream fails its next send, so its search stops and frees its permit like a gone client's (S36)
-    private static final Duration STREAM_TIMEOUT = Duration.ofMinutes(5);
+    // A stream may take this many times the longest a search can wait and run (SearchAdmission.longestWait), for
+    // sending the result to a slow client. A timed out stream fails its next send, so its search stops and frees its
+    // permit like a gone client's (S36)
+    private static final double STREAM_TIMEOUT_FACTOR = 2.5;
 
     private final ReachabilityService reachabilityService;
     private final TransitGraph transitGraph;
@@ -43,18 +42,20 @@ public class RailRadiusController {
     private final CoverageService coverageService;
     private final AsyncTaskExecutor taskExecutor;
     private final AdminToken adminToken;
+    private final long streamTimeoutMs;
 
     // With @EnableScheduling the task scheduler is an AsyncTaskExecutor too; SSE streams use the task executor
     public RailRadiusController(ReachabilityService reachabilityService, TransitGraph transitGraph,
                                StationSearchIndex stationSearchIndex, CoverageService coverageService,
                                @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor,
-                               AdminToken adminToken) {
+                               AdminToken adminToken, SearchAdmission admission) {
         this.reachabilityService = reachabilityService;
         this.transitGraph = transitGraph;
         this.stationSearchIndex = stationSearchIndex;
         this.coverageService = coverageService;
         this.taskExecutor = taskExecutor;
         this.adminToken = adminToken;
+        this.streamTimeoutMs = (long) (admission.longestWait().toMillis() * STREAM_TIMEOUT_FACTOR);
     }
     
     /**
@@ -79,12 +80,12 @@ public class RailRadiusController {
             @RequestParam(value = "maxJourneyHours", required = false) Double maxJourneyHours,
             HttpServletRequest httpRequest) {
 
-        SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT.toMillis());
+        SseEmitter emitter = new SseEmitter(streamTimeoutMs);
 
         SearchRequest req = new SearchRequest(stationId, maxTransfers, minTransferMinutes, maxTransferMinutes,
                 maxJourneyHours);
         // Read here: the servlet request is recycled before the worker runs
-        SearchRateLimiter.Client client = client(httpRequest);
+        SearchAdmission.Client client = client(httpRequest);
 
         taskExecutor.execute(() ->
                 reachabilityService.calculateReachabilityStreaming(client, req, emitter));
@@ -110,8 +111,8 @@ public class RailRadiusController {
         return ResponseEntity.of(reachabilityService.journey(client(httpRequest), req, targetId));
     }
 
-    private SearchRateLimiter.Client client(HttpServletRequest request) {
-        return new SearchRateLimiter.Client(request.getRemoteAddr(), adminToken.sentWith(request));
+    private SearchAdmission.Client client(HttpServletRequest request) {
+        return new SearchAdmission.Client(request.getRemoteAddr(), adminToken.sentWith(request));
     }
 
     @GetMapping("/stations/search")

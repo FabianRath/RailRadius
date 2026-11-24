@@ -76,14 +76,14 @@ public class StationSearchIndex {
 
     /**
      * Stations with a name variant that contains the query and that have outgoing edges, best connected first.
-     * @throws InvalidSearchException if the limit is outside 1–{@value #MAX_LIMIT} or the query is too long (B44)
+     * @throws SearchRefusal if the limit is outside 1–{@value #MAX_LIMIT} or the query is too long (B44)
      */
     public List<Station> search(String query, int limit) {
         if (limit < 1 || limit > MAX_LIMIT) {
-            throw new InvalidSearchException("The limit must be between 1 and " + MAX_LIMIT);
+            throw SearchRefusal.invalid("The limit must be between 1 and " + MAX_LIMIT);
         }
         if (query.length() > MAX_QUERY_LENGTH) {
-            throw new InvalidSearchException("The query must be at most " + MAX_QUERY_LENGTH + " characters");
+            throw SearchRefusal.invalid("The query must be at most " + MAX_QUERY_LENGTH + " characters");
         }
         Index current = index;
         String q = StationNameVariants.fold(query);

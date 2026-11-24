@@ -32,19 +32,19 @@ class SearchOptionsTest {
     @Test
     void transfersOutsideTheBoundsAreRejected() {
         assertThatThrownBy(() -> new SearchOptions(START_ID, -1, 0, 180))
-                .isInstanceOf(InvalidSearchException.class).hasMessageContaining("Changes");
+                .isInstanceOf(SearchRefusal.class).hasMessageContaining("Changes");
         assertThatThrownBy(() -> new SearchOptions(START_ID, SearchOptions.MAX_TRANSFERS + 1, 0, 180))
-                .isInstanceOf(InvalidSearchException.class);
+                .isInstanceOf(SearchRefusal.class);
     }
 
     @Test
     void waitsOutsideTheBoundsOrMinimumAboveMaximumAreRejected() {
         assertThatThrownBy(() -> new SearchOptions(START_ID, 1, -1, 180))
-                .isInstanceOf(InvalidSearchException.class).hasMessageContaining("wait at changes");
+                .isInstanceOf(SearchRefusal.class).hasMessageContaining("wait at changes");
         assertThatThrownBy(() -> new SearchOptions(START_ID, 1, 0, SearchOptions.MAX_TRANSFER_WAIT_MINUTES + 1))
-                .isInstanceOf(InvalidSearchException.class);
+                .isInstanceOf(SearchRefusal.class);
         assertThatThrownBy(() -> new SearchOptions(START_ID, 1, 30, 20))
-                .isInstanceOf(InvalidSearchException.class);
+                .isInstanceOf(SearchRefusal.class);
     }
 
     @Test
@@ -53,6 +53,6 @@ class SearchOptionsTest {
 
         assertThat(options.withMaxTransfers(3)).isEqualTo(new SearchOptions(START_ID, 3, 5, 60));
         assertThatThrownBy(() -> options.withMaxTransfers(SearchOptions.MAX_TRANSFERS + 1))
-                .isInstanceOf(InvalidSearchException.class);
+                .isInstanceOf(SearchRefusal.class);
     }
 }

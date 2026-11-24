@@ -12,11 +12,13 @@ class ReachabilityWarmerTest {
 
     @Test
     void warmingCachesEachHigherTransferCountUpToTheConfiguredMaximum(@TempDir Path dir) throws Exception {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(GtfsTestFixtures.load(dir, "alpha", "beta"));
-        ReachabilityWarmer warmer = new ReachabilityWarmer(cache);
+        TransitGraph graph = GtfsTestFixtures.load(dir, "alpha", "beta");
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        SearchAdmission admission = GtfsTestFixtures.admission(graph, cache);
+        ReachabilityWarmer warmer = new ReachabilityWarmer(cache, admission);
         ReflectionTestUtils.setField(warmer, "predictiveMaxTransfers", 2);
         SearchOptions queried = new SearchOptions("alpha:A1", 0, 0, 180);
-        cache.getOrCompute(queried);
+        admission.admit(GtfsTestFixtures.VISITOR, queried, SearchAdmission.SearchListener.NONE);
 
         warmer.warmHigherTransferCounts(queried);
 
@@ -28,8 +30,10 @@ class ReachabilityWarmerTest {
 
     @Test
     void warmingStoresOnlyTheMaximumTransferCount(@TempDir Path dir) throws Exception {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(GtfsTestFixtures.load(dir, "alpha", "beta"));
-        ReachabilityWarmer warmer = new ReachabilityWarmer(cache);
+        TransitGraph graph = GtfsTestFixtures.load(dir, "alpha", "beta");
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        SearchAdmission admission = GtfsTestFixtures.admission(graph, cache);
+        ReachabilityWarmer warmer = new ReachabilityWarmer(cache, admission);
         ReflectionTestUtils.setField(warmer, "predictiveMaxTransfers", 3);
 
         warmer.warmHigherTransferCounts(new SearchOptions("alpha:A1", 0, 0, 180));
@@ -41,11 +45,13 @@ class ReachabilityWarmerTest {
     // B8
     @Test
     void warmingKeepsTheQueriedMinimumTransferTime(@TempDir Path dir) throws Exception {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(GtfsTestFixtures.load(dir, "alpha", "beta"));
-        ReachabilityWarmer warmer = new ReachabilityWarmer(cache);
+        TransitGraph graph = GtfsTestFixtures.load(dir, "alpha", "beta");
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        SearchAdmission admission = GtfsTestFixtures.admission(graph, cache);
+        ReachabilityWarmer warmer = new ReachabilityWarmer(cache, admission);
         ReflectionTestUtils.setField(warmer, "predictiveMaxTransfers", 1);
         SearchOptions queried = new SearchOptions("alpha:A1", 0, 5, 180);
-        cache.getOrCompute(queried);
+        admission.admit(GtfsTestFixtures.VISITOR, queried, SearchAdmission.SearchListener.NONE);
 
         warmer.warmHigherTransferCounts(queried);
 
@@ -54,9 +60,11 @@ class ReachabilityWarmerTest {
 
     @Test
     void warmingIsSkippedWhileNoSearchPermitIsFree(@TempDir Path dir) throws Exception {
-        SearchGate gate = new SearchGate(1, 1);
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(GtfsTestFixtures.load(dir, "alpha", "beta"), gate);
-        ReachabilityWarmer warmer = new ReachabilityWarmer(cache);
+        SearchGate gate = GtfsTestFixtures.gate(1, 1);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        SearchAdmission admission =
+                GtfsTestFixtures.admission(GtfsTestFixtures.load(dir, "alpha", "beta"), cache, gate);
+        ReachabilityWarmer warmer = new ReachabilityWarmer(cache, admission);
         ReflectionTestUtils.setField(warmer, "predictiveMaxTransfers", 1);
         SearchOptions queried = new SearchOptions("alpha:A1", 0, 0, 180);
 

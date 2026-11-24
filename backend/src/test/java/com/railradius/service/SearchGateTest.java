@@ -16,7 +16,7 @@ class SearchGateTest {
 
     @Test
     void aSearchBeyondThePermitsWaitsUntilOneIsFree() throws Exception {
-        SearchGate gate = new SearchGate(1, 1);
+        SearchGate gate = GtfsTestFixtures.gate(1, 1);
         CountDownLatch queued = new CountDownLatch(1);
         FutureTask<String> waiting;
         try (HeldPermit ignored = new HeldPermit(gate)) {
@@ -30,7 +30,7 @@ class SearchGateTest {
 
     @Test
     void aSearchIsTurnedAwayWhenTheQueueIsFull() throws Exception {
-        SearchGate gate = new SearchGate(1, 1);
+        SearchGate gate = GtfsTestFixtures.gate(1, 1);
         CountDownLatch queued = new CountDownLatch(1);
         AtomicBoolean searched = new AtomicBoolean();
         try (HeldPermit ignored = new HeldPermit(gate)) {
@@ -38,14 +38,14 @@ class SearchGateTest {
             assertThat(queued.await(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)).isTrue();
 
             assertThatThrownBy(() -> gate.run(() -> searched.getAndSet(true), () -> {}))
-                    .isInstanceOf(SearchGate.BusyException.class);
+                    .isInstanceOf(SearchRefusal.class);
         }
         assertThat(searched).isFalse();
     }
 
     @Test
     void aQueuedSearchThatGivesUpLeavesTheQueue() throws Exception {
-        SearchGate gate = new SearchGate(1, 1);
+        SearchGate gate = GtfsTestFixtures.gate(1, 1);
         CountDownLatch queued = new CountDownLatch(1);
         FutureTask<String> waiting;
         try (HeldPermit ignored = new HeldPermit(gate)) {
@@ -62,7 +62,7 @@ class SearchGateTest {
 
     @Test
     void runIfFreeSkipsTheSearchWhileEveryPermitIsTaken() throws Exception {
-        SearchGate gate = new SearchGate(1, 1);
+        SearchGate gate = GtfsTestFixtures.gate(1, 1);
         try (HeldPermit ignored = new HeldPermit(gate)) {
             assertThat(gate.runIfFree(() -> "searched")).isEmpty();
         }

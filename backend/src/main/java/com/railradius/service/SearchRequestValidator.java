@@ -25,10 +25,10 @@ public class SearchRequestValidator {
 
     private final TransitGraph graph;
 
-    /** @throws InvalidSearchException if the station is unknown or a parameter is out of range */
+    /** @throws SearchRefusal if the station is unknown or a parameter is out of range */
     public ValidSearch validate(SearchRequest request) {
         String startId = request.startId();
-        if (startId == null || graph.getStation(startId) == null) throw new InvalidSearchException("Unknown station");
+        if (startId == null || graph.getStation(startId) == null) throw SearchRefusal.invalid("Unknown station");
         SearchOptions options = SearchOptions.of(startId, request.maxTransfers(), request.minTransferMins(),
                 request.maxTransferMins());
         return new ValidSearch(options, maxJourneyMinutes(request.maxJourneyHours()));
@@ -38,7 +38,7 @@ public class SearchRequestValidator {
     private static int maxJourneyMinutes(Double hours) {
         if (hours == null) return Integer.MAX_VALUE;
         if (!(hours >= MIN_JOURNEY_HOURS && hours <= MAX_JOURNEY_HOURS)) {
-            throw new InvalidSearchException("The max journey time must be between " + MIN_JOURNEY_HOURS + " and "
+            throw SearchRefusal.invalid("The max journey time must be between " + MIN_JOURNEY_HOURS + " and "
                     + (int) MAX_JOURNEY_HOURS + " hours");
         }
         return (int) (hours * MINUTES_PER_HOUR);

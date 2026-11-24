@@ -53,11 +53,11 @@ class StationSearchIndexTest {
     @Test
     void limitOutsideTheApiBoundsIsRejected() {
         assertThatThrownBy(() -> index.search("alpha", 0))
-                .isInstanceOf(InvalidSearchException.class);
+                .isInstanceOf(SearchRefusal.class);
         assertThatThrownBy(() -> index.search("alpha", -1))
-                .isInstanceOf(InvalidSearchException.class);
+                .isInstanceOf(SearchRefusal.class);
         assertThatThrownBy(() -> index.search("", StationSearchIndex.MAX_LIMIT + 1))
-                .isInstanceOf(InvalidSearchException.class);
+                .isInstanceOf(SearchRefusal.class);
         assertThat(index.search("alpha", StationSearchIndex.MAX_LIMIT)).isNotEmpty();
     }
 
@@ -66,7 +66,7 @@ class StationSearchIndexTest {
         String longest = "a".repeat(StationSearchIndex.MAX_QUERY_LENGTH);
         assertThat(index.search(longest, 10)).isEmpty();
         assertThatThrownBy(() -> index.search(longest + "a", 10))
-                .isInstanceOf(InvalidSearchException.class);
+                .isInstanceOf(SearchRefusal.class);
     }
 
     @Test
@@ -74,7 +74,7 @@ class StationSearchIndexTest {
         TransitGraph graph = new TransitGraph();
         StationSearchIndex loadedIndex = new StationSearchIndex(graph);
 
-        GtfsTestFixtures.dataService(dir, graph, GtfsTestFixtures.reachabilityCache(graph), loadedIndex,
+        GtfsTestFixtures.dataService(dir, graph, GtfsTestFixtures.reachabilityCache(), loadedIndex,
                 "alpha", "beta").loadFromFiles();
 
         assertThat(ids(loadedIndex.search("central", 10))).containsExactly("alpha:A1");

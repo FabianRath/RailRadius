@@ -20,7 +20,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 
-/** Answers reachability requests: validates them, gets the (cached) search result and maps it to DTOs. */
+/** Answers reachability requests: validates them, has the search admitted ({@link SearchAdmission}), maps results. */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -32,9 +32,9 @@ public class ReachabilityService {
     private static final String INTERNAL_ERROR_MESSAGE = "Something went wrong on the server, please try again later";
 
     private final ReachabilityCache cache;
+    private final SearchAdmission admission;
     private final ReachabilityWarmer warmer;
     private final JourneyLegBuilder legBuilder;
-    private final SearchRateLimiter rateLimiter;
     private final SearchRequestValidator validator;
 
     @Value("${railradius.cache.predictive-enabled:true}")
@@ -44,15 +44,12 @@ public class ReachabilityService {
      * The journey to targetId with the path the stream sent for it; empty if the target is not reachable within the
      * request's limits. The search result is usually stored by the stream that showed the station.
      *
-     * @throws SearchRateLimiter.TooManySearchesException if it would have to search and the client's budget is too low
-     * @throws InvalidSearchException if the station is unknown or a parameter out of range
+     * @throws SearchRefusal if the request is invalid or the search is refused ({@link SearchAdmission#admit})
      */
-    public Optional<ReachableStation> journey(SearchRateLimiter.Client client, SearchRequest request,
-                                              String targetId) {
+    public Optional<ReachableStation> journey(SearchAdmission.Client client, SearchRequest request, String targetId) {
         ValidSearch search = validator.validate(request);
         if (targetId.equals(search.options().startId())) return Optional.empty();
-        chargeUnlessStored(client, search.options());
-        CompactResult result = cache.getOrCompute(search.options());
+        CompactResult result = admission.admit(client, search.options(), SearchAdmission.SearchListener.NONE);
         return fewestTransfersWithin(result.paths(targetId), search.maxJourneyMinutes())
                 .flatMap(path -> legBuilder.toReachableStation(targetId, result.journey(targetId, path.transfers())));
     }
@@ -61,20 +58,18 @@ public class ReachabilityService {
      * Resolves the request and sends the stations to the emitter in batches, then a "done" event. A search sends
      * each round's stations when the round ends; a stored result is sent at once. Runs on a worker thread; the HTTP
      * response stays open until it completes. A search that waits for a {@link SearchGate} permit sends SSE comments
-     * meanwhile, and the search stops when a send fails because the client is gone, which frees its permit. A client
-     * over its {@link SearchRateLimiter} budget gets an error event instead, and so does one whose search ran past its
-     * deadline.
+     * meanwhile, and the search stops when a send fails because the client is gone, which frees its permit. A refused
+     * search ({@link SearchRefusal}) gets an error event with the refusal's message instead.
      */
-    public void calculateReachabilityStreaming(SearchRateLimiter.Client client, SearchRequest request,
+    public void calculateReachabilityStreaming(SearchAdmission.Client client, SearchRequest request,
                                                SseEmitter emitter) {
         long startMs = System.currentTimeMillis();
         try {
             ValidSearch search = validator.validate(request);
-            chargeUnlessStored(client, search.options());
             StreamedStations streamed = new StreamedStations(search, emitter, startMs);
             // A station is sent once, with its first path within the time limit. Rounds add paths by ascending
             // transfers, so that is the path its journey shows too (B4).
-            streamed.sendNew(cache.getOrCompute(search.options(), streamed));
+            streamed.sendNew(admission.admit(client, search.options(), streamed));
             log.info("Streamed {} stations in {} ms, the first after {} ms", streamed.sent.size(),
                     System.currentTimeMillis() - startMs, streamed.firstSentMs);
             streamed.sendDone();
@@ -86,9 +81,8 @@ public class ReachabilityService {
         } catch (CancellationException e) {
             log.info("Stream stopped after {} ms: {}", System.currentTimeMillis() - startMs, e.getMessage());
             emitter.complete();
-        } catch (InvalidSearchException | SearchGate.BusyException
-                 | SearchRateLimiter.TooManySearchesException | CompactReachabilitySearch.DeadlineExceededException e) {
-            sendError(emitter, e.getMessage());
+        } catch (SearchRefusal e) {
+            sendError(emitter, e.getReason());
         } catch (Exception e) {
             log.error("Search from {} x{} failed", request.startId(), request.maxTransfers(), e);
             sendError(emitter, INTERNAL_ERROR_MESSAGE);
@@ -113,14 +107,6 @@ public class ReachabilityService {
         emitter.complete();
     }
 
-    // A stored result costs no search, so it costs no budget either. One that waits for an equal running search is
-    // charged all the same: it searches itself if that one's client leaves, and a free wait would let a client that
-    // starts a search and leaves hand out searches nobody paid for (S37)
-    private void chargeUnlessStored(SearchRateLimiter.Client client, SearchOptions options) {
-        if (client.admin() || cache.contains(options)) return;
-        rateLimiter.charge(client.ip(), options);
-    }
-
     public Map<String, Object> getCacheStats() {
         List<String> warming = warmer.getWarmingInProgress();
         Map<String, Object> stats = new LinkedHashMap<>();
@@ -131,7 +117,7 @@ public class ReachabilityService {
     }
 
     /** The stations a stream has sent so far. The start station is not a destination, so it is never sent. */
-    private final class StreamedStations implements ReachabilityCache.SearchListener {
+    private final class StreamedStations implements SearchAdmission.SearchListener {
 
         private final String startId;
         private final SseEmitter emitter;
