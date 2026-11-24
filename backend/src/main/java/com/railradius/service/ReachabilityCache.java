@@ -20,18 +20,20 @@ public class ReachabilityCache {
 
     // One full-data result holds paths to every reachable station, so the count must stay small
     private final Cache<SearchOptions, CompactResult> rawPaths;
+    private final TransitGraph graph;
 
-    public ReachabilityCache(@Value("${railradius.cache.raw-max-entries:30}") int rawMaxEntries) {
+    public ReachabilityCache(TransitGraph graph, @Value("${railradius.cache.raw-max-entries:30}") int rawMaxEntries) {
+        this.graph = graph;
         this.rawPaths = Caffeine.newBuilder().maximumSize(rawMaxEntries).build();
     }
 
     /** The stored result, else one cut down from a stored result with more transfers. */
     Optional<CompactResult> get(SearchOptions key) {
-        CompactResult cached = rawPaths.getIfPresent(key);
-        if (cached != null) {
+        Optional<CompactResult> cached = storedExactly(key);
+        if (cached.isPresent()) {
             log.info("  Raw cache HIT: {} x{} ({} stations)", key.startId(), key.maxTransfers(),
-                    cached.stationCount());
-            return Optional.of(cached);
+                    cached.get().stationCount());
+            return cached;
         }
         return storedWithMoreTransfers(key).map(higher -> {
             log.info("  Raw cache HIT: {} x{} cut down from x{}",
@@ -41,6 +43,7 @@ public class ReachabilityCache {
     }
 
     void put(SearchOptions key, CompactResult result) {
+        if (!isServed(result)) return;
         rawPaths.put(key, result);
         log.info("  Cached raw result: {} x{} ({} stations)", key.startId(), key.maxTransfers(),
                 result.stationCount());
@@ -48,17 +51,30 @@ public class ReachabilityCache {
 
     /** True if {@link #get} would find a result. */
     public boolean contains(SearchOptions key) {
-        return rawPaths.getIfPresent(key) != null || storedWithMoreTransfers(key).isPresent();
+        return storedExactly(key).isPresent() || storedWithMoreTransfers(key).isPresent();
+    }
+
+    private Optional<CompactResult> storedExactly(SearchOptions key) {
+        return Optional.ofNullable(rawPaths.getIfPresent(key)).filter(this::isServed);
     }
 
     private Optional<Map.Entry<SearchOptions, CompactResult>> storedWithMoreTransfers(SearchOptions key) {
         return rawPaths.asMap().entrySet().stream()
                 .filter(entry -> entry.getKey().maxTransfers() > key.maxTransfers()
-                        && entry.getKey().withMaxTransfers(key.maxTransfers()).equals(key))
+                        && entry.getKey().withMaxTransfers(key.maxTransfers()).equals(key)
+                        && isServed(entry.getValue()))
                 .findAny();
     }
 
-    /** Drops every stored result; they describe a graph that no longer exists. */
+    /**
+     * A search that started before a load can finish after it, on the graph from before. Its result must not answer
+     * for the new graph, even if it is stored after {@link #clear} (#19).
+     */
+    private boolean isServed(CompactResult result) {
+        return result.served() == graph.served();
+    }
+
+    /** Drops every stored result, to free the memory of results searched on a graph that is no longer served. */
     public void clear() {
         rawPaths.invalidateAll();
         log.info("Reachability cache cleared");

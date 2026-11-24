@@ -36,6 +36,7 @@ public class ReachabilityService {
     private final ReachabilityWarmer warmer;
     private final JourneyLegBuilder legBuilder;
     private final SearchRequestValidator validator;
+    private final TransitGraph graph;
 
     @Value("${railradius.cache.predictive-enabled:true}")
     private boolean predictiveEnabled;
@@ -51,7 +52,7 @@ public class ReachabilityService {
         if (targetId.equals(search.options().startId())) return Optional.empty();
         CompactResult result = admission.admit(client, search.options(), SearchAdmission.SearchListener.NONE);
         return fewestTransfersWithin(result.paths(targetId), search.maxJourneyMinutes())
-                .flatMap(path -> legBuilder.toReachableStation(targetId, result.journey(targetId, path.transfers())));
+                .flatMap(path -> legBuilder.toReachableStation(result, targetId, path.transfers()));
     }
 
     /**
@@ -141,7 +142,9 @@ public class ReachabilityService {
         @Override
         public void roundPaths(Map<String, CompactResult.PathSummary> paths) {
             List<ReachableStationSummary> stations = new ArrayList<>();
-            paths.forEach((stopId, path) -> addIfNew(stations, stopId, List.of(path)));
+            // No result yet to name the graph: a station missing from the one served now is sent with the result
+            ServedGraph served = graph.served();
+            paths.forEach((stopId, path) -> addIfNew(served, stations, stopId, List.of(path)));
             sendBatches(stations);
         }
 
@@ -151,7 +154,7 @@ public class ReachabilityService {
          */
         void sendNew(CompactResult result) {
             List<ReachableStationSummary> stations = new ArrayList<>();
-            result.forEachStation((stopId, paths) -> addIfNew(stations, stopId, paths));
+            result.forEachStation((stopId, paths) -> addIfNew(result.served(), stations, stopId, paths));
             sendBatches(stations);
         }
 
@@ -161,11 +164,11 @@ public class ReachabilityService {
                     "calculationTimeMs", System.currentTimeMillis() - startMs)));
         }
 
-        private void addIfNew(List<ReachableStationSummary> stations, String stopId,
+        private void addIfNew(ServedGraph served, List<ReachableStationSummary> stations, String stopId,
                               List<CompactResult.PathSummary> paths) {
             if (stopId.equals(startId) || sent.contains(stopId)) return;
             fewestTransfersWithin(paths, maxJourneyMins)
-                    .flatMap(path -> legBuilder.toSummary(stopId, path))
+                    .flatMap(path -> legBuilder.toSummary(served, stopId, path))
                     .ifPresent(station -> {
                         stations.add(station);
                         sent.add(stopId);

@@ -45,9 +45,14 @@ public class CompactReachabilitySearch {
     }
 
     /** One running search: what it searches, its scratch, when it started and how long it may run. */
-    private record Run(TimetableStore store, SearchScratch scratch, String startId, int startIndex, int maxTransfers,
+    private record Run(ServedGraph served, SearchScratch scratch, String startId, int startIndex, int maxTransfers,
                        long[] patternDays, CompactTransferRound.Parameters parameters, SearchCounters counters,
-                       long startNanos, long deadlineNanos) {}
+                       long startNanos, long deadlineNanos) {
+
+        TimetableStore store() {
+            return served.store();
+        }
+    }
 
     /**
      * Per station: the fastest path for each transfer count that is faster than every path with fewer transfers,
@@ -60,11 +65,12 @@ public class CompactReachabilitySearch {
     public CompactResult search(String startId, int maxTransfers, int minTransferMins, int maxTransferMins,
                                 Duration deadline, Consumer<Map<String, CompactResult.PathSummary>> roundPaths) {
         if (maxTransfers > Byte.MAX_VALUE) throw new IllegalArgumentException("Too many transfers: " + maxTransfers);
-        TimetableStore store = graph.timetableStore();
+        ServedGraph served = graph.served();
+        TimetableStore store = served.store();
         SearchScratch scratch = acquire(store);
         try {
             long[] patternDays = store.dayPatterns().weekPeriodMasks(graph.todayEpochDay());
-            Run run = new Run(store, scratch, startId, store.stations().indexOf(startId).orElse(LabelArena.NONE),
+            Run run = new Run(served, scratch, startId, store.stations().indexOf(startId).orElse(LabelArena.NONE),
                     maxTransfers, patternDays,
                     new CompactTransferRound.Parameters(patternDays, minTransferMins * GtfsTime.SECONDS_PER_MINUTE,
                             maxTransferMins * GtfsTime.SECONDS_PER_MINUTE),
@@ -115,7 +121,7 @@ public class CompactReachabilitySearch {
     private CompactResult result(Run run) {
         SearchScratch scratch = run.scratch();
         trimArena(scratch, labels -> {});
-        return new CompactResult(run.store(), graph, run.startId(), scratch.labels().resultLabels(),
+        return new CompactResult(run.served(), graph, run.startId(), scratch.labels().resultLabels(),
                 scratch.chosen().byStation(run.store().stations().size()), run.maxTransfers());
     }
 

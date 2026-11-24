@@ -60,7 +60,7 @@ final class GtfsTestFixtures {
     private static TransitGraph load(Path tempDir, int tripBatchSize, LocalDate today, String... feedFolders)
             throws IOException {
         TransitGraph graph = TransitGraph.withToday(today);
-        dataService(tempDir, graph, reachabilityCache(), tripBatchSize,
+        dataService(tempDir, graph, reachabilityCache(graph), tripBatchSize,
                 feedFolders).loadFromFiles();
         return graph;
     }
@@ -98,7 +98,7 @@ final class GtfsTestFixtures {
 
     /** Like {@link #dataService(Path, TransitGraph, ReachabilityCache, String...)}. */
     static GtfsDataService dataService(Path tempDir, TransitGraph graph, String... feedFolders) throws IOException {
-        return dataService(tempDir, graph, reachabilityCache(), feedFolders);
+        return dataService(tempDir, graph, reachabilityCache(graph), feedFolders);
     }
 
     private static GtfsDataService dataService(Path tempDir, TransitGraph graph, ReachabilityCache reachabilityCache,
@@ -137,7 +137,7 @@ final class GtfsTestFixtures {
 
     /** A ReachabilityService wired like in the app, without warming. */
     static ReachabilityService reachabilityService(TransitGraph graph) {
-        return reachabilityService(graph, reachabilityCache());
+        return reachabilityService(graph, reachabilityCache(graph));
     }
 
     static ReachabilityService reachabilityService(TransitGraph graph, ReachabilityCache cache) {
@@ -153,15 +153,16 @@ final class GtfsTestFixtures {
     static ReachabilityService reachabilityService(TransitGraph graph, ReachabilityCache cache,
                                                    SearchAdmission admission) {
         return new ReachabilityService(cache, admission, new ReachabilityWarmer(cache, admission),
-                new JourneyLegBuilder(graph), new SearchRequestValidator(graph));
+                new JourneyLegBuilder(), new SearchRequestValidator(graph), graph);
     }
 
-    static ReachabilityCache reachabilityCache() {
-        return reachabilityCache(RAW_CACHE_MAX_ENTRIES);
+    /** A cache that serves only results searched on the graph's served graph now. */
+    static ReachabilityCache reachabilityCache(TransitGraph graph) {
+        return reachabilityCache(graph, RAW_CACHE_MAX_ENTRIES);
     }
 
-    static ReachabilityCache reachabilityCache(int rawMaxEntries) {
-        return new ReachabilityCache(rawMaxEntries);
+    static ReachabilityCache reachabilityCache(TransitGraph graph, int rawMaxEntries) {
+        return new ReachabilityCache(graph, rawMaxEntries);
     }
 
     /** Admission with the app's gate, no deadline (so a slow test machine never stops a search) and no budget limit. */

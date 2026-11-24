@@ -13,7 +13,8 @@ import java.util.function.BiConsumer;
  * It holds the labels of the chosen paths and of the rides before them, copied out of the search's arena, and per
  * station its chosen labels by ascending transfers. A path's transfers and duration are at hand; its stations,
  * connections and running days are built from the {@link TimetableStore} when it is asked for ({@link #journey}), so
- * a stored result is a few arrays. A result with fewer transfers is a view on the same arrays.
+ * a stored result is a few arrays. A result with fewer transfers is a view on the same arrays. It keeps the
+ * {@link ServedGraph} it was searched on, so it is described by that graph even after a load replaced it (#19).
  */
 final class CompactResult {
 
@@ -34,16 +35,19 @@ final class CompactResult {
         }
     }
 
+    private final ServedGraph served;
     private final TimetableStore store;
+    // Only for its clock: which days are past
     private final TransitGraph graph;
     private final String startId;
     private final Labels labels;
     private final ChosenPaths.ByStation chosen;
     private final int maxTransfers;
 
-    CompactResult(TimetableStore store, TransitGraph graph, String startId, Labels labels,
+    CompactResult(ServedGraph served, TransitGraph graph, String startId, Labels labels,
                   ChosenPaths.ByStation chosen, int maxTransfers) {
-        this.store = store;
+        this.served = served;
+        this.store = served.store();
         this.graph = graph;
         this.startId = startId;
         this.labels = labels;
@@ -88,7 +92,12 @@ final class CompactResult {
      * exactly the result of a search with that many.
      */
     CompactResult withMaxTransfers(int transfers) {
-        return new CompactResult(store, graph, startId, labels, chosen, Math.min(transfers, maxTransfers));
+        return new CompactResult(served, graph, startId, labels, chosen, Math.min(transfers, maxTransfers));
+    }
+
+    /** The graph the result was searched on. */
+    ServedGraph served() {
+        return served;
     }
 
     /** Stations with a path, the start station included. */

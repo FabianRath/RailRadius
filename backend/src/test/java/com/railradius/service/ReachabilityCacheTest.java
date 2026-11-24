@@ -28,7 +28,7 @@ class ReachabilityCacheTest {
     @Test
     void lowerTransferCountsCutFromAStoredResultEqualTheirOwnSearch() {
         CompactReachabilitySearch search = GtfsTestFixtures.search(gtfs);
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         store(gtfs, cache, key(MAX_TRANSFERS));
 
         for (int transfers = 0; transfers < MAX_TRANSFERS; transfers++) {
@@ -46,7 +46,7 @@ class ReachabilityCacheTest {
     // B9
     @Test
     void storedResultsBeyondTheMaximumAreEvicted() {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(1);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs, 1);
 
         store(gtfs, cache, key(0));
         store(gtfs, cache, key(1));
@@ -58,7 +58,7 @@ class ReachabilityCacheTest {
     @Test
     void reloadingGtfsDropsStoredResults(@TempDir Path dir) throws Exception {
         TransitGraph graph = new TransitGraph();
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(graph);
         GtfsDataService dataService = GtfsTestFixtures.dataService(dir, graph, cache, "alpha", "beta");
         dataService.loadFromFiles();
         store(graph, cache, key(1));
@@ -66,6 +66,23 @@ class ReachabilityCacheTest {
         dataService.loadFromFiles();
 
         assertThat(cache.contains(key(1))).isFalse();
+    }
+
+    // #19: a search that ran on the graph from before a reload can store its result after the reload cleared them
+    @Test
+    void aResultSearchedBeforeAReloadIsNotServedAfterIt(@TempDir Path dir) throws Exception {
+        TransitGraph graph = new TransitGraph();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(graph);
+        GtfsDataService dataService = GtfsTestFixtures.dataService(dir, graph, cache, "alpha", "beta");
+        dataService.loadFromFiles();
+        CompactResult searchedBefore = GtfsTestFixtures.search(graph).search(START_ID, 2, 0, 180,
+                CompactReachabilitySearch.NO_DEADLINE, paths -> {});
+
+        dataService.loadFromFiles();
+        cache.put(key(2), searchedBefore);
+
+        assertThat(cache.get(key(2))).isEmpty();
+        assertThat(cache.contains(key(1))).as("cut down from it").isFalse();
     }
 
     private static void store(TransitGraph graph, ReachabilityCache cache, SearchOptions options) {

@@ -7,7 +7,6 @@ import com.railradius.model.Connection;
 import com.railradius.model.JourneyPath;
 import com.railradius.model.Station;
 import com.railradius.util.GtfsTime;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -18,10 +17,10 @@ import java.util.stream.Collectors;
 
 /**
  * Turns a search's journey into the API's {@link ReachableStation}, with the rides and transfers as legs, or a path's
- * summary into a {@link ReachableStationSummary}.
+ * summary into a {@link ReachableStationSummary}. Stations and trips are looked up in the graph the result was
+ * searched on ({@link CompactResult#served}), so a result never mixes the graph from before a load with the new one.
  */
 @Component
-@RequiredArgsConstructor
 public class JourneyLegBuilder {
 
     private static final String LEG_TRAIN = "TRAIN";
@@ -29,12 +28,12 @@ public class JourneyLegBuilder {
     // Rounding in the feeds can put a few seconds between arriving and departing on the same train
     private static final int SAME_RIDE_MAX_GAP_MINUTES = 1;
 
-    private final TransitGraph transitGraph;
-
     /** Empty if the destination station is unknown. */
-    public Optional<ReachableStation> toReachableStation(String stopId, CompactResult.Journey journey) {
-        Station station = transitGraph.getStation(stopId);
+    public Optional<ReachableStation> toReachableStation(CompactResult result, String stopId, int transfers) {
+        ServedGraph graph = result.served();
+        Station station = graph.station(stopId);
         if (station == null) return Optional.empty();
+        CompactResult.Journey journey = result.journey(stopId, transfers);
         JourneyPath path = journey.path();
         ServiceDays runningDays = journey.runningDays();
         return Optional.of(ReachableStation.builder()
@@ -47,17 +46,18 @@ public class JourneyLegBuilder {
                 .totalDuration(GtfsTime.formatDuration(path.getTotalDurationMinutes()))
                 .totalDurationMinutes(path.getTotalDurationMinutes())
                 .path(path.getStationIds())
-                .pathNames(path.getStationIds().stream().map(this::stationName).toList())
-                .legs(buildLegs(path.getConnections()))
+                .pathNames(path.getStationIds().stream().map(id -> stationName(graph, id)).toList())
+                .legs(buildLegs(graph, path.getConnections()))
                 .runningDays(JourneyRunningDays.describe(runningDays).orElse(null))
                 .hasCommonDay(!runningDays.isEmpty())
-                .roundTripStation(roundTripStation(path.getStationIds()).map(this::stationName).orElse(null))
+                .roundTripStation(roundTripStation(path.getStationIds()).map(id -> stationName(graph, id)).orElse(null))
                 .build());
     }
 
     /** The station and the path's transfers and duration, without the journey; empty if the station is unknown. */
-    public Optional<ReachableStationSummary> toSummary(String stopId, CompactResult.PathSummary path) {
-        Station station = transitGraph.getStation(stopId);
+    public Optional<ReachableStationSummary> toSummary(ServedGraph graph, String stopId,
+                                                       CompactResult.PathSummary path) {
+        Station station = graph.station(stopId);
         if (station == null) return Optional.empty();
         return Optional.of(ReachableStationSummary.builder()
                 .stopId(stopId)
@@ -75,7 +75,7 @@ public class JourneyLegBuilder {
      * One TRAIN leg per ride and a TRANSFER leg between rides. Consecutive connections are one ride if they
      * share the trip, or the route name with no gap (the same train split across trip_id variants).
      */
-    private List<JourneyLeg> buildLegs(List<Connection> connections) {
+    private static List<JourneyLeg> buildLegs(ServedGraph graph, List<Connection> connections) {
         List<JourneyLeg> legs = new ArrayList<>();
         int rideStart = 0;
         while (rideStart < connections.size()) {
@@ -84,14 +84,14 @@ public class JourneyLegBuilder {
                 rideEnd++;
             }
             Connection last = connections.get(rideEnd - 1);
-            legs.add(trainLeg(connections.get(rideStart), last));
+            legs.add(trainLeg(graph, connections.get(rideStart), last));
 
             if (rideEnd < connections.size()) {
                 int transferMinutes = Math.max(0, GtfsTime.diffMinutes(
                         last.getArrivalTimeSeconds(), connections.get(rideEnd).getDepartureTimeSeconds()));
                 String transferStopId = last.getToStopId();
-                String transferStation = stationName(transferStopId);
-                String transferCountry = stationCountry(transferStopId);
+                String transferStation = stationName(graph, transferStopId);
+                String transferCountry = stationCountry(graph, transferStopId);
                 legs.add(JourneyLeg.builder()
                         .type(LEG_TRANSFER)
                         .fromStation(transferStation)
@@ -109,21 +109,21 @@ public class JourneyLegBuilder {
         return legs;
     }
 
-    private JourneyLeg trainLeg(Connection first, Connection last) {
+    private static JourneyLeg trainLeg(ServedGraph graph, Connection first, Connection last) {
         int rideMinutes = GtfsTime.diffMinutes(first.getDepartureTimeSeconds(), last.getArrivalTimeSeconds());
-        Optional<TripInfo> tripInfo = transitGraph.getTripInfo(first.getTripId());
+        Optional<TripInfo> tripInfo = graph.tripInfo(first.getTripId());
         return JourneyLeg.builder()
                 .type(LEG_TRAIN)
                 .trainName(first.getRouteName())
                 .trainNumber(tripInfo.map(TripInfo::trainNumber).orElse(null))
                 .headsign(tripInfo.map(TripInfo::headsign).orElse(null))
                 .operator(tripInfo.map(TripInfo::operator).orElse(null))
-                .fromStation(stationName(first.getFromStopId()))
-                .toStation(stationName(last.getToStopId()))
+                .fromStation(stationName(graph, first.getFromStopId()))
+                .toStation(stationName(graph, last.getToStopId()))
                 .fromStopId(first.getFromStopId())
                 .toStopId(last.getToStopId())
-                .fromCountry(stationCountry(first.getFromStopId()))
-                .toCountry(stationCountry(last.getToStopId()))
+                .fromCountry(stationCountry(graph, first.getFromStopId()))
+                .toCountry(stationCountry(graph, last.getToStopId()))
                 .departureTime(first.getDepartureTime())
                 .arrivalTime(last.getArrivalTime())
                 .duration(GtfsTime.formatDuration(rideMinutes))
@@ -148,13 +148,13 @@ public class JourneyLegBuilder {
     }
 
     /** Falls back to the raw stop ID when the station is unknown (see F2). */
-    private String stationName(String stopId) {
-        Station s = transitGraph.getStation(stopId);
+    private static String stationName(ServedGraph graph, String stopId) {
+        Station s = graph.station(stopId);
         return s != null ? s.getName() : stopId;
     }
 
-    private String stationCountry(String stopId) {
-        Station s = transitGraph.getStation(stopId);
+    private static String stationCountry(ServedGraph graph, String stopId) {
+        Station s = graph.station(stopId);
         return s != null ? s.getCountry() : null;
     }
 }

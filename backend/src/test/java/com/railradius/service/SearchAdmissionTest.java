@@ -41,7 +41,7 @@ class SearchAdmissionTest {
 
     @Test
     void aStoredResultCostsNoBudget() {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         SearchAdmission admission = admissionWithBudgetForOneBigSearch(cache);
         admission.admit(VISITOR, BIG_SEARCH, SearchAdmission.SearchListener.NONE);
 
@@ -54,7 +54,7 @@ class SearchAdmissionTest {
     // #16: the charge follows the lookup that serves the result, so a result that is gone is searched and charged
     @Test
     void aSearchWhoseStoredResultWasEvictedIsCharged() {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(1);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs, 1);
         SearchAdmission admission = admissionWithBudgetForOneBigSearch(cache);
         admission.admit(VISITOR, BIG_SEARCH, SearchAdmission.SearchListener.NONE);
         admission.admit(ADMIN, key(0), SearchAdmission.SearchListener.NONE);
@@ -67,7 +67,7 @@ class SearchAdmissionTest {
     // S37: a joiner searches itself if the one it waits for stops, so waiting is not free
     @Test
     void aSearchThatJoinsAnEqualRunningOneIsCharged() throws Exception {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         SearchAdmission admission = admissionWithBudgetForOneBigSearch(cache);
         HeldSearch first = new HeldSearch(admission, BIG_SEARCH, () -> {});
 
@@ -81,7 +81,7 @@ class SearchAdmissionTest {
     @Test
     void aSearchBeyondTheFullQueueIsRefusedAsBusy() throws Exception {
         SearchGate gate = GtfsTestFixtures.gate(1, 0);
-        SearchAdmission admission = GtfsTestFixtures.admission(gtfs, GtfsTestFixtures.reachabilityCache(), gate);
+        SearchAdmission admission = GtfsTestFixtures.admission(gtfs, GtfsTestFixtures.reachabilityCache(gtfs), gate);
 
         try (HeldPermit ignored = new HeldPermit(gate)) {
             assertThatThrownBy(() -> admission.admit(VISITOR, key(1), SearchAdmission.SearchListener.NONE))
@@ -93,7 +93,7 @@ class SearchAdmissionTest {
     @Test
     void aSearchPastItsDeadlineIsRefusedAsTooSlowStoresNothingAndFreesItsPermit() {
         SearchGate gate = GtfsTestFixtures.gate(1, 0);
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         SearchAdmission admission = GtfsTestFixtures.admission(gtfs, cache, gate,
                 GtfsTestFixtures.unlimitedRateLimiter(), Duration.ZERO);
 
@@ -118,7 +118,7 @@ class SearchAdmissionTest {
     @Test
     void anEqualSearchStartedMeanwhileWaitsWithoutAPermitAndGetsTheSameResult() throws Exception {
         SearchGate gate = GtfsTestFixtures.gate(2, 0);
-        SearchAdmission admission = GtfsTestFixtures.admission(gtfs, GtfsTestFixtures.reachabilityCache(), gate);
+        SearchAdmission admission = GtfsTestFixtures.admission(gtfs, GtfsTestFixtures.reachabilityCache(gtfs), gate);
         HeldSearch first = new HeldSearch(admission, key(MAX_TRANSFERS), () -> {});
         Waiter second = new Waiter(admission);
 
@@ -135,7 +135,7 @@ class SearchAdmissionTest {
     // S37
     @Test
     void aSearchWaitingForOneWhoseClientLeftSearchesItself() throws Exception {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         SearchAdmission admission = GtfsTestFixtures.admission(gtfs, cache);
         HeldSearch first = new HeldSearch(admission, key(MAX_TRANSFERS), () -> {
             throw new CancellationException("the client is gone");
@@ -156,7 +156,7 @@ class SearchAdmissionTest {
     // S37
     @Test
     void aSearchWaitingForOneThatFailsGetsTheSameFailure() throws Exception {
-        SearchAdmission admission = GtfsTestFixtures.admission(gtfs, GtfsTestFixtures.reachabilityCache());
+        SearchAdmission admission = GtfsTestFixtures.admission(gtfs, GtfsTestFixtures.reachabilityCache(gtfs));
         HeldSearch first = new HeldSearch(admission, key(MAX_TRANSFERS), () -> {
             throw new IllegalStateException("search failed");
         });
@@ -175,7 +175,7 @@ class SearchAdmissionTest {
     // S37
     @Test
     void aWaitingSearchWhoseClientLeftStopsWithoutStoppingTheOneItWaitedFor() throws Exception {
-        SearchAdmission admission = GtfsTestFixtures.admission(gtfs, GtfsTestFixtures.reachabilityCache());
+        SearchAdmission admission = GtfsTestFixtures.admission(gtfs, GtfsTestFixtures.reachabilityCache(gtfs));
         HeldSearch first = new HeldSearch(admission, key(MAX_TRANSFERS), () -> {});
 
         assertThatThrownBy(() -> admission.admit(VISITOR, key(MAX_TRANSFERS), new SearchAdmission.SearchListener() {
@@ -193,7 +193,7 @@ class SearchAdmissionTest {
     // S37: the warmer never waits for a visitor's search
     @Test
     void warmingSkipsSearchOptionsThatAreBeingSearched() throws Exception {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         SearchAdmission admission = GtfsTestFixtures.admission(gtfs, cache, GtfsTestFixtures.gate(2, 0));
         HeldSearch first = new HeldSearch(admission, key(MAX_TRANSFERS), () -> {});
 
@@ -211,7 +211,7 @@ class SearchAdmissionTest {
     }
 
     private static SearchAdmission admissionWithGate(int permits, int maxQueued, Duration deadline) {
-        return GtfsTestFixtures.admission(gtfs, GtfsTestFixtures.reachabilityCache(),
+        return GtfsTestFixtures.admission(gtfs, GtfsTestFixtures.reachabilityCache(gtfs),
                 GtfsTestFixtures.gate(permits, maxQueued), GtfsTestFixtures.unlimitedRateLimiter(), deadline);
     }
 

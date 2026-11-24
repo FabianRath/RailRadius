@@ -27,7 +27,7 @@ class GtfsLoadProgressTest {
     @Test
     void finishedLoadReportsEveryFeedParsedAndTheGraphSize(@TempDir Path dir) throws Exception {
         TransitGraph graph = new TransitGraph();
-        GtfsDataService service = GtfsTestFixtures.dataService(dir, graph, GtfsTestFixtures.reachabilityCache(),
+        GtfsDataService service = GtfsTestFixtures.dataService(dir, graph, GtfsTestFixtures.reachabilityCache(graph),
                 "alpha", "beta");
 
         service.loadFromFiles();
@@ -44,7 +44,7 @@ class GtfsLoadProgressTest {
     @Test
     void loadWithoutFeedsEndsAsFailed(@TempDir Path dir) throws Exception {
         TransitGraph graph = new TransitGraph();
-        GtfsDataService service = GtfsTestFixtures.dataService(dir, graph, GtfsTestFixtures.reachabilityCache());
+        GtfsDataService service = GtfsTestFixtures.dataService(dir, graph, GtfsTestFixtures.reachabilityCache(graph));
 
         assertThatThrownBy(service::loadFromFiles).isInstanceOf(IllegalStateException.class);
         assertThat(service.getLoadStatus().getPhase()).isEqualTo("FAILED");

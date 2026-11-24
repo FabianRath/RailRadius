@@ -155,7 +155,7 @@ class ReachabilityServiceTest {
     // B41, B42: a request outside the API's bounds costs no budget, searches nothing and stores nothing
     @Test
     void invalidRequestsAreRejectedBeforeTheyAreChargedOrStored() {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         ReachabilityService service = serviceWithBudgetForOneBigSearch(cache);
         List<SearchRequest> invalid = List.of(
                 request("alpha:A1", -1, 0, 180, null),
@@ -432,7 +432,7 @@ class ReachabilityServiceTest {
 
     @Test
     void streamStopsSearchingWhenTheClientIsGone() {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs, cache);
         GoneClientEmitter emitter = new GoneClientEmitter();
 
@@ -444,7 +444,7 @@ class ReachabilityServiceTest {
 
     @Test
     void clientGoneBeforeTheDoneEventEndsTheStreamWithoutAnErrorEvent() {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         ReachabilityService service = GtfsTestFixtures.reachabilityService(gtfs, cache);
         // Spring's send after a timeout or a gone client fails like this
         RecordingEmitter emitter = new RecordingEmitter() {
@@ -467,7 +467,7 @@ class ReachabilityServiceTest {
     @Test
     void streamThatTimedOutStopsSearchingAndFreesItsPermit() {
         SearchGate gate = GtfsTestFixtures.gate(1, 0);
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         ReachabilityService service = serviceWithGate(cache, gate, CompactReachabilitySearch.NO_DEADLINE);
         // Spring's timeout marks the emitter complete just like this, so every later send fails
         SseEmitter emitter = new SseEmitter();
@@ -482,7 +482,7 @@ class ReachabilityServiceTest {
     @Test
     void streamTurnedAwayWhenTheSearchQueueIsFullEndsWithAnErrorEvent() throws Exception {
         SearchGate gate = GtfsTestFixtures.gate(1, 0);
-        ReachabilityService service = serviceWithGate(GtfsTestFixtures.reachabilityCache(), gate,
+        ReachabilityService service = serviceWithGate(GtfsTestFixtures.reachabilityCache(gtfs), gate,
                 CompactReachabilitySearch.NO_DEADLINE);
         RecordingEmitter emitter = new RecordingEmitter();
 
@@ -499,7 +499,7 @@ class ReachabilityServiceTest {
 
     @Test
     void streamOverTheSearchBudgetEndsWithAnErrorEventAndSearchesNothing() {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         ReachabilityService service = serviceWithBudgetForOneBigSearch(cache);
         service.calculateReachabilityStreaming(VISITOR, request("alpha:A1", 5, 0, 360, null),
                 new RecordingEmitter());
@@ -515,7 +515,7 @@ class ReachabilityServiceTest {
 
     @Test
     void storedResultsCostNoSearchBudget() {
-        ReachabilityService service = serviceWithBudgetForOneBigSearch(GtfsTestFixtures.reachabilityCache());
+        ReachabilityService service = serviceWithBudgetForOneBigSearch(GtfsTestFixtures.reachabilityCache(gtfs));
         service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 5),
                 new RecordingEmitter());
 
@@ -531,7 +531,7 @@ class ReachabilityServiceTest {
 
     @Test
     void adminSearchesAreNeverRateLimited() {
-        ReachabilityService service = serviceWithBudgetForOneBigSearch(GtfsTestFixtures.reachabilityCache());
+        ReachabilityService service = serviceWithBudgetForOneBigSearch(GtfsTestFixtures.reachabilityCache(gtfs));
         SearchAdmission.Client admin = new SearchAdmission.Client(VISITOR.ip(), true);
         service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 5),
                 new RecordingEmitter());
@@ -544,8 +544,8 @@ class ReachabilityServiceTest {
 
     @Test
     void streamThatRunsOutOfMemorySendsAnErrorAndFreesItsPermit() {
-        ReachabilityService service = serviceWithGate(GtfsTestFixtures.reachabilityCache(), GtfsTestFixtures.gate(1, 0),
-                CompactReachabilitySearch.NO_DEADLINE);
+        ReachabilityService service = serviceWithGate(GtfsTestFixtures.reachabilityCache(gtfs),
+                GtfsTestFixtures.gate(1, 0), CompactReachabilitySearch.NO_DEADLINE);
         FailingStationsEmitter emitter = new FailingStationsEmitter(() -> {
             throw new OutOfMemoryError("Java heap space");
         });
@@ -564,7 +564,7 @@ class ReachabilityServiceTest {
     @Test
     void streamPastTheSearchDeadlineSendsAnErrorStoresNothingAndFreesItsPermit() {
         SearchGate gate = GtfsTestFixtures.gate(1, 0);
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache();
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         ReachabilityService service = serviceWithGate(cache, gate, Duration.ZERO);
         RecordingEmitter emitter = new RecordingEmitter();
 
@@ -580,7 +580,7 @@ class ReachabilityServiceTest {
     @Test
     void journeyPastTheSearchDeadlineIsRefusedAndFreesItsPermit() {
         SearchGate gate = GtfsTestFixtures.gate(1, 0);
-        ReachabilityService service = serviceWithGate(GtfsTestFixtures.reachabilityCache(), gate, Duration.ZERO);
+        ReachabilityService service = serviceWithGate(GtfsTestFixtures.reachabilityCache(gtfs), gate, Duration.ZERO);
 
         assertThatThrownBy(() -> service.journey(VISITOR, streamRequest("alpha:A1", 3), "beta:B2"))
                 .isInstanceOfSatisfying(SearchRefusal.class, refusal -> assertThat(refusal.getStatusCode().value())
@@ -722,5 +722,19 @@ class ReachabilityServiceTest {
 
     private static Optional<ReachableStation> find(Search search, String stopId) {
         return search.service().journey(VISITOR, search.request(), stopId);
+    }
+
+    // #19: a result's stations come from the graph it was searched on, even after a reload replaced that graph
+    @Test
+    void aResultIsDescribedByTheGraphItWasSearchedOn(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir.resolve("before"), "alpha", "beta");
+        CompactResult result = GtfsTestFixtures.search(graph).search("alpha:A1", 1, 0, 180,
+                CompactReachabilitySearch.NO_DEADLINE, paths -> {});
+
+        graph.serve(GtfsTestFixtures.network(dir.resolve("after"), "omega").servedData());
+
+        CompactResult.PathSummary path = result.paths("alpha:A2").getFirst();
+        assertThat(new JourneyLegBuilder().toSummary(result.served(), "alpha:A2", path))
+                .map(ReachableStationSummary::getStopName).contains("Alpha North");
     }
 }
