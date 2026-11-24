@@ -2,7 +2,6 @@ package com.railradius.service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.IntStream;
 
 /**
  * The exact running days of the journeys a compact search chooses among: per label its journey's
@@ -54,7 +53,7 @@ final class LabelDays {
     void resolve(TimetableStore store, TransitGraph graph) {
         for (IntList queued : queuedByTransfers) {
             JourneyRunningDays.SoFar[] soFar = new JourneyRunningDays.SoFar[queued.size()];
-            IntStream.range(0, queued.size()).parallel()
+            Parallel.range(queued.size())
                     .forEach(i -> soFar[i] = soFar(queued.get(i), store, graph));
             for (int i = 0; i < soFar.length; i++) {
                 int daysIndex = interned.intern(soFar[i].days());

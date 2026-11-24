@@ -2,11 +2,8 @@ package com.railradius.service;
 
 import com.railradius.util.GtfsTime;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.IntStream;
 
 /**
  * The transfer part of a round of {@link CompactReachabilitySearch}: the arrivals of the previous round's
@@ -28,8 +25,6 @@ final class CompactTransferRound {
     private static final int RIDE_SHIFT = MINUTES_BITS + STOPS_BITS;
     // record >>> WORD_SHIFT is the record's word in dropped
     private static final int WORD_SHIFT = 6;
-    // Rides mark their records in parallel, and a word can hold records of two rides
-    private static final VarHandle DROPPED_WORD = MethodHandles.arrayElementVarHandle(long[].class);
 
     /** A search's trips' days by day pattern ({@link WeekPeriodDays}) and its wait window. */
     record Parameters(long[] patternDays, int minWaitSeconds, int maxWaitSeconds) {}
@@ -136,7 +131,7 @@ final class CompactTransferRound {
     /** What each station boards from the arrivals of the rides, by ascending station index. */
     List<StationBoardings> boardings(int startStation, Parameters parameters) {
         groupByStation(startStation);
-        return IntStream.range(0, stations.size()).parallel()
+        return Parallel.range(stations.size())
                 .mapToObj(i -> boardingsAt(stations.get(i), parameters))
                 .toList();
     }
@@ -163,7 +158,7 @@ final class CompactTransferRound {
             fromTotal += boarded.get(i).fromCount;
         }
         int first = labels.reserve(fromTotal);
-        IntStream.range(0, boarded.size()).parallel().forEach(i -> label(boarded.get(i), first + firstLabel[i]));
+        Parallel.range(boarded.size()).forEach(i -> label(boarded.get(i), first + firstLabel[i]));
     }
 
     long sizeBytes() {
@@ -198,7 +193,7 @@ final class CompactTransferRound {
         } else {
             Arrays.fill(dropped, 0, words, 0L);
         }
-        IntStream.range(0, rides.size()).parallel().forEach(ride -> markDropped(ride, startStation));
+        Parallel.range(rides.size()).forEach(ride -> markDropped(ride, startStation));
         Arrays.fill(stationStart, 0);
         int kept = 0;
         for (int ride = 0; ride < rides.size(); ride++) {
@@ -210,7 +205,7 @@ final class CompactTransferRound {
                 kept++;
             }
         }
-        Arrays.parallelPrefix(stationStart, Integer::sum);
+        Parallel.prefixSum(stationStart);
         if (grouped.length < kept) grouped = new long[kept];
         System.arraycopy(stationStart, 0, stationNext, 0, stationStart.length);
         for (int ride = 0; ride < rides.size(); ride++) {
@@ -246,7 +241,7 @@ final class CompactTransferRound {
             }
             boolean wordEnds = record + 1 == end || ((record + 1) & (Long.SIZE - 1)) == 0;
             if (wordEnds && bits != 0) {
-                DROPPED_WORD.getAndBitwiseOr(dropped, record >>> WORD_SHIFT, bits);
+                Parallel.orInto(dropped, record >>> WORD_SHIFT, bits);
                 bits = 0;
             }
         }

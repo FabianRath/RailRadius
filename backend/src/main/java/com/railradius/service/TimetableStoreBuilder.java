@@ -87,7 +87,7 @@ final class TimetableStoreBuilder {
         for (int event = 0; event < events.station().length; event++) {
             if (events.depSec()[event] != TimetableStore.NO_LEG) start[events.station()[event] + 1]++;
         }
-        Arrays.parallelPrefix(start, Integer::sum);
+        Parallel.prefixSum(start);
         // Seconds in the high half, the event in the low half: sorting the keys sorts by time, then by event
         long[] keys = new long[start[stationCount]];
         int[] next = start.clone();

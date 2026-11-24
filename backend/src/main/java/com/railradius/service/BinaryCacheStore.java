@@ -158,7 +158,7 @@ public class BinaryCacheStore {
         data.store().writeTo(out);
     }
 
-    private static BinaryCacheData read(BinaryBlocks.Reader in) throws IOException {
+    static BinaryCacheData read(BinaryBlocks.Reader in) throws IOException {
         PackedStrings packed = PackedStrings.readFrom(in);
         // Decoded once, so equal strings share one instance, like the graph's station IDs (S16)
         String[] strings = new String[packed.size()];

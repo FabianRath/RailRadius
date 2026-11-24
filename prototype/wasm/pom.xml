@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Prototype only (#8): compiles the backend's search to WebAssembly. Never merged into main. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.railradius</groupId>
+    <artifactId>wasm-search-prototype</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <teavm.version>0.17.0</teavm.version>
+        <backend.classes>${project.basedir}/../../backend/target/classes</backend.classes>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.teavm</groupId>
+            <artifactId>teavm-classlib</artifactId>
+            <version>${teavm.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.teavm</groupId>
+            <artifactId>teavm-jso</artifactId>
+            <version>${teavm.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.teavm</groupId>
+            <artifactId>teavm-jso-apis</artifactId>
+            <version>${teavm.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- The backend's compiled classes, unchanged, except BinaryBlocks: this module has one that reads memory -->
+            <plugin>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>backend-classes</id>
+                        <phase>process-resources</phase>
+                        <goals><goal>copy-resources</goal></goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${backend.classes}</directory>
+                                    <includes><include>com/railradius/**/*.class</include><include>*.txt</include></includes>
+                                    <excludes><exclude>com/railradius/service/BinaryBlocks*.class</exclude>
+                                        <exclude>com/railradius/service/Parallel.class</exclude>
+                                        <exclude>com/railradius/service/SearchRefusal*.class</exclude>
+                                        <exclude>com/railradius/service/StationSearchIndex*.class</exclude></excludes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.teavm</groupId>
+                <artifactId>teavm-maven-plugin</artifactId>
+                <version>${teavm.version}</version>
+                <executions>
+                    <execution>
+                        <id>wasm-gc</id>
+                        <phase>process-classes</phase>
+                        <goals><goal>compile</goal></goals>
+                        <configuration>
+                            <mainClass>com.railradius.service.TeaVmEntry</mainClass>
+                            <targetType>WEBASSEMBLY_GC</targetType>
+                            <targetDirectory>${project.basedir}/web/build/teavm-wasm</targetDirectory>
+                            <targetFileName>search.wasm</targetFileName>
+                            <optimizationLevel>FULL</optimizationLevel>
+                            <minifying>true</minifying>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>js</id>
+                        <phase>process-classes</phase>
+                        <goals><goal>compile</goal></goals>
+                        <configuration>
+                            <mainClass>com.railradius.service.TeaVmEntry</mainClass>
+                            <targetType>JAVASCRIPT</targetType>
+                            <jsModuleType>ES2015</jsModuleType>
+                            <targetDirectory>${project.basedir}/web/build/teavm-js</targetDirectory>
+                            <targetFileName>search.js</targetFileName>
+                            <optimizationLevel>ADVANCED</optimizationLevel>
+                            <minifying>true</minifying>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
