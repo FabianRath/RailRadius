@@ -1,9 +1,8 @@
 package com.railradius.service;
 
-import com.railradius.dto.ReachabilityRequest;
 import com.railradius.dto.ReachableStation;
 import com.railradius.dto.ReachableStationSummary;
-import com.railradius.service.ReachabilityCache.SearchKey;
+import com.railradius.service.SearchRequestValidator.SearchRequest;
 import com.railradius.service.SearchRequestValidator.ValidSearch;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,14 +45,14 @@ public class ReachabilityService {
      * request's limits. The search result is usually stored by the stream that showed the station.
      *
      * @throws SearchRateLimiter.TooManySearchesException if it would have to search and the client's budget is too low
-     * @throws SearchRequestValidator.InvalidSearchException if the station is unknown or a parameter out of range
+     * @throws InvalidSearchException if the station is unknown or a parameter out of range
      */
-    public Optional<ReachableStation> journey(SearchRateLimiter.Client client, ReachabilityRequest request,
+    public Optional<ReachableStation> journey(SearchRateLimiter.Client client, SearchRequest request,
                                               String targetId) {
         ValidSearch search = validator.validate(request);
-        if (targetId.equals(search.key().startId())) return Optional.empty();
-        chargeUnlessStored(client, search.key());
-        CompactResult result = cache.getOrCompute(search.key());
+        if (targetId.equals(search.options().startId())) return Optional.empty();
+        chargeUnlessStored(client, search.options());
+        CompactResult result = cache.getOrCompute(search.options());
         return fewestTransfersWithin(result.paths(targetId), search.maxJourneyMinutes())
                 .flatMap(path -> legBuilder.toReachableStation(targetId, result.journey(targetId, path.transfers())));
     }
@@ -66,37 +65,37 @@ public class ReachabilityService {
      * over its {@link SearchRateLimiter} budget gets an error event instead, and so does one whose search ran past its
      * deadline.
      */
-    public void calculateReachabilityStreaming(SearchRateLimiter.Client client, ReachabilityRequest request,
+    public void calculateReachabilityStreaming(SearchRateLimiter.Client client, SearchRequest request,
                                                SseEmitter emitter) {
         long startMs = System.currentTimeMillis();
         try {
             ValidSearch search = validator.validate(request);
-            chargeUnlessStored(client, search.key());
+            chargeUnlessStored(client, search.options());
             StreamedStations streamed = new StreamedStations(search, emitter, startMs);
             // A station is sent once, with its first path within the time limit. Rounds add paths by ascending
             // transfers, so that is the path its journey shows too (B4).
-            streamed.sendNew(cache.getOrCompute(search.key(), streamed));
+            streamed.sendNew(cache.getOrCompute(search.options(), streamed));
             log.info("Streamed {} stations in {} ms, the first after {} ms", streamed.sent.size(),
                     System.currentTimeMillis() - startMs, streamed.firstSentMs);
             streamed.sendDone();
             emitter.complete();
 
             if (predictiveEnabled) {
-                warmer.warmHigherTransferCounts(search.key());
+                warmer.warmHigherTransferCounts(search.options());
             }
         } catch (CancellationException e) {
             log.info("Stream stopped after {} ms: {}", System.currentTimeMillis() - startMs, e.getMessage());
             emitter.complete();
-        } catch (SearchRequestValidator.InvalidSearchException | SearchGate.BusyException
+        } catch (InvalidSearchException | SearchGate.BusyException
                  | SearchRateLimiter.TooManySearchesException | CompactReachabilitySearch.DeadlineExceededException e) {
             sendError(emitter, e.getMessage());
         } catch (Exception e) {
-            log.error("Search from {} x{} failed", request.getStartStationId(), request.getMaxTransfers(), e);
+            log.error("Search from {} x{} failed", request.startId(), request.maxTransfers(), e);
             sendError(emitter, INTERNAL_ERROR_MESSAGE);
         } catch (OutOfMemoryError e) {
             // The failed search's memory is garbage once it has unwound, and its permit is free, so the app goes on;
             // without this the client would wait for an event forever (B38)
-            log.error("Search from {} x{} ran out of memory", request.getStartStationId(), request.getMaxTransfers(),
+            log.error("Search from {} x{} ran out of memory", request.startId(), request.maxTransfers(),
                     e);
             sendError(emitter, OUT_OF_MEMORY_MESSAGE);
         }
@@ -117,9 +116,9 @@ public class ReachabilityService {
     // A stored result costs no search, so it costs no budget either. One that waits for an equal running search is
     // charged all the same: it searches itself if that one's client leaves, and a free wait would let a client that
     // starts a search and leaves hand out searches nobody paid for (S37)
-    private void chargeUnlessStored(SearchRateLimiter.Client client, SearchKey key) {
-        if (client.admin() || cache.contains(key)) return;
-        rateLimiter.charge(client.ip(), key.maxTransfers(), key.maxTransferMins());
+    private void chargeUnlessStored(SearchRateLimiter.Client client, SearchOptions options) {
+        if (client.admin() || cache.contains(options)) return;
+        rateLimiter.charge(client.ip(), options);
     }
 
     public Map<String, Object> getCacheStats() {
@@ -142,7 +141,7 @@ public class ReachabilityService {
         private long firstSentMs = -1;
 
         StreamedStations(ValidSearch search, SseEmitter emitter, long startMs) {
-            this.startId = search.key().startId();
+            this.startId = search.options().startId();
             this.emitter = emitter;
             this.startMs = startMs;
             this.maxJourneyMins = search.maxJourneyMinutes();

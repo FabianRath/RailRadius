@@ -2,12 +2,12 @@ package com.railradius.controller;
 
 import com.railradius.config.AdminToken;
 import com.railradius.dto.Coverage;
-import com.railradius.dto.ReachabilityRequest;
 import com.railradius.dto.ReachableStation;
 import com.railradius.model.Station;
 import com.railradius.service.CoverageService;
 import com.railradius.service.ReachabilityService;
 import com.railradius.service.SearchRateLimiter;
+import com.railradius.service.SearchRequestValidator.SearchRequest;
 import com.railradius.service.StationSearchIndex;
 import com.railradius.service.TransitGraph;
 import jakarta.servlet.http.HttpServletRequest;
@@ -74,20 +74,15 @@ public class RailRadiusController {
     public SseEmitter streamReachability(
             @RequestParam("stationId")           String stationId,
             @RequestParam("maxTransfers")         int maxTransfers,
-            @RequestParam(value = "minTransferMinutes", defaultValue = "0")   int minTransferMinutes,
-            @RequestParam(value = "maxTransferMinutes", defaultValue = "180") int maxTransferMinutes,
+            @RequestParam(value = "minTransferMinutes", required = false) Integer minTransferMinutes,
+            @RequestParam(value = "maxTransferMinutes", required = false) Integer maxTransferMinutes,
             @RequestParam(value = "maxJourneyHours", required = false) Double maxJourneyHours,
             HttpServletRequest httpRequest) {
 
         SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT.toMillis());
 
-        ReachabilityRequest req = ReachabilityRequest.builder()
-                .startStationId(stationId)
-                .maxTransfers(maxTransfers)
-                .minTransferTimeMinutes(minTransferMinutes)
-                .maxTransferTimeMinutes(maxTransferMinutes)
-                .maxJourneyTimeHours(maxJourneyHours)
-                .build();
+        SearchRequest req = new SearchRequest(stationId, maxTransfers, minTransferMinutes, maxTransferMinutes,
+                maxJourneyHours);
         // Read here: the servlet request is recycled before the worker runs
         SearchRateLimiter.Client client = client(httpRequest);
 
@@ -105,18 +100,13 @@ public class RailRadiusController {
     public ResponseEntity<ReachableStation> journey(
             @RequestParam("stationId")           String stationId,
             @RequestParam("maxTransfers")         int maxTransfers,
-            @RequestParam(value = "minTransferMinutes", defaultValue = "0")   int minTransferMinutes,
-            @RequestParam(value = "maxTransferMinutes", defaultValue = "180") int maxTransferMinutes,
+            @RequestParam(value = "minTransferMinutes", required = false) Integer minTransferMinutes,
+            @RequestParam(value = "maxTransferMinutes", required = false) Integer maxTransferMinutes,
             @RequestParam(value = "maxJourneyHours", required = false) Double maxJourneyHours,
             @RequestParam("targetId")             String targetId,
             HttpServletRequest httpRequest) {
-        ReachabilityRequest req = ReachabilityRequest.builder()
-                .startStationId(stationId)
-                .maxTransfers(maxTransfers)
-                .minTransferTimeMinutes(minTransferMinutes)
-                .maxTransferTimeMinutes(maxTransferMinutes)
-                .maxJourneyTimeHours(maxJourneyHours)
-                .build();
+        SearchRequest req = new SearchRequest(stationId, maxTransfers, minTransferMinutes, maxTransferMinutes,
+                maxJourneyHours);
         return ResponseEntity.of(reachabilityService.journey(client(httpRequest), req, targetId));
     }
 

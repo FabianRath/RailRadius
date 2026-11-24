@@ -23,10 +23,10 @@ class SearchRateLimiterTest {
     @Test
     void searchOverTheBudgetIsTurnedAwayWithTheSecondsUntilItFits() {
         SearchRateLimiter limiter = new SearchRateLimiter(BIG_COST, 1, nowNanos::get);
-        limiter.charge(IP, 5, MAX_WAIT_MINUTES);
+        limiter.charge(IP, options(5, MAX_WAIT_MINUTES));
         nowNanos.addAndGet(2 * NANOS_PER_SECOND);
 
-        assertThatThrownBy(() -> limiter.charge(IP, 2, TABLE_WAIT_MINUTES))
+        assertThatThrownBy(() -> limiter.charge(IP, options(2, TABLE_WAIT_MINUTES)))
                 .isInstanceOf(SearchRateLimiter.TooManySearchesException.class)
                 .hasMessageContaining("try again in 3 s");
     }
@@ -34,56 +34,50 @@ class SearchRateLimiterTest {
     @Test
     void budgetRefillsOverTime() {
         SearchRateLimiter limiter = new SearchRateLimiter(BIG_COST, 1, nowNanos::get);
-        limiter.charge(IP, 5, MAX_WAIT_MINUTES);
+        limiter.charge(IP, options(5, MAX_WAIT_MINUTES));
         nowNanos.addAndGet(TWO_TRANSFER_COST * NANOS_PER_SECOND);
 
-        assertThatCode(() -> limiter.charge(IP, 2, TABLE_WAIT_MINUTES)).doesNotThrowAnyException();
+        assertThatCode(() -> limiter.charge(IP, options(2, TABLE_WAIT_MINUTES))).doesNotThrowAnyException();
     }
 
     @Test
     void searchesWithMoreTransfersCostMore() {
         SearchRateLimiter limiter = new SearchRateLimiter(BIG_COST, 1, nowNanos::get);
-        for (int i = 0; i < BIG_COST / TWO_TRANSFER_COST; i++) limiter.charge(IP, 2, TABLE_WAIT_MINUTES);
+        for (int i = 0; i < BIG_COST / TWO_TRANSFER_COST; i++) limiter.charge(IP, options(2, TABLE_WAIT_MINUTES));
 
-        assertThatThrownBy(() -> limiter.charge(IP, 2, TABLE_WAIT_MINUTES))
+        assertThatThrownBy(() -> limiter.charge(IP, options(2, TABLE_WAIT_MINUTES)))
                 .isInstanceOf(SearchRateLimiter.TooManySearchesException.class);
     }
 
     @Test
     void eachIpHasItsOwnBudget() {
         SearchRateLimiter limiter = new SearchRateLimiter(BIG_COST, 1, nowNanos::get);
-        limiter.charge(IP, 5, MAX_WAIT_MINUTES);
+        limiter.charge(IP, options(5, MAX_WAIT_MINUTES));
 
-        assertThatCode(() -> limiter.charge("192.0.2.2", 5, MAX_WAIT_MINUTES)).doesNotThrowAnyException();
+        assertThatCode(() -> limiter.charge("192.0.2.2", options(5, MAX_WAIT_MINUTES))).doesNotThrowAnyException();
     }
 
     @Test
     void ipv6AddressesInOneSlash64ShareABudget() {
         SearchRateLimiter limiter = new SearchRateLimiter(BIG_COST, 1, nowNanos::get);
-        limiter.charge("2001:db8:1:2::1", 5, MAX_WAIT_MINUTES);
+        limiter.charge("2001:db8:1:2::1", options(5, MAX_WAIT_MINUTES));
 
-        assertThatThrownBy(() -> limiter.charge("2001:db8:1:2::2", 5, MAX_WAIT_MINUTES))
+        assertThatThrownBy(() -> limiter.charge("2001:db8:1:2::2", options(5, MAX_WAIT_MINUTES)))
                 .isInstanceOf(SearchRateLimiter.TooManySearchesException.class);
-        assertThatCode(() -> limiter.charge("2001:db8:1:3::1", 5, MAX_WAIT_MINUTES)).doesNotThrowAnyException();
+        assertThatCode(() -> limiter.charge("2001:db8:1:3::1", options(5, MAX_WAIT_MINUTES)))
+                .doesNotThrowAnyException();
     }
 
     @Test
     void longerMaxWaitsAtChangesCostMore() {
         SearchRateLimiter limiter = new SearchRateLimiter(BIG_COST, 1, nowNanos::get);
-        limiter.charge(IP, 5, MAX_WAIT_MINUTES);
+        limiter.charge(IP, options(5, MAX_WAIT_MINUTES));
 
-        assertThatThrownBy(() -> limiter.charge(IP, 5, 0)).hasMessageContaining("try again in 43 s");
-        assertThatThrownBy(() -> limiter.charge(IP, 5, TABLE_WAIT_MINUTES)).hasMessageContaining("try again in 65 s");
-        assertThatThrownBy(() -> limiter.charge(IP, 5, MAX_WAIT_MINUTES)).hasMessageContaining("try again in 87 s");
-    }
-
-    @Test
-    void valuesAboveTheBoundsCostAsMuchAsTheBiggestSearch() {
-        SearchRateLimiter limiter = new SearchRateLimiter(BIG_COST, 1, nowNanos::get);
-
-        assertThatCode(() -> limiter.charge(IP, 9, 9999)).doesNotThrowAnyException();
-        assertThatThrownBy(() -> limiter.charge(IP, 0, 0))
-                .isInstanceOf(SearchRateLimiter.TooManySearchesException.class);
+        assertThatThrownBy(() -> limiter.charge(IP, options(5, 0))).hasMessageContaining("try again in 43 s");
+        assertThatThrownBy(() -> limiter.charge(IP, options(5, TABLE_WAIT_MINUTES)))
+                .hasMessageContaining("try again in 65 s");
+        assertThatThrownBy(() -> limiter.charge(IP, options(5, MAX_WAIT_MINUTES)))
+                .hasMessageContaining("try again in 87 s");
     }
 
     @Test
@@ -91,5 +85,9 @@ class SearchRateLimiterTest {
         assertThatThrownBy(() -> new SearchRateLimiter(BIG_COST - 1, 1, nowNanos::get))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(new SearchRateLimiter(BIG_COST, 1, nowNanos::get)).isNotNull();
+    }
+
+    private static SearchOptions options(int maxTransfers, int maxTransferMinutes) {
+        return new SearchOptions("alpha:A1", maxTransfers, 0, maxTransferMinutes);
     }
 }

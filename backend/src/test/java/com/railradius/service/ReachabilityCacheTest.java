@@ -230,7 +230,7 @@ class ReachabilityCacheTest {
         }
     }
 
-    private static ReachabilityCache.SearchKey key(int transfers) {
-        return new ReachabilityCache.SearchKey(START_ID, transfers, 0, 180);
+    private static SearchOptions key(int transfers) {
+        return new SearchOptions(START_ID, transfers, 0, 180);
     }
 }

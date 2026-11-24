@@ -1,6 +1,5 @@
 package com.railradius.service;
 
-import com.railradius.service.ReachabilityCache.SearchKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,11 +26,11 @@ public class ReachabilityWarmer {
     @Value("${railradius.cache.predictive-max-transfers:5}")
     private int predictiveMaxTransfers;
 
-    private final Set<SearchKey> warmingInProgress = ConcurrentHashMap.newKeySet();
+    private final Set<SearchOptions> warmingInProgress = ConcurrentHashMap.newKeySet();
 
     @Async
-    public void warmHigherTransferCounts(SearchKey queried) {
-        SearchKey key = queried.withMaxTransfers(predictiveMaxTransfers);
+    public void warmHigherTransferCounts(SearchOptions queried) {
+        SearchOptions key = queried.withMaxTransfers(predictiveMaxTransfers);
         if (queried.maxTransfers() >= predictiveMaxTransfers || cache.contains(key)) return;
         if (!warmingInProgress.add(key)) {
             log.debug("  Predictive cache: {} x{} already warming", key.startId(), key.maxTransfers());
@@ -54,6 +53,6 @@ public class ReachabilityWarmer {
     }
 
     public List<String> getWarmingInProgress() {
-        return warmingInProgress.stream().map(SearchKey::label).toList();
+        return warmingInProgress.stream().map(SearchOptions::label).toList();
     }
 }

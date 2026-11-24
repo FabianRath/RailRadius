@@ -24,7 +24,7 @@ public class SearchRateLimiter {
 
     // A search's p50 time on the full data per max transfers at a 0-180 min wait at changes, in units of about 100 ms
     // of the engine before S18, at least 1 (docs/HOSTING.md, "Baselines (S13)"). Today's engine is faster but has the
-    // same shape (S34). More transfers cost as much as 5
+    // same shape (S34). One entry per allowed max transfers, 0 to SearchOptions.MAX_TRANSFERS
     private static final int[] COST_BY_MAX_TRANSFERS = {1, 1, 5, 17, 40, 65};
     // The time grows about linearly with the max wait at changes (S34): the cost scales with the max wait plus this, so
     // a 0-min max wait costs 2/3 of the table and the 360-min maximum 4/3
@@ -55,7 +55,7 @@ public class SearchRateLimiter {
     }
 
     SearchRateLimiter(int capacity, double refillPerSecond, LongSupplier nanoTime) {
-        int biggestCost = costOf(Integer.MAX_VALUE, Integer.MAX_VALUE);
+        int biggestCost = costOf(SearchOptions.MAX_TRANSFERS, SearchOptions.MAX_TRANSFER_WAIT_MINUTES);
         if (capacity < biggestCost) {
             throw new IllegalArgumentException("search.rate-limit.capacity " + capacity
                     + " is below the cost of the biggest search, " + biggestCost);
@@ -72,12 +72,12 @@ public class SearchRateLimiter {
     }
 
     /**
-     * Takes the cost of a search with this many transfers and this max wait at changes from the client's budget.
+     * Takes the cost of a search, by its max transfers and max wait at changes, from the client's budget.
      *
      * @throws TooManySearchesException if the budget is too low; nothing is taken then
      */
-    public void charge(String clientIp, int maxTransfers, int maxTransferMinutes) {
-        int cost = costOf(maxTransfers, maxTransferMinutes);
+    public void charge(String clientIp, SearchOptions options) {
+        int cost = costOf(options.maxTransfers(), options.maxTransferMins());
         long waitSeconds = buckets.get(ClientKeys.rateLimitKey(clientIp), clientKey -> new Bucket()).take(cost);
         if (waitSeconds > 0) {
             log.info("Search turned away by the rate limit, {} s until it fits", waitSeconds);
@@ -86,9 +86,8 @@ public class SearchRateLimiter {
     }
 
     private static int costOf(int maxTransfers, int maxTransferMinutes) {
-        int tableCost = COST_BY_MAX_TRANSFERS[Math.clamp(maxTransfers, 0, COST_BY_MAX_TRANSFERS.length - 1)];
-        int waitMinutes = Math.clamp(maxTransferMinutes, 0, SearchRequestValidator.MAX_TRANSFER_WAIT_MINUTES);
-        double waitFactor = (double) (waitMinutes + WAIT_COST_OFFSET_MINUTES)
+        int tableCost = COST_BY_MAX_TRANSFERS[maxTransfers];
+        double waitFactor = (double) (maxTransferMinutes + WAIT_COST_OFFSET_MINUTES)
                 / (TABLE_WAIT_MINUTES + WAIT_COST_OFFSET_MINUTES);
         return Math.max(1, (int) Math.round(tableCost * waitFactor));
     }

@@ -1,6 +1,5 @@
 package com.railradius.service;
 
-import com.railradius.service.ReachabilityCache.SearchKey;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Optional;
@@ -19,14 +18,15 @@ import java.util.function.Supplier;
 @Slf4j
 final class InFlightSearches {
 
-    private final ConcurrentHashMap<SearchKey, CompletableFuture<CompactResult>> running = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<SearchOptions, CompletableFuture<CompactResult>> running =
+            new ConcurrentHashMap<>();
 
     /**
      * The result of the equal search running now, else of search, which then runs as the key's only one. While it
      * waits for another caller's search, whileWaiting runs about every second and may throw to stop waiting. Gets the
      * other search's failure too, except when that one stopped because its own client is gone: then it searches itself.
      */
-    CompactResult joinOrRun(SearchKey key, Supplier<CompactResult> search, Runnable whileWaiting) {
+    CompactResult joinOrRun(SearchOptions key, Supplier<CompactResult> search, Runnable whileWaiting) {
         while (true) {
             CompletableFuture<CompactResult> mine = new CompletableFuture<>();
             CompletableFuture<CompactResult> other = running.putIfAbsent(key, mine);
@@ -38,7 +38,7 @@ final class InFlightSearches {
     }
 
     /** Runs search unless an equal one runs now; empty then, or if search returns empty. Never waits. */
-    Optional<CompactResult> runUnlessRunning(SearchKey key, Supplier<Optional<CompactResult>> search) {
+    Optional<CompactResult> runUnlessRunning(SearchOptions key, Supplier<Optional<CompactResult>> search) {
         CompletableFuture<CompactResult> mine = new CompletableFuture<>();
         if (running.putIfAbsent(key, mine) != null) return Optional.empty();
         return lead(key, mine, search);
@@ -46,7 +46,7 @@ final class InFlightSearches {
 
     // A search that stopped without a result for others (its client is gone, or nothing was searched) is cancelled,
     // so its waiters search themselves
-    private Optional<CompactResult> lead(SearchKey key, CompletableFuture<CompactResult> mine,
+    private Optional<CompactResult> lead(SearchOptions key, CompletableFuture<CompactResult> mine,
                                          Supplier<Optional<CompactResult>> search) {
         try {
             Optional<CompactResult> result = search.get();
@@ -64,7 +64,7 @@ final class InFlightSearches {
     }
 
     // Empty if the other search was cancelled; it is dropped here too, so the next try need not wait for its finally
-    private Optional<CompactResult> await(SearchKey key, CompletableFuture<CompactResult> other,
+    private Optional<CompactResult> await(SearchOptions key, CompletableFuture<CompactResult> other,
                                           Runnable whileWaiting) {
         while (true) {
             try {

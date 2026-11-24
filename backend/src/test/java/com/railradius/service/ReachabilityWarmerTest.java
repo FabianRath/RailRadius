@@ -1,6 +1,5 @@
 package com.railradius.service;
 
-import com.railradius.service.ReachabilityCache.SearchKey;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -16,7 +15,7 @@ class ReachabilityWarmerTest {
         ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(GtfsTestFixtures.load(dir, "alpha", "beta"));
         ReachabilityWarmer warmer = new ReachabilityWarmer(cache);
         ReflectionTestUtils.setField(warmer, "predictiveMaxTransfers", 2);
-        SearchKey queried = new SearchKey("alpha:A1", 0, 0, 180);
+        SearchOptions queried = new SearchOptions("alpha:A1", 0, 0, 180);
         cache.getOrCompute(queried);
 
         warmer.warmHigherTransferCounts(queried);
@@ -33,10 +32,10 @@ class ReachabilityWarmerTest {
         ReachabilityWarmer warmer = new ReachabilityWarmer(cache);
         ReflectionTestUtils.setField(warmer, "predictiveMaxTransfers", 3);
 
-        warmer.warmHigherTransferCounts(new SearchKey("alpha:A1", 0, 0, 180));
+        warmer.warmHigherTransferCounts(new SearchOptions("alpha:A1", 0, 0, 180));
 
         assertThat(cache.getStats()).containsEntry("rawPathCacheEntries", 1L);
-        assertThat(cache.contains(new SearchKey("alpha:A1", 3, 0, 180))).isTrue();
+        assertThat(cache.contains(new SearchOptions("alpha:A1", 3, 0, 180))).isTrue();
     }
 
     // B8
@@ -45,7 +44,7 @@ class ReachabilityWarmerTest {
         ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(GtfsTestFixtures.load(dir, "alpha", "beta"));
         ReachabilityWarmer warmer = new ReachabilityWarmer(cache);
         ReflectionTestUtils.setField(warmer, "predictiveMaxTransfers", 1);
-        SearchKey queried = new SearchKey("alpha:A1", 0, 5, 180);
+        SearchOptions queried = new SearchOptions("alpha:A1", 0, 5, 180);
         cache.getOrCompute(queried);
 
         warmer.warmHigherTransferCounts(queried);
@@ -59,7 +58,7 @@ class ReachabilityWarmerTest {
         ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(GtfsTestFixtures.load(dir, "alpha", "beta"), gate);
         ReachabilityWarmer warmer = new ReachabilityWarmer(cache);
         ReflectionTestUtils.setField(warmer, "predictiveMaxTransfers", 1);
-        SearchKey queried = new SearchKey("alpha:A1", 0, 0, 180);
+        SearchOptions queried = new SearchOptions("alpha:A1", 0, 0, 180);
 
         try (HeldPermit ignored = new HeldPermit(gate)) {
             warmer.warmHigherTransferCounts(queried);

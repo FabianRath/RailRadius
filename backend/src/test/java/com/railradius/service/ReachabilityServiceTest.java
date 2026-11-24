@@ -1,10 +1,9 @@
 package com.railradius.service;
 
 import com.railradius.dto.JourneyLeg;
-import com.railradius.dto.ReachabilityRequest;
 import com.railradius.dto.ReachableStation;
 import com.railradius.dto.ReachableStationSummary;
-import com.railradius.service.ReachabilityCache.SearchKey;
+import com.railradius.service.SearchRequestValidator.SearchRequest;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -145,7 +144,7 @@ class ReachabilityServiceTest {
 
     @Test
     void waitUpToTheCeilingIsAllowed() {
-        int ceiling = SearchRequestValidator.MAX_TRANSFER_WAIT_MINUTES;
+        int ceiling = SearchOptions.MAX_TRANSFER_WAIT_MINUTES;
 
         assertThat(find(query(gtfs, "alpha:A1", 1, ceiling, ceiling), "alpha:A2")).isPresent();
         assertThat(find(query(gtfs, "alpha:A1", 1, 0, ceiling), "beta:B2")).isPresent();
@@ -156,7 +155,7 @@ class ReachabilityServiceTest {
     void invalidRequestsAreRejectedBeforeTheyAreChargedOrStored() {
         ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         ReachabilityService service = serviceWithBudgetForOneBigSearch(cache);
-        List<ReachabilityRequest> invalid = List.of(
+        List<SearchRequest> invalid = List.of(
                 request("alpha:A1", -1, 0, 180, null),
                 request("alpha:A1", 6, 0, 180, null),
                 request("alpha:A1", 1, -1, 180, null),
@@ -168,16 +167,16 @@ class ReachabilityServiceTest {
                 request("alpha:NOPE", 1, 0, 180, null),
                 request(null, 1, 0, 180, null));
 
-        for (ReachabilityRequest request : invalid) {
+        for (SearchRequest request : invalid) {
             RecordingEmitter emitter = new RecordingEmitter();
             service.calculateReachabilityStreaming(VISITOR, request, emitter);
 
             assertThat(emitter.texts).as("%s", request).anyMatch(text -> text.contains("event:error"));
             assertThat(emitter.completed).isTrue();
             assertThatThrownBy(() -> service.journey(VISITOR, request, "alpha:A2"))
-                    .isInstanceOf(SearchRequestValidator.InvalidSearchException.class);
+                    .isInstanceOf(InvalidSearchException.class);
         }
-        assertThat(cache.contains(new SearchKey("alpha:NOPE", 1, 0, 180))).isFalse();
+        assertThat(cache.contains(new SearchOptions("alpha:NOPE", 1, 0, 180))).isFalse();
         RecordingEmitter fullBudget = new RecordingEmitter();
         service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 5), fullBudget);
         assertThat(fullBudget.done().get("total")).isEqualTo(fullBudget.streamedStopIds().size());
@@ -209,16 +208,12 @@ class ReachabilityServiceTest {
     void stationOverTheTimeLimitWithFewestTransfersShowsTheFasterPathWithMoreTransfers(@TempDir Path dir)
             throws Exception {
         ReachabilityService service = service(GtfsTestFixtures.load(dir, "epsilon"));
-        ReachabilityRequest.ReachabilityRequestBuilder longestWait = ReachabilityRequest.builder()
-                .startStationId("epsilon:E1")
-                .maxTransfers(2)
-                .minTransferTimeMinutes(0)
-                .maxTransferTimeMinutes(SearchRequestValidator.MAX_TRANSFER_WAIT_MINUTES);
+        int longestWait = SearchOptions.MAX_TRANSFER_WAIT_MINUTES;
 
-        ReachableStation anyTime = service.journey(VISITOR, longestWait.build(), "epsilon:E6").orElseThrow();
-        ReachableStation withinTwoHours = service.journey(VISITOR, longestWait.maxJourneyTimeHours(2.0).build(),
-                        "epsilon:E6")
-                .orElseThrow();
+        ReachableStation anyTime = service.journey(VISITOR, request("epsilon:E1", 2, 0, longestWait, null),
+                "epsilon:E6").orElseThrow();
+        ReachableStation withinTwoHours = service.journey(VISITOR, request("epsilon:E1", 2, 0, longestWait, 2.0),
+                "epsilon:E6").orElseThrow();
 
         assertThat(anyTime.getTransfers()).isEqualTo(1);
         assertThat(anyTime.getTotalDurationMinutes()).isEqualTo(330); // X1, wait until 15:00, X4
@@ -381,13 +376,7 @@ class ReachabilityServiceTest {
         // A2 (30 min) and A3/B1 (60 min) fit into 1 h, B2 (120 min) does not
         RecordingEmitter emitter = new RecordingEmitter();
         ReachabilityService service = service(gtfs);
-        service.calculateReachabilityStreaming(VISITOR, ReachabilityRequest.builder()
-                .startStationId("alpha:A1")
-                .maxTransfers(1)
-                .minTransferTimeMinutes(0)
-                .maxTransferTimeMinutes(180)
-                .maxJourneyTimeHours(1.0)
-                .build(), emitter);
+        service.calculateReachabilityStreaming(VISITOR, request("alpha:A1", 1, 0, 180, 1.0), emitter);
 
         long streamedCount = emitter.payloads.stream()
                 .filter(List.class::isInstance)
@@ -403,12 +392,7 @@ class ReachabilityServiceTest {
     @Test
     void uncachedStreamSendsEachStationOnceAndMatchesTheCachedRepeat() {
         ReachabilityService service = service(gtfs);
-        ReachabilityRequest request = ReachabilityRequest.builder()
-                .startStationId("alpha:A1")
-                .maxTransfers(1)
-                .minTransferTimeMinutes(0)
-                .maxTransferTimeMinutes(180)
-                .build();
+        SearchRequest request = request("alpha:A1", 1, 0, 180, null);
 
         RecordingEmitter first = new RecordingEmitter();
         service.calculateReachabilityStreaming(VISITOR, request, first);
@@ -426,13 +410,7 @@ class ReachabilityServiceTest {
     void streamWithATimeLimitSendsTheStationsThatHaveAJourney(@TempDir Path dir) throws Exception {
         TransitGraph graph = GtfsTestFixtures.load(dir, "epsilon");
         ReachabilityService service = service(graph);
-        ReachabilityRequest request = ReachabilityRequest.builder()
-                .startStationId("epsilon:E1")
-                .maxTransfers(2)
-                .minTransferTimeMinutes(0)
-                .maxTransferTimeMinutes(SearchRequestValidator.MAX_TRANSFER_WAIT_MINUTES)
-                .maxJourneyTimeHours(2.0)
-                .build();
+        SearchRequest request = request("epsilon:E1", 2, 0, SearchOptions.MAX_TRANSFER_WAIT_MINUTES, 2.0);
 
         RecordingEmitter emitter = new RecordingEmitter();
         service.calculateReachabilityStreaming(VISITOR, request, emitter);
@@ -459,7 +437,7 @@ class ReachabilityServiceTest {
         service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 3), emitter);
 
         assertThat(emitter.sendAttempts).isEqualTo(1);
-        assertThat(cache.contains(new SearchKey("alpha:A1", 3, 0, 180))).isFalse();
+        assertThat(cache.contains(new SearchOptions("alpha:A1", 3, 0, 180))).isFalse();
     }
 
     @Test
@@ -481,7 +459,7 @@ class ReachabilityServiceTest {
 
         assertThat(emitter.texts).noneMatch(text -> text.contains("event:error"));
         assertThat(emitter.completed).isTrue();
-        assertThat(cache.contains(new SearchKey("alpha:A1", 3, 0, 180))).isTrue();
+        assertThat(cache.contains(new SearchOptions("alpha:A1", 3, 0, 180))).isTrue();
     }
 
     @Test
@@ -495,7 +473,7 @@ class ReachabilityServiceTest {
 
         service.calculateReachabilityStreaming(VISITOR, streamRequest("alpha:A1", 3), emitter);
 
-        assertThat(cache.contains(new SearchKey("alpha:A1", 3, 0, 180))).isFalse();
+        assertThat(cache.contains(new SearchOptions("alpha:A1", 3, 0, 180))).isFalse();
         assertThat(gate.runIfFree(() -> true)).isPresent();
     }
 
@@ -530,7 +508,7 @@ class ReachabilityServiceTest {
         assertThat(emitter.texts).anyMatch(text -> text.contains("event:error") && text.contains("try again in"));
         assertThat(emitter.completed).isTrue();
         assertThat(emitter.error).isNull();
-        assertThat(cache.contains(new SearchKey("alpha:A2", 0, 0, 180))).isFalse();
+        assertThat(cache.contains(new SearchOptions("alpha:A2", 0, 0, 180))).isFalse();
     }
 
     @Test
@@ -593,7 +571,7 @@ class ReachabilityServiceTest {
         assertThat(emitter.texts).anyMatch(text -> text.contains("event:error") && text.contains("took too long"));
         assertThat(emitter.completed).isTrue();
         assertThat(emitter.error).isNull();
-        assertThat(cache.contains(new SearchKey("alpha:A1", 3, 0, 180))).isFalse();
+        assertThat(cache.contains(new SearchOptions("alpha:A1", 3, 0, 180))).isFalse();
         assertThat(gate.runIfFree(() -> true)).isPresent();
     }
 
@@ -627,12 +605,7 @@ class ReachabilityServiceTest {
     @Test
     void journeyToAStationOutOfReachOrToTheStartIsEmpty() {
         ReachabilityService service = service(gtfs);
-        ReachabilityRequest request = ReachabilityRequest.builder()
-                .startStationId("alpha:A1")
-                .maxTransfers(0)
-                .minTransferTimeMinutes(0)
-                .maxTransferTimeMinutes(180)
-                .build();
+        SearchRequest request = request("alpha:A1", 0, 0, 180, null);
 
         assertThat(service.journey(VISITOR, request, "beta:B2")).isEmpty();
         assertThat(service.journey(VISITOR, request, "alpha:A1")).isEmpty();
@@ -715,19 +688,13 @@ class ReachabilityServiceTest {
         }
     }
 
-    private static ReachabilityRequest streamRequest(String start, int maxTransfers) {
+    private static SearchRequest streamRequest(String start, int maxTransfers) {
         return request(start, maxTransfers, 0, 180, null);
     }
 
-    private static ReachabilityRequest request(String start, int maxTransfers, int minTransferMins,
+    private static SearchRequest request(String start, int maxTransfers, int minTransferMins,
                                                int maxTransferMins, Double maxJourneyHours) {
-        return ReachabilityRequest.builder()
-                .startStationId(start)
-                .maxTransfers(maxTransfers)
-                .minTransferTimeMinutes(minTransferMins)
-                .maxTransferTimeMinutes(maxTransferMins)
-                .maxJourneyTimeHours(maxJourneyHours)
-                .build();
+        return new SearchRequest(start, maxTransfers, minTransferMins, maxTransferMins, maxJourneyHours);
     }
 
     // A clock that stands still, so the budget never refills during the test
@@ -740,15 +707,10 @@ class ReachabilityServiceTest {
         return GtfsTestFixtures.reachabilityService(graph);
     }
 
-    private record Search(ReachabilityService service, ReachabilityRequest request) {}
+    private record Search(ReachabilityService service, SearchRequest request) {}
 
     private Search query(TransitGraph data, String start, int maxTransfers, int minTransferMins, int maxTransferMins) {
-        return new Search(service(data), ReachabilityRequest.builder()
-                .startStationId(start)
-                .maxTransfers(maxTransfers)
-                .minTransferTimeMinutes(minTransferMins)
-                .maxTransferTimeMinutes(maxTransferMins)
-                .build());
+        return new Search(service(data), request(start, maxTransfers, minTransferMins, maxTransferMins, null));
     }
 
     private static Optional<ReachableStation> find(Search search, String stopId) {

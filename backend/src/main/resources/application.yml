@@ -68,9 +68,6 @@ railradius:
       to: ${RAILRADIUS_ALERTS_TO:}
       from: ${RAILRADIUS_ALERTS_FROM:${spring.mail.username:}}
 
-  algorithm:
-    max-transfer-time-minutes: 180
-
   cache:
     # When a user queries station X with N transfers, search this max in the background; N+1 and up are cut from it
     predictive-enabled: true

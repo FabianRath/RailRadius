@@ -22,24 +22,13 @@ public class ReachabilityCache {
     private final SearchGate gate;
     private final InFlightSearches inFlight = new InFlightSearches();
     // One full-data result holds paths to every reachable station, so the count must stay small
-    private final Cache<SearchKey, CompactResult> rawPaths;
+    private final Cache<SearchOptions, CompactResult> rawPaths;
 
     public ReachabilityCache(CompactReachabilitySearch search, SearchGate gate,
                              @Value("${railradius.cache.raw-max-entries:30}") int rawMaxEntries) {
         this.search = search;
         this.gate = gate;
         this.rawPaths = Caffeine.newBuilder().maximumSize(rawMaxEntries).build();
-    }
-
-    public record SearchKey(String startId, int maxTransfers, int minTransferMins, int maxTransferMins) {
-
-        SearchKey withMaxTransfers(int transfers) {
-            return new SearchKey(startId, transfers, minTransferMins, maxTransferMins);
-        }
-
-        String label() {
-            return startId + "-" + maxTransfers + "-" + minTransferMins + "-" + maxTransferMins;
-        }
     }
 
     /** What a caller hears of a search it waits for. */
@@ -64,12 +53,12 @@ public class ReachabilityCache {
      *
      * @throws SearchGate.BusyException if it would have to search and too many searches wait already
      */
-    public CompactResult getOrCompute(SearchKey key) {
+    public CompactResult getOrCompute(SearchOptions key) {
         return getOrCompute(key, SearchListener.NONE);
     }
 
-    /** Like {@link #getOrCompute(SearchKey)}, telling the listener about the queue and the rounds of a search. */
-    public CompactResult getOrCompute(SearchKey key, SearchListener listener) {
+    /** Like {@link #getOrCompute(SearchOptions)}, telling the listener about the queue and the rounds of a search. */
+    public CompactResult getOrCompute(SearchOptions key, SearchListener listener) {
         Optional<CompactResult> stored = stored(key);
         if (stored.isPresent()) return stored.get();
         return inFlight.joinOrRun(key, () -> gate.run(() -> storedOrSearched(key, listener), listener::queued),
@@ -80,13 +69,13 @@ public class ReachabilityCache {
      * Searches and stores the result only if a search permit is free right now and no equal search runs; true if the
      * result is stored.
      */
-    public boolean computeIfPermitFree(SearchKey key) {
+    public boolean computeIfPermitFree(SearchOptions key) {
         return inFlight.runUnlessRunning(key, () -> gate.runIfFree(() -> storedOrSearched(key, SearchListener.NONE)))
                 .isPresent();
     }
 
     // Checked again with the permit: an equal search may have finished while this one waited
-    private CompactResult storedOrSearched(SearchKey key, SearchListener listener) {
+    private CompactResult storedOrSearched(SearchOptions key, SearchListener listener) {
         return stored(key).orElseGet(() -> {
             log.info("  Search: {} x{}", key.startId(), key.maxTransfers());
             CompactResult result = search.search(key.startId(), key.maxTransfers(),
@@ -98,7 +87,7 @@ public class ReachabilityCache {
         });
     }
 
-    private Optional<CompactResult> stored(SearchKey key) {
+    private Optional<CompactResult> stored(SearchOptions key) {
         CompactResult cached = rawPaths.getIfPresent(key);
         if (cached != null) {
             log.info("  Raw cache HIT: {} x{} ({} stations)", key.startId(), key.maxTransfers(),
@@ -113,11 +102,11 @@ public class ReachabilityCache {
     }
 
     /** True if {@link #getOrCompute} would not have to search. */
-    public boolean contains(SearchKey key) {
+    public boolean contains(SearchOptions key) {
         return rawPaths.getIfPresent(key) != null || storedWithMoreTransfers(key).isPresent();
     }
 
-    private Optional<Map.Entry<SearchKey, CompactResult>> storedWithMoreTransfers(SearchKey key) {
+    private Optional<Map.Entry<SearchOptions, CompactResult>> storedWithMoreTransfers(SearchOptions key) {
         return rawPaths.asMap().entrySet().stream()
                 .filter(entry -> entry.getKey().maxTransfers() > key.maxTransfers()
                         && entry.getKey().withMaxTransfers(key.maxTransfers()).equals(key))
@@ -135,7 +124,7 @@ public class ReachabilityCache {
         // Applies pending evictions, so the count is exact
         rawPaths.cleanUp();
         stats.put("rawPathCacheEntries", rawPaths.estimatedSize());
-        stats.put("rawPathCacheKeys", rawPaths.asMap().keySet().stream().map(SearchKey::label).toList());
+        stats.put("rawPathCacheKeys", rawPaths.asMap().keySet().stream().map(SearchOptions::label).toList());
         return stats;
     }
 }

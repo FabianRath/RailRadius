@@ -53,11 +53,11 @@ class StationSearchIndexTest {
     @Test
     void limitOutsideTheApiBoundsIsRejected() {
         assertThatThrownBy(() -> index.search("alpha", 0))
-                .isInstanceOf(SearchRequestValidator.InvalidSearchException.class);
+                .isInstanceOf(InvalidSearchException.class);
         assertThatThrownBy(() -> index.search("alpha", -1))
-                .isInstanceOf(SearchRequestValidator.InvalidSearchException.class);
+                .isInstanceOf(InvalidSearchException.class);
         assertThatThrownBy(() -> index.search("", StationSearchIndex.MAX_LIMIT + 1))
-                .isInstanceOf(SearchRequestValidator.InvalidSearchException.class);
+                .isInstanceOf(InvalidSearchException.class);
         assertThat(index.search("alpha", StationSearchIndex.MAX_LIMIT)).isNotEmpty();
     }
 
@@ -66,7 +66,7 @@ class StationSearchIndexTest {
         String longest = "a".repeat(StationSearchIndex.MAX_QUERY_LENGTH);
         assertThat(index.search(longest, 10)).isEmpty();
         assertThatThrownBy(() -> index.search(longest + "a", 10))
-                .isInstanceOf(SearchRequestValidator.InvalidSearchException.class);
+                .isInstanceOf(InvalidSearchException.class);
     }
 
     @Test
