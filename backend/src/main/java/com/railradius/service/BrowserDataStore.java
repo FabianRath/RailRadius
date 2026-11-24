@@ -78,8 +78,20 @@ public class BrowserDataStore {
 
     /** The file of the graph served now; empty while it is built, or if its build failed. */
     public Optional<Published> current() {
+        return currentBuilt().map(Built::published);
+    }
+
+    /**
+     * The served graph whose file has this version: the one whose store positions a browser's rides name (#11).
+     * Empty if the version is not the current one.
+     */
+    Optional<ServedGraph> servedWithVersion(String version) {
+        return currentBuilt().filter(now -> now.published().version().equals(version)).map(Built::source);
+    }
+
+    private Optional<Built> currentBuilt() {
         Built now = built;
-        return now != null && now.source() == graph.served() ? Optional.of(now.published()) : Optional.empty();
+        return now != null && now.source() == graph.served() ? Optional.of(now) : Optional.empty();
     }
 
     private Published write(ServedGraph served) throws IOException {

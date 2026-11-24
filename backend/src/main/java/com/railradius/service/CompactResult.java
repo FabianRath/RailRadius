@@ -160,20 +160,31 @@ final class CompactResult {
             backwards.add(label);
         }
         List<Ride> rides = new ArrayList<>();
-        JourneyRunningDays.SoFar days = JourneyRunningDays.SoFar.START;
         for (int label : backwards.reversed()) {
             int firstEvent = store.firstEvent(labels.trip()[label]);
-            Ride ride = new Ride(labels.trip()[label], firstEvent + labels.boardIdx()[label],
-                    firstEvent + labels.alightIdx()[label]);
-            rides.add(ride);
+            rides.add(new Ride(labels.trip()[label], firstEvent + labels.boardIdx()[label],
+                    firstEvent + labels.alightIdx()[label]));
+        }
+        return rideList(store, rides, graph);
+    }
+
+    /** The journey ending with the ride of label, or the start's empty one for {@link LabelArena#NONE}. */
+    private Journey journey(int last) {
+        boolean start = last == LabelArena.NONE;
+        return journey(store, startId, rideList(last), start ? 0 : labels.durationMinutes()[last]);
+    }
+
+    /** The rides with the exact days on which all of them run; graph only tells which days are past. */
+    static RideList rideList(TimetableStore store, List<Ride> rides, TransitGraph graph) {
+        JourneyRunningDays.SoFar days = JourneyRunningDays.SoFar.START;
+        for (Ride ride : rides) {
             days = JourneyRunningDays.withRide(days, store, ride.boardEvent(), ride.alightEvent(), graph);
         }
         return new RideList(rides, days.days());
     }
 
-    /** The journey ending with the ride of label, or the start's empty one for {@link LabelArena#NONE}. */
-    private Journey journey(int last) {
-        RideList rideList = rideList(last);
+    /** The journey of the rides from startId, which the first ride boards at; one transfer between two rides. */
+    static Journey journey(TimetableStore store, String startId, RideList rideList, int durationMinutes) {
         List<String> stationIds = new ArrayList<>(List.of(startId));
         List<Connection> connections = new ArrayList<>();
         for (Ride ride : rideList.rides()) {
@@ -182,12 +193,11 @@ final class CompactResult {
                 stationIds.add(store.stations().id(store.station(event + 1)));
             }
         }
-        boolean start = last == LabelArena.NONE;
         JourneyPath path = JourneyPath.builder()
                 .stationIds(stationIds)
                 .connections(connections)
-                .transfers(start ? 0 : (int) labels.transfers()[last])
-                .totalDurationMinutes(start ? 0 : labels.durationMinutes()[last])
+                .transfers(Math.max(0, rideList.rides().size() - 1))
+                .totalDurationMinutes(durationMinutes)
                 .build();
         return new Journey(path, rideList.runningDays());
     }

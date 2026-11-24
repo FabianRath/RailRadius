@@ -29,6 +29,8 @@ public class SearchRateLimiter {
     private static final int WAIT_COST_OFFSET_MINUTES = 360;
     private static final int TABLE_WAIT_MINUTES = 180;
     private static final double NANOS_PER_SECOND = 1e9;
+    // A journey from a ride list reads only the few trips it rides
+    private static final int RIDE_LIST_JOURNEY_COST = 1;
 
     private final int capacity;
     private final double refillPerSecond;
@@ -64,10 +66,23 @@ public class SearchRateLimiter {
      * @throws SearchRefusal if the budget is too low; nothing is taken then
      */
     public void charge(String clientIp, SearchOptions options) {
-        int cost = costOf(options.maxTransfers(), options.maxTransferMins());
+        take(clientIp, costOf(options.maxTransfers(), options.maxTransferMins()));
+    }
+
+    /**
+     * Takes the cost of building a journey from a browser's ride list ({@link RideListJourneys}) from the client's
+     * budget, so forged lists can't make the server do much work.
+     *
+     * @throws SearchRefusal if the budget is too low; nothing is taken then
+     */
+    public void chargeRideListJourney(String clientIp) {
+        take(clientIp, RIDE_LIST_JOURNEY_COST);
+    }
+
+    private void take(String clientIp, int cost) {
         long waitSeconds = buckets.get(ClientKeys.rateLimitKey(clientIp), clientKey -> new Bucket()).take(cost);
         if (waitSeconds > 0) {
-            log.info("Search turned away by the rate limit, {} s until it fits", waitSeconds);
+            log.info("Request turned away by the rate limit, {} s until it fits", waitSeconds);
             throw SearchRefusal.tooManySearches(waitSeconds);
         }
     }

@@ -30,10 +30,14 @@ public class JourneyLegBuilder {
 
     /** Empty if the destination station is unknown. */
     public Optional<ReachableStation> toReachableStation(CompactResult result, String stopId, int transfers) {
-        ServedGraph graph = result.served();
+        if (result.served().station(stopId) == null) return Optional.empty();
+        return toReachableStation(result.served(), stopId, result.journey(stopId, transfers));
+    }
+
+    /** The journey to stopId on the graph whose store it was built from; empty if the station is unknown. */
+    Optional<ReachableStation> toReachableStation(ServedGraph graph, String stopId, CompactResult.Journey journey) {
         Station station = graph.station(stopId);
         if (station == null) return Optional.empty();
-        CompactResult.Journey journey = result.journey(stopId, transfers);
         JourneyPath path = journey.path();
         ServiceDays runningDays = journey.runningDays();
         return Optional.of(ReachableStation.builder()

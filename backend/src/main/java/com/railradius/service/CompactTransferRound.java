@@ -30,6 +30,14 @@ final class CompactTransferRound {
     record Parameters(long[] patternDays, int minWaitSeconds, int maxWaitSeconds) {}
 
     /**
+     * The longest wait past midnight a search allows: its max wait, at most the longest that
+     * {@link GtfsTime#diffMinutes} counts as crossing midnight, so a journey's minutes count the wait as it is.
+     */
+    static int overnightMaxWaitSeconds(int maxWaitSeconds) {
+        return Math.min(maxWaitSeconds, GtfsTime.MAX_OVERNIGHT_GAP_SECONDS);
+    }
+
+    /**
      * What one station boards, in departure order, and what choosing it took. A round can board ~10 M times on the
      * full data and holds them until it rides them, so a boarding is two ints and a char: its departure event with
      * whether the wait passes midnight, the arrival boarded from and the journey's minutes up to the departure. Its
@@ -259,7 +267,7 @@ final class CompactTransferRound {
                 parameters.minWaitSeconds(), parameters.maxWaitSeconds());
         TransferWindowInts overnight = new TransferWindowInts(arrivals.arrivals(), new int[count],
                 -GtfsTime.SECONDS_PER_DAY, parameters.minWaitSeconds(),
-                Math.min(parameters.maxWaitSeconds(), GtfsTime.MAX_OVERNIGHT_GAP_SECONDS));
+                overnightMaxWaitSeconds(parameters.maxWaitSeconds()));
         StationBoardings boardings = new StationBoardings();
         // Per sorted arrival: its index into the boardings' fromPositions, -1 while nothing boards from it
         int[] fromIndex = new int[count];

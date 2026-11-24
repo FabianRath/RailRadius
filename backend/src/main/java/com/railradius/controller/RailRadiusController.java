@@ -4,10 +4,12 @@ import com.railradius.config.AdminAccess;
 import com.railradius.dto.BrowserDataInfo;
 import com.railradius.dto.Coverage;
 import com.railradius.dto.ReachableStation;
+import com.railradius.dto.RideListJourneyRequest;
 import com.railradius.model.Station;
 import com.railradius.service.BrowserDataStore;
 import com.railradius.service.CoverageService;
 import com.railradius.service.ReachabilityService;
+import com.railradius.service.RideListJourneys;
 import com.railradius.service.SearchAdmission;
 import com.railradius.service.SearchRequestValidator.SearchRequest;
 import com.railradius.service.StationSearchIndex;
@@ -24,6 +26,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -56,6 +60,7 @@ public class RailRadiusController {
     private final AsyncTaskExecutor taskExecutor;
     private final AdminAccess adminAccess;
     private final BrowserDataStore browserDataStore;
+    private final RideListJourneys rideListJourneys;
     private final long streamTimeoutMs;
 
     // With @EnableScheduling the task scheduler is an AsyncTaskExecutor too; SSE streams use the task executor
@@ -63,7 +68,7 @@ public class RailRadiusController {
                                StationSearchIndex stationSearchIndex, CoverageService coverageService,
                                @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor,
                                AdminAccess adminAccess, SearchAdmission admission,
-                               BrowserDataStore browserDataStore) {
+                               BrowserDataStore browserDataStore, RideListJourneys rideListJourneys) {
         this.reachabilityService = reachabilityService;
         this.transitGraph = transitGraph;
         this.stationSearchIndex = stationSearchIndex;
@@ -71,6 +76,7 @@ public class RailRadiusController {
         this.taskExecutor = taskExecutor;
         this.adminAccess = adminAccess;
         this.browserDataStore = browserDataStore;
+        this.rideListJourneys = rideListJourneys;
         this.streamTimeoutMs = (long) (admission.longestWait().toMillis() * STREAM_TIMEOUT_FACTOR);
     }
     
@@ -125,6 +131,16 @@ public class RailRadiusController {
         SearchRequest req = new SearchRequest(stationId, maxTransfers, minTransferMinutes, maxTransferMinutes,
                 maxJourneyHours);
         return ResponseEntity.of(reachabilityService.journey(client(httpRequest), req, targetId));
+    }
+
+    /**
+     * The journey of the rides a browser's search found (#11), built without a search. 400 if the browser data
+     * version is not the served one or the rides are no journey within the wait at changes, 429 over the budget.
+     */
+    @PostMapping("/reachability/ride-journey")
+    public ResponseEntity<ReachableStation> rideListJourney(@RequestBody RideListJourneyRequest request,
+                                                            HttpServletRequest httpRequest) {
+        return ResponseEntity.of(rideListJourneys.journey(client(httpRequest), request));
     }
 
     private SearchAdmission.Client client(HttpServletRequest request) {
