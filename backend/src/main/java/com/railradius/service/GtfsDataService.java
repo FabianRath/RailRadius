@@ -63,8 +63,7 @@ public class GtfsDataService {
     public void loadFromFiles() {
         log.info("=== Loading GTFS from files ===");
         log.info("Scanning directory: {}", gtfsDirectory);
-        graph.clear();
-        dataLoaded = false;
+        // The graph from before is served until the new one is built, and stays if the load fails (#17)
         loadProgress.start();
         try {
             buildGraphFromFiles();

@@ -6,11 +6,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class GtfsDataServiceTest {
 
@@ -57,6 +59,21 @@ class GtfsDataServiceTest {
         assertThat(fromBinary.getAllStations()).isEqualTo(parsed.getAllStations());
         assertThat(service.getCacheStats()).containsEntry("dataLoaded", true)
                 .containsEntry("connectionCount", parsed.edgeCount());
+    }
+
+    // #17: the graph a reload replaces is served until the new one is built, and stays if the reload fails
+    @Test
+    void aFailedReloadKeepsServingTheGraphFromBefore(@TempDir Path dir) throws Exception {
+        TransitGraph graph = new TransitGraph();
+        GtfsDataService service = GtfsTestFixtures.dataService(dir, graph, "alpha");
+        service.loadFromFiles();
+        Files.delete(dir.resolve("gtfs").resolve("gtfs_alpha.zip"));
+
+        assertThatThrownBy(service::loadFromFiles).isInstanceOf(IllegalStateException.class);
+
+        assertThat(graph.getStation("alpha:A1")).isNotNull();
+        assertThat(graph.isDataLoaded()).isTrue();
+        assertThat(service.getCacheStats()).containsEntry("dataLoaded", true);
     }
 
     @Test
