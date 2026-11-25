@@ -23,6 +23,7 @@ class BrowserDataFileTest {
     private static final double COORDINATE_TOLERANCE_DEG = 1e-5;
     // Relative to backend/, where Maven runs the tests; the browser engine's build check reads it (browser-engine/)
     private static final Path ENGINE_CHECK_DIR = Path.of("target/browser-engine-check");
+    private static final String SAME_RESULT_SUFFIX = ".same-result.txt";
 
     @TempDir
     Path tempDir;
@@ -42,8 +43,9 @@ class BrowserDataFileTest {
     }
 
     /**
-     * The file and the server's results are also left in {@link #ENGINE_CHECK_DIR}: the browser engine's build check
-     * searches the same file in WebAssembly and must find the same (#10).
+     * Strict: the same rides at the same store positions as the server. Same result: what the recording holds (#32).
+     * The file, the server's strict results and the same-result recording are also left in {@link #ENGINE_CHECK_DIR}:
+     * the browser engine's build check searches the same file in WebAssembly and must find the same (#10).
      */
     @ParameterizedTest
     @MethodSource("feedCombinations")
@@ -57,10 +59,15 @@ class BrowserDataFileTest {
         String serverDump = SearchSnapshotTest.dump(server, SearchSnapshot.RideFormat.STORE_POSITIONS);
 
         assertThat(SearchSnapshotTest.dump(browser, SearchSnapshot.RideFormat.STORE_POSITIONS)).isEqualTo(serverDump);
+        Path sameResult = SearchSnapshotTest.recording(feeds, SearchSnapshot.RideFormat.STATIONS_AND_TIMES);
+        assertThat(SearchSnapshotTest.dump(browser, SearchSnapshot.RideFormat.STATIONS_AND_TIMES))
+                .isEqualTo(Files.readString(sameResult));
         String combination = String.join("+", feeds);
         Files.createDirectories(ENGINE_CHECK_DIR);
         Files.copy(file, ENGINE_CHECK_DIR.resolve(combination + ".bin"), StandardCopyOption.REPLACE_EXISTING);
         Files.writeString(ENGINE_CHECK_DIR.resolve(combination + ".txt"), serverDump);
+        Files.copy(sameResult, ENGINE_CHECK_DIR.resolve(combination + SAME_RESULT_SUFFIX),
+                StandardCopyOption.REPLACE_EXISTING);
     }
 
     @Test

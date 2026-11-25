@@ -1,0 +1,79 @@
+# today 2026-01-01
+## theta:Q1 maxTransfers 0
+theta:Q1	0	0	theta:Q1		every day	-
+theta:Q2	0	30	theta:Q1 theta:Q2	theta:QT1 theta:Q1 28800 theta:Q2 30600	20458-20541	Runs daily
+theta:Q3	0	60	theta:Q1 theta:Q2 theta:Q3	theta:QT1 theta:Q1 28800 theta:Q3 32400	20458-20541	Runs daily
+theta:Q4	0	70	theta:Q1 theta:Q2 theta:Q4	theta:QT2 theta:Q1 28800 theta:Q4 33000	20458-20541	Runs daily
+## theta:Q1 maxTransfers 1
+theta:Q1	0	0	theta:Q1		every day	-
+theta:Q2	0	30	theta:Q1 theta:Q2	theta:QT1 theta:Q1 28800 theta:Q2 30600	20458-20541	Runs daily
+theta:Q3	0	60	theta:Q1 theta:Q2 theta:Q3	theta:QT1 theta:Q1 28800 theta:Q3 32400	20458-20541	Runs daily
+theta:Q4	0	70	theta:Q1 theta:Q2 theta:Q4	theta:QT2 theta:Q1 28800 theta:Q4 33000	20458-20541	Runs daily
+## theta:Q1 maxTransfers 2
+theta:Q1	0	0	theta:Q1		every day	-
+theta:Q2	0	30	theta:Q1 theta:Q2	theta:QT1 theta:Q1 28800 theta:Q2 30600	20458-20541	Runs daily
+theta:Q3	0	60	theta:Q1 theta:Q2 theta:Q3	theta:QT1 theta:Q1 28800 theta:Q3 32400	20458-20541	Runs daily
+theta:Q4	0	70	theta:Q1 theta:Q2 theta:Q4	theta:QT2 theta:Q1 28800 theta:Q4 33000	20458-20541	Runs daily
+## theta:Q1 maxTransfers 3
+theta:Q1	0	0	theta:Q1		every day	-
+theta:Q2	0	30	theta:Q1 theta:Q2	theta:QT1 theta:Q1 28800 theta:Q2 30600	20458-20541	Runs daily
+theta:Q3	0	60	theta:Q1 theta:Q2 theta:Q3	theta:QT1 theta:Q1 28800 theta:Q3 32400	20458-20541	Runs daily
+theta:Q4	0	70	theta:Q1 theta:Q2 theta:Q4	theta:QT2 theta:Q1 28800 theta:Q4 33000	20458-20541	Runs daily
+## theta:Q1 maxTransfers 4
+theta:Q1	0	0	theta:Q1		every day	-
+theta:Q2	0	30	theta:Q1 theta:Q2	theta:QT1 theta:Q1 28800 theta:Q2 30600	20458-20541	Runs daily
+theta:Q3	0	60	theta:Q1 theta:Q2 theta:Q3	theta:QT1 theta:Q1 28800 theta:Q3 32400	20458-20541	Runs daily
+theta:Q4	0	70	theta:Q1 theta:Q2 theta:Q4	theta:QT2 theta:Q1 28800 theta:Q4 33000	20458-20541	Runs daily
+## theta:Q1 maxTransfers 5
+theta:Q1	0	0	theta:Q1		every day	-
+theta:Q2	0	30	theta:Q1 theta:Q2	theta:QT1 theta:Q1 28800 theta:Q2 30600	20458-20541	Runs daily
+theta:Q3	0	60	theta:Q1 theta:Q2 theta:Q3	theta:QT1 theta:Q1 28800 theta:Q3 32400	20458-20541	Runs daily
+theta:Q4	0	70	theta:Q1 theta:Q2 theta:Q4	theta:QT2 theta:Q1 28800 theta:Q4 33000	20458-20541	Runs daily
+## theta:Q2 maxTransfers 0
+theta:Q2	0	0	theta:Q2		every day	-
+theta:Q3	0	30	theta:Q2 theta:Q3	theta:QT1 theta:Q2 30600 theta:Q3 32400	20458-20541	Runs daily
+theta:Q4	0	40	theta:Q2 theta:Q4	theta:QT2 theta:Q2 30600 theta:Q4 33000	20458-20541	Runs daily
+## theta:Q2 maxTransfers 1
+theta:Q2	0	0	theta:Q2		every day	-
+theta:Q3	0	30	theta:Q2 theta:Q3	theta:QT1 theta:Q2 30600 theta:Q3 32400	20458-20541	Runs daily
+theta:Q4	0	40	theta:Q2 theta:Q4	theta:QT2 theta:Q2 30600 theta:Q4 33000	20458-20541	Runs daily
+## theta:Q2 maxTransfers 2
+theta:Q2	0	0	theta:Q2		every day	-
+theta:Q3	0	30	theta:Q2 theta:Q3	theta:QT1 theta:Q2 30600 theta:Q3 32400	20458-20541	Runs daily
+theta:Q4	0	40	theta:Q2 theta:Q4	theta:QT2 theta:Q2 30600 theta:Q4 33000	20458-20541	Runs daily
+## theta:Q2 maxTransfers 3
+theta:Q2	0	0	theta:Q2		every day	-
+theta:Q3	0	30	theta:Q2 theta:Q3	theta:QT1 theta:Q2 30600 theta:Q3 32400	20458-20541	Runs daily
+theta:Q4	0	40	theta:Q2 theta:Q4	theta:QT2 theta:Q2 30600 theta:Q4 33000	20458-20541	Runs daily
+## theta:Q2 maxTransfers 4
+theta:Q2	0	0	theta:Q2		every day	-
+theta:Q3	0	30	theta:Q2 theta:Q3	theta:QT1 theta:Q2 30600 theta:Q3 32400	20458-20541	Runs daily
+theta:Q4	0	40	theta:Q2 theta:Q4	theta:QT2 theta:Q2 30600 theta:Q4 33000	20458-20541	Runs daily
+## theta:Q2 maxTransfers 5
+theta:Q2	0	0	theta:Q2		every day	-
+theta:Q3	0	30	theta:Q2 theta:Q3	theta:QT1 theta:Q2 30600 theta:Q3 32400	20458-20541	Runs daily
+theta:Q4	0	40	theta:Q2 theta:Q4	theta:QT2 theta:Q2 30600 theta:Q4 33000	20458-20541	Runs daily
+## theta:Q3 maxTransfers 0
+theta:Q3	0	0	theta:Q3		every day	-
+## theta:Q3 maxTransfers 1
+theta:Q3	0	0	theta:Q3		every day	-
+## theta:Q3 maxTransfers 2
+theta:Q3	0	0	theta:Q3		every day	-
+## theta:Q3 maxTransfers 3
+theta:Q3	0	0	theta:Q3		every day	-
+## theta:Q3 maxTransfers 4
+theta:Q3	0	0	theta:Q3		every day	-
+## theta:Q3 maxTransfers 5
+theta:Q3	0	0	theta:Q3		every day	-
+## theta:Q4 maxTransfers 0
+theta:Q4	0	0	theta:Q4		every day	-
+## theta:Q4 maxTransfers 1
+theta:Q4	0	0	theta:Q4		every day	-
+## theta:Q4 maxTransfers 2
+theta:Q4	0	0	theta:Q4		every day	-
+## theta:Q4 maxTransfers 3
+theta:Q4	0	0	theta:Q4		every day	-
+## theta:Q4 maxTransfers 4
+theta:Q4	0	0	theta:Q4		every day	-
+## theta:Q4 maxTransfers 5
+theta:Q4	0	0	theta:Q4		every day	-

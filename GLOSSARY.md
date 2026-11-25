@@ -19,3 +19,12 @@ _Avoid_: graph (alone), network (the merged network a load is still building is 
 
 **Admin access**: how the app tells the admin from everyone else. The admin proves itself with the token in the `X-Admin-Token` header, or with the cookie of an admin session started by dev login. Only the header opens the admin API, because a cookie would also be sent by a forged cross-site request; either one exempts a search from the rate limit. A wrong token counts against the client wherever it is sent, and a client with too many is turned away from the admin API and loses its header's exemption. In code: `AdminAccess`.
 _Avoid_: admin token (the token is only one of the two proofs), admin identity.
+
+**Path**: one way a search reaches a station: its rides in order, with the transfers between them, the minutes from the first departure to the last arrival, the stations passed and the running days. A station can have several paths, one per number of transfers, each kept only if it is better than those with fewer. In code: `CompactResult.PathSummary`, and as a journey `JourneyPath`.
+_Avoid_: route (a GTFS route is a line), connection (one leg between two stops).
+
+**Running days**: the exact days, from today on, on which a whole path can be travelled: every ride runs on them and each transfer is caught. Shown with a label such as "Runs daily". In code: `ServiceDays`, worked out by `JourneyRunningDays`.
+_Avoid_: service days (a trip's own days, before the journey's are worked out), calendar.
+
+**Same result**: what a change to the search or its data must keep. For every start and number of transfers, each station has the same paths with the same transfers, minutes, stations, rides boarded and left at the same stations and times, and the same running days. Which of two trains with the same stops and times a ride names may differ. Checked by the "same result" mode of the search oracle; the strict mode also wants the same trains. In code: `SearchSnapshot.RideFormat.STATIONS_AND_TIMES`.
+_Avoid_: identical results, byte-identical (that is the strict mode).

@@ -1,0 +1,150 @@
+# today 2026-01-01
+## epsilon:E1 maxTransfers 0
+epsilon:E1	0	0	epsilon:E1		every day	-
+epsilon:E2	0	30	epsilon:E1 epsilon:E2	epsilon:E1 36000 epsilon:E2 37800	every day	-
+epsilon:E3	0	8	epsilon:E1 epsilon:E3	epsilon:E1 31800 epsilon:E3 32280	every day	-
+## epsilon:E1 maxTransfers 1
+epsilon:E1	0	0	epsilon:E1		every day	-
+epsilon:E2	0	30	epsilon:E1 epsilon:E2	epsilon:E1 36000 epsilon:E2 37800	every day	-
+epsilon:E3	0	8	epsilon:E1 epsilon:E3	epsilon:E1 31800 epsilon:E3 32280	every day	-
+epsilon:E4	1	40	epsilon:E1 epsilon:E3 epsilon:E4	epsilon:E1 31800 epsilon:E3 32280 | epsilon:E3 32400 epsilon:E4 34200	every day	-
+epsilon:E5	1	60	epsilon:E1 epsilon:E2 epsilon:E5	epsilon:E1 36000 epsilon:E2 37800 | epsilon:E2 38400 epsilon:E5 39600	every day	-
+## epsilon:E1 maxTransfers 2
+epsilon:E1	0	0	epsilon:E1		every day	-
+epsilon:E2	0	30	epsilon:E1 epsilon:E2	epsilon:E1 36000 epsilon:E2 37800	every day	-
+epsilon:E3	0	8	epsilon:E1 epsilon:E3	epsilon:E1 31800 epsilon:E3 32280	every day	-
+epsilon:E4	1	40	epsilon:E1 epsilon:E3 epsilon:E4	epsilon:E1 31800 epsilon:E3 32280 | epsilon:E3 32400 epsilon:E4 34200	every day	-
+epsilon:E5	1	60	epsilon:E1 epsilon:E2 epsilon:E5	epsilon:E1 36000 epsilon:E2 37800 | epsilon:E2 38400 epsilon:E5 39600	every day	-
+epsilon:E6	2	90	epsilon:E1 epsilon:E2 epsilon:E5 epsilon:E6	epsilon:E1 36000 epsilon:E2 37800 | epsilon:E2 38400 epsilon:E5 39600 | epsilon:E5 40200 epsilon:E6 41400	every day	-
+epsilon:E7	2	60	epsilon:E1 epsilon:E3 epsilon:E4 epsilon:E7	epsilon:E1 31800 epsilon:E3 32280 | epsilon:E3 32400 epsilon:E4 34200 | epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E1 maxTransfers 3
+epsilon:E1	0	0	epsilon:E1		every day	-
+epsilon:E2	0	30	epsilon:E1 epsilon:E2	epsilon:E1 36000 epsilon:E2 37800	every day	-
+epsilon:E3	0	8	epsilon:E1 epsilon:E3	epsilon:E1 31800 epsilon:E3 32280	every day	-
+epsilon:E4	1	40	epsilon:E1 epsilon:E3 epsilon:E4	epsilon:E1 31800 epsilon:E3 32280 | epsilon:E3 32400 epsilon:E4 34200	every day	-
+epsilon:E5	1	60	epsilon:E1 epsilon:E2 epsilon:E5	epsilon:E1 36000 epsilon:E2 37800 | epsilon:E2 38400 epsilon:E5 39600	every day	-
+epsilon:E6	2	90	epsilon:E1 epsilon:E2 epsilon:E5 epsilon:E6	epsilon:E1 36000 epsilon:E2 37800 | epsilon:E2 38400 epsilon:E5 39600 | epsilon:E5 40200 epsilon:E6 41400	every day	-
+epsilon:E7	2	60	epsilon:E1 epsilon:E3 epsilon:E4 epsilon:E7	epsilon:E1 31800 epsilon:E3 32280 | epsilon:E3 32400 epsilon:E4 34200 | epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E1 maxTransfers 4
+epsilon:E1	0	0	epsilon:E1		every day	-
+epsilon:E2	0	30	epsilon:E1 epsilon:E2	epsilon:E1 36000 epsilon:E2 37800	every day	-
+epsilon:E3	0	8	epsilon:E1 epsilon:E3	epsilon:E1 31800 epsilon:E3 32280	every day	-
+epsilon:E4	1	40	epsilon:E1 epsilon:E3 epsilon:E4	epsilon:E1 31800 epsilon:E3 32280 | epsilon:E3 32400 epsilon:E4 34200	every day	-
+epsilon:E5	1	60	epsilon:E1 epsilon:E2 epsilon:E5	epsilon:E1 36000 epsilon:E2 37800 | epsilon:E2 38400 epsilon:E5 39600	every day	-
+epsilon:E6	2	90	epsilon:E1 epsilon:E2 epsilon:E5 epsilon:E6	epsilon:E1 36000 epsilon:E2 37800 | epsilon:E2 38400 epsilon:E5 39600 | epsilon:E5 40200 epsilon:E6 41400	every day	-
+epsilon:E7	2	60	epsilon:E1 epsilon:E3 epsilon:E4 epsilon:E7	epsilon:E1 31800 epsilon:E3 32280 | epsilon:E3 32400 epsilon:E4 34200 | epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E1 maxTransfers 5
+epsilon:E1	0	0	epsilon:E1		every day	-
+epsilon:E2	0	30	epsilon:E1 epsilon:E2	epsilon:E1 36000 epsilon:E2 37800	every day	-
+epsilon:E3	0	8	epsilon:E1 epsilon:E3	epsilon:E1 31800 epsilon:E3 32280	every day	-
+epsilon:E4	1	40	epsilon:E1 epsilon:E3 epsilon:E4	epsilon:E1 31800 epsilon:E3 32280 | epsilon:E3 32400 epsilon:E4 34200	every day	-
+epsilon:E5	1	60	epsilon:E1 epsilon:E2 epsilon:E5	epsilon:E1 36000 epsilon:E2 37800 | epsilon:E2 38400 epsilon:E5 39600	every day	-
+epsilon:E6	2	90	epsilon:E1 epsilon:E2 epsilon:E5 epsilon:E6	epsilon:E1 36000 epsilon:E2 37800 | epsilon:E2 38400 epsilon:E5 39600 | epsilon:E5 40200 epsilon:E6 41400	every day	-
+epsilon:E7	2	60	epsilon:E1 epsilon:E3 epsilon:E4 epsilon:E7	epsilon:E1 31800 epsilon:E3 32280 | epsilon:E3 32400 epsilon:E4 34200 | epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E2 maxTransfers 0
+epsilon:E2	0	0	epsilon:E2		every day	-
+epsilon:E5	0	20	epsilon:E2 epsilon:E5	epsilon:E2 38400 epsilon:E5 39600	every day	-
+epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:E2 54000 epsilon:E6 55800	every day	-
+## epsilon:E2 maxTransfers 1
+epsilon:E2	0	0	epsilon:E2		every day	-
+epsilon:E5	0	20	epsilon:E2 epsilon:E5	epsilon:E2 38400 epsilon:E5 39600	every day	-
+epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:E2 54000 epsilon:E6 55800	every day	-
+## epsilon:E2 maxTransfers 2
+epsilon:E2	0	0	epsilon:E2		every day	-
+epsilon:E5	0	20	epsilon:E2 epsilon:E5	epsilon:E2 38400 epsilon:E5 39600	every day	-
+epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:E2 54000 epsilon:E6 55800	every day	-
+## epsilon:E2 maxTransfers 3
+epsilon:E2	0	0	epsilon:E2		every day	-
+epsilon:E5	0	20	epsilon:E2 epsilon:E5	epsilon:E2 38400 epsilon:E5 39600	every day	-
+epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:E2 54000 epsilon:E6 55800	every day	-
+## epsilon:E2 maxTransfers 4
+epsilon:E2	0	0	epsilon:E2		every day	-
+epsilon:E5	0	20	epsilon:E2 epsilon:E5	epsilon:E2 38400 epsilon:E5 39600	every day	-
+epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:E2 54000 epsilon:E6 55800	every day	-
+## epsilon:E2 maxTransfers 5
+epsilon:E2	0	0	epsilon:E2		every day	-
+epsilon:E5	0	20	epsilon:E2 epsilon:E5	epsilon:E2 38400 epsilon:E5 39600	every day	-
+epsilon:E6	0	30	epsilon:E2 epsilon:E6	epsilon:E2 54000 epsilon:E6 55800	every day	-
+## epsilon:E3 maxTransfers 0
+epsilon:E3	0	0	epsilon:E3		every day	-
+epsilon:E4	0	30	epsilon:E3 epsilon:E4	epsilon:E3 32400 epsilon:E4 34200	every day	-
+## epsilon:E3 maxTransfers 1
+epsilon:E3	0	0	epsilon:E3		every day	-
+epsilon:E4	0	30	epsilon:E3 epsilon:E4	epsilon:E3 32400 epsilon:E4 34200	every day	-
+epsilon:E7	1	50	epsilon:E3 epsilon:E4 epsilon:E7	epsilon:E3 32400 epsilon:E4 34200 | epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E3 maxTransfers 2
+epsilon:E3	0	0	epsilon:E3		every day	-
+epsilon:E4	0	30	epsilon:E3 epsilon:E4	epsilon:E3 32400 epsilon:E4 34200	every day	-
+epsilon:E7	1	50	epsilon:E3 epsilon:E4 epsilon:E7	epsilon:E3 32400 epsilon:E4 34200 | epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E3 maxTransfers 3
+epsilon:E3	0	0	epsilon:E3		every day	-
+epsilon:E4	0	30	epsilon:E3 epsilon:E4	epsilon:E3 32400 epsilon:E4 34200	every day	-
+epsilon:E7	1	50	epsilon:E3 epsilon:E4 epsilon:E7	epsilon:E3 32400 epsilon:E4 34200 | epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E3 maxTransfers 4
+epsilon:E3	0	0	epsilon:E3		every day	-
+epsilon:E4	0	30	epsilon:E3 epsilon:E4	epsilon:E3 32400 epsilon:E4 34200	every day	-
+epsilon:E7	1	50	epsilon:E3 epsilon:E4 epsilon:E7	epsilon:E3 32400 epsilon:E4 34200 | epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E3 maxTransfers 5
+epsilon:E3	0	0	epsilon:E3		every day	-
+epsilon:E4	0	30	epsilon:E3 epsilon:E4	epsilon:E3 32400 epsilon:E4 34200	every day	-
+epsilon:E7	1	50	epsilon:E3 epsilon:E4 epsilon:E7	epsilon:E3 32400 epsilon:E4 34200 | epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E4 maxTransfers 0
+epsilon:E4	0	0	epsilon:E4		every day	-
+epsilon:E7	0	10	epsilon:E4 epsilon:E7	epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E4 maxTransfers 1
+epsilon:E4	0	0	epsilon:E4		every day	-
+epsilon:E7	0	10	epsilon:E4 epsilon:E7	epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E4 maxTransfers 2
+epsilon:E4	0	0	epsilon:E4		every day	-
+epsilon:E7	0	10	epsilon:E4 epsilon:E7	epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E4 maxTransfers 3
+epsilon:E4	0	0	epsilon:E4		every day	-
+epsilon:E7	0	10	epsilon:E4 epsilon:E7	epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E4 maxTransfers 4
+epsilon:E4	0	0	epsilon:E4		every day	-
+epsilon:E7	0	10	epsilon:E4 epsilon:E7	epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E4 maxTransfers 5
+epsilon:E4	0	0	epsilon:E4		every day	-
+epsilon:E7	0	10	epsilon:E4 epsilon:E7	epsilon:E4 34800 epsilon:E7 35400	every day	-
+## epsilon:E5 maxTransfers 0
+epsilon:E5	0	0	epsilon:E5		every day	-
+epsilon:E6	0	20	epsilon:E5 epsilon:E6	epsilon:E5 40200 epsilon:E6 41400	every day	-
+## epsilon:E5 maxTransfers 1
+epsilon:E5	0	0	epsilon:E5		every day	-
+epsilon:E6	0	20	epsilon:E5 epsilon:E6	epsilon:E5 40200 epsilon:E6 41400	every day	-
+## epsilon:E5 maxTransfers 2
+epsilon:E5	0	0	epsilon:E5		every day	-
+epsilon:E6	0	20	epsilon:E5 epsilon:E6	epsilon:E5 40200 epsilon:E6 41400	every day	-
+## epsilon:E5 maxTransfers 3
+epsilon:E5	0	0	epsilon:E5		every day	-
+epsilon:E6	0	20	epsilon:E5 epsilon:E6	epsilon:E5 40200 epsilon:E6 41400	every day	-
+## epsilon:E5 maxTransfers 4
+epsilon:E5	0	0	epsilon:E5		every day	-
+epsilon:E6	0	20	epsilon:E5 epsilon:E6	epsilon:E5 40200 epsilon:E6 41400	every day	-
+## epsilon:E5 maxTransfers 5
+epsilon:E5	0	0	epsilon:E5		every day	-
+epsilon:E6	0	20	epsilon:E5 epsilon:E6	epsilon:E5 40200 epsilon:E6 41400	every day	-
+## epsilon:E6 maxTransfers 0
+epsilon:E6	0	0	epsilon:E6		every day	-
+## epsilon:E6 maxTransfers 1
+epsilon:E6	0	0	epsilon:E6		every day	-
+## epsilon:E6 maxTransfers 2
+epsilon:E6	0	0	epsilon:E6		every day	-
+## epsilon:E6 maxTransfers 3
+epsilon:E6	0	0	epsilon:E6		every day	-
+## epsilon:E6 maxTransfers 4
+epsilon:E6	0	0	epsilon:E6		every day	-
+## epsilon:E6 maxTransfers 5
+epsilon:E6	0	0	epsilon:E6		every day	-
+## epsilon:E7 maxTransfers 0
+epsilon:E7	0	0	epsilon:E7		every day	-
+## epsilon:E7 maxTransfers 1
+epsilon:E7	0	0	epsilon:E7		every day	-
+## epsilon:E7 maxTransfers 2
+epsilon:E7	0	0	epsilon:E7		every day	-
+## epsilon:E7 maxTransfers 3
+epsilon:E7	0	0	epsilon:E7		every day	-
+## epsilon:E7 maxTransfers 4
+epsilon:E7	0	0	epsilon:E7		every day	-
+## epsilon:E7 maxTransfers 5
+epsilon:E7	0	0	epsilon:E7		every day	-

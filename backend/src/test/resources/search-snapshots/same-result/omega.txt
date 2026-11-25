@@ -1,0 +1,66 @@
+# today 2026-01-01
+## omega:O1 maxTransfers 0
+omega:O1	0	0	omega:O1		every day	-
+omega:O2	0	30	omega:O1 omega:O2	omega:O1 28800 omega:O2 30600	every day	-
+omega:O3	0	60	omega:O1 omega:O2 omega:O3	omega:O1 28800 omega:O3 32400	every day	-
+## omega:O1 maxTransfers 1
+omega:O1	0	0	omega:O1		every day	-
+omega:O2	0	30	omega:O1 omega:O2	omega:O1 28800 omega:O2 30600	every day	-
+omega:O3	0	60	omega:O1 omega:O2 omega:O3	omega:O1 28800 omega:O3 32400	every day	-
+## omega:O1 maxTransfers 2
+omega:O1	0	0	omega:O1		every day	-
+omega:O2	0	30	omega:O1 omega:O2	omega:O1 28800 omega:O2 30600	every day	-
+omega:O3	0	60	omega:O1 omega:O2 omega:O3	omega:O1 28800 omega:O3 32400	every day	-
+## omega:O1 maxTransfers 3
+omega:O1	0	0	omega:O1		every day	-
+omega:O2	0	30	omega:O1 omega:O2	omega:O1 28800 omega:O2 30600	every day	-
+omega:O3	0	60	omega:O1 omega:O2 omega:O3	omega:O1 28800 omega:O3 32400	every day	-
+## omega:O1 maxTransfers 4
+omega:O1	0	0	omega:O1		every day	-
+omega:O2	0	30	omega:O1 omega:O2	omega:O1 28800 omega:O2 30600	every day	-
+omega:O3	0	60	omega:O1 omega:O2 omega:O3	omega:O1 28800 omega:O3 32400	every day	-
+## omega:O1 maxTransfers 5
+omega:O1	0	0	omega:O1		every day	-
+omega:O2	0	30	omega:O1 omega:O2	omega:O1 28800 omega:O2 30600	every day	-
+omega:O3	0	60	omega:O1 omega:O2 omega:O3	omega:O1 28800 omega:O3 32400	every day	-
+## omega:O2 maxTransfers 0
+omega:O2	0	0	omega:O2		every day	-
+omega:O3	0	30	omega:O2 omega:O3	omega:O2 30600 omega:O3 32400	every day	-
+## omega:O2 maxTransfers 1
+omega:O1	1	150	omega:O2 omega:O3 omega:O1	omega:O2 30600 omega:O3 32400 | omega:O3 36000 omega:O1 39600	every day	-
+omega:O2	0	0	omega:O2		every day	-
+omega:O3	0	30	omega:O2 omega:O3	omega:O2 30600 omega:O3 32400	every day	-
+## omega:O2 maxTransfers 2
+omega:O1	1	150	omega:O2 omega:O3 omega:O1	omega:O2 30600 omega:O3 32400 | omega:O3 36000 omega:O1 39600	every day	-
+omega:O2	0	0	omega:O2		every day	-
+omega:O3	0	30	omega:O2 omega:O3	omega:O2 30600 omega:O3 32400	every day	-
+## omega:O2 maxTransfers 3
+omega:O1	1	150	omega:O2 omega:O3 omega:O1	omega:O2 30600 omega:O3 32400 | omega:O3 36000 omega:O1 39600	every day	-
+omega:O2	0	0	omega:O2		every day	-
+omega:O3	0	30	omega:O2 omega:O3	omega:O2 30600 omega:O3 32400	every day	-
+## omega:O2 maxTransfers 4
+omega:O1	1	150	omega:O2 omega:O3 omega:O1	omega:O2 30600 omega:O3 32400 | omega:O3 36000 omega:O1 39600	every day	-
+omega:O2	0	0	omega:O2		every day	-
+omega:O3	0	30	omega:O2 omega:O3	omega:O2 30600 omega:O3 32400	every day	-
+## omega:O2 maxTransfers 5
+omega:O1	1	150	omega:O2 omega:O3 omega:O1	omega:O2 30600 omega:O3 32400 | omega:O3 36000 omega:O1 39600	every day	-
+omega:O2	0	0	omega:O2		every day	-
+omega:O3	0	30	omega:O2 omega:O3	omega:O2 30600 omega:O3 32400	every day	-
+## omega:O3 maxTransfers 0
+omega:O1	0	60	omega:O3 omega:O1	omega:O3 36000 omega:O1 39600	every day	-
+omega:O3	0	0	omega:O3		every day	-
+## omega:O3 maxTransfers 1
+omega:O1	0	60	omega:O3 omega:O1	omega:O3 36000 omega:O1 39600	every day	-
+omega:O3	0	0	omega:O3		every day	-
+## omega:O3 maxTransfers 2
+omega:O1	0	60	omega:O3 omega:O1	omega:O3 36000 omega:O1 39600	every day	-
+omega:O3	0	0	omega:O3		every day	-
+## omega:O3 maxTransfers 3
+omega:O1	0	60	omega:O3 omega:O1	omega:O3 36000 omega:O1 39600	every day	-
+omega:O3	0	0	omega:O3		every day	-
+## omega:O3 maxTransfers 4
+omega:O1	0	60	omega:O3 omega:O1	omega:O3 36000 omega:O1 39600	every day	-
+omega:O3	0	0	omega:O3		every day	-
+## omega:O3 maxTransfers 5
+omega:O1	0	60	omega:O3 omega:O1	omega:O3 36000 omega:O1 39600	every day	-
+omega:O3	0	0	omega:O3		every day	-

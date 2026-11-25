@@ -1,0 +1,88 @@
+# today 2026-01-01
+## iota:I1 maxTransfers 0
+iota:I1	0	0	iota:I1		every day	-
+iota:I2	0	60	iota:I1 iota:I2	iota:I1 28800 iota:I2 32400	every day	-
+## iota:I1 maxTransfers 1
+iota:I1	0	0	iota:I1		every day	-
+iota:I2	0	60	iota:I1 iota:I2	iota:I1 28800 iota:I2 32400	every day	-
+iota:I3	1	120	iota:I1 iota:I2 iota:I3	iota:I1 28800 iota:I2 32400 | iota:I2 34200 iota:I3 36000	every day	-
+iota:I4	1	240	iota:I1 iota:I2 iota:I4	iota:I1 28800 iota:I2 32400 | iota:I2 41400 iota:I4 43200	every day	-
+## iota:I1 maxTransfers 2
+iota:I1	0	0	iota:I1		every day	-
+iota:I2	0	60	iota:I1 iota:I2	iota:I1 28800 iota:I2 32400	every day	-
+iota:I3	1	120	iota:I1 iota:I2 iota:I3	iota:I1 28800 iota:I2 32400 | iota:I2 34200 iota:I3 36000	every day	-
+iota:I4	1	240	iota:I1 iota:I2 iota:I4	iota:I1 28800 iota:I2 32400 | iota:I2 41400 iota:I4 43200	every day	-
+## iota:I1 maxTransfers 3
+iota:I1	0	0	iota:I1		every day	-
+iota:I2	0	60	iota:I1 iota:I2	iota:I1 28800 iota:I2 32400	every day	-
+iota:I3	1	120	iota:I1 iota:I2 iota:I3	iota:I1 28800 iota:I2 32400 | iota:I2 34200 iota:I3 36000	every day	-
+iota:I4	1	240	iota:I1 iota:I2 iota:I4	iota:I1 28800 iota:I2 32400 | iota:I2 41400 iota:I4 43200	every day	-
+## iota:I1 maxTransfers 4
+iota:I1	0	0	iota:I1		every day	-
+iota:I2	0	60	iota:I1 iota:I2	iota:I1 28800 iota:I2 32400	every day	-
+iota:I3	1	120	iota:I1 iota:I2 iota:I3	iota:I1 28800 iota:I2 32400 | iota:I2 34200 iota:I3 36000	every day	-
+iota:I4	1	240	iota:I1 iota:I2 iota:I4	iota:I1 28800 iota:I2 32400 | iota:I2 41400 iota:I4 43200	every day	-
+## iota:I1 maxTransfers 5
+iota:I1	0	0	iota:I1		every day	-
+iota:I2	0	60	iota:I1 iota:I2	iota:I1 28800 iota:I2 32400	every day	-
+iota:I3	1	120	iota:I1 iota:I2 iota:I3	iota:I1 28800 iota:I2 32400 | iota:I2 34200 iota:I3 36000	every day	-
+iota:I4	1	240	iota:I1 iota:I2 iota:I4	iota:I1 28800 iota:I2 32400 | iota:I2 41400 iota:I4 43200	every day	-
+## iota:I2 maxTransfers 0
+iota:I2	0	0	iota:I2		every day	-
+iota:I3	0	30	iota:I2 iota:I3	iota:I2 34200 iota:I3 36000	every day	-
+iota:I4	0	30	iota:I2 iota:I4	iota:I2 41400 iota:I4 43200	every day	-
+## iota:I2 maxTransfers 1
+iota:I2	0	0	iota:I2		every day	-
+iota:I3	0	30	iota:I2 iota:I3	iota:I2 34200 iota:I3 36000	every day	-
+iota:I4	0	30	iota:I2 iota:I4	iota:I2 41400 iota:I4 43200	every day	-
+## iota:I2 maxTransfers 2
+iota:I2	0	0	iota:I2		every day	-
+iota:I3	0	30	iota:I2 iota:I3	iota:I2 34200 iota:I3 36000	every day	-
+iota:I4	0	30	iota:I2 iota:I4	iota:I2 41400 iota:I4 43200	every day	-
+## iota:I2 maxTransfers 3
+iota:I2	0	0	iota:I2		every day	-
+iota:I3	0	30	iota:I2 iota:I3	iota:I2 34200 iota:I3 36000	every day	-
+iota:I4	0	30	iota:I2 iota:I4	iota:I2 41400 iota:I4 43200	every day	-
+## iota:I2 maxTransfers 4
+iota:I2	0	0	iota:I2		every day	-
+iota:I3	0	30	iota:I2 iota:I3	iota:I2 34200 iota:I3 36000	every day	-
+iota:I4	0	30	iota:I2 iota:I4	iota:I2 41400 iota:I4 43200	every day	-
+## iota:I2 maxTransfers 5
+iota:I2	0	0	iota:I2		every day	-
+iota:I3	0	30	iota:I2 iota:I3	iota:I2 34200 iota:I3 36000	every day	-
+iota:I4	0	30	iota:I2 iota:I4	iota:I2 41400 iota:I4 43200	every day	-
+## iota:I3 maxTransfers 0
+iota:I2	0	30	iota:I3 iota:I2	iota:I3 37800 iota:I2 39600	every day	-
+iota:I3	0	0	iota:I3		every day	-
+## iota:I3 maxTransfers 1
+iota:I2	0	30	iota:I3 iota:I2	iota:I3 37800 iota:I2 39600	every day	-
+iota:I3	0	0	iota:I3		every day	-
+iota:I4	1	90	iota:I3 iota:I2 iota:I4	iota:I3 37800 iota:I2 39600 | iota:I2 41400 iota:I4 43200	every day	-
+## iota:I3 maxTransfers 2
+iota:I2	0	30	iota:I3 iota:I2	iota:I3 37800 iota:I2 39600	every day	-
+iota:I3	0	0	iota:I3		every day	-
+iota:I4	1	90	iota:I3 iota:I2 iota:I4	iota:I3 37800 iota:I2 39600 | iota:I2 41400 iota:I4 43200	every day	-
+## iota:I3 maxTransfers 3
+iota:I2	0	30	iota:I3 iota:I2	iota:I3 37800 iota:I2 39600	every day	-
+iota:I3	0	0	iota:I3		every day	-
+iota:I4	1	90	iota:I3 iota:I2 iota:I4	iota:I3 37800 iota:I2 39600 | iota:I2 41400 iota:I4 43200	every day	-
+## iota:I3 maxTransfers 4
+iota:I2	0	30	iota:I3 iota:I2	iota:I3 37800 iota:I2 39600	every day	-
+iota:I3	0	0	iota:I3		every day	-
+iota:I4	1	90	iota:I3 iota:I2 iota:I4	iota:I3 37800 iota:I2 39600 | iota:I2 41400 iota:I4 43200	every day	-
+## iota:I3 maxTransfers 5
+iota:I2	0	30	iota:I3 iota:I2	iota:I3 37800 iota:I2 39600	every day	-
+iota:I3	0	0	iota:I3		every day	-
+iota:I4	1	90	iota:I3 iota:I2 iota:I4	iota:I3 37800 iota:I2 39600 | iota:I2 41400 iota:I4 43200	every day	-
+## iota:I4 maxTransfers 0
+iota:I4	0	0	iota:I4		every day	-
+## iota:I4 maxTransfers 1
+iota:I4	0	0	iota:I4		every day	-
+## iota:I4 maxTransfers 2
+iota:I4	0	0	iota:I4		every day	-
+## iota:I4 maxTransfers 3
+iota:I4	0	0	iota:I4		every day	-
+## iota:I4 maxTransfers 4
+iota:I4	0	0	iota:I4		every day	-
+## iota:I4 maxTransfers 5
+iota:I4	0	0	iota:I4		every day	-
