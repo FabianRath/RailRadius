@@ -27,7 +27,6 @@ class SearchAdmissionTest {
     // The cost of the biggest search (5 transfers, 360-min wait), the least budget a client can have
     private static final int BIG_SEARCH_COST = 87;
     private static final SearchOptions BIG_SEARCH = new SearchOptions(START_ID, 5, 0, 360);
-    private static final SearchAdmission.Client ADMIN = new SearchAdmission.Client(VISITOR.ip(), true);
 
     @TempDir
     static Path tempDir;
@@ -51,13 +50,14 @@ class SearchAdmissionTest {
         }).doesNotThrowAnyException();
     }
 
-    // #16: the charge follows the lookup that serves the result, so a result that is gone is searched and charged
+    // #16: the charge follows the lookup that serves the result, so a result that is gone is searched and charged.
+    // Dropped with clear(): which entry Caffeine evicts by size, and when, is not fixed (#22)
     @Test
     void aSearchWhoseStoredResultWasEvictedIsCharged() {
-        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs, 1);
+        ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
         SearchAdmission admission = admissionWithBudgetForOneBigSearch(cache);
         admission.admit(VISITOR, BIG_SEARCH, SearchAdmission.SearchListener.NONE);
-        admission.admit(ADMIN, key(0), SearchAdmission.SearchListener.NONE);
+        cache.clear();
 
         assertThatThrownBy(() -> admission.admit(VISITOR, BIG_SEARCH, SearchAdmission.SearchListener.NONE))
                 .isInstanceOfSatisfying(SearchRefusal.class, refusal -> assertThat(refusal.refusalReason())
