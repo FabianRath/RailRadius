@@ -1,0 +1,24 @@
+# Offline profile on the gtfs-mini test fixture (#21): made-up stations, for places that can't download the dev
+# feeds, such as a Claude Code cloud session. Zip the fixture first with scripts/mini-data.sh, then run with
+# -Dspring-boot.run.profiles=mini. Each start without data/gtfs-mini-store.bin parses the zips (under a second).
+railradius:
+  gtfs:
+    directory: ./data/gtfs-mini
+    auto-load-from-files: true
+    store-file: data/gtfs-mini-store.bin
+
+  browser-data:
+    directory: data/browser-data-mini
+
+  # The feeds scripts/mini-data.sh zips; none of them can be downloaded
+  feeds:
+    sources: alpha,beta,gamma,delta,epsilon,omega,iota,germany,netherlands,poland,france,switzerland
+    alerts:
+      settings-file: data/feed-alerts-mini.json
+
+  cache:
+    predictive-enabled: false
+
+  # Fixed token for local runs only (scripts/api.sh sends it by default); never use the mini profile when deployed
+  admin:
+    token: ${RAILRADIUS_ADMIN_TOKEN:dev}

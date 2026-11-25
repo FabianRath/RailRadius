@@ -16,10 +16,11 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 - `docs/decisions.md` (why things are the way they are), `docs/HOSTING.md` (server size, memory measurements)
 - `scripts/api.sh`: curl shortcuts (`scripts/api.sh help`); `scripts/bench.sh`: memory and speed baselines (`docs/HOSTING.md`); `scripts/probe.sh`: abuse probe (hostile requests, expected statuses)
 
-## Environment: Windows, not Linux
+## Environment: Windows first, also Linux cloud sessions
 - Dev machine is Windows 10. Claude's Bash tool is Git Bash; the user's own terminal is PowerShell 5.1.
-- Every shell command in docs, skills and scripts must work in Git Bash on Windows. No Linux-only tools or paths (`lsof`, `pkill`, `ps aux`, `nohup`, `xdg-open`, `/tmp`, `/proc`). Use instead:
-  - ports/processes: `netstat -ano | grep :8080`, then `taskkill //PID <pid> //F` (double slashes in Git Bash)
+- Claude Code cloud sessions (claude.ai/code) run in a Linux container instead (#21): its setup script installs JDK 25, its proxy blocks the feed hosts, so `/run-dev` falls back to the offline `mini` profile (gtfs-mini test feeds). `uname -s` says which one you are in.
+- Every shell command in docs, skills and scripts must work in Git Bash on Windows (and so also on Linux). No Linux-only tools or paths (`lsof`, `pkill`, `ps aux`, `nohup`, `xdg-open`, `/tmp`, `/proc`). Use instead:
+  - ports/processes: stop the background task first; if the port stays busy, on Windows `netstat -ano | grep :8080`, then `taskkill //PID <pid> //F` (double slashes in Git Bash); on Linux `fuser -k 8080/tcp`
   - temp files: the session scratchpad
 - Commands the user should type themselves: give PowerShell syntax (`.\mvnw.cmd`, `$env:X = "…"`, `;` instead of `&&`).
 
@@ -30,7 +31,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 - Frontend tests: `node --test "frontend/test/*.test.js"` (Node's built-in runner, no dependency; < 1 s)
 - Browser engine check (after the backend's `test`; TeaVM build plus Node): `mvn -q -f browser-engine/pom.xml verify`. Run it when the search, `BrowserDataFile` or `SearchSnapshot` changes.
 - "Unresolved compilation problem", `ClassFormatError` or a bean that fails to resolve while the source is fine: stale classes, because VS Code's Java compiler also writes into `backend/target/classes`. Run `mvn -q -f backend/pom.xml clean test` before debugging.
-- Run with small dev data: use the `/run-dev` skill. Then use `scripts/api.sh health`, `scripts/api.sh search wien`, etc.
+- Run with small dev data: use the `/run-dev` skill (dev feeds if `backend/data/gtfs-dev/` has them, else the offline `mini` profile from `scripts/mini-data.sh`). Then use `scripts/api.sh health`, `scripts/api.sh search wien`, etc.
 - Full data (3 GB heap, ~3 s to start from the binary cache): only when explicitly asked. See ARCHITECTURE.md.
 
 ## Hard rules
