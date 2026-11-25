@@ -23,6 +23,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -218,11 +219,13 @@ public class RailRadiusController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    /** 503 while no data is loaded, so an uptime check on the status code alone notices (#2). */
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> health() {
-        return ResponseEntity.ok(Map.of(
-                "status", transitGraph.isDataLoaded() ? "UP" : "DOWN",
-                "dataLoaded", transitGraph.isDataLoaded()
+        boolean dataLoaded = transitGraph.isDataLoaded();
+        return ResponseEntity.status(dataLoaded ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "status", dataLoaded ? "UP" : "DOWN",
+                "dataLoaded", dataLoaded
         ));
     }
     

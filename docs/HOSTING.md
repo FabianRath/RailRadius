@@ -102,7 +102,7 @@ In order, before the site goes public. Paths are examples (`/opt/railradius`, De
 
 **After each deploy**
 - [ ] The abuse probe against the public host: `RAILRADIUS_URL=https://<host> scripts/probe.sh --public` (Git Bash or Linux). It covers the path tests from [Admin surface](#admin-surface-s35), invalid and oversized parameters, unknown stations and the security headers including HSTS, prints PASS/FAIL per request and must end with `0 failed`. Without `--public` it checks the app itself on `localhost:8080`; with an admin token configured, that run blocks admin logins from the server's own address for 15 min (the failed-login throttle).
-- [ ] External uptime check (any free monitor, e.g. every 5 min, alert by mail) on `https://<host>/api/health`. It answers 200 even while no data is loaded, so match the body for `"status":"UP"`, not only the status code.
+- [ ] External uptime check (any free monitor, e.g. every 5 min, alert by mail) on `https://<host>/api/health`. It answers 503 while no data is loaded (startup without data, failed load), so the status code alone is enough (#2).
 
 **Each update of the store or jar**
 - [ ] Keep the previous ones for rollback: upload as `*.new`, then `mv data/gtfs-store.bin data/gtfs-store.bin.prev`, `mv railradius.jar railradius.jar.prev` and move the new files in place, then `sudo systemctl restart railradius`. Roll back by moving the `.prev` files back and restarting. Roll back jar and store together: a jar does not read a store of another format version.
