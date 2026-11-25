@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -126,10 +127,30 @@ final class GtfsTestFixtures {
     private static Path zipFeeds(Path tempDir, String... feedFolders) throws IOException {
         Path gtfsDir = Files.createDirectories(tempDir.resolve("gtfs"));
         for (String folder : feedFolders) {
-            String source = folder.split("-")[0];
-            zipFeed(folder, gtfsDir.resolve("gtfs_" + source + ".zip"));
+            zipFeed(folder, gtfsDir.resolve(zipName(folder)));
         }
         return gtfsDir;
+    }
+
+    /** The zip a feed folder loads from: its source is the folder name up to the first '-'. */
+    private static String zipName(String feedFolder) {
+        return "gtfs_" + feedFolder.split("-")[0] + ".zip";
+    }
+
+    /**
+     * Like {@link #load(Path, String...)} for one feed, with every file of the folder changed by edit first: for
+     * tests that compare a feed with a slightly different version of itself.
+     */
+    static TransitGraph loadEdited(Path tempDir, String feedFolder, UnaryOperator<String> edit) throws IOException {
+        Path edited = Files.createDirectories(tempDir.resolve("edited"));
+        try (Stream<Path> files = Files.list(resource("gtfs-mini/" + feedFolder))) {
+            for (Path file : files.toList()) {
+                Files.writeString(edited.resolve(file.getFileName()), edit.apply(Files.readString(file)));
+            }
+        }
+        zipFolder(edited, Files.createDirectories(tempDir.resolve("gtfs")).resolve(zipName(feedFolder)));
+        // No folders: the data service loads the zip already in tempDir/gtfs
+        return load(tempDir);
     }
 
     private static GtfsFeedLoader feedLoader(int tripBatchSize) {

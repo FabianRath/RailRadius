@@ -1,0 +1,67 @@
+# today 2026-01-01
+## netherlands:N1 maxTransfers 0
+netherlands:N1	0	0	netherlands:N1		every day	-
+netherlands:N2	0	30	netherlands:N1 netherlands:N2	netherlands:N1 28800 netherlands:N2 30600	every day	-
+## netherlands:N1 maxTransfers 1
+netherlands:N1	0	0	netherlands:N1		every day	-
+netherlands:N2	0	30	netherlands:N1 netherlands:N2	netherlands:N1 28800 netherlands:N2 30600	every day	-
+## netherlands:N1 maxTransfers 2
+netherlands:N1	0	0	netherlands:N1		every day	-
+netherlands:N2	0	30	netherlands:N1 netherlands:N2	netherlands:N1 28800 netherlands:N2 30600	every day	-
+## netherlands:N1 maxTransfers 3
+netherlands:N1	0	0	netherlands:N1		every day	-
+netherlands:N2	0	30	netherlands:N1 netherlands:N2	netherlands:N1 28800 netherlands:N2 30600	every day	-
+## netherlands:N1 maxTransfers 4
+netherlands:N1	0	0	netherlands:N1		every day	-
+netherlands:N2	0	30	netherlands:N1 netherlands:N2	netherlands:N1 28800 netherlands:N2 30600	every day	-
+## netherlands:N1 maxTransfers 5
+netherlands:N1	0	0	netherlands:N1		every day	-
+netherlands:N2	0	30	netherlands:N1 netherlands:N2	netherlands:N1 28800 netherlands:N2 30600	every day	-
+## netherlands:N2 maxTransfers 0
+netherlands:N2	0	0	netherlands:N2		every day	-
+## netherlands:N2 maxTransfers 1
+netherlands:N2	0	0	netherlands:N2		every day	-
+## netherlands:N2 maxTransfers 2
+netherlands:N2	0	0	netherlands:N2		every day	-
+## netherlands:N2 maxTransfers 3
+netherlands:N2	0	0	netherlands:N2		every day	-
+## netherlands:N2 maxTransfers 4
+netherlands:N2	0	0	netherlands:N2		every day	-
+## netherlands:N2 maxTransfers 5
+netherlands:N2	0	0	netherlands:N2		every day	-
+## poland:P1 maxTransfers 0
+poland:P1	0	0	poland:P1		every day	-
+poland:P2	0	90	poland:P1 poland:P2	poland:P1 28800 poland:P2 34200	every day	-
+## poland:P1 maxTransfers 1
+poland:P1	0	0	poland:P1		every day	-
+poland:P2	0	90	poland:P1 poland:P2	poland:P1 28800 poland:P2 34200	every day	-
+## poland:P1 maxTransfers 2
+poland:P1	0	0	poland:P1		every day	-
+poland:P2	0	90	poland:P1 poland:P2	poland:P1 28800 poland:P2 34200	every day	-
+## poland:P1 maxTransfers 3
+poland:P1	0	0	poland:P1		every day	-
+poland:P2	0	90	poland:P1 poland:P2	poland:P1 28800 poland:P2 34200	every day	-
+## poland:P1 maxTransfers 4
+poland:P1	0	0	poland:P1		every day	-
+poland:P2	0	90	poland:P1 poland:P2	poland:P1 28800 poland:P2 34200	every day	-
+## poland:P1 maxTransfers 5
+poland:P1	0	0	poland:P1		every day	-
+poland:P2	0	90	poland:P1 poland:P2	poland:P1 28800 poland:P2 34200	every day	-
+## poland:P2 maxTransfers 0
+poland:P1	0	90	poland:P2 poland:P1	poland:P2 36000 poland:P1 41400	every day	-
+poland:P2	0	0	poland:P2		every day	-
+## poland:P2 maxTransfers 1
+poland:P1	0	90	poland:P2 poland:P1	poland:P2 36000 poland:P1 41400	every day	-
+poland:P2	0	0	poland:P2		every day	-
+## poland:P2 maxTransfers 2
+poland:P1	0	90	poland:P2 poland:P1	poland:P2 36000 poland:P1 41400	every day	-
+poland:P2	0	0	poland:P2		every day	-
+## poland:P2 maxTransfers 3
+poland:P1	0	90	poland:P2 poland:P1	poland:P2 36000 poland:P1 41400	every day	-
+poland:P2	0	0	poland:P2		every day	-
+## poland:P2 maxTransfers 4
+poland:P1	0	90	poland:P2 poland:P1	poland:P2 36000 poland:P1 41400	every day	-
+poland:P2	0	0	poland:P2		every day	-
+## poland:P2 maxTransfers 5
+poland:P1	0	90	poland:P2 poland:P1	poland:P2 36000 poland:P1 41400	every day	-
+poland:P2	0	0	poland:P2		every day	-

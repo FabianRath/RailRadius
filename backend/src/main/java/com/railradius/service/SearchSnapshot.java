@@ -31,6 +31,11 @@ import java.util.zip.GZIPOutputStream;
  * set in {@code docs/bench-stations.txt} from a binary cache file. The browser engine has no trip IDs, so it writes
  * its rides as store positions ({@link RideFormat#STORE_POSITIONS}), which the build check compares with the JVM's
  * (#10).
+ * <p>
+ * Two modes (GLOSSARY.md, "same result"): strict names the train of each ride, by trip ID or store position, so it
+ * proves a change picked the very same trains. Same result ({@link RideFormat#STATIONS_AND_TIMES}) names each ride
+ * only by where and when it is boarded and left, so a change that moves trips around in the store, or picks another
+ * train with the same stops and times, still compares equal, while any change a user could see does not (#32).
  */
 @Slf4j
 final class SearchSnapshot {
@@ -47,13 +52,27 @@ final class SearchSnapshot {
     private static final String EVERY_DAY = "every day";
     private static final String NO_DAYS = "none";
     private static final String NO_LABEL = "-";
+    private static final String STRICT_MODE = "strict";
+    private static final String SAME_RESULT_MODE = "same-result";
 
     /** How a line names a path's rides. */
     enum RideFormat {
-        /** Trip ID, board stop and departure, alight stop and arrival, and the path's stations: the goldens. */
+        /** Trip ID, board stop and departure, alight stop and arrival, and the path's stations: strict. */
         TRIP_IDS,
         /** Trip, board event and alight event as positions in the store: all a browser's store can say. */
-        STORE_POSITIONS
+        STORE_POSITIONS,
+        /** Board station and departure, alight station and arrival, and the path's stations: same result. */
+        STATIONS_AND_TIMES;
+
+        /** The format main writes in a mode: {@code strict} (trip IDs) or {@code same-result}. */
+        static RideFormat ofMode(String mode) {
+            return switch (mode) {
+                case STRICT_MODE -> TRIP_IDS;
+                case SAME_RESULT_MODE -> STATIONS_AND_TIMES;
+                default -> throw new IllegalArgumentException(
+                        "Mode must be " + STRICT_MODE + " or " + SAME_RESULT_MODE + ": " + mode);
+            };
+        }
     }
 
     private final TransitGraph graph;
@@ -79,7 +98,7 @@ final class SearchSnapshot {
                 result.forEachStation(pathsByStation::put);
                 for (Map.Entry<String, List<CompactResult.PathSummary>> station : pathsByStation.entrySet()) {
                     for (CompactResult.PathSummary path : station.getValue()) {
-                        out.write(line(result, station.getKey(), path) + "\n");
+                        out.write(line(result, startId, station.getKey(), path) + "\n");
                     }
                 }
             }
@@ -91,12 +110,20 @@ final class SearchSnapshot {
         write(graph.getAllStations().keySet().stream().sorted().toList(), out);
     }
 
-    private String line(CompactResult result, String stationId, CompactResult.PathSummary summary) {
+    private String line(CompactResult result, String startId, String stationId, CompactResult.PathSummary summary) {
         if (rideFormat == RideFormat.STORE_POSITIONS) {
             CompactResult.RideList rideList = result.rideList(stationId, summary.transfers());
             return String.join(FIELD_SEPARATOR, stationId, String.valueOf(summary.transfers()),
                     String.valueOf(summary.durationMinutes()), positions(rideList.rides()),
                     days(rideList.runningDays()));
+        }
+        if (rideFormat == RideFormat.STATIONS_AND_TIMES) {
+            TimetableStore store = result.served().store();
+            CompactResult.RideList rideList = result.rideList(stationId, summary.transfers());
+            return String.join(FIELD_SEPARATOR, stationId, String.valueOf(summary.transfers()),
+                    String.valueOf(summary.durationMinutes()),
+                    String.join(" ", CompactResult.stationIds(store, startId, rideList.rides())),
+                    stationsAndTimes(store, rideList.rides()), days(rideList.runningDays()));
         }
         CompactResult.Journey journey = result.journey(stationId, summary.transfers());
         JourneyPath path = journey.path();
@@ -112,6 +139,18 @@ final class SearchSnapshot {
             positions.add(ride.trip() + " " + ride.boardEvent() + " " + ride.alightEvent());
         }
         return positions.toString();
+    }
+
+    /** Each ride as board station and departure, alight station and arrival: what it is, not which train. */
+    private static String stationsAndTimes(TimetableStore store, List<CompactResult.Ride> rides) {
+        StringJoiner stationsAndTimes = new StringJoiner(RIDE_SEPARATOR);
+        for (CompactResult.Ride ride : rides) {
+            stationsAndTimes.add(String.join(" ", store.stations().id(store.station(ride.boardEvent())),
+                    String.valueOf(store.departureSeconds(ride.boardEvent())),
+                    store.stations().id(store.station(ride.alightEvent())),
+                    String.valueOf(store.arrivalSeconds(ride.alightEvent()))));
+        }
+        return stationsAndTimes.toString();
     }
 
     /** The day ranges and their label. */
@@ -172,12 +211,15 @@ final class SearchSnapshot {
     }
 
     /**
-     * Args: binary cache file, bench set, today (yyyy-mm-dd), output file. Paths are relative to backend/.
+     * Args: binary cache file, bench set, today (yyyy-mm-dd), output file, mode ({@code strict} or
+     * {@code same-result}). Paths are relative to backend/.
      */
     public static void main(String[] args) throws IOException {
-        if (args.length != 4) {
-            throw new IllegalArgumentException("Usage: SearchSnapshot <store-file> <bench-set> <today> <out-file>");
+        if (args.length != 5) {
+            throw new IllegalArgumentException(
+                    "Usage: SearchSnapshot <store-file> <bench-set> <today> <out-file> <strict|same-result>");
         }
+        RideFormat rideFormat = RideFormat.ofMode(args[4]);
         long startMs = System.currentTimeMillis();
         TransitGraph graph = TransitGraph.withToday(LocalDate.parse(args[2]));
         graph.serve(new BinaryCacheStore(args[0]).load()
@@ -187,7 +229,7 @@ final class SearchSnapshot {
         List<String> unknown = startIds.stream().filter(id -> graph.getStation(id) == null).toList();
         if (!unknown.isEmpty()) throw new IllegalArgumentException("Not in the cache file: " + unknown);
         try (Writer out = writer(Path.of(args[3]))) {
-            new SearchSnapshot(graph, RideFormat.TRIP_IDS).write(startIds, out);
+            new SearchSnapshot(graph, rideFormat).write(startIds, out);
         }
         log.info("Wrote the snapshot of {} starts to {} in {} s", startIds.size(), args[3],
                 TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - startMs));

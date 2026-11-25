@@ -1,0 +1,5 @@
+stop_id,stop_name,stop_lat,stop_lon,parent_station
+Q1,Theta Start,54.0000,28.0000,
+Q2,Theta Hub,54.1000,28.1000,
+Q3,Theta North,54.2000,28.1000,
+Q4,Theta South,54.0000,28.2000,

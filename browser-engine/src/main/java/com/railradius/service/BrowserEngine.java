@@ -80,12 +80,16 @@ public final class BrowserEngine {
         return BrowserJson.rides(lastResult.rideList(stationId, path.transfers()).rides());
     }
 
-    /** The search snapshot from every station, rides as store positions: what the build check compares (#10). */
+    /**
+     * The search snapshot from every station, rides as store positions (strict) or as stations and times (same
+     * result): what the build check compares (#10, #32).
+     */
     @JSExport
-    public static String snapshot() throws IOException {
+    public static String snapshot(boolean sameResult) throws IOException {
         requireGraph();
         StringWriter out = new StringWriter();
-        new SearchSnapshot(graph, SearchSnapshot.RideFormat.STORE_POSITIONS).writeEveryStation(out);
+        new SearchSnapshot(graph, sameResult ? SearchSnapshot.RideFormat.STATIONS_AND_TIMES
+                : SearchSnapshot.RideFormat.STORE_POSITIONS).writeEveryStation(out);
         return out.toString();
     }
 
