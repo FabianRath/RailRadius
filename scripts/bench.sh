@@ -55,6 +55,11 @@ case "${1:-help}" in
       done
     done
     ;;
+  # browser <set> <file> <today>: the same searches in the browser engine, in Node (frontend/engine, from the browser
+  # engine check's build), on a browser data file such as backend/data/browser-data/*.bin.gz; needs no running app
+  browser)
+    node scripts/bench-browser.mjs frontend/engine "${3:?file}" "${4:?today yyyy-mm-dd}" $(starts "${2:?set}")
+    ;;
   # alloc <stationId> <transfers>: bytes allocated by all threads during one search (JFR, settings=profile)
   alloc)
     pid=$(app_pid); jfr_file="$OUT/alloc.jfr"
