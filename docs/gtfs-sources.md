@@ -38,7 +38,7 @@ Feeds in backticks are in `gtfs-feeds.txt`. Rail routes, dates and operators wer
 | L | Italy | `italy-trenord` | CC BY 4.0 | Trenord (Lombardy, incl. Malpensa Express and the lines to Chiasso and Tirano), official (Regione Lombardia). Saved as `gtfs_italy-trenord.zip`. |
 | L | Kosovo | `kosovo` | **unclear** | Trainkos, volunteer rehost. |
 | L | Latvia | `latvia` | CC0 | Vivi. Its server answers HTTP 403 to Java's default User-Agent, so `gtfs-feeds.txt` sends its own. |
-| L | Lithuania | `lithuania` | **unclear** | LTG Link rail. `data.public-transport.earth/gtfs/lt` has bus, ferry and trolleybus only. |
+| L | Lithuania | `lithuania` | CC BY 4.0 | LTG Link rail, from the national feed of LTSA (Lithuanian Transport Safety Administration, https://www.visimarsrutai.lt/gtfs/; dataset on data.gov.lt). 72 MB, mostly buses, which the rail filter drops; 73 rail routes on 2026-10-25. Replaced jbb's `lt-ltglink`, a scrape of ÖBB's journey planner with no licence (#6). `data.public-transport.earth/gtfs/lt` has bus, ferry and trolleybus only. |
 | L | Luxembourg | `luxembourg` | CC BY 4.0 | CFL. |
 | L | Moldova | `moldova` | **unclear** | CFM, volunteer rehost. |
 | L | Montenegro | `montenegro` | ODbL | ŽPCG. |
@@ -83,7 +83,7 @@ Not needed: Liechtenstein and Monaco (served by ÖBB / SNCF, so covered by the A
   - Spain (OUIGO): Spanish NAP licence (LDA). Commercial use is allowed, but it requires the credit "Powered by MITRAMS" with a link, and shares raw data alike. OUIGO's own licence is unknown.
   - Turkey: the generator is MIT, but the timetable is taken from TCDD's website, and TCDD has published no licence for it.
 - ² Only from Transitous; no licence page found at the publisher.
-- **unclear**: no licence found anywhere. These are the volunteer rehosts (Bosnia, Kosovo, Moldova), the jbb feeds that Transitous lists without a licence (Bulgaria, Greece, Lithuania, Ukraine), Serbia's GitLab feed, Cotral, Slovakia (data.slovensko.sk only renders in a browser; an older Mobility Database entry said CC0) and Northern Ireland (a busmaps.com derivative whose licence page is gone).
+- **unclear**: no licence found anywhere. These are the volunteer rehosts (Bosnia, Kosovo, Moldova), the jbb feeds that Transitous lists without a licence (Bulgaria, Greece, Ukraine), Serbia's GitLab feed, Cotral, Slovakia (data.slovensko.sk only renders in a browser; an older Mobility Database entry said CC0) and Northern Ireland (a busmaps.com derivative whose licence page is gone).
 
 ## Survey: rail feeds not loaded yet (2026-10-05)
 
@@ -121,7 +121,7 @@ Feeds that only duplicate what we load (German Verkehrsverbund feeds, regional T
 
 ## Also worth knowing
 
-- `s3.transitpdf.com` stopped resolving on 2026-10-05, `blues3.transitpdf.com` by 2026-10-06; transitpdf.com no longer offers the files. https://jbb.ghsq.de/gtfs/ (host of the Lithuania feed) has rail feeds for Bulgaria, Greece, Romania, Serbia, Montenegro and Slovenia, which are the fallbacks in `gtfs-feeds.txt`.
+- `s3.transitpdf.com` stopped resolving on 2026-10-05, `blues3.transitpdf.com` by 2026-10-06; transitpdf.com no longer offers the files. https://jbb.ghsq.de/gtfs/ (host of several of our feeds) has rail feeds for Bulgaria, Greece, Romania, Serbia, Montenegro and Slovenia, which are the fallbacks in `gtfs-feeds.txt`.
 - **German long-distance with train categories (checked 2026-10-05):** gtfs.de `de_fv` free feed, https://download.gtfs.de/germany/fv_free/latest.zip (424 KB, CC BY 4.0, data from DELFI e.V., updated weekly). Routes carry category + line (`ICE 33`, `IC 33`, `EC 85`, `ECE`, `EN`, `RJ`), but `trips.txt` has only `route_id, service_id, trip_id`: no train numbers or headsigns. Valid for only 30 days (2026-10-03 to 2026-11-02 in the checked download). Regional (`de_rv`) and full (`de_full`) feeds exist in the same form. Paid plans (from €39/month) add headsigns, transfers.txt and full timetable validity; their page doesn't say whether train numbers are included. So no free German feed has both category and train number.
 - Transitous post-processes DELFI with `scripts/de-DELFI.lua` (https://github.com/public-transport/transitous/blob/main/scripts/de-DELFI.lua): route type 101 → `ICE <number>`, 102 → `IC <number>` (`ECE` for a fixed list of route short names), leading zeros stripped.
 - The Transitous feed catalogue (https://github.com/public-transport/transitous/tree/main/feeds, one JSON per country) is the best place to look for new or changed URLs.
