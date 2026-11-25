@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -95,14 +96,8 @@ class CompactReachabilitySearchTest {
     @Test
     void aTripToStationsBeyondSixteenBitsReachesThemThere() {
         List<String> ids = IntStream.range(0, WIDE_STATION_COUNT).mapToObj(index -> "x:S" + index).toList();
-        DayPatterns.Builder dayPatterns = new DayPatterns.Builder();
-        int everyDay = dayPatterns.intern(ServiceDays.EVERY_DAY);
-        TimetableStore store = TimetableStore.of(TimetableStoreBuilder.withoutTripNames(StationTable.of(ids),
-                new int[] {0, 3}, new int[] {65535, 65536, 65537}, new int[] {3600, 4260, NO_LEG},
-                new int[] {NO_LEG, 4200, 4800}, dayPatterns.build(), new int[] {everyDay}));
-        TransitGraph graph = TransitGraph.withToday(GtfsTestFixtures.TODAY);
-        graph.serve(new BrowserDataFile.BrowserData(
-                ids.stream().map(id -> Station.builder().id(id).build()).toList(), store, ""));
+        TransitGraph graph = graphOf(ids, new int[] {0, 3}, new int[] {65535, 65536, 65537},
+                new int[] {3600, 4260, NO_LEG}, new int[] {NO_LEG, 4200, 4800});
 
         CompactResult result = GtfsTestFixtures.search(graph).search("x:S65535", 0, 0, 180,
                 CompactReachabilitySearch.NO_DEADLINE, round -> { });
@@ -111,5 +106,37 @@ class CompactReachabilitySearchTest {
         assertThat(result.paths("x:S65537")).containsExactly(new CompactResult.PathSummary(0, 20));
         assertThat(result.paths("x:S0")).isEmpty();
         assertThat(result.paths("x:S1")).isEmpty();
+    }
+
+    // Times are held as offsets from the trip's earliest one, which reach ~18 h (#38). The first trip runs 01:00 to
+    // 20:13:20, then on to 25:00; the second leaves at 23:50 and arrives at 00:10, 23 h 40 min before its departure
+    @Test
+    void tripsLongerThanATimeOffsetHoldsKeepTheirExactTimes() {
+        List<String> ids = List.of("x:S0", "x:S1", "x:S2", "x:S3");
+        TransitGraph graph = graphOf(ids, new int[] {0, 3, 5}, new int[] {0, 1, 2, 0, 3},
+                new int[] {3600, 72900, NO_LEG, 85800, NO_LEG}, new int[] {NO_LEG, 72800, 90000, NO_LEG, 600});
+
+        CompactResult result = GtfsTestFixtures.search(graph).search("x:S0", 0, 0, 180,
+                CompactReachabilitySearch.NO_DEADLINE, round -> { });
+
+        // 69200 s is 1153 min 20 s; then 100 s of dwell and 17100 s of run make 1 and 285 min
+        assertThat(result.paths("x:S1")).containsExactly(new CompactResult.PathSummary(0, 1153));
+        assertThat(result.paths("x:S2")).containsExactly(new CompactResult.PathSummary(0, 1439));
+        assertThat(result.paths("x:S3")).containsExactly(new CompactResult.PathSummary(0, 20));
+    }
+
+    /** A graph of one store, every trip running every day; events as in {@link TimetableStoreBuilder.Parts}. */
+    private static TransitGraph graphOf(List<String> ids, int[] tripFirstEvent, int[] evStation, int[] evDepSec,
+                                        int[] evArrSec) {
+        DayPatterns.Builder dayPatterns = new DayPatterns.Builder();
+        int everyDay = dayPatterns.intern(ServiceDays.EVERY_DAY);
+        int[] tripDayPattern = new int[tripFirstEvent.length - 1];
+        Arrays.fill(tripDayPattern, everyDay);
+        TimetableStore store = TimetableStore.of(TimetableStoreBuilder.withoutTripNames(StationTable.of(ids),
+                tripFirstEvent, evStation, evDepSec, evArrSec, dayPatterns.build(), tripDayPattern));
+        TransitGraph graph = TransitGraph.withToday(GtfsTestFixtures.TODAY);
+        graph.serve(new BrowserDataFile.BrowserData(
+                ids.stream().map(id -> Station.builder().id(id).build()).toList(), store, ""));
+        return graph;
     }
 }

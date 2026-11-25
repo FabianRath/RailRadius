@@ -13,9 +13,9 @@ import java.util.Optional;
  * stop or departure, and without strings except in packed tables.
  * <p>
  * A trip's stops are events {@code tripFirstEvent[trip]} up to {@code tripFirstEvent[trip + 1]}, numbered across all
- * trips. Event e leaves its station at {@code evDepSec[e]} towards event e + 1, or has no leg there
- * ({@link #NO_LEG}, also on a trip's last stop); it arrives at {@code evArrSec[e]}, {@link #NO_LEG} on the first stop
- * and after a missing leg. A station's departures are positions {@code depStart[station]} up to
+ * trips. Event e leaves its station at {@link #departureSeconds} towards event e + 1, or has no leg there
+ * ({@link #NO_LEG}, also on a trip's last stop); it arrives at {@link #arrivalSeconds}, {@link #NO_LEG} on the first
+ * stop and after a missing leg ({@link EventTimes}). A station's departures are positions {@code depStart[station]} up to
  * {@code depStart[station + 1]} of {@code depSec}/{@code depEvent}, by departure time, equal times in event order
  * (trip order, then stop order).
  */
@@ -33,8 +33,7 @@ final class TimetableStore {
     // Derived from tripFirstEvent: the search looks up the trip of every departure it scans
     private final int[] evTrip;
     private final EventStations evStation;
-    private final int[] evDepSec;
-    private final int[] evArrSec;
+    private final EventTimes evTimes;
     private final DayPatterns dayPatterns;
     private final int[] tripDayPattern;
     private final PackedStrings routeNames;
@@ -54,8 +53,7 @@ final class TimetableStore {
         this.tripFirstEvent = parts.tripFirstEvent();
         this.evTrip = evTrip;
         this.evStation = EventStations.of(parts.evStation(), stations.size());
-        this.evDepSec = parts.evDepSec();
-        this.evArrSec = parts.evArrSec();
+        this.evTimes = EventTimes.of(tripFirstEvent, evTrip, parts.evDepSec(), parts.evArrSec());
         this.dayPatterns = parts.dayPatterns();
         this.tripDayPattern = parts.tripDayPattern();
         this.routeNames = parts.routeNames();
@@ -72,8 +70,9 @@ final class TimetableStore {
     static TimetableStore build(RailNetwork network) {
         long startMs = System.currentTimeMillis();
         TimetableStore store = of(TimetableStoreBuilder.parts(MergedTrips.of(network)));
-        log.info("Timetable store built in {} ms: {} trips, {} stop events, {} stations ({}-bit), {} day patterns, {}",
-                System.currentTimeMillis() - startMs, store.tripCount(), store.eventCount(), store.stations.size(),
+        log.info("Timetable store built in {} ms: {} trips, {} stop events ({} with whole times), {} stations ({}-bit), "
+                        + "{} day patterns, {}", System.currentTimeMillis() - startMs, store.tripCount(),
+                store.eventCount(), store.evTimes.wholeCount(), store.stations.size(),
                 store.evStation.isNarrow() ? Character.SIZE : Integer.SIZE, store.dayPatterns.size(),
                 String.format("%.1f MB", store.sizeBytes() / 1e6));
         return store;
@@ -103,8 +102,8 @@ final class TimetableStore {
         stations.writeTo(out);
         out.ints(tripFirstEvent);
         out.ints(evStation.toInts());
-        out.ints(evDepSec);
-        out.ints(evArrSec);
+        out.ints(evTimes.departuresToInts());
+        out.ints(evTimes.arrivalsToInts());
         dayPatterns.writeTo(out);
         out.ints(tripDayPattern);
         routeNames.writeTo(out);
@@ -150,21 +149,21 @@ final class TimetableStore {
     }
 
     int departureSeconds(int event) {
-        return evDepSec[event];
+        return evTimes.departureSeconds(event);
     }
 
     int arrivalSeconds(int event) {
-        return evArrSec[event];
+        return evTimes.arrivalSeconds(event);
     }
 
     /** Whether the trip runs on from this event to the next. */
     boolean hasLeg(int event) {
-        return evDepSec[event] != NO_LEG;
+        return departureSeconds(event) != NO_LEG;
     }
 
     /** Minutes from leaving this event to arriving at the trip's next one, at least 0. Needs {@link #hasLeg}. */
     int legMinutes(int event) {
-        return Math.max(0, GtfsTime.diffMinutes(evDepSec[event], evArrSec[event + 1]));
+        return Math.max(0, GtfsTime.diffMinutes(departureSeconds(event), arrivalSeconds(event + 1)));
     }
 
     /**
@@ -173,7 +172,7 @@ final class TimetableStore {
      */
     int rideLegMinutes(int boardEvent, int legEvent) {
         int dwellMinutes = legEvent > boardEvent
-                ? Math.max(0, GtfsTime.diffMinutes(evArrSec[legEvent], evDepSec[legEvent])) : 0;
+                ? Math.max(0, GtfsTime.diffMinutes(arrivalSeconds(legEvent), departureSeconds(legEvent))) : 0;
         return dwellMinutes + legMinutes(legEvent);
     }
 
@@ -208,8 +207,8 @@ final class TimetableStore {
                 .routeName(routeName(trip).orElse(null))
                 .fromStopId(stations.id(evStation.get(event)))
                 .toStopId(stations.id(evStation.get(event + 1)))
-                .departureTimeSeconds(evDepSec[event])
-                .arrivalTimeSeconds(evArrSec[event + 1])
+                .departureTimeSeconds(departureSeconds(event))
+                .arrivalTimeSeconds(arrivalSeconds(event + 1))
                 .build();
     }
 
@@ -266,12 +265,12 @@ final class TimetableStore {
      */
     ServiceDays rideDays(int boardEvent, int alightEvent) {
         int boardStation = evStation.get(boardEvent);
-        int departure = evDepSec[boardEvent];
+        int departure = departureSeconds(boardEvent);
         ServiceDays days = dayPatterns.days(tripDayPattern[tripOf(boardEvent)]);
         for (int position = firstDepartureAt(boardStation, departure);
              position < depStart[boardStation + 1] && depSec[position] == departure; position++) {
             int twin = depEvent[position];
-            if (arrivesLike(twin, evStation.get(alightEvent), evArrSec[alightEvent])) {
+            if (arrivesLike(twin, evStation.get(alightEvent), arrivalSeconds(alightEvent))) {
                 days = days.union(dayPatterns.days(tripDayPattern[tripOf(twin)]));
             }
         }
@@ -280,10 +279,9 @@ final class TimetableStore {
 
     /** Estimated bytes of the store's arrays and strings. */
     long sizeBytes() {
-        long intArrays = (long) tripFirstEvent.length + evTrip.length + evDepSec.length + evArrSec.length
-                + tripDayPattern.length + tripRouteName.length + depStart.length + depSec.length + depEvent.length
+        long intArrays = (long) tripFirstEvent.length + evTrip.length + tripDayPattern.length + tripRouteName.length + depStart.length + depSec.length + depEvent.length
                 + nextStationCount.length + stoppingTripCount.length;
-        return intArrays * Integer.BYTES + evStation.sizeBytes() + (long) regularDeparture.length * Long.BYTES
+        return intArrays * Integer.BYTES + evStation.sizeBytes() + evTimes.sizeBytes() + (long) regularDeparture.length * Long.BYTES
                 + stations.sizeBytes()
                 + dayPatterns.sizeBytes() + routeNames.sizeBytes() + tripIds.sizeBytes();
     }
@@ -331,7 +329,7 @@ final class TimetableStore {
     private boolean arrivesLike(int departureEvent, int station, int arrivalSeconds) {
         int end = endEvent(tripOf(departureEvent));
         for (int event = departureEvent + 1; event < end && hasLeg(event - 1); event++) {
-            if (evStation.get(event) == station) return evArrSec[event] == arrivalSeconds;
+            if (evStation.get(event) == station) return arrivalSeconds(event) == arrivalSeconds;
         }
         return false;
     }
