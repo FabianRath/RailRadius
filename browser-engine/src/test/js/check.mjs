@@ -1,7 +1,8 @@
 // The build check (#10): the browser engine must find exactly what the server finds. For every gtfs-mini feed
-// combination, the backend's BrowserDataFileTest leaves the browser file (<combination>.bin) and the server's search
-// snapshot (<combination>.txt, rides as store positions) in one directory. This searches each file in the compiled
-// engine and compares line by line. Then it runs each snapshot's searches as the page does (search, rides, #12) and
+// combination, the backend's BrowserDataFileTest leaves the browser file (<combination>.bin), the server's search
+// snapshot (<combination>.txt, strict: rides as store positions) and the same-result recording
+// (<combination>.same-result.txt, #32) in one directory. This searches each file in the compiled engine and compares
+// line by line in both modes. Then it runs each snapshot's searches as the page does (search, rides, #12) and
 // checks they show what the server's stream shows: each station once, with its first path within the max journey time.
 // Usage: node check.mjs <engine dir> <check dir>
 import { readFileSync, readdirSync } from "node:fs";
@@ -29,9 +30,10 @@ if (combinations.length === 0) {
 let failures = 0;
 for (const combination of combinations) {
   const want = readFileSync(join(checkDir, `${combination}.txt`), "utf8").split("\n");
+  const wantSameResult = readFileSync(join(checkDir, `${combination}.same-result.txt`), "utf8").split("\n");
   // The snapshot pins today, which decides the running days
   engine.load(new Int8Array(readFileSync(join(checkDir, `${combination}.bin`))), want[0].slice(TODAY_PREFIX.length));
-  const diff = snapshotDiff(want) ?? sections(want)
+  const diff = snapshotDiff(want, false) ?? snapshotDiff(wantSameResult, true) ?? sections(want)
       .flatMap(section => MAX_JOURNEY_MINUTES.map(limit => searchDiff(section, limit)))
       .find(found => found);
   if (diff) {
@@ -45,13 +47,14 @@ console.log(failures === 0 ? "The browser engine finds what the server finds"
     : `${failures} of ${combinations.length} combinations differ`);
 process.exit(failures === 0 ? 0 : 1);
 
-/** The first line where the engine's snapshot differs from the server's; undefined if none. */
-function snapshotDiff(want) {
-  const got = engine.snapshot().split("\n");
+/** The first line where the engine's snapshot in a mode differs from the wanted one; undefined if none. */
+function snapshotDiff(want, sameResult) {
+  const got = engine.snapshot(sameResult).split("\n");
   const firstDiff = want.findIndex((line, i) => line !== got[i]);
   if (firstDiff < 0 && got.length === want.length) return undefined;
   const at = firstDiff < 0 ? Math.min(want.length, got.length) : firstDiff;
-  return `line ${at + 1} of ${want.length}\n  server  ${want[at]}\n  browser ${got[at]}`;
+  const mode = sameResult ? "same result" : "strict";
+  return `${mode}, line ${at + 1} of ${want.length}\n  server  ${want[at]}\n  browser ${got[at]}`;
 }
 
 /** Each search of a snapshot: start, max transfers and per station its paths, fewest transfers first. */

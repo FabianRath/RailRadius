@@ -185,20 +185,29 @@ final class CompactResult {
 
     /** The journey of the rides from startId, which the first ride boards at; one transfer between two rides. */
     static Journey journey(TimetableStore store, String startId, RideList rideList, int durationMinutes) {
-        List<String> stationIds = new ArrayList<>(List.of(startId));
         List<Connection> connections = new ArrayList<>();
         for (Ride ride : rideList.rides()) {
             for (int event = ride.boardEvent(); event < ride.alightEvent(); event++) {
                 connections.add(store.legConnection(event));
-                stationIds.add(store.stations().id(store.station(event + 1)));
             }
         }
         JourneyPath path = JourneyPath.builder()
-                .stationIds(stationIds)
+                .stationIds(stationIds(store, startId, rideList.rides()))
                 .connections(connections)
                 .transfers(Math.max(0, rideList.rides().size() - 1))
                 .totalDurationMinutes(durationMinutes)
                 .build();
         return new Journey(path, rideList.runningDays());
+    }
+
+    /** The stations the rides pass from startId on, each stop once: the journey's path. */
+    static List<String> stationIds(TimetableStore store, String startId, List<Ride> rides) {
+        List<String> stationIds = new ArrayList<>(List.of(startId));
+        for (Ride ride : rides) {
+            for (int event = ride.boardEvent(); event < ride.alightEvent(); event++) {
+                stationIds.add(store.stations().id(store.station(event + 1)));
+            }
+        }
+        return stationIds;
     }
 }

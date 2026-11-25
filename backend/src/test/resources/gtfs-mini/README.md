@@ -34,7 +34,7 @@ Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the 
   - GT2 line 33, type 102, "002214": GK 09:00 → GW 13:00 (→ "IC 2214")
   - GT3 line 85, type 102, "000009": GK 10:00 → GH 14:00 (→ "ECE 9")
   - GT4 RE7, DB Regio, type 106, "04711": GK 11:00 → GH 15:00 (no rule, → "4711")
-- **zeta** (loaded alone, by the service day tests; with eta the only feeds with `calendar.txt`/`calendar_dates.txt`, so every other feed's trips run every day): Z1 Zeta Start, Z2 Zeta Hub, Z3 Zeta Weekend, Z4 Zeta Weekday, Z5 Zeta Night, Z6 Zeta Holiday, Z7 Zeta Junction, Z8 Zeta End, Z9 Zeta Twin. No trip has a train number, so every service runs on at least 8 days to survive the rare-train filter (B32). Services 2026-01-05 – 2026-03-29: WD Mon–Fri minus 8 weekdays (removed in calendar_dates), WE Sat–Sun, FR Fridays, SA Saturdays, ALL every day, HOL only those 8 weekdays (calendar_dates only)
+- **zeta** (loaded alone, by the service day tests; with eta and theta the only feeds with `calendar.txt`/`calendar_dates.txt`, so every other feed's trips run every day): Z1 Zeta Start, Z2 Zeta Hub, Z3 Zeta Weekend, Z4 Zeta Weekday, Z5 Zeta Night, Z6 Zeta Holiday, Z7 Zeta Junction, Z8 Zeta End, Z9 Zeta Twin. No trip has a train number, so every service runs on at least 8 days to survive the rare-train filter (B32). Services 2026-01-05 – 2026-03-29: WD Mon–Fri minus 8 weekdays (removed in calendar_dates), WE Sat–Sun, FR Fridays, SA Saturdays, ALL every day, HOL only those 8 weekdays (calendar_dates only)
   - ZT1 WD: Z1 08:00 → Z2 09:00; ZT7 WE: Z1 08:30 → Z2 09:10 (the better arrival for every departure after it)
   - ZT2 WE: Z2 09:30 → Z3 10:00; ZT3 WD: Z2 09:30 → Z4 10:00 (only from ZT1); ZT6 HOL: Z2 09:40 → Z6 10:10 (shares no day with ZT1 or ZT7)
   - ZT4 FR: Z1 22:00 → Z2 23:30; ZT5 SA: Z2 00:30 → Z5 01:00 (connects across midnight)
@@ -62,3 +62,5 @@ Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the 
 - **iota** (loaded alone, by the round-trip test of F24): I1 Iota Start, I2 Iota Hub, I3 Iota Loop, I4 Iota End
   - IT1: I1 08:00 → I2 09:00; IT4: I2 11:30 → I4 12:00 (a 150 min wait at I2)
   - IT2: I2 09:30 → I3 10:00; IT3: I3 10:30 → I2 11:00. With waits of at most 60 min, I4 is reached only by riding I2 → I3 → I2
+- **theta** (loaded alone, by the same-result tests of #32; `calendar.txt`: ALL every day 2026-01-05 – 2026-03-29): Q1 Theta Start, Q2 Theta Hub, Q3 Theta North, Q4 Theta South
+  - QT1 RE3: Q1 08:00 → Q2 08:30 → Q3 09:00; QT2 RE3: Q1 08:00 → Q2 08:30 → Q4 09:10. Two trains, equally good from Q1 to Q2, so not merged into one trip; the search rides the one first in trip ID order there

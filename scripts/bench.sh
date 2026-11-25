@@ -6,6 +6,7 @@
 # <log> must be relative (to backend/): -Xlog splits at the colon of "C:". jcmd/jfr come from $JAVA_HOME/bin, else PATH;
 # alloc and held write their files to $BENCH_OUT (default: the current directory). Searches send RAILRADIUS_ADMIN_TOKEN
 # (default "dev"): without the dev profile, start the app with the same env var, or the rate limit turns them away.
+# BENCH_APP: a pattern that picks the backend among several running JVMs (default: the first RailRadius one).
 # Usage: scripts/bench.sh <command> [args]
 set -euo pipefail
 BASE="${RAILRADIUS_URL:-http://localhost:8080}"
@@ -13,7 +14,10 @@ JDK_BIN="${JAVA_HOME:+$JAVA_HOME/bin/}"
 OUT="${BENCH_OUT:-.}"
 
 # PID of the running backend (not Maven's own JVM)
-app_pid() { "${JDK_BIN}jcmd" -l | grep -E 'com\.railradius\.RailRadiusBackendApplication|railradius-backend-[^ ]*\.jar' | awk '{print $1}' | head -n 1; }
+app_pid() {
+  "${JDK_BIN}jcmd" -l | grep -E 'com\.railradius\.RailRadiusBackendApplication|railradius-backend-[^ ]*\.jar' \
+    | grep -E -e "${BENCH_APP:-.}" | awk '{print $1}' | head -n 1
+}
 
 # Live heap in MB after a full GC
 live_heap_mb() {
@@ -36,8 +40,23 @@ stream() {
 # Starts of one set in docs/bench-stations.txt
 starts() { awk -v set="$1" '$1 == set {print $2}' docs/bench-stations.txt; }
 
+# Per start of a set and transfer count 0..5 a fresh search, then the same again from the result cache
+search_times() {
+  echo "start transfers stations searchMs replayMs"
+  for start in $(starts "$1"); do
+    for transfers in 0 1 2 3 4 5; do
+      read -r stations searchMs <<< "$(stream "$start" "$transfers")"
+      read -r _ replayMs <<< "$(stream "$start" "$transfers")"
+      echo "$start $transfers $stations $searchMs $replayMs"
+    done
+  done
+}
+
+# browser_times <engine dir> <browser file> <today> <set>: the searches of search_times in the browser engine, in Node
+browser_times() { node scripts/bench-browser.mjs "$1" "$2" "$3" $(starts "$4"); }
+
 case "${1:-help}" in
-  # Live heap after a full GC, and the process's peak working set so far
+  # memory: live heap after a full GC, and the process's peak working set so far
   memory)
     pid=$(app_pid)
     echo "live heap after GC: $(live_heap_mb) MB"
@@ -45,16 +64,10 @@ case "${1:-help}" in
     ;;
   # times <set>: per start and transfer count 0..5 a fresh search, then the same again from the result cache.
   # The search's time includes sending its stations; the cached replay is the output alone.
-  times)
-    echo "start transfers stations searchMs replayMs"
-    for start in $(starts "${2:?set}"); do
-      for transfers in 0 1 2 3 4 5; do
-        read -r stations searchMs <<< "$(stream "$start" "$transfers")"
-        read -r _ replayMs <<< "$(stream "$start" "$transfers")"
-        echo "$start $transfers $stations $searchMs $replayMs"
-      done
-    done
-    ;;
+  times) search_times "${2:?set}" ;;
+  # browser <set> <file> <today>: the same searches in the browser engine, in Node (frontend/engine, from the browser
+  # engine check's build), on a browser data file such as backend/data/browser-data/*.bin.gz; needs no running app
+  browser) browser_times frontend/engine "${3:?file}" "${4:?today yyyy-mm-dd}" "${2:?set}" ;;
   # alloc <stationId> <transfers>: bytes allocated by all threads during one search (JFR, settings=profile)
   alloc)
     pid=$(app_pid); jfr_file="$OUT/alloc.jfr"
@@ -87,5 +100,12 @@ case "${1:-help}" in
     after=$(live_heap_mb)
     echo "per stored result: $(( (after - before) / $# )) MB ($before -> $after MB for $# results)"
     ;;
-  *) sed -n '2,8p' "$0"; grep -oE '^  [a-z-]+\)' "$0" | tr -d ') ' | paste -sd' ' ;;
+  # perf-check <dev|full|mini> [set] [perf-ref]: builds and measures each commit of perf (default origin/perf) and
+  # checks its results against main's; set defaults to the data set's name (docs/HOSTING.md -> Full-data check of perf)
+  perf-check) shift; source scripts/perf-check.sh "$@" ;;
+  # The header, then each command's comment
+  *)
+    sed -n '2,9p' "$0"
+    awk '/^  # / {block = block $0 "\n"; next} /^  [a-z-]+\)/ {printf "%s", block} {block = ""}' "$0"
+    ;;
 esac

@@ -1,0 +1,161 @@
+# today 2026-01-01
+## kappa:K1 maxTransfers 0
+kappa:K1	0	0	kappa:K1		every day	-
+kappa:K2	0	30	kappa:K1 kappa:K2	kappa:K1 28800 kappa:K2 30600	every day	-
+lambda:L1	0	60	kappa:K1 kappa:K2 lambda:L1	kappa:K1 28800 lambda:L1 32400	every day	-
+## kappa:K1 maxTransfers 1
+kappa:K1	0	0	kappa:K1		every day	-
+kappa:K2	0	30	kappa:K1 kappa:K2	kappa:K1 28800 kappa:K2 30600	every day	-
+lambda:L1	0	60	kappa:K1 kappa:K2 lambda:L1	kappa:K1 28800 lambda:L1 32400	every day	-
+lambda:L2	1	120	kappa:K1 kappa:K2 lambda:L1 lambda:L2	kappa:K1 28800 lambda:L1 32400 | lambda:L1 34200 lambda:L2 36000	every day	-
+## kappa:K1 maxTransfers 2
+kappa:K1	0	0	kappa:K1		every day	-
+kappa:K2	0	30	kappa:K1 kappa:K2	kappa:K1 28800 kappa:K2 30600	every day	-
+lambda:L1	0	60	kappa:K1 kappa:K2 lambda:L1	kappa:K1 28800 lambda:L1 32400	every day	-
+lambda:L2	1	120	kappa:K1 kappa:K2 lambda:L1 lambda:L2	kappa:K1 28800 lambda:L1 32400 | lambda:L1 34200 lambda:L2 36000	every day	-
+## kappa:K1 maxTransfers 3
+kappa:K1	0	0	kappa:K1		every day	-
+kappa:K2	0	30	kappa:K1 kappa:K2	kappa:K1 28800 kappa:K2 30600	every day	-
+lambda:L1	0	60	kappa:K1 kappa:K2 lambda:L1	kappa:K1 28800 lambda:L1 32400	every day	-
+lambda:L2	1	120	kappa:K1 kappa:K2 lambda:L1 lambda:L2	kappa:K1 28800 lambda:L1 32400 | lambda:L1 34200 lambda:L2 36000	every day	-
+## kappa:K1 maxTransfers 4
+kappa:K1	0	0	kappa:K1		every day	-
+kappa:K2	0	30	kappa:K1 kappa:K2	kappa:K1 28800 kappa:K2 30600	every day	-
+lambda:L1	0	60	kappa:K1 kappa:K2 lambda:L1	kappa:K1 28800 lambda:L1 32400	every day	-
+lambda:L2	1	120	kappa:K1 kappa:K2 lambda:L1 lambda:L2	kappa:K1 28800 lambda:L1 32400 | lambda:L1 34200 lambda:L2 36000	every day	-
+## kappa:K1 maxTransfers 5
+kappa:K1	0	0	kappa:K1		every day	-
+kappa:K2	0	30	kappa:K1 kappa:K2	kappa:K1 28800 kappa:K2 30600	every day	-
+lambda:L1	0	60	kappa:K1 kappa:K2 lambda:L1	kappa:K1 28800 lambda:L1 32400	every day	-
+lambda:L2	1	120	kappa:K1 kappa:K2 lambda:L1 lambda:L2	kappa:K1 28800 lambda:L1 32400 | lambda:L1 34200 lambda:L2 36000	every day	-
+## kappa:K2 maxTransfers 0
+kappa:K2	0	0	kappa:K2		every day	-
+lambda:L1	0	30	kappa:K2 lambda:L1	kappa:K2 30600 lambda:L1 32400	every day	-
+## kappa:K2 maxTransfers 1
+kappa:K2	0	0	kappa:K2		every day	-
+lambda:L1	0	30	kappa:K2 lambda:L1	kappa:K2 30600 lambda:L1 32400	every day	-
+lambda:L2	1	90	kappa:K2 lambda:L1 lambda:L2	kappa:K2 30600 lambda:L1 32400 | lambda:L1 34200 lambda:L2 36000	every day	-
+## kappa:K2 maxTransfers 2
+kappa:K2	0	0	kappa:K2		every day	-
+lambda:L1	0	30	kappa:K2 lambda:L1	kappa:K2 30600 lambda:L1 32400	every day	-
+lambda:L2	1	90	kappa:K2 lambda:L1 lambda:L2	kappa:K2 30600 lambda:L1 32400 | lambda:L1 34200 lambda:L2 36000	every day	-
+## kappa:K2 maxTransfers 3
+kappa:K2	0	0	kappa:K2		every day	-
+lambda:L1	0	30	kappa:K2 lambda:L1	kappa:K2 30600 lambda:L1 32400	every day	-
+lambda:L2	1	90	kappa:K2 lambda:L1 lambda:L2	kappa:K2 30600 lambda:L1 32400 | lambda:L1 34200 lambda:L2 36000	every day	-
+## kappa:K2 maxTransfers 4
+kappa:K2	0	0	kappa:K2		every day	-
+lambda:L1	0	30	kappa:K2 lambda:L1	kappa:K2 30600 lambda:L1 32400	every day	-
+lambda:L2	1	90	kappa:K2 lambda:L1 lambda:L2	kappa:K2 30600 lambda:L1 32400 | lambda:L1 34200 lambda:L2 36000	every day	-
+## kappa:K2 maxTransfers 5
+kappa:K2	0	0	kappa:K2		every day	-
+lambda:L1	0	30	kappa:K2 lambda:L1	kappa:K2 30600 lambda:L1 32400	every day	-
+lambda:L2	1	90	kappa:K2 lambda:L1 lambda:L2	kappa:K2 30600 lambda:L1 32400 | lambda:L1 34200 lambda:L2 36000	every day	-
+## kappa:K4 maxTransfers 0
+kappa:K4	0	0	kappa:K4		every day	-
+## kappa:K4 maxTransfers 1
+kappa:K4	0	0	kappa:K4		every day	-
+## kappa:K4 maxTransfers 2
+kappa:K4	0	0	kappa:K4		every day	-
+## kappa:K4 maxTransfers 3
+kappa:K4	0	0	kappa:K4		every day	-
+## kappa:K4 maxTransfers 4
+kappa:K4	0	0	kappa:K4		every day	-
+## kappa:K4 maxTransfers 5
+kappa:K4	0	0	kappa:K4		every day	-
+## kappa:K5 maxTransfers 0
+kappa:K4	0	60	kappa:K5 kappa:K4	kappa:K5 36000 kappa:K4 39600	every day	-
+kappa:K5	0	0	kappa:K5		every day	-
+## kappa:K5 maxTransfers 1
+kappa:K4	0	60	kappa:K5 kappa:K4	kappa:K5 36000 kappa:K4 39600	every day	-
+kappa:K5	0	0	kappa:K5		every day	-
+## kappa:K5 maxTransfers 2
+kappa:K4	0	60	kappa:K5 kappa:K4	kappa:K5 36000 kappa:K4 39600	every day	-
+kappa:K5	0	0	kappa:K5		every day	-
+## kappa:K5 maxTransfers 3
+kappa:K4	0	60	kappa:K5 kappa:K4	kappa:K5 36000 kappa:K4 39600	every day	-
+kappa:K5	0	0	kappa:K5		every day	-
+## kappa:K5 maxTransfers 4
+kappa:K4	0	60	kappa:K5 kappa:K4	kappa:K5 36000 kappa:K4 39600	every day	-
+kappa:K5	0	0	kappa:K5		every day	-
+## kappa:K5 maxTransfers 5
+kappa:K4	0	60	kappa:K5 kappa:K4	kappa:K5 36000 kappa:K4 39600	every day	-
+kappa:K5	0	0	kappa:K5		every day	-
+## kappa:K7 maxTransfers 0
+kappa:K7	0	0	kappa:K7		every day	-
+lambda:L3	0	60	kappa:K7 lambda:L3	kappa:K7 43200 lambda:L3 46800	every day	-
+## kappa:K7 maxTransfers 1
+kappa:K7	0	0	kappa:K7		every day	-
+lambda:L3	0	60	kappa:K7 lambda:L3	kappa:K7 43200 lambda:L3 46800	every day	-
+## kappa:K7 maxTransfers 2
+kappa:K7	0	0	kappa:K7		every day	-
+lambda:L3	0	60	kappa:K7 lambda:L3	kappa:K7 43200 lambda:L3 46800	every day	-
+## kappa:K7 maxTransfers 3
+kappa:K7	0	0	kappa:K7		every day	-
+lambda:L3	0	60	kappa:K7 lambda:L3	kappa:K7 43200 lambda:L3 46800	every day	-
+## kappa:K7 maxTransfers 4
+kappa:K7	0	0	kappa:K7		every day	-
+lambda:L3	0	60	kappa:K7 lambda:L3	kappa:K7 43200 lambda:L3 46800	every day	-
+## kappa:K7 maxTransfers 5
+kappa:K7	0	0	kappa:K7		every day	-
+lambda:L3	0	60	kappa:K7 lambda:L3	kappa:K7 43200 lambda:L3 46800	every day	-
+## lambda:L1 maxTransfers 0
+lambda:L1	0	0	lambda:L1		every day	-
+lambda:L2	0	30	lambda:L1 lambda:L2	lambda:L1 34200 lambda:L2 36000	every day	-
+## lambda:L1 maxTransfers 1
+lambda:L1	0	0	lambda:L1		every day	-
+lambda:L2	0	30	lambda:L1 lambda:L2	lambda:L1 34200 lambda:L2 36000	every day	-
+## lambda:L1 maxTransfers 2
+lambda:L1	0	0	lambda:L1		every day	-
+lambda:L2	0	30	lambda:L1 lambda:L2	lambda:L1 34200 lambda:L2 36000	every day	-
+## lambda:L1 maxTransfers 3
+lambda:L1	0	0	lambda:L1		every day	-
+lambda:L2	0	30	lambda:L1 lambda:L2	lambda:L1 34200 lambda:L2 36000	every day	-
+## lambda:L1 maxTransfers 4
+lambda:L1	0	0	lambda:L1		every day	-
+lambda:L2	0	30	lambda:L1 lambda:L2	lambda:L1 34200 lambda:L2 36000	every day	-
+## lambda:L1 maxTransfers 5
+lambda:L1	0	0	lambda:L1		every day	-
+lambda:L2	0	30	lambda:L1 lambda:L2	lambda:L1 34200 lambda:L2 36000	every day	-
+## lambda:L2 maxTransfers 0
+lambda:L2	0	0	lambda:L2		every day	-
+## lambda:L2 maxTransfers 1
+lambda:L2	0	0	lambda:L2		every day	-
+## lambda:L2 maxTransfers 2
+lambda:L2	0	0	lambda:L2		every day	-
+## lambda:L2 maxTransfers 3
+lambda:L2	0	0	lambda:L2		every day	-
+## lambda:L2 maxTransfers 4
+lambda:L2	0	0	lambda:L2		every day	-
+## lambda:L2 maxTransfers 5
+lambda:L2	0	0	lambda:L2		every day	-
+## lambda:L3 maxTransfers 0
+lambda:L3	0	0	lambda:L3		every day	-
+lambda:L4	0	30	lambda:L3 lambda:L4	lambda:L3 45000 lambda:L4 46800	every day	-
+## lambda:L3 maxTransfers 1
+lambda:L3	0	0	lambda:L3		every day	-
+lambda:L4	0	30	lambda:L3 lambda:L4	lambda:L3 45000 lambda:L4 46800	every day	-
+## lambda:L3 maxTransfers 2
+lambda:L3	0	0	lambda:L3		every day	-
+lambda:L4	0	30	lambda:L3 lambda:L4	lambda:L3 45000 lambda:L4 46800	every day	-
+## lambda:L3 maxTransfers 3
+lambda:L3	0	0	lambda:L3		every day	-
+lambda:L4	0	30	lambda:L3 lambda:L4	lambda:L3 45000 lambda:L4 46800	every day	-
+## lambda:L3 maxTransfers 4
+lambda:L3	0	0	lambda:L3		every day	-
+lambda:L4	0	30	lambda:L3 lambda:L4	lambda:L3 45000 lambda:L4 46800	every day	-
+## lambda:L3 maxTransfers 5
+lambda:L3	0	0	lambda:L3		every day	-
+lambda:L4	0	30	lambda:L3 lambda:L4	lambda:L3 45000 lambda:L4 46800	every day	-
+## lambda:L4 maxTransfers 0
+lambda:L4	0	0	lambda:L4		every day	-
+## lambda:L4 maxTransfers 1
+lambda:L4	0	0	lambda:L4		every day	-
+## lambda:L4 maxTransfers 2
+lambda:L4	0	0	lambda:L4		every day	-
+## lambda:L4 maxTransfers 3
+lambda:L4	0	0	lambda:L4		every day	-
+## lambda:L4 maxTransfers 4
+lambda:L4	0	0	lambda:L4		every day	-
+## lambda:L4 maxTransfers 5
+lambda:L4	0	0	lambda:L4		every day	-

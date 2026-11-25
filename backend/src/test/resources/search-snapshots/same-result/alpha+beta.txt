@@ -1,0 +1,106 @@
+# today 2026-01-01
+## alpha:A1 maxTransfers 0
+alpha:A1	0	0	alpha:A1		every day	-
+alpha:A2	0	30	alpha:A1 alpha:A2	alpha:A1 28800 alpha:A2 30600	every day	-
+beta:B1	0	60	alpha:A1 alpha:A2 beta:B1	alpha:A1 28800 beta:B1 32400	every day	-
+## alpha:A1 maxTransfers 1
+alpha:A1	0	0	alpha:A1		every day	-
+alpha:A2	0	30	alpha:A1 alpha:A2	alpha:A1 28800 alpha:A2 30600	every day	-
+beta:B1	0	60	alpha:A1 alpha:A2 beta:B1	alpha:A1 28800 beta:B1 32400	every day	-
+beta:B2	1	120	alpha:A1 alpha:A2 beta:B1 beta:B2	alpha:A1 28800 beta:B1 32400 | beta:B1 33600 beta:B2 36000	every day	-
+## alpha:A1 maxTransfers 2
+alpha:A1	0	0	alpha:A1		every day	-
+alpha:A2	0	30	alpha:A1 alpha:A2	alpha:A1 28800 alpha:A2 30600	every day	-
+beta:B1	0	60	alpha:A1 alpha:A2 beta:B1	alpha:A1 28800 beta:B1 32400	every day	-
+beta:B2	1	120	alpha:A1 alpha:A2 beta:B1 beta:B2	alpha:A1 28800 beta:B1 32400 | beta:B1 33600 beta:B2 36000	every day	-
+## alpha:A1 maxTransfers 3
+alpha:A1	0	0	alpha:A1		every day	-
+alpha:A2	0	30	alpha:A1 alpha:A2	alpha:A1 28800 alpha:A2 30600	every day	-
+beta:B1	0	60	alpha:A1 alpha:A2 beta:B1	alpha:A1 28800 beta:B1 32400	every day	-
+beta:B2	1	120	alpha:A1 alpha:A2 beta:B1 beta:B2	alpha:A1 28800 beta:B1 32400 | beta:B1 33600 beta:B2 36000	every day	-
+## alpha:A1 maxTransfers 4
+alpha:A1	0	0	alpha:A1		every day	-
+alpha:A2	0	30	alpha:A1 alpha:A2	alpha:A1 28800 alpha:A2 30600	every day	-
+beta:B1	0	60	alpha:A1 alpha:A2 beta:B1	alpha:A1 28800 beta:B1 32400	every day	-
+beta:B2	1	120	alpha:A1 alpha:A2 beta:B1 beta:B2	alpha:A1 28800 beta:B1 32400 | beta:B1 33600 beta:B2 36000	every day	-
+## alpha:A1 maxTransfers 5
+alpha:A1	0	0	alpha:A1		every day	-
+alpha:A2	0	30	alpha:A1 alpha:A2	alpha:A1 28800 alpha:A2 30600	every day	-
+beta:B1	0	60	alpha:A1 alpha:A2 beta:B1	alpha:A1 28800 beta:B1 32400	every day	-
+beta:B2	1	120	alpha:A1 alpha:A2 beta:B1 beta:B2	alpha:A1 28800 beta:B1 32400 | beta:B1 33600 beta:B2 36000	every day	-
+## alpha:A2 maxTransfers 0
+alpha:A2	0	0	alpha:A2		every day	-
+beta:B1	0	30	alpha:A2 beta:B1	alpha:A2 30600 beta:B1 32400	every day	-
+## alpha:A2 maxTransfers 1
+alpha:A2	0	0	alpha:A2		every day	-
+beta:B1	0	30	alpha:A2 beta:B1	alpha:A2 30600 beta:B1 32400	every day	-
+beta:B2	1	90	alpha:A2 beta:B1 beta:B2	alpha:A2 30600 beta:B1 32400 | beta:B1 33600 beta:B2 36000	every day	-
+## alpha:A2 maxTransfers 2
+alpha:A2	0	0	alpha:A2		every day	-
+beta:B1	0	30	alpha:A2 beta:B1	alpha:A2 30600 beta:B1 32400	every day	-
+beta:B2	1	90	alpha:A2 beta:B1 beta:B2	alpha:A2 30600 beta:B1 32400 | beta:B1 33600 beta:B2 36000	every day	-
+## alpha:A2 maxTransfers 3
+alpha:A2	0	0	alpha:A2		every day	-
+beta:B1	0	30	alpha:A2 beta:B1	alpha:A2 30600 beta:B1 32400	every day	-
+beta:B2	1	90	alpha:A2 beta:B1 beta:B2	alpha:A2 30600 beta:B1 32400 | beta:B1 33600 beta:B2 36000	every day	-
+## alpha:A2 maxTransfers 4
+alpha:A2	0	0	alpha:A2		every day	-
+beta:B1	0	30	alpha:A2 beta:B1	alpha:A2 30600 beta:B1 32400	every day	-
+beta:B2	1	90	alpha:A2 beta:B1 beta:B2	alpha:A2 30600 beta:B1 32400 | beta:B1 33600 beta:B2 36000	every day	-
+## alpha:A2 maxTransfers 5
+alpha:A2	0	0	alpha:A2		every day	-
+beta:B1	0	30	alpha:A2 beta:B1	alpha:A2 30600 beta:B1 32400	every day	-
+beta:B2	1	90	alpha:A2 beta:B1 beta:B2	alpha:A2 30600 beta:B1 32400 | beta:B1 33600 beta:B2 36000	every day	-
+## alpha:A4 maxTransfers 0
+alpha:A4	0	0	alpha:A4		every day	-
+beta:B1	0	40	alpha:A4 beta:B1	alpha:A4 82200 beta:B1 84600	every day	-
+## alpha:A4 maxTransfers 1
+alpha:A4	0	0	alpha:A4		every day	-
+beta:B1	0	40	alpha:A4 beta:B1	alpha:A4 82200 beta:B1 84600	every day	-
+beta:B2	1	140	alpha:A4 beta:B1 beta:B2	alpha:A4 82200 beta:B1 84600 | beta:B1 600 beta:B2 4200	every day	-
+## alpha:A4 maxTransfers 2
+alpha:A4	0	0	alpha:A4		every day	-
+beta:B1	0	40	alpha:A4 beta:B1	alpha:A4 82200 beta:B1 84600	every day	-
+beta:B2	1	140	alpha:A4 beta:B1 beta:B2	alpha:A4 82200 beta:B1 84600 | beta:B1 600 beta:B2 4200	every day	-
+## alpha:A4 maxTransfers 3
+alpha:A4	0	0	alpha:A4		every day	-
+beta:B1	0	40	alpha:A4 beta:B1	alpha:A4 82200 beta:B1 84600	every day	-
+beta:B2	1	140	alpha:A4 beta:B1 beta:B2	alpha:A4 82200 beta:B1 84600 | beta:B1 600 beta:B2 4200	every day	-
+## alpha:A4 maxTransfers 4
+alpha:A4	0	0	alpha:A4		every day	-
+beta:B1	0	40	alpha:A4 beta:B1	alpha:A4 82200 beta:B1 84600	every day	-
+beta:B2	1	140	alpha:A4 beta:B1 beta:B2	alpha:A4 82200 beta:B1 84600 | beta:B1 600 beta:B2 4200	every day	-
+## alpha:A4 maxTransfers 5
+alpha:A4	0	0	alpha:A4		every day	-
+beta:B1	0	40	alpha:A4 beta:B1	alpha:A4 82200 beta:B1 84600	every day	-
+beta:B2	1	140	alpha:A4 beta:B1 beta:B2	alpha:A4 82200 beta:B1 84600 | beta:B1 600 beta:B2 4200	every day	-
+## beta:B1 maxTransfers 0
+beta:B1	0	0	beta:B1		every day	-
+beta:B2	0	40	beta:B1 beta:B2	beta:B1 33600 beta:B2 36000	every day	-
+## beta:B1 maxTransfers 1
+beta:B1	0	0	beta:B1		every day	-
+beta:B2	0	40	beta:B1 beta:B2	beta:B1 33600 beta:B2 36000	every day	-
+## beta:B1 maxTransfers 2
+beta:B1	0	0	beta:B1		every day	-
+beta:B2	0	40	beta:B1 beta:B2	beta:B1 33600 beta:B2 36000	every day	-
+## beta:B1 maxTransfers 3
+beta:B1	0	0	beta:B1		every day	-
+beta:B2	0	40	beta:B1 beta:B2	beta:B1 33600 beta:B2 36000	every day	-
+## beta:B1 maxTransfers 4
+beta:B1	0	0	beta:B1		every day	-
+beta:B2	0	40	beta:B1 beta:B2	beta:B1 33600 beta:B2 36000	every day	-
+## beta:B1 maxTransfers 5
+beta:B1	0	0	beta:B1		every day	-
+beta:B2	0	40	beta:B1 beta:B2	beta:B1 33600 beta:B2 36000	every day	-
+## beta:B2 maxTransfers 0
+beta:B2	0	0	beta:B2		every day	-
+## beta:B2 maxTransfers 1
+beta:B2	0	0	beta:B2		every day	-
+## beta:B2 maxTransfers 2
+beta:B2	0	0	beta:B2		every day	-
+## beta:B2 maxTransfers 3
+beta:B2	0	0	beta:B2		every day	-
+## beta:B2 maxTransfers 4
+beta:B2	0	0	beta:B2		every day	-
+## beta:B2 maxTransfers 5
+beta:B2	0	0	beta:B2		every day	-

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Zips the gtfs-mini test feeds into backend/data/gtfs-mini/ for the offline "mini" profile (#21).
 # Leaves out the feeds that only make sense in their own tests: alpha-fast-train (a second "alpha"), kappa and
-# lambda (their countries exist only in the test borders), eta and zeta (their trains run in early 2026 only).
+# lambda (their countries exist only in the test borders), eta, theta and zeta (their trains run in early 2026 only).
 # Uses the JDK's jar tool, which also exists in Git Bash on Windows, where zip usually does not.
 set -euo pipefail
 cd "$(dirname "$0")/.."
