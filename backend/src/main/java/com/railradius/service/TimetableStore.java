@@ -6,9 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
-import java.util.stream.IntStream;
 
 /**
  * The search's static data in flat arrays (S17), built from {@link MergedTrips}. It does without an object per trip,
@@ -41,8 +39,7 @@ final class TimetableStore {
     private final int[] tripDayPattern;
     private final PackedStrings routeNames;
     private final int[] tripRouteName;
-    private final PackedStrings memberTripIds;
-    private final int[] tripMemberStart;
+    private final PackedStrings tripIds;
     private final int[] depStart;
     private final int[] depSec;
     private final int[] depEvent;
@@ -63,8 +60,7 @@ final class TimetableStore {
         this.tripDayPattern = parts.tripDayPattern();
         this.routeNames = parts.routeNames();
         this.tripRouteName = parts.tripRouteName();
-        this.memberTripIds = parts.memberTripIds();
-        this.tripMemberStart = parts.tripMemberStart();
+        this.tripIds = parts.tripIds();
         this.depStart = parts.depStart();
         this.depSec = parts.depSec();
         this.depEvent = parts.depEvent();
@@ -97,7 +93,7 @@ final class TimetableStore {
     static TimetableStore readFrom(BinaryBlocks.Reader in) throws IOException {
         TimetableStoreBuilder.Parts parts = new TimetableStoreBuilder.Parts(StationTable.readFrom(in), in.ints(),
                 in.ints(), in.ints(), in.ints(), DayPatterns.readFrom(in), in.ints(), PackedStrings.readFrom(in),
-                in.ints(), PackedStrings.readFrom(in), in.ints(), in.ints(), in.ints(), in.ints());
+                in.ints(), PackedStrings.readFrom(in), in.ints(), in.ints(), in.ints());
         return new TimetableStore(parts, eventTrips(parts.tripFirstEvent()), in.longs());
     }
 
@@ -112,8 +108,7 @@ final class TimetableStore {
         out.ints(tripDayPattern);
         routeNames.writeTo(out);
         out.ints(tripRouteName);
-        memberTripIds.writeTo(out);
-        out.ints(tripMemberStart);
+        tripIds.writeTo(out);
         out.ints(depStart);
         out.ints(depSec);
         out.ints(depEvent);
@@ -190,14 +185,9 @@ final class TimetableStore {
         return tripDayPattern[trip];
     }
 
-    /** The kept trip's ID: the first of {@link #memberTripIds}. */
+    /** The kept trip's ID ({@link MergedTrips}); the IDs of the trips merged into it are not kept. */
     String tripId(int trip) {
-        return memberTripIds.get(tripMemberStart[trip]);
-    }
-
-    /** The trips merged into this one, in trip ID order. */
-    List<String> memberTripIds(int trip) {
-        return IntStream.range(tripMemberStart[trip], tripMemberStart[trip + 1]).mapToObj(memberTripIds::get).toList();
+        return tripIds.get(trip);
     }
 
     Optional<String> routeName(int trip) {
@@ -290,11 +280,10 @@ final class TimetableStore {
     /** Estimated bytes of the store's arrays and strings. */
     long sizeBytes() {
         long intArrays = (long) tripFirstEvent.length + evTrip.length + evStation.length + evDepSec.length
-                + evArrSec.length + tripDayPattern.length + tripRouteName.length + tripMemberStart.length
-                + depStart.length + depSec.length + depEvent.length + nextStationCount.length
+                + evArrSec.length + tripDayPattern.length + tripRouteName.length + depStart.length + depSec.length + depEvent.length + nextStationCount.length
                 + stoppingTripCount.length;
         return intArrays * Integer.BYTES + (long) regularDeparture.length * Long.BYTES + stations.sizeBytes()
-                + dayPatterns.sizeBytes() + routeNames.sizeBytes() + memberTripIds.sizeBytes();
+                + dayPatterns.sizeBytes() + routeNames.sizeBytes() + tripIds.sizeBytes();
     }
 
     private static int[] eventTrips(int[] tripFirstEvent) {

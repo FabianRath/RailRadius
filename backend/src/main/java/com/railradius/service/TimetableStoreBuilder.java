@@ -2,7 +2,6 @@ package com.railradius.service;
 
 import com.railradius.model.Connection;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -18,7 +17,7 @@ final class TimetableStoreBuilder {
     /** Everything a TimetableStore holds except what it derives itself. */
     record Parts(StationTable stations, int[] tripFirstEvent, int[] evStation, int[] evDepSec, int[] evArrSec,
                  DayPatterns dayPatterns, int[] tripDayPattern, PackedStrings routeNames, int[] tripRouteName,
-                 PackedStrings memberTripIds, int[] tripMemberStart, int[] depStart, int[] depSec, int[] depEvent) {}
+                 PackedStrings tripIds, int[] depStart, int[] depSec, int[] depEvent) {}
 
     private record Events(int[] tripFirstEvent, int[] station, int[] depSec, int[] arrSec) {}
 
@@ -34,18 +33,13 @@ final class TimetableStoreBuilder {
         int[] tripDayPattern = trips.stream().mapToInt(trip -> dayPatterns.intern(trip.days())).toArray();
         Map<String, Integer> routeNameIndexes = new HashMap<>();
         int[] tripRouteName = trips.stream().mapToInt(trip -> routeNameIndex(trip, routeNameIndexes)).toArray();
-        List<String> memberTripIds = new ArrayList<>();
-        int[] tripMemberStart = new int[trips.size() + 1];
-        for (int trip = 0; trip < trips.size(); trip++) {
-            memberTripIds.addAll(trips.get(trip).memberTripIds());
-            tripMemberStart[trip + 1] = memberTripIds.size();
-        }
+        PackedStrings tripIds = PackedStrings.of(trips.stream().map(MergedTrips.Trip::tripId).toList());
         Departures departures = departures(merged.stationIndexes().size(), events.station(), events.depSec());
         StationTable stations = StationTable.of(inIndexOrder(merged.stationIndexes()));
         return new Parts(stations, events.tripFirstEvent(), events.station(), events.depSec(), events.arrSec(),
                 dayPatterns.build(), tripDayPattern,
-                PackedStrings.of(inIndexOrder(routeNameIndexes)), tripRouteName, PackedStrings.of(memberTripIds),
-                tripMemberStart, departures.start(), departures.seconds(), departures.events());
+                PackedStrings.of(inIndexOrder(routeNameIndexes)), tripRouteName, tripIds, departures.start(),
+                departures.seconds(), departures.events());
     }
 
     /**
@@ -54,13 +48,12 @@ final class TimetableStoreBuilder {
      */
     static Parts withoutTripNames(StationTable stations, int[] tripFirstEvent, int[] evStation, int[] evDepSec,
                                   int[] evArrSec, DayPatterns dayPatterns, int[] tripDayPattern) {
-        int tripCount = tripDayPattern.length;
-        int[] tripRouteName = new int[tripCount];
+        int[] tripRouteName = new int[tripDayPattern.length];
         Arrays.fill(tripRouteName, TimetableStore.NO_ROUTE_NAME);
         Departures departures = departures(stations.size(), evStation, evDepSec);
         return new Parts(stations, tripFirstEvent, evStation, evDepSec, evArrSec, dayPatterns, tripDayPattern,
-                PackedStrings.of(List.of()), tripRouteName, PackedStrings.of(List.of()), new int[tripCount + 1],
-                departures.start(), departures.seconds(), departures.events());
+                PackedStrings.of(List.of()), tripRouteName, PackedStrings.of(List.of()), departures.start(),
+                departures.seconds(), departures.events());
     }
 
     private static Events events(List<MergedTrips.Trip> trips) {
