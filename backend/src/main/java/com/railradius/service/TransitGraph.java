@@ -8,7 +8,6 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.IntStream;
 
@@ -63,10 +62,6 @@ public class TransitGraph {
 
     Set<String> getTranslatedNames(String stopId) {
         return served.translatedNamesOf(stopId);
-    }
-
-    public Optional<TripInfo> getTripInfo(String tripId) {
-        return served.tripInfo(tripId);
     }
 
     /**

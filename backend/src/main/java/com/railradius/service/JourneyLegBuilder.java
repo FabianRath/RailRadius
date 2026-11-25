@@ -115,7 +115,7 @@ public class JourneyLegBuilder {
 
     private static JourneyLeg trainLeg(ServedGraph graph, Connection first, Connection last) {
         int rideMinutes = GtfsTime.diffMinutes(first.getDepartureTimeSeconds(), last.getArrivalTimeSeconds());
-        Optional<TripInfo> tripInfo = graph.tripInfo(first.getTripId());
+        Optional<TripInfo> tripInfo = graph.tripInfo(first.getStoreTrip());
         return JourneyLeg.builder()
                 .type(LEG_TRAIN)
                 .trainName(first.getRouteName())

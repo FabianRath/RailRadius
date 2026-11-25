@@ -12,6 +12,8 @@ import lombok.NoArgsConstructor;
 @Builder
 public class Connection {
     private String tripId;
+    // Position of the trip in the store; only set on a search result's connections, for the journey's trip infos
+    private int storeTrip;
     private String routeName;
     private String fromStopId;
     private String toStopId;

@@ -112,12 +112,12 @@ final class RailNetwork {
      */
     BinaryCacheStore.BinaryCacheData servedData() {
         TimetableStore store = TimetableStore.build(this);
-        List<TripInfo> storeTripInfos = new ArrayList<>(store.tripCount());
+        TripInfos storeTripInfos = new TripInfos(store.tripCount());
         for (int trip = 0; trip < store.tripCount(); trip++) {
             String tripId = store.tripId(trip);
             TripInfo info = tripInfos.get(tripId);
             if (info == null) throw new IllegalStateException("No trip info for " + tripId);
-            storeTripInfos.add(info);
+            storeTripInfos.set(trip, info);
         }
         List<FeedTimespan> feeds = feedTimespans.values().stream()
                 .sorted(Comparator.comparing(FeedTimespan::source))
