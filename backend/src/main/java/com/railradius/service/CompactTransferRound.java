@@ -289,7 +289,7 @@ final class CompactTransferRound {
 
     /**
      * Stable (Search semantics contract): equal times keep the order the arrivals came in, which is their grouped
-     * order, so sorting by arrival seconds and then grouped position does it.
+     * order, so sorting by arrival seconds and then grouped position does it ({@link ArrivalSort}).
      */
     private StationArrivals sortedArrivals(BoardingWorkspace workspace, int from, int count) {
         TransferWindowInts.Arrivals arrivals = workspace.arrivals(count);
@@ -297,7 +297,7 @@ final class CompactTransferRound {
         for (int i = 0; i < count; i++) {
             days[i] = (long) arrivalSeconds(grouped[from + i]) << SECONDS_SHIFT | (from + i);
         }
-        Arrays.sort(days, 0, count);
+        workspace.sorter().sort(days, count);
         int[] positions = workspace.positions();
         for (int i = 0; i < count; i++) {
             int position = (int) (days[i] & POSITION_MASK);
