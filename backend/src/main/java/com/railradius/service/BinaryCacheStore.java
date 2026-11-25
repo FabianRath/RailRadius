@@ -43,7 +43,7 @@ import java.util.Set;
 public class BinaryCacheStore {
 
     /** Bump on every change of the layout or of how the store is built: a file with another version is not read. */
-    static final int FORMAT_VERSION = 2;
+    static final int FORMAT_VERSION = 3;
 
     private static final int NO_STRING = -1;
     private static final long BYTES_PER_MB = 1024 * 1024;

@@ -2,7 +2,6 @@ package com.railradius.service;
 
 import com.railradius.model.Connection;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -17,25 +16,19 @@ import java.util.Map;
  * several trips that differ only in their days, and some trains are in two feeds; on the full data that was almost
  * half of all trips, each searched separately. Under the whole-journey day check (B33) this is exact: a date has the
  * train if any of the trips runs then. The merged trip keeps the first trip's ID, so its connections, and that trip's
- * train number and operator, stand for the train.
+ * train number and operator, stand for the train. The other trips' IDs are dropped: nothing reads them.
  */
 record MergedTrips(List<Trip> trips, Map<String, Integer> stationIndexes, int sourceTripCount) {
 
     /**
-     * One merged trip. memberTripIds are the trips it stands for in trip ID order, the kept one first.
+     * One merged trip. tripId is the first in trip ID order of the trips it stands for.
      * legConnections[i] is leg i's connection, null where the trip has none.
      */
-    record Trip(List<String> memberTripIds, List<String> stops, int[] stationIndexes, Connection[] legConnections,
+    record Trip(String tripId, List<String> stops, int[] stationIndexes, Connection[] legConnections,
                 ServiceDays days) {
 
-        String tripId() {
-            return memberTripIds.getFirst();
-        }
-
         private Trip withMember(Trip same) {
-            List<String> members = new ArrayList<>(memberTripIds);
-            members.add(same.tripId());
-            return new Trip(members, stops, stationIndexes, legConnections, days.union(same.days()));
+            return new Trip(tripId, stops, stationIndexes, legConnections, days.union(same.days()));
         }
     }
 
@@ -72,7 +65,7 @@ record MergedTrips(List<Trip> trips, Map<String, Integer> stationIndexes, int so
         Map<TripKey, Trip> tripsByTimes = new LinkedHashMap<>();
         for (String tripId : tripIds) {
             List<String> stops = network.getStopsOnTrip(tripId);
-            Trip trip = new Trip(List.of(tripId), stops, indexesOf(stops, stationIndexes),
+            Trip trip = new Trip(tripId, stops, indexesOf(stops, stationIndexes),
                     legConnections(stops, connectionsByTrip.getOrDefault(tripId, List.of())),
                     network.getServiceDays(tripId));
             tripsByTimes.merge(TripKey.of(trip), trip, Trip::withMember);
