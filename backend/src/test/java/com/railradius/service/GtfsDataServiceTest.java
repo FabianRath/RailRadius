@@ -128,7 +128,8 @@ class GtfsDataServiceTest {
     // B35: the ÖBB zip keeps its files in a folder GTFS_Fahrplan_2026/
     @Test
     void feedWithItsFilesInAFolderIsLoaded(@TempDir Path dir) throws Exception {
-        TransitGraph graph = new TransitGraph();
+        // zeta's days are in early 2026: from a later today, its trips would be dropped as past (#45)
+        TransitGraph graph = TransitGraph.withToday(GtfsTestFixtures.TODAY);
         GtfsDataService service = GtfsTestFixtures.dataService(dir, graph, "zeta");
         GtfsTestFixtures.zipFeedInFolder("zeta", dir.resolve("gtfs").resolve("gtfs_zeta.zip"), "zeta_feed");
 

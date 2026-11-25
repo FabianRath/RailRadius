@@ -103,7 +103,7 @@ public class GtfsDataService {
         log.info("Total edges     : {}", network.edgeCount());
 
         loadProgress.enter(GtfsLoadProgress.Phase.SAVING);
-        BinaryCacheStore.BinaryCacheData data = network.servedData();
+        BinaryCacheStore.BinaryCacheData data = network.servedData(graph.todayEpochDay());
         binaryCacheStore.save(data, zips);
         serve(data);
     }

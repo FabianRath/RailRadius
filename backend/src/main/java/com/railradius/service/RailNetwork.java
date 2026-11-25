@@ -107,11 +107,15 @@ final class RailNetwork {
     }
 
     /**
-     * What the app serves (S21): stations, translated names, the {@link TimetableStore} built from the trips and the
-     * {@link TripInfo} of each store trip.
+     * What the app serves (S21): stations, translated names, the {@link TimetableStore} built from the trips without
+     * the days before today ({@link PastDays}) and the {@link TripInfo} of each store trip.
      */
-    BinaryCacheStore.BinaryCacheData servedData() {
-        TimetableStore store = TimetableStore.build(this);
+    BinaryCacheStore.BinaryCacheData servedData(int todayEpochDay) {
+        TimetableStore built = TimetableStore.build(this);
+        TimetableStore store = PastDays.dropped(built, todayEpochDay);
+        log.info("Past days dropped: {} of {} trips and {} of {} stop events kept, {} of {} day patterns",
+                store.tripCount(), built.tripCount(), store.eventCount(), built.eventCount(),
+                store.dayPatterns().size(), built.dayPatterns().size());
         TripInfos storeTripInfos = new TripInfos(store.tripCount());
         for (int trip = 0; trip < store.tripCount(); trip++) {
             String tripId = store.tripId(trip);
