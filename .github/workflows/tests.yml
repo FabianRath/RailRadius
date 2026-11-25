@@ -1,0 +1,44 @@
+# Runs every test on each pull request into main and on each push to main, so a change is checked before it lands.
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same pull request makes the older run pointless
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: |
+            backend/pom.xml
+            browser-engine/pom.xml
+      # The engine check runs the compiled WebAssembly (Wasm GC) in Node, which needs 22 or later
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      # The runner's own Maven, as in dependency-submission.yml: mvnw is not executable in git
+      - name: Backend tests
+        run: mvn -B -q -f backend/pom.xml test
+      # Needs the backend's classes and the check files its tests leave in backend/target
+      - name: Browser engine check
+        run: mvn -B -q -f browser-engine/pom.xml verify
+      - name: Frontend tests
+        run: node --test "frontend/test/*.test.js"
