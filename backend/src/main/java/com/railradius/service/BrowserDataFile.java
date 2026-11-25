@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,26 +17,21 @@ import java.util.Objects;
  * Blocks: the notice (UTF-8 text: ODbL and the feeds it comes from); the station IDs, names and countries
  * ({@link PackedStrings}, a missing name or country as ""); latitudes and longitudes as float bits (NaN if missing);
  * the distinct stop sequences, as each one's stop count and their stations, and each trip's sequence (#48: many
- * trips stop at the same stations, so each sequence is stored once); each event's arrival and departure as the
- * seconds since the trip's
- * previous time ({@link #NO_TIME} where the store has {@link TimetableStore#NO_LEG}); the day patterns; each trip's
- * day pattern; the regular departures ({@link TimetableStore#regularDepartureWords}).
+ * trips stop at the same stations, so each sequence is stored once); the trips' times ({@link BrowserTripTimes});
+ * the day patterns; each trip's day pattern; the regular departures ({@link TimetableStore#regularDepartureWords}).
  * <p>
  * The regular departures are shipped, not derived again, because they count days the file may leave out (#47): the
  * server works them out from every day of the feeds. They are almost all ones, so they gzip to very little.
  * <p>
  * Left out, and why: trip IDs, route names, train numbers and translated names belong to journeys, which the server
  * builds (#11); the station name index stays on the server; the departures index is derived again on reading, as the
- * store does. Times as differences within a trip are small, repeating numbers, which
- * cuts the gzipped file of all of Europe to a fifth (docs/HOSTING.md).
+ * store does. Times as differences within a trip are small, repeating numbers, which cut the gzipped file of all of
+ * Europe to a fifth (docs/HOSTING.md).
  */
 final class BrowserDataFile {
 
     /** Bump on every change of the layout: a browser with another version searches on the server. */
-    static final int FORMAT_VERSION = 3;
-
-    /** An arrival or departure the store has none of; no real difference is this low. */
-    static final int NO_TIME = Integer.MIN_VALUE;
+    static final int FORMAT_VERSION = 4;
 
     private static final String ODBL_URL = "https://opendatacommons.org/licenses/odbl/1-0/";
     // The file has no other input to hash: its own content hash is its version (BrowserDataStore)
@@ -78,16 +72,14 @@ final class BrowserDataFile {
         int[] tripSequence = in.ints();
         int[] tripFirstEvent = tripFirstEvents(sequenceStopCounts, tripSequence);
         int[] evStation = eventStations(sequenceStopCounts, sequenceStations, tripSequence, tripFirstEvent);
-        int[] evArrSec = in.ints();
-        int[] evDepSec = in.ints();
-        undoDifferences(tripFirstEvent, evArrSec, evDepSec);
+        BrowserTripTimes.Times times = BrowserTripTimes.read(in, tripFirstEvent);
         DayPatterns dayPatterns = DayPatterns.readFrom(in);
         int[] tripDayPattern = in.ints();
         long[] regularDeparture = in.longs();
         in.checkAllRead();
         StationTable stationTable = StationTable.of(stations.stream().map(Station::getId).toList());
         TimetableStore store = TimetableStore.of(TimetableStoreBuilder.withoutTripNames(stationTable,
-                tripFirstEvent, evStation, evDepSec, evArrSec, dayPatterns, tripDayPattern), regularDeparture);
+                tripFirstEvent, evStation, times.evDepSec(), times.evArrSec(), dayPatterns, tripDayPattern), regularDeparture);
         return new BrowserData(stations, store, notice);
     }
 
@@ -145,42 +137,10 @@ final class BrowserDataFile {
         return stations;
     }
 
-    /** The stop sequences and each trip's, then arrivals and departures as differences. */
+    /** The stop sequences and each trip's, then the trips' times. */
     private static void writeTrips(TimetableStore store, BinaryBlocks.Writer out) throws IOException {
         writeSequences(store, out);
-        int[] arrivalDiffs = new int[store.eventCount()];
-        int[] departureDiffs = new int[store.eventCount()];
-        for (int trip = 0; trip < store.tripCount(); trip++) {
-            int previousSeconds = 0;
-            for (int event = store.firstEvent(trip); event < store.endEvent(trip); event++) {
-                arrivalDiffs[event] = difference(store.arrivalSeconds(event), previousSeconds);
-                if (arrivalDiffs[event] != NO_TIME) previousSeconds = store.arrivalSeconds(event);
-                departureDiffs[event] = difference(store.departureSeconds(event), previousSeconds);
-                if (departureDiffs[event] != NO_TIME) previousSeconds = store.departureSeconds(event);
-            }
-        }
-        out.ints(arrivalDiffs);
-        out.ints(departureDiffs);
-    }
-
-    private static void undoDifferences(int[] tripFirstEvent, int[] evArrSec, int[] evDepSec) {
-        for (int trip = 0; trip + 1 < tripFirstEvent.length; trip++) {
-            int previousSeconds = 0;
-            for (int event = tripFirstEvent[trip]; event < tripFirstEvent[trip + 1]; event++) {
-                evArrSec[event] = seconds(evArrSec[event], previousSeconds);
-                if (evArrSec[event] != TimetableStore.NO_LEG) previousSeconds = evArrSec[event];
-                evDepSec[event] = seconds(evDepSec[event], previousSeconds);
-                if (evDepSec[event] != TimetableStore.NO_LEG) previousSeconds = evDepSec[event];
-            }
-        }
-    }
-
-    private static int difference(int seconds, int previousSeconds) {
-        return seconds == TimetableStore.NO_LEG ? NO_TIME : seconds - previousSeconds;
-    }
-
-    private static int seconds(int difference, int previousSeconds) {
-        return difference == NO_TIME ? TimetableStore.NO_LEG : previousSeconds + difference;
+        BrowserTripTimes.write(store, out);
     }
 
     private static int[] tripDayPatterns(TimetableStore store) {
@@ -193,7 +153,7 @@ final class BrowserDataFile {
 
     /** Each distinct sequence of stations once, numbered in the order trips first stop at it, and each trip's. */
     private static void writeSequences(TimetableStore store, BinaryBlocks.Writer out) throws IOException {
-        Map<StopSequence, Integer> sequences = new HashMap<>();
+        Map<IntArrayKey, Integer> sequences = new HashMap<>();
         IntList stopCounts = new IntList();
         IntList stations = new IntList();
         int[] tripSequence = new int[store.tripCount()];
@@ -202,7 +162,7 @@ final class BrowserDataFile {
             for (int stop = 0; stop < tripStations.length; stop++) {
                 tripStations[stop] = store.station(store.firstEvent(trip) + stop);
             }
-            tripSequence[trip] = sequences.computeIfAbsent(new StopSequence(tripStations), sequence -> {
+            tripSequence[trip] = sequences.computeIfAbsent(new IntArrayKey(tripStations), sequence -> {
                 stopCounts.add(tripStations.length);
                 for (int station : tripStations) stations.add(station);
                 return stopCounts.size() - 1;
@@ -211,20 +171,6 @@ final class BrowserDataFile {
         out.ints(stopCounts.toArray());
         out.ints(stations.toArray());
         out.ints(tripSequence);
-    }
-
-    /** A trip's stations in stop order, compared by content. */
-    private record StopSequence(int[] stations) {
-
-        @Override
-        public boolean equals(Object other) {
-            return other instanceof StopSequence sequence && Arrays.equals(stations, sequence.stations);
-        }
-
-        @Override
-        public int hashCode() {
-            return Arrays.hashCode(stations);
-        }
     }
 
     private static int[] tripFirstEvents(int[] sequenceStopCounts, int[] tripSequence) {
