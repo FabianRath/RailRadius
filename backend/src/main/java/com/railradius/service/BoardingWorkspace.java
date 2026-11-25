@@ -2,7 +2,8 @@ package com.railradius.service;
 
 /**
  * One thread's working arrays for a station choosing what to board ({@link CompactTransferRound}): its sorted arrivals,
- * their grouped positions, the two transfer windows' queues and each arrival's index into the boardings. A station
+ * their grouped positions, the two transfer windows' queues, each arrival's index into the boardings and the sort's
+ * buffer. A station
  * used to allocate them anew, ~32 bytes per arrival and ~190 MB per round on the full data (#40). A thread chooses one
  * station at a time, so it reuses them from station to station and search to search, growing them for a station with
  * more arrivals than any before. Each station writes every entry it reads, up to its arrival count.
@@ -21,6 +22,7 @@ final class BoardingWorkspace {
     private int[] sameDayQueue = new int[0];
     private int[] overnightQueue = new int[0];
     private int[] fromIndex = new int[0];
+    private final ArrivalSort sorter = new ArrivalSort();
 
     private BoardingWorkspace() {
     }
@@ -51,6 +53,10 @@ final class BoardingWorkspace {
 
     int[] fromIndex() {
         return fromIndex;
+    }
+
+    ArrivalSort sorter() {
+        return sorter;
     }
 
     /** Growing replaces the arrays without copying: a station writes before it reads. */
