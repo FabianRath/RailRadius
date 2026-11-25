@@ -13,10 +13,10 @@ class TransitGraphTest {
     @Test
     void servingNewDataLeavesTheServedGraphFromBeforeWhole(@TempDir Path dir) throws Exception {
         TransitGraph graph = TransitGraph.withToday(GtfsTestFixtures.TODAY);
-        graph.serve(GtfsTestFixtures.network(dir.resolve("alpha"), "alpha").servedData());
+        graph.serve(GtfsTestFixtures.network(dir.resolve("alpha"), "alpha").servedData(graph.todayEpochDay()));
         ServedGraph before = graph.served();
 
-        graph.serve(GtfsTestFixtures.network(dir.resolve("omega"), "omega").servedData());
+        graph.serve(GtfsTestFixtures.network(dir.resolve("omega"), "omega").servedData(graph.todayEpochDay()));
 
         assertThat(before.station("alpha:A1")).isNotNull();
         assertThat(GtfsTestFixtures.tripInfo(before, "alpha:T1")).isPresent();

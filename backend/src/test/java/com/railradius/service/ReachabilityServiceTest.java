@@ -731,7 +731,7 @@ class ReachabilityServiceTest {
         CompactResult result = GtfsTestFixtures.search(graph).search("alpha:A1", 1, 0, 180,
                 CompactReachabilitySearch.NO_DEADLINE, paths -> {});
 
-        graph.serve(GtfsTestFixtures.network(dir.resolve("after"), "omega").servedData());
+        graph.serve(GtfsTestFixtures.network(dir.resolve("after"), "omega").servedData(graph.todayEpochDay()));
 
         CompactResult.PathSummary path = result.paths("alpha:A2").getFirst();
         assertThat(new JourneyLegBuilder().toSummary(result.served(), "alpha:A2", path))

@@ -50,10 +50,17 @@ final class TimetableStoreBuilder {
                                   int[] evArrSec, DayPatterns dayPatterns, int[] tripDayPattern) {
         int[] tripRouteName = new int[tripDayPattern.length];
         Arrays.fill(tripRouteName, TimetableStore.NO_ROUTE_NAME);
+        return withDerivedDepartures(stations, tripFirstEvent, evStation, evDepSec, evArrSec, dayPatterns,
+                tripDayPattern, PackedStrings.of(List.of()), tripRouteName, PackedStrings.of(List.of()));
+    }
+
+    /** The parts of these trips, with the departures derived from their events. */
+    static Parts withDerivedDepartures(StationTable stations, int[] tripFirstEvent, int[] evStation, int[] evDepSec,
+                                       int[] evArrSec, DayPatterns dayPatterns, int[] tripDayPattern,
+                                       PackedStrings routeNames, int[] tripRouteName, PackedStrings tripIds) {
         Departures departures = departures(stations.size(), evStation, evDepSec);
         return new Parts(stations, tripFirstEvent, evStation, evDepSec, evArrSec, dayPatterns, tripDayPattern,
-                PackedStrings.of(List.of()), tripRouteName, PackedStrings.of(List.of()), departures.start(),
-                departures.seconds(), departures.events());
+                routeNames, tripRouteName, tripIds, departures.start(), departures.seconds(), departures.events());
     }
 
     private static Events events(List<MergedTrips.Trip> trips) {

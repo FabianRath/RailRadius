@@ -26,7 +26,6 @@ final class TimetableStore {
     static final int NO_ROUTE_NAME = -1;
     /** Departure or arrival seconds of an event without a leg there. */
     static final int NO_LEG = -1;
-    private static final int NOT_SEEN = -1;
 
     private final StationTable stations;
     private final int[] tripFirstEvent;
@@ -49,6 +48,11 @@ final class TimetableStore {
     private final int[] stoppingTripCount;
 
     private TimetableStore(TimetableStoreBuilder.Parts parts, int[] evTrip, long[] regularDeparture) {
+        this(parts, evTrip, regularDeparture, StationCounts.of(parts));
+    }
+
+    private TimetableStore(TimetableStoreBuilder.Parts parts, int[] evTrip, long[] regularDeparture,
+                           StationCounts counts) {
         this.stations = parts.stations();
         this.tripFirstEvent = parts.tripFirstEvent();
         this.evTrip = evTrip;
@@ -63,8 +67,8 @@ final class TimetableStore {
         this.depSec = parts.depSec();
         this.depEvent = parts.depEvent();
         this.regularDeparture = regularDeparture;
-        this.nextStationCount = nextStationCounts(stations.size(), depStart, depEvent, parts.evStation());
-        this.stoppingTripCount = stoppingTripCounts(stations.size(), tripFirstEvent, parts.evStation());
+        this.nextStationCount = counts.nextStationCount();
+        this.stoppingTripCount = counts.stoppingTripCount();
     }
 
     static TimetableStore build(RailNetwork network) {
@@ -94,15 +98,35 @@ final class TimetableStore {
         return new TimetableStore(parts, eventTrips(parts.tripFirstEvent()), regularDeparture);
     }
 
+    /** A store of the parts with the regular departures and station counts of the store they were cut from. */
+    static TimetableStore of(TimetableStoreBuilder.Parts parts, long[] regularDeparture, StationCounts counts) {
+        return new TimetableStore(parts, eventTrips(parts.tripFirstEvent()), regularDeparture, counts);
+    }
+
+    /** What the store was built of, as its parts. */
+    TimetableStoreBuilder.Parts parts() {
+        return new TimetableStoreBuilder.Parts(stations, tripFirstEvent, evStation.toInts(),
+                evTimes.departuresToInts(), evTimes.arrivalsToInts(), dayPatterns, tripDayPattern, routeNames,
+                tripRouteName, tripIds, depStart, depSec, depEvent);
+    }
+
+    StationCounts stationCounts() {
+        return new StationCounts(nextStationCount, stoppingTripCount);
+    }
+
     /** Reads what {@link #writeTo} wrote. Only evTrip is derived again, which is quick. */
     static TimetableStore readFrom(BinaryBlocks.Reader in) throws IOException {
         TimetableStoreBuilder.Parts parts = new TimetableStoreBuilder.Parts(StationTable.readFrom(in), in.ints(),
                 in.ints(), in.ints(), in.ints(), DayPatterns.readFrom(in), in.ints(), PackedStrings.readFrom(in),
                 in.ints(), PackedStrings.readFrom(in), in.ints(), in.ints(), in.ints());
-        return new TimetableStore(parts, eventTrips(parts.tripFirstEvent()), in.longs());
+        return new TimetableStore(parts, eventTrips(parts.tripFirstEvent()), in.longs(),
+                new StationCounts(in.ints(), in.ints()));
     }
 
-    /** The parts in {@link TimetableStoreBuilder.Parts} order, then the regular departures. */
+    /**
+     * The parts in {@link TimetableStoreBuilder.Parts} order, then the regular departures and the station counts,
+     * which a store without past days can't derive ({@link PastDays}).
+     */
     void writeTo(BinaryBlocks.Writer out) throws IOException {
         stations.writeTo(out);
         out.ints(tripFirstEvent);
@@ -118,6 +142,8 @@ final class TimetableStore {
         out.ints(depSec);
         out.ints(depEvent);
         out.longs(regularDeparture);
+        out.ints(nextStationCount);
+        out.ints(stoppingTripCount);
     }
 
     StationTable stations() {
@@ -302,38 +328,6 @@ final class TimetableStore {
             Arrays.fill(trips, tripFirstEvent[trip], tripFirstEvent[trip + 1], trip);
         }
         return trips;
-    }
-
-    private static int[] nextStationCounts(int stationCount, int[] depStart, int[] depEvent, int[] evStation) {
-        int[] counts = new int[stationCount];
-        // The station that last counted each next station, so each counts once per station
-        int[] countedBy = new int[stationCount];
-        Arrays.fill(countedBy, NOT_SEEN);
-        for (int station = 0; station < stationCount; station++) {
-            for (int position = depStart[station]; position < depStart[station + 1]; position++) {
-                int next = evStation[depEvent[position] + 1];
-                if (countedBy[next] == station) continue;
-                countedBy[next] = station;
-                counts[station]++;
-            }
-        }
-        return counts;
-    }
-
-    private static int[] stoppingTripCounts(int stationCount, int[] tripFirstEvent, int[] evStation) {
-        int[] counts = new int[stationCount];
-        // The trip that last counted each station, so a trip that stops there twice counts once
-        int[] countedBy = new int[stationCount];
-        Arrays.fill(countedBy, NOT_SEEN);
-        for (int trip = 0; trip + 1 < tripFirstEvent.length; trip++) {
-            for (int event = tripFirstEvent[trip]; event < tripFirstEvent[trip + 1]; event++) {
-                int station = evStation[event];
-                if (countedBy[station] == trip) continue;
-                countedBy[station] = trip;
-                counts[station]++;
-            }
-        }
-        return counts;
     }
 
     private boolean arrivesLike(int departureEvent, int station, int arrivalSeconds) {
