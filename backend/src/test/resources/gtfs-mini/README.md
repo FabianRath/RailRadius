@@ -2,6 +2,8 @@
 
 Tiny feeds. `GtfsTestFixtures` zips each folder to `gtfs_<name>.zip`, where the name is the folder name up to the first `-`.
 
+`scripts/mini-data.sh` zips most of these feeds for the app's offline `mini` profile (#21; which ones and why in the script). A feed added or changed here shows up there too.
+
 - **alpha** (`translations.txt` in the pre-2019 `trans_id` format: "Border Town" → "Grenzstadt", which ends up on B1 via the cross-border merge): A1 Alpha Central, A5 Alpha Central (platform with parent_station A1, ~390 m away, beyond every distance-based merge, so merged into A1 only via its parent; B23), A2/A2b Alpha North (duplicate stop, merged per feed), A3 Border Town, A4 Alpha West, A9 bus stop (bus route, filtered out), AP Alpha Central Complex and AE its entrance (no rail trip uses either, so neither becomes a station)
   - `agency.txt` has one agency "Alpha Rail" and routes.txt no `agency_id`, so every route gets it as operator
   - T1 RE1 (train number "RE 4711", headsign "Border Town"): A5 08:00 → A2b 08:30 → A3 09:00

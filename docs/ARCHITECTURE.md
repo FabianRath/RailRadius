@@ -29,6 +29,8 @@ Run from `backend/`; the cache paths are relative to the working directory. The 
   - Server size, memory measurements and the launch checklist (proxy, systemd, firewall): `docs/HOSTING.md`.
 - **Dev data:** `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev -Dspring-boot.run.jvmArguments=-XX:+UseCompactObjectHeaders`
   - Austria + Hungary + Slovakia from `data/gtfs-dev/`, binary cache in `data/gtfs-dev-store.bin`.
+- **Offline data (#21):** `scripts/mini-data.sh` (from the repo root) zips 12 `gtfs-mini` test feeds into `data/gtfs-mini/`, then `./mvnw spring-boot:run -Dspring-boot.run.profiles=mini` runs on them (44 made-up stations, cache `data/gtfs-mini-store.bin`). For places without the dev feeds, such as a Claude Code cloud session, whose proxy blocks the feed hosts. The script leaves out `alpha-fast-train` (a second `alpha`), `kappa`/`lambda` (their countries exist only in the test borders) and `eta`/`zeta` (their trains run in early 2026 only), and uses the JDK's `jar`, since Git Bash has no `zip`.
+- **Claude Code cloud session (#21):** a Linux container with OpenJDK 21, so its environment's setup script installs JDK 25 and points `JAVA_HOME` at it. Its network allows `tiles.openfreemap.org` (map style, tiles, fonts), not the feed hosts. The `/run-dev` skill picks the `dev` profile when `data/gtfs-dev/` has zips, else `mini`.
 - **Fresh checkout:** `backend/data/` is not in git, so there are no zips. Start the app (it starts empty), open the admin panel → Feeds, click "Download outdated" (it includes the `MISSING` feeds), then Tools → reload. Or with `scripts/api.sh`: `feeds-download-outdated`, then `reload-gtfs`. Which feeds are expected comes from `feeds.sources` (dev: austria, hungary, slovakia; default: every feed in `gtfs-feeds.txt`). `hungary` downloads only with MÁV credentials in `feeds.auth.hungary` (see Configuration).
 
 - **Rollback:** the git tag `pre-compact` is the last version with the legacy engine and the JSON cache (`data/gtfs-cache.json`, `data/gtfs-dev-cache.json`, kept on disk for it). Its jar runs from those JSON files.
@@ -45,7 +47,7 @@ Run from `backend/`; the cache paths are relative to the working directory. The 
 
 ```
 RailRadius/
-├── README.md, LICENSE (AGPL-3.0), SECURITY.md, CLAUDE.md, docs/ (ARCHITECTURE, CODING_GUIDELINES, decisions, HOSTING, gtfs-sources, bench-stations.txt), scripts/ (api.sh, bench.sh, probe.sh)
+├── README.md, LICENSE (AGPL-3.0), SECURITY.md, CLAUDE.md, docs/ (ARCHITECTURE, CODING_GUIDELINES, decisions, HOSTING, gtfs-sources, bench-stations.txt), scripts/ (api.sh, bench.sh, probe.sh, mini-data.sh)
 ├── frontend/index.html               # markup; served at / by Spring (static-locations: file:../frontend/). Layout: a
 │                                     #   board bar across the top (search, query fields, result count, button), the map
 │                                     #   below it (notices, loading overlay, debug banner and dev login over it) and the
@@ -70,7 +72,7 @@ RailRadius/
 └── backend/
     ├── pom.xml
     ├── src/main/java/com/railradius/{controller,service,dto,model,config}/
-    ├── src/main/resources/application.yml (+ application-dev.yml), borders/europe.geojson (country borders),
+    ├── src/main/resources/application.yml (+ application-dev.yml, application-mini.yml), borders/europe.geojson (country borders),
     │                                          #   station-aliases.txt, station-codes.txt, train-categories.txt, train-category-columns.txt,
     │                                          #   gtfs-feeds.txt (download URLs per feed), feed-roots.pem (extra TLS roots)
     ├── config/application.yml                 # GITIGNORED local secrets (feed credentials), optional
@@ -80,6 +82,7 @@ RailRadius/
     └── data/                                  # GITIGNORED
         ├── gtfs/            # gtfs_<country>.zip, previous/ (zips replaced by the update center), broken/, list.txt (old download list), maps
         ├── gtfs-dev/        # 3 small feeds for the dev profile
+        ├── gtfs-mini/       # gtfs-mini test feeds zipped by scripts/mini-data.sh for the mini profile (#21)
         ├── snapshots/       # search oracle dumps of dev and full data
         ├── gtfs-store.bin   # what the app serves, as primitive arrays (generated, S20)
         ├── browser-data/    # the gzipped timetable for browsers, newest version only (generated, #9)
@@ -343,7 +346,7 @@ Every response, API and static files, carries the security headers of `SecurityH
 - `server.compression` (on, `application/wasm` only): `search.wasm` goes out gzipped, 0.30 instead of 0.86 MB (#12); nothing else is compressed by the app, and the browser data file is gzipped already
 - `server.forward-headers-strategy` (`none`, env `RAILRADIUS_FORWARD_HEADERS_STRATEGY`): set `native` behind a reverse proxy, so the rate limit sees the client's IP from `X-Forwarded-For` instead of the proxy's
 
-`application-dev.yml` overrides the GTFS directory, store file and alert settings file, sets `auto-load-from-files: true` and `feeds.sources: austria,hungary,slovakia`, turns predictive warming off and defaults `admin.token` to `dev`.
+`application-dev.yml` overrides the GTFS directory, store file and alert settings file, sets `auto-load-from-files: true` and `feeds.sources: austria,hungary,slovakia`, turns predictive warming off and defaults `admin.token` to `dev`. `application-mini.yml` does the same for `data/gtfs-mini/` (store `data/gtfs-mini-store.bin`, browser data `data/browser-data-mini`, alert settings `data/feed-alerts-mini.json`, `feeds.sources` the 12 feeds `scripts/mini-data.sh` zips).
 
 ## Known issues and TODOs
 
