@@ -42,7 +42,7 @@ italy-trenord;https://www.dati.lombardia.it/download/3z4k-mxz9/application%2Fzip
 italy-trenord;https://files.mobilitydatabase.org/mdb-855/latest.zip
 kosovo;https://hoermalmeister.github.io/gtfs-rehost/trainkos/trainkos.zip
 latvia;https://vivi.lv/uploads/GTFS.zip;User-Agent: RailRadius
-lithuania;https://jbb.ghsq.de/gtfs/lt-ltglink.gtfs.zip
+lithuania;https://www.visimarsrutai.lt/gtfs/gtfs_all.zip
 luxembourg;https://data.public-transport.earth/gtfs/lu
 moldova;https://hoermalmeister.github.io/gtfs-rehost/cfm/cfm.zip
 montenegro;https://jbb.ghsq.de/gtfs/me-zpcg.gtfs.zip
