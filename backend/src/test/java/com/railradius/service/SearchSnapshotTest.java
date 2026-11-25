@@ -11,6 +11,7 @@ import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.ForkJoinPool;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -79,6 +80,22 @@ class SearchSnapshotTest {
             assertThat(dump(readBack, mode).lines()).as(mode.name())
                     .containsExactlyElementsOf(Files.readAllLines(recording(feeds, mode)));
         }
+    }
+
+    // Stations reuse their thread's boarding workspace from station to station and search to search (#40); on one
+    // thread, every search of the dump runs on the arrays the one before left
+    @ParameterizedTest
+    @MethodSource("feedCombinations")
+    void searchesBackToBackOnOneThreadMatchTheRecordings(List<String> feeds) throws Exception {
+        TransitGraph loaded = GtfsTestFixtures.load(tempDir, feeds.toArray(String[]::new));
+        SearchSnapshot.RideFormat strict = SearchSnapshot.RideFormat.TRIP_IDS;
+
+        String dump;
+        try (ForkJoinPool oneThread = new ForkJoinPool(1)) {
+            dump = oneThread.submit(() -> dump(loaded, strict)).get();
+        }
+
+        assertThat(dump.lines()).containsExactlyElementsOf(Files.readAllLines(recording(feeds, strict)));
     }
 
     @Test
