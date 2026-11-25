@@ -18,7 +18,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 
 ## Environment: Windows first, also Linux cloud sessions
 - Dev machine is Windows 10. Claude's Bash tool is Git Bash; the user's own terminal is PowerShell 5.1.
-- Claude Code cloud sessions (claude.ai/code) run in a Linux container instead (#21): its setup script installs JDK 25, its proxy blocks the feed hosts, so `/run-dev` falls back to the offline `mini` profile (gtfs-mini test feeds). `uname -s` says which one you are in.
+- Claude Code cloud sessions (claude.ai/code) run in a Linux container instead (#21): its setup script installs JDK 25, its proxy allows the map tiles but blocks the feed hosts, so `/run-dev` falls back to the offline `mini` profile (gtfs-mini test feeds). `uname -s` says which one you are in.
 - Every shell command in docs, skills and scripts must work in Git Bash on Windows (and so also on Linux). No Linux-only tools or paths (`lsof`, `pkill`, `ps aux`, `nohup`, `xdg-open`, `/tmp`, `/proc`). Use instead:
   - ports/processes: stop the background task first; if the port stays busy, on Windows `netstat -ano | grep :8080`, then `taskkill //PID <pid> //F` (double slashes in Git Bash); on Linux `fuser -k 8080/tcp`
   - temp files: the session scratchpad
