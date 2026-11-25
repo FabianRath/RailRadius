@@ -1,11 +1,12 @@
-# Runs every test on each pull request into main and on each push to main, so a change is checked before it lands.
+# Runs every test on each pull request into main or perf and on each push to them, so a change is checked before it
+# lands. perf collects optimisations until the owner checks them on full data (decisions.md, 2026-11-25).
 name: Tests
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, perf]
   push:
-    branches: [main]
+    branches: [main, perf]
   workflow_dispatch:
 
 permissions:
