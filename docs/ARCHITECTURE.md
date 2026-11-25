@@ -50,7 +50,7 @@ Run from `backend/`; the cache paths are relative to the working directory. The 
 
 ```
 RailRadius/
-├── README.md, LICENSE (AGPL-3.0), SECURITY.md, CLAUDE.md, docs/ (ARCHITECTURE, CODING_GUIDELINES, decisions, HOSTING, gtfs-sources, bench-stations.txt), scripts/ (api.sh, bench.sh with bench-browser.mjs and perf-check.sh, probe.sh, mini-data.sh)
+├── README.md, LICENSE (AGPL-3.0), SECURITY.md, CLAUDE.md, docs/ (ARCHITECTURE, CODING_GUIDELINES, decisions, HOSTING, gtfs-sources, bench-stations.txt, internals.html: diagrams of the search, the browser data and the store, open in a browser), scripts/ (api.sh, bench.sh with bench-browser.mjs and perf-check.sh, probe.sh, mini-data.sh)
 ├── frontend/index.html               # markup; served at / by Spring (static-locations: file:../frontend/). Layout: a
 │                                     #   board bar across the top (search, query fields, result count, button), the map
 │                                     #   below it (notices, loading overlay, debug banner and dev login over it) and the

@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RailRadius Search Internals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column with wide figure bands; tabs for the three views; every diagram built on one toy Austrian network. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --sunk: #e9edf1;
+  --ink: #16202b;
+  --muted: #5a6776;
+  --line: #d3dae2;
+  --r0: #2459c4;
+  --r1: #0b8a7c;
+  --r2: #c0470f;
+  --miss: #b4232f;
+  --r0-soft: #e2eafb;
+  --r1-soft: #dcf2ee;
+  --r2-soft: #fbe6da;
+  --miss-soft: #f8e0e2;
+  --hl: #fff2b8;
+  --font-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1319; --surface: #151c24; --sunk: #1c2530; --ink: #e5eaf0; --muted: #94a2b1; --line: #2b3644;
+    --r0: #7aa5ff; --r1: #3fc9b5; --r2: #f2904f; --miss: #ff7a85;
+    --r0-soft: #1c2a47; --r1-soft: #133630; --r2-soft: #3b2416; --miss-soft: #3d1c21; --hl: #4a3f12;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1319; --surface: #151c24; --sunk: #1c2530; --ink: #e5eaf0; --muted: #94a2b1; --line: #2b3644;
+  --r0: #7aa5ff; --r1: #3fc9b5; --r2: #f2904f; --miss: #ff7a85;
+  --r0-soft: #1c2a47; --r1-soft: #133630; --r2-soft: #3b2416; --miss-soft: #3d1c21; --hl: #4a3f12;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--font-display); font-stretch: 85%; line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(30px, 5vw, 44px); font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 26px; font-weight: 700; }
+h3 { font-size: 18px; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--font-mono); font-size: 0.88em; }
+code { background: var(--sunk); padding: 1px 5px; border-radius: 4px; }
+.muted { color: var(--muted); }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+header.top { padding-block: 40px 20px; display: grid; gap: 12px; }
+header.top p { color: var(--muted); font-size: 16px; }
+
+nav.tabs {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; margin-bottom: 28px;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+nav.tabs a {
+  font-family: var(--font-display); font-stretch: 85%; font-weight: 600; font-size: 16px; color: var(--muted);
+  text-decoration: none; padding: 12px 14px 10px; border-bottom: 3px solid transparent; white-space: nowrap;
+}
+nav.tabs a:hover { color: var(--ink); }
+nav.tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--r0); }
+nav.tabs a:focus-visible, button:focus-visible { outline: 2px solid var(--r0); outline-offset: 2px; }
+
+section.view { display: grid; gap: 44px; }
+[hidden] { display: none !important; }
+.block { display: grid; gap: 14px; }
+.block > p { color: var(--ink); }
+.figure { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 14px; min-width: 0; }
+.scroll-x { overflow-x: auto; }
+.caption { font-size: 13px; color: var(--muted); }
+
+/* stats */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.stat { background: var(--surface); padding: 14px 16px; display: grid; gap: 2px; }
+.stat b { font-family: var(--font-display); font-stretch: 85%; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12.5px; color: var(--muted); }
+
+/* admission flow */
+.flow { display: grid; gap: 0; }
+.flow-step { display: grid; grid-template-columns: 34px 1fr; gap: 12px; }
+.flow-rail { display: flex; flex-direction: column; align-items: center; }
+.flow-dot { width: 14px; height: 14px; border-radius: 50%; border: 3px solid var(--r0); background: var(--surface); margin-top: 4px; flex: none; }
+.flow-line { width: 3px; flex: 1; background: var(--r0); opacity: 0.35; }
+.flow-step:last-child .flow-line { display: none; }
+.flow-body { padding-bottom: 18px; display: grid; gap: 6px; min-width: 0; }
+.flow-body h3 { font-size: 16px; }
+.exits { display: flex; flex-wrap: wrap; gap: 6px; }
+.exit { font-size: 12.5px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; background: var(--sunk); }
+.exit.ok { border-color: var(--r1); color: var(--r1); background: var(--r1-soft); }
+.exit.no { border-color: var(--miss); color: var(--miss); background: var(--miss-soft); }
+
+/* round stepper */
+.stepper { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 820px) { .stepper { grid-template-columns: 1fr; } }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button {
+  font: 600 14px var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 12px; cursor: pointer;
+}
+button:hover { background: var(--sunk); }
+button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+button:disabled { opacity: 0.4; cursor: default; }
+svg text { font-family: var(--font-body); }
+.map-svg { width: 100%; min-width: 560px; height: auto; display: block; }
+.log { display: grid; gap: 8px; font-size: 14px; align-content: start; }
+.log li { margin-left: 18px; }
+.log ul { margin: 0; padding: 0; display: grid; gap: 6px; }
+.tag { display: inline-block; font: 500 11.5px var(--font-mono); padding: 1px 6px; border-radius: 4px; }
+.tag.r0 { background: var(--r0-soft); color: var(--r0); }
+.tag.r1 { background: var(--r1-soft); color: var(--r1); }
+.tag.r2 { background: var(--r2-soft); color: var(--r2); }
+.tag.miss { background: var(--miss-soft); color: var(--miss); }
+
+table { border-collapse: collapse; font-size: 13.5px; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; }
+
+/* round anatomy */
+.phases { display: grid; gap: 16px; }
+.phase { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+@media (max-width: 760px) { .phase { grid-template-columns: 1fr; } }
+.phase-head { display: grid; gap: 6px; align-content: start; }
+.phase-num { font: 700 13px var(--font-mono); color: var(--r0); }
+.phase-head p { font-size: 14px; color: var(--muted); }
+.phase-body { display: grid; gap: 10px; min-width: 0; }
+
+.days { display: grid; grid-template-columns: 44px repeat(9, minmax(18px, 1fr)); gap: 3px; font: 11px var(--font-mono); color: var(--muted); max-width: 420px; }
+.days .c { aspect-ratio: 1; border-radius: 3px; background: var(--sunk); max-width: 100%; }
+.days .c.on { background: var(--r0); }
+.days .c.on2 { background: var(--r1); }
+.days .c.both { background: var(--r2); }
+.days .lab { align-self: center; }
+.days .ph { text-align: center; }
+.day-grids { display: flex; flex-wrap: wrap; gap: 18px; align-items: start; }
+.day-grids > div { display: grid; gap: 6px; flex: 1 1 200px; min-width: 0; }
+.verdict { font-weight: 600; }
+.verdict.ok { color: var(--r1); }
+.verdict.no { color: var(--miss); }
+
+/* sequence */
+.seq { display: grid; grid-template-columns: 1fr 1fr; gap: 0; position: relative; }
+.seq-head { font: 700 15px var(--font-display); font-stretch: 85%; padding: 8px 12px; border-bottom: 2px solid var(--ink); }
+.seq-head:nth-child(2) { text-align: right; }
+.msg { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; padding: 10px 0; border-bottom: 1px dashed var(--line); gap: 4px; }
+.msg .arrow { display: flex; align-items: center; gap: 8px; font: 500 13px var(--font-mono); }
+.msg .arrow::before, .msg .arrow::after { content: ""; height: 2px; background: currentColor; flex: 1; opacity: .6; }
+.msg.up .arrow { color: var(--r0); }
+.msg.down .arrow { color: var(--r1); }
+.msg.up .arrow::after { flex: 0 0 0; }
+.msg.up .arrow { flex-direction: row; }
+.msg .arrow span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.msg p { font-size: 13.5px; color: var(--muted); max-width: none; }
+.msg .dir { font: 600 11px var(--font-mono); letter-spacing: .06em; }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 760px) { .split { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+pre { margin: 0; background: var(--sunk); border-radius: 8px; padding: 12px; overflow-x: auto; font: 12.5px/1.5 var(--font-mono); }
+
+/* file anatomy */
+.file { display: grid; gap: 4px; font-size: 13.5px; }
+.blk { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 12px; border-radius: 6px; background: var(--sunk); border-left: 4px solid var(--muted); }
+@media (max-width: 600px) { .blk { grid-template-columns: 1fr; gap: 2px; } }
+.blk.h { border-left-color: var(--ink); }
+.blk.st { border-left-color: var(--r0); }
+.blk.tr { border-left-color: var(--r1); }
+.blk.dy { border-left-color: var(--r2); }
+.blk b { font-family: var(--font-mono); font-weight: 500; font-size: 12.5px; }
+.blk .ty { font: 12px var(--font-mono); color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+.bars { display: grid; gap: 10px; }
+.bar-row { display: grid; grid-template-columns: minmax(120px, 260px) minmax(0, 1fr); gap: 12px; align-items: center; font-size: 13.5px; }
+@media (max-width: 600px) { .bar-row { grid-template-columns: 1fr; gap: 4px; } }
+.bar-track { position: relative; height: 22px; }
+.bar { height: 100%; background: var(--r0); border-radius: 0 4px 4px 0; min-width: 2px; }
+.bar.final { background: var(--r1); }
+.bar-val { position: absolute; top: 2px; font: 500 12.5px var(--font-mono); font-variant-numeric: tabular-nums; padding-left: 6px; }
+
+.delta td.d { color: var(--r1); font-weight: 600; }
+
+/* store */
+.store { display: grid; gap: 18px; }
+.arr { display: grid; gap: 4px; min-width: 0; }
+.arr-name { font: 500 12.5px var(--font-mono); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.arr-name span { font-family: var(--font-body); color: var(--muted); font-size: 12.5px; }
+.cells { display: flex; gap: 2px; }
+.cell { min-width: 46px; flex: none; text-align: center; padding: 4px 2px; border-radius: 4px; background: var(--sunk); font: 12px var(--font-mono); font-variant-numeric: tabular-nums; cursor: pointer; position: relative; border: 1px solid transparent; }
+.cell .ix { display: block; font-size: 9.5px; color: var(--muted); }
+.cell.hl { background: var(--hl); border-color: var(--r2); }
+.cell.sel { background: var(--r0); color: var(--bg); }
+.cell.sel .ix { color: var(--bg); }
+.cell.wide { min-width: 86px; }
+.pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick button { font-size: 13px; padding: 5px 10px; }
+.explain { font-size: 14px; min-height: 3em; background: var(--sunk); border-radius: 8px; padding: 10px 12px; }
+
+.bytes { display: grid; gap: 14px; }
+.byte-row { display: grid; gap: 6px; }
+.byte-bar { display: flex; height: 34px; border-radius: 6px; overflow: hidden; gap: 2px; }
+.byte-bar div { display: flex; align-items: center; justify-content: center; font: 11px var(--font-mono); color: var(--bg); overflow: hidden; white-space: nowrap; padding: 0 3px; min-width: 0; }
+.f-int { background: var(--r0); }
+.f-short { background: var(--r1); }
+.f-long { background: var(--r2); }
+.f-char { background: var(--muted); }
+
+footer { margin-top: 56px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .net-node, .net-edge { transition: opacity .25s, stroke .25s, fill .25s; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow">RailRadius · how it works</div>
+  <h1>How a reachability search runs</h1>
+  <p>Three views of the same system: the round-based search, what the browser downloads and sends, and the flat arrays the server searches on. Every example uses the same small Austrian network, so you can follow one train from the map into the arrays.</p>
+</header>
+
+<nav class="tabs" aria-label="Views">
+  <a href="#search" data-view="search">1 · The search</a>
+  <a href="#browser" data-view="browser">2 · What the browser gets</a>
+  <a href="#server" data-view="server">3 · Data on the server</a>
+</nav>
+
+<!-- ============================ SEARCH ============================ -->
+<section class="view" id="view-search">
+  <div class="block">
+    <h2>The question</h2>
+    <p>From one start station, with at most <em>N</em> transfers, which stations can you reach, and how fast? There is no travel date and no start time: every train leaving the start can begin a journey, and a journey's duration counts from that train's departure. The search runs one round per transfer count, like RAPTOR.</p>
+  </div>
+
+  <div class="block">
+    <h2>Rounds on a toy network</h2>
+    <p>Start: <b>Wien</b>, minimum transfer time 5 min (the example's window). Step through the rounds. Each round boards trains from the stations the previous round reached.</p>
+    <div class="figure">
+      <div class="controls" role="group" aria-label="Round">
+        <button type="button" id="r-0" data-round="0">Round 0 · ride from start</button>
+        <button type="button" id="r-1" data-round="1">Round 1 · 1 transfer</button>
+        <button type="button" id="r-2" data-round="2">Round 2 · 2 transfers</button>
+      </div>
+      <div class="stepper">
+        <div class="scroll-x"><svg id="net" class="map-svg" viewBox="0 0 880 360" role="img" aria-label="Toy rail network around Austria"></svg></div>
+        <div class="log" id="log"></div>
+      </div>
+      <div class="scroll-x">
+        <table id="result-table" aria-label="Result after this round"></table>
+      </div>
+      <p class="caption">Durations count from the first train's departure at Wien. Passau is never reached: the only train there leaves Linz 3 min after the arrival, under the 5 min minimum.</p>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>Before any search: admission</h2>
+    <p><code>SearchAdmission.admit</code> decides whether a request needs a search at all. Results live in <code>ReachabilityCache</code>, keyed by <code>SearchOptions(start, maxTransfers, minTransfer, maxTransfer)</code>.</p>
+    <div class="figure">
+      <div class="flow">
+        <div class="flow-step"><div class="flow-rail"><div class="flow-dot"></div><div class="flow-line"></div></div>
+          <div class="flow-body"><h3>Validate</h3><p class="muted">Unknown station or out-of-range parameter: refused before cache, rate limit or search (<code>SearchRequestValidator</code>).</p>
+            <div class="exits"><span class="exit no">400 INVALID</span></div></div></div>
+        <div class="flow-step"><div class="flow-rail"><div class="flow-dot"></div><div class="flow-line"></div></div>
+          <div class="flow-body"><h3>Stored result?</h3><p class="muted">Same key: sent at once. A stored result with <em>more</em> transfers is cut down to paths with ≤ N transfers, which equals a search with N, since a round never depends on later rounds.</p>
+            <div class="exits"><span class="exit ok">exact hit</span><span class="exit ok">cut down</span></div></div></div>
+        <div class="flow-step"><div class="flow-rail"><div class="flow-dot"></div><div class="flow-line"></div></div>
+          <div class="flow-body"><h3>Same search already running?</h3><p class="muted">Identical keys wait for it (<code>InFlightSearches</code>) without holding a permit or a queue place.</p>
+            <div class="exits"><span class="exit ok">share its result</span></div></div></div>
+        <div class="flow-step"><div class="flow-rail"><div class="flow-dot"></div><div class="flow-line"></div></div>
+          <div class="flow-body"><h3>Rate limit</h3><p class="muted">The search is charged to the client key's budget (IPv4 address or IPv6 /64). Stored results and admins are free.</p>
+            <div class="exits"><span class="exit no">over budget</span></div></div></div>
+        <div class="flow-step"><div class="flow-rail"><div class="flow-dot"></div><div class="flow-line"></div></div>
+          <div class="flow-body"><h3>Gate: 2 permits, 6 waiting</h3><p class="muted">The permits bound the heap, since each keeps a ~170 MB scratch. A full queue refuses; with a permit, stored results are checked once more.</p>
+            <div class="exits"><span class="exit no">503 BUSY</span></div></div></div>
+        <div class="flow-step"><div class="flow-rail"><div class="flow-dot"></div><div class="flow-line"></div></div>
+          <div class="flow-body"><h3>Search, round by round</h3><p class="muted"><code>CompactReachabilitySearch</code>. Each round's stations stream out as it ends. Past the 30 s deadline the search stops, stores nothing and frees its permit.</p>
+            <div class="exits"><span class="exit ok">stored in cache</span><span class="exit no">503 TOO_SLOW</span></div></div></div>
+        <div class="flow-step"><div class="flow-rail"><div class="flow-dot"></div><div class="flow-line"></div></div>
+          <div class="flow-body"><h3>Warm up</h3><p class="muted">After a stream with N &lt; 5, <code>ReachabilityWarmer</code> searches 5 transfers in the background, but only when the gate is idle. Every higher count is then a cut-down.</p></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>Inside one round</h2>
+    <p>Round 0 rides every trip from the start. Each later round runs these steps on the previous round's arrivals.</p>
+    <div class="phases">
+      <div class="phase">
+        <div class="phase-head"><span class="phase-num">STEP 1</span><h3>Group arrivals by station</h3>
+          <p>The previous round's arrivals, minus those overtaken on all their days, grouped by station index and sorted by arrival time.</p></div>
+        <div class="phase-body"><p>Stations then choose what to board <b>in parallel</b> on the fork-join pool: choosing only reads earlier rounds. The result is the same as on one thread.</p></div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head"><span class="phase-num">STEP 2</span><h3>Sweep departures against arrivals</h3>
+          <p><code>TransferWindowInts</code>: a sliding window over the station's sorted arrivals.</p></div>
+        <div class="phase-body">
+          <div class="scroll-x"><svg id="window-svg" viewBox="0 0 640 200" style="min-width:520px;width:100%;height:auto" role="img" aria-label="Transfer window at a station"></svg></div>
+          <p>Each departure boards from the arrival inside the wait window (min … max) that gives the <b>shortest journey so far</b>. A later arrival can win if its journey started later. Slower arrivals board too, but only for days of the departing train that no faster one covers. Waits past midnight use a second window with the arrivals moved a day back.</p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head"><span class="phase-num">STEP 3</span><h3>Check the days</h3>
+          <p>A transfer needs a day on which the whole journey so far runs <em>and</em> the next train runs.</p></div>
+        <div class="phase-body">
+          <p>Days are a <code>WeekPeriodDays</code>: one <code>long</code>, 7 weekdays × 9 six-week periods from this week's Monday (about a year, 63 bits). The check is one bitwise AND. Exact dates made the full-data search about 4× slower.</p>
+          <div class="controls" role="group" aria-label="Next train">
+            <button type="button" id="d-a" data-days="a" aria-pressed="true">Next train: daily, autumn only</button>
+            <button type="button" id="d-b" data-days="b" aria-pressed="false">Next train: weekends, spring only</button>
+          </div>
+          <div class="day-grids" id="day-grids"></div>
+          <p class="verdict" id="day-verdict"></p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head"><span class="phase-num">STEP 4</span><h3>Ride boarded trips forward</h3>
+          <p>Every stop after boarding becomes an arrival, unless pruning stops the ride.</p></div>
+        <div class="phase-body">
+          <p><code>TripProgressFlat</code> keeps, per stop of each reached trip, the shortest duration and the days of rides recorded there. A ride stops as soon as it is no faster and all its days are already reached: an earlier ride got there with no more transfers and stays ahead for the rest of the trip.</p>
+          <p class="muted">Arrival time is part of the state, so a slower but earlier arrival that catches a better train is kept (B2), and so is a slower ride on days the faster one does not run (B33). Riding runs in station index order, after the parallel choice.</p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head"><span class="phase-num">STEP 5</span><h3>Choose each station's shown path</h3>
+          <p><code>RegularJourneyChooser</code>, once the round ends. Later rounds only add paths with more transfers, so this choice is final.</p></div>
+        <div class="phase-body">
+          <p>Candidates: the fastest ride with this transfer count and every ride at most <b>30 min slower</b>. The shown path is the fastest that runs on at least <b>half as many days</b> as the most frequent candidate, so a slightly faster train that runs on a few days doesn't hide the regular one (B26).</p>
+          <p class="muted">A chosen path not faster than one with fewer transfers is left out. That is why Salzburg via Linz (2 h 55, 1 transfer) never shows in the toy: the direct IC takes 2 h 30.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ BROWSER ============================ -->
+<section class="view" id="view-browser" hidden>
+  <div class="block">
+    <h2>Two ways to search, one result</h2>
+    <p>The page runs the search in the browser when it can: the same Java search, compiled to WebAssembly with TeaVM, on a trimmed copy of the timetable. The server's SSE stream is the fallback. Both show the same stations, because both pick them through <code>ShownStations</code>.</p>
+    <div class="split">
+      <div class="card">
+        <span class="tag r1">preferred</span>
+        <h3>In the browser</h3>
+        <ul>
+          <li>Used when the engine is ready, or becomes ready within 5 s of its load's start.</li>
+          <li>Runs in a Web Worker on one thread, so the page stays responsive.</li>
+          <li>Costs the server nothing per search, except a journey when a station is opened.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <span class="tag r0">fallback</span>
+        <h3>On the server (SSE)</h3>
+        <ul>
+          <li>When the engine isn't ready or fails. The stream then retries loading the engine.</li>
+          <li>Goes through admission, the rate limit and the gate.</li>
+          <li>Sends each round's stations as soon as the round ends.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>What goes over the wire</h2>
+    <div class="figure">
+      <div class="seq" id="seq">
+        <div class="seq-head">Browser</div><div class="seq-head">Server</div>
+      </div>
+      <p class="caption">Full data, gzipped sizes. The data file's URL holds its content version, so it is cached for a year; a new timetable gets a new URL.</p>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>Payloads</h2>
+    <div class="split">
+      <div class="card">
+        <h3>Manifest · <code>GET /api/browser-data</code></h3>
+        <p class="muted" style="font-size:14px">A browser searches locally only if data version, engine version and today all match. Otherwise it would find other stations.</p>
+<pre>{
+  "version": "3f9c2a71b04e8d15",
+  "path": "/api/browser-data/3f9c2a71b04e8d15.bin",
+  "sizeBytes": 8178441,
+  "engineVersion": "a81e06c2d94f7b30",
+  "today": "2026-11-25"
+}</pre>
+      </div>
+      <div class="card">
+        <h3>A station on the map · SSE <code>stations</code></h3>
+        <p class="muted" style="font-size:14px"><code>ReachableStationSummary</code>, in batches of 30. No path, legs or running days: on full data those made the stream about 100 MB.</p>
+<pre>{
+  "stopId": "austria:Pi-3a8",
+  "stopName": "Innsbruck Hbf",
+  "country": "AT",
+  "latitude": 47.2632,
+  "longitude": 11.4011,
+  "transfers": 1,
+  "totalDuration": "4h 35m",
+  "totalDurationMinutes": 275
+}</pre>
+      </div>
+      <div class="card">
+        <h3>Open a station · <code>POST /reachability/ride-journey</code></h3>
+        <p class="muted" style="font-size:14px">After a browser search, the browser sends the rides it found as positions in the store. The server builds the journey without searching.</p>
+<pre>{
+  "version": "3f9c2a71b04e8d15",
+  "minTransferMinutes": null,
+  "maxTransferMinutes": null,
+  "rides": [
+    { "trip": 0, "boardEvent": 0, "alightEvent": 2 },
+    { "trip": 3, "boardEvent": 11, "alightEvent": 12 }
+  ]
+}</pre>
+      </div>
+      <div class="card">
+        <h3>The answer · <code>ReachableStation</code></h3>
+        <p class="muted" style="font-size:14px">The summary's fields plus everything a journey needs: path, legs, running days.</p>
+<pre>{ …summary fields…,
+  "path": ["austria:…Wien", "austria:…Linz", …],
+  "pathNames": ["Wien Hbf", "Linz Hbf", …],
+  "legs": [
+    { "type": "TRAIN", "trainName": "IC 540",
+      "fromStation": "Wien Hbf", "toStation": "Salzburg Hbf",
+      "departureTime": "08:00", "arrivalTime": "10:30" },
+    { "type": "TRANSFER", "duration": "15m" }, …
+  ],
+  "runningDays": "Runs daily",
+  "hasCommonDay": true,
+  "roundTripStation": null
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>Inside the browser data file</h2>
+    <p><code>BrowserDataFile</code>, format version 1: a <code>BinaryBlocks</code> file of length-prefixed little-endian arrays. It holds only what the search and the map need. Counts below are for the full data.</p>
+    <div class="figure">
+      <div class="legend"><span><i style="background:var(--ink)"></i>header</span><span><i style="background:var(--r0)"></i>stations</span><span><i style="background:var(--r1)"></i>trips and stop events</span><span><i style="background:var(--r2)"></i>days</span></div>
+      <div class="file">
+        <div class="blk h"><b>header</b><span>magic <code>RRST</code>, format version, 32-byte hash, block count</span><span class="ty">fixed</span></div>
+        <div class="blk h"><b>notice</b><span>ODbL text and every feed with its first and last day</span><span class="ty">UTF-8</span></div>
+        <div class="blk st"><b>station ids</b><span><code>PackedStrings</code>: one UTF-8 byte[] plus offsets</span><span class="ty">34,081 × str</span></div>
+        <div class="blk st"><b>names, countries</b><span>same layout; missing as ""</span><span class="ty">2 × 34,081 × str</span></div>
+        <div class="blk st"><b>lat, lon</b><span>float bits, NaN if missing</span><span class="ty">2 × 34,081 × int</span></div>
+        <div class="blk tr"><b>stop counts</b><span>stops per trip; the browser rebuilds <code>tripFirstEvent</code> from it</span><span class="ty">~430 k × int</span></div>
+        <div class="blk tr"><b>event station</b><span>station index of every stop event</span><span class="ty">5.8 M × int</span></div>
+        <div class="blk tr"><b>arrival diffs</b><span>seconds since the trip's previous time</span><span class="ty">5.8 M × int</span></div>
+        <div class="blk tr"><b>departure diffs</b><span>same; <code>NO_TIME</code> where there is no leg</span><span class="ty">5.8 M × int</span></div>
+        <div class="blk dy"><b>day patterns</b><span>the distinct service-day bitsets: first word, word starts, words</span><span class="ty">int, int, long</span></div>
+        <div class="blk dy"><b>trip pattern</b><span>each trip's day pattern</span><span class="ty">~430 k × int</span></div>
+      </div>
+      <div class="split">
+        <div>
+          <h3 style="margin-bottom:6px">Left out</h3>
+          <ul style="margin:0;padding-left:18px;font-size:14px;display:grid;gap:4px">
+            <li>Trip IDs, route names, train numbers, translated names: journeys are built on the server.</li>
+            <li>Station name index: station search stays on the server.</li>
+            <li>Departure index and regular departures: derived again when the file is read.</li>
+          </ul>
+        </div>
+        <div>
+          <h3 style="margin-bottom:6px">Why time differences</h3>
+          <p style="font-size:14px">Within a trip, the gaps between times are small numbers that repeat across trains, and gzip compresses repeats well. Absolute times barely repeat.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>Times as differences, on IC 540</h2>
+    <div class="figure scroll-x">
+      <table class="delta" id="delta-table"></table>
+      <p class="caption">The first stop has no arrival and the last no departure (<code>NO_TIME</code>). Reading undoes the differences per trip, back to seconds since midnight.</p>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>How the file got to 7.8 MB</h2>
+    <div class="figure">
+      <div class="bars" id="bars"></div>
+      <p class="caption">gzip -9 sizes of each step, measured on the full data (docs/HOSTING.md). Brotli would save 2.7 MB more but needs a library. The engine itself, <code>search.wasm</code>, is 0.30 MB gzipped.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ SERVER ============================ -->
+<section class="view" id="view-server" hidden>
+  <div class="block">
+    <h2>One graph, flat arrays</h2>
+    <p>What the server serves is a <code>ServedGraph</code>: stations, trip infos, translated names, the station search index and the <code>TimetableStore</code>, swapped whole in one <code>volatile</code> field so a reader never sees a mix of old and new. The search only reads the store: no objects per trip or stop, just parallel <code>int[]</code> arrays.</p>
+    <div class="stats">
+      <div class="stat"><b>34,081</b><span>stations after cross-border merging</span></div>
+      <div class="stat"><b>~430 k</b><span>search trips (840 k feed trips; identical ones merged)</span></div>
+      <div class="stat"><b>5.8 M</b><span>stop events</span></div>
+      <div class="stat"><b>~184 MB</b><span>the store in memory</span></div>
+      <div class="stat"><b>~3 s</b><span>start from the binary cache</span></div>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>The toy network as a <code>TimetableStore</code></h2>
+    <p>The same ten trips as in the search view. Trips index into stop events (CSR); each station indexes into its departures, sorted by time. Pick a trip, a station or any cell to follow the links.</p>
+    <div class="figure">
+      <div class="pick" id="pick-trips" aria-label="Trips"></div>
+      <div class="pick" id="pick-stations" aria-label="Stations"></div>
+      <div class="explain" id="store-explain">Pick a trip or a station.</div>
+      <div class="store scroll-x" id="store"></div>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>How the arrays answer the search's questions</h2>
+    <div class="split">
+      <div class="card">
+        <h3>"Which trains leave station s?"</h3>
+        <p style="font-size:14px"><code>depStart[s] … depStart[s+1]</code> is a slice of <code>depSec</code> and <code>depEvent</code>, already sorted by time (equal times in event order). The transfer sweep walks it in one pass.</p>
+      </div>
+      <div class="card">
+        <h3>"Ride trip t on from event e"</h3>
+        <p style="font-size:14px">Events of a trip are contiguous: <code>e+1 … tripFirstEvent[t+1]-1</code>. Each gives <code>evStation</code> and <code>evArrSec</code>. <code>evTrip</code> maps any departure's event back to its trip.</p>
+      </div>
+      <div class="card">
+        <h3>"Does it run on those days?"</h3>
+        <p style="font-size:14px"><code>tripDayPattern[t]</code> points into <code>DayPatterns</code>: each distinct calendar once, as exact <code>ServiceDays</code> (a bitset over epoch days) and as its <code>WeekPeriodDays</code> long, worked out once per day.</p>
+      </div>
+      <div class="card">
+        <h3>"Is this departure regular?"</h3>
+        <p style="font-size:14px"><code>regularDeparture</code> is a bitset over departures. A ride ends where its trip leaves at a time that, over all trips leaving there then, runs on fewer than 8 days.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>A search's scratch space</h2>
+    <p>Per running search, a <code>SearchScratch</code> of flat arrays that are reused and never shrink (one per gate permit). Durations are <code>char</code>s (<code>PackedMinutes</code>, up to 65,534 min), because these columns hold millions of entries. Byte layouts per entry:</p>
+    <div class="figure">
+      <div class="legend"><span><i class="f-int"></i>int (4 B)</span><span><i class="f-short"></i>short (2 B)</span><span><i class="f-char"></i>char (2 B)</span><span><i class="f-long"></i>long (8 B)</span></div>
+      <div class="bytes" id="bytes"></div>
+      <p class="caption">Largest measured search, Stockholm with 5 transfers: ~171 MB scratch, ~195 MiB held while it runs. Labels 1.23 M used of 1.79 M, rides 1.24 M of 1.51 M, trip progress 2.98 M of 3.78 M slots.</p>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>A result in the cache</h2>
+    <p><code>CompactResult</code> holds, per station, its paths' transfers and minutes, plus only the labels of the chosen paths and the rides before them. No strings, no journey objects: a journey is built from the store when a station is opened. A stored 5-transfer result is ~1.3–1.8 MB, and the cache keeps at most 30.</p>
+  </div>
+</section>
+
+<footer>Built from <code>docs/ARCHITECTURE.md</code>, <code>docs/HOSTING.md</code> and the source of <code>TimetableStore</code>, <code>BrowserDataFile</code> and the DTOs. The toy network and the payload IDs are examples; sizes and counts are the full-data measurements.</footer>
+</div>
+
+<script>
+(function () {
+  const NS = "http://www.w3.org/2000/svg";
+  const MIN_TRANSFER = 5;
+
+  const ST = {
+    wien: { name: "Wien", lon: 16.37, lat: 48.21 }, linz: { name: "Linz", lon: 14.29, lat: 48.31 },
+    salzburg: { name: "Salzburg", lon: 13.04, lat: 47.81 }, innsbruck: { name: "Innsbruck", lon: 11.40, lat: 47.26 },
+    zurich: { name: "Zürich", lon: 8.54, lat: 47.38 }, passau: { name: "Passau", lon: 13.45, lat: 48.57 },
+    graz: { name: "Graz", lon: 15.44, lat: 47.07 }, villach: { name: "Villach", lon: 13.85, lat: 46.61 },
+    ljubljana: { name: "Ljubljana", lon: 14.51, lat: 46.06 }, gyor: { name: "Győr", lon: 17.63, lat: 47.69 },
+    budapest: { name: "Budapest", lon: 19.04, lat: 47.50 }, szeged: { name: "Szeged", lon: 20.15, lat: 46.25 }
+  };
+  // Stops: [station, arrival, departure]; null = no leg there (NO_LEG)
+  const TRIPS = [
+    { id: "IC 540", days: 0, stops: [["wien", null, "08:00"], ["linz", "09:15", "09:17"], ["salzburg", "10:30", null]] },
+    { id: "RJ 61", days: 0, stops: [["wien", null, "09:00"], ["gyor", "10:10", "10:12"], ["budapest", "11:40", null]] },
+    { id: "RJ 533", days: 0, stops: [["wien", null, "07:30"], ["graz", "10:00", null]] },
+    { id: "RJ 162", days: 0, stops: [["salzburg", null, "10:45"], ["innsbruck", "12:35", null]] },
+    { id: "IC 515", days: 1, stops: [["graz", null, "10:20"], ["villach", "12:10", null]] },
+    { id: "REX 3912", days: 1, stops: [["linz", null, "09:30"], ["salzburg", "10:55", null]] },
+    { id: "EC 158", days: 0, stops: [["innsbruck", null, "13:00"], ["zurich", "16:30", null]] },
+    { id: "EC 151", days: 0, stops: [["villach", null, "12:40"], ["ljubljana", "14:20", null]] },
+    { id: "REX 5961", days: 2, stops: [["linz", null, "09:18"], ["passau", "10:20", null]] },
+    { id: "IC 1", days: 1, stops: [["budapest", null, "12:10"], ["szeged", "14:30", null]] }
+  ];
+  const PATTERNS = ["daily", "Mon–Fri", "Sat, Sun"];
+
+  const sec = (hm) => { const [h, m] = hm.split(":").map(Number); return h * 3600 + m * 60; };
+  const fmtMin = (m) => `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}`;
+  function el(tag, attrs, text) {
+    const e = document.createElement(tag);
+    for (const k in attrs || {}) e.setAttribute(k, attrs[k]);
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+  function sv(tag, attrs, text) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs || {}) e.setAttribute(k, attrs[k]);
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  /* ---------- tabs ---------- */
+  const VIEWS = ["search", "browser", "server"];
+  function showView() {
+    const name = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "search";
+    for (const v of VIEWS) document.getElementById("view-" + v).hidden = v !== name;
+    document.querySelectorAll("nav.tabs a").forEach((a) => {
+      if (a.dataset.view === name) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
+  }
+  window.addEventListener("hashchange", showView);
+  showView();
+
+  /* ---------- round stepper ---------- */
+  const proj = (s) => ({ x: 40 + (s.lon - 8.3) * 66, y: 40 + (48.75 - s.lat) * 66 * 1.45 });
+  // Which trip legs are ridden in which round, and what each round reaches
+  const ROUNDS = [
+    { rides: ["IC 540", "RJ 61", "RJ 533"], misses: [], reached: {
+        linz: [75, "IC 540"], salzburg: [150, "IC 540"], gyor: [70, "RJ 61"], budapest: [160, "RJ 61"], graz: [150, "RJ 533"] },
+      log: [
+        ["r0", "Every trip leaving Wien is ridden stop by stop. Three trains: IC 540 at 08:00, RJ 533 at 07:30, RJ 61 at 09:00."],
+        ["r0", "Each stop records an arrival with its duration since that train left Wien."],
+        ["", "5 stations reached with 0 transfers."]
+      ] },
+    { rides: ["RJ 162", "IC 515", "IC 1", "REX 3912"], misses: ["REX 5961"], reached: {
+        innsbruck: [275, "IC 540 → RJ 162"], villach: [280, "RJ 533 → IC 515"], szeged: [330, "RJ 61 → IC 1"] },
+      log: [
+        ["r1", "Salzburg (arr 10:30) boards RJ 162 at 10:45 → Innsbruck in 4 h 35."],
+        ["r1", "Graz (arr 10:00) boards IC 515 at 10:20 → Villach. Budapest (arr 11:40) boards IC 1 → Szeged."],
+        ["miss", "Linz (arr 09:15) misses REX 5961 at 09:18: 3 min is under the 5 min minimum. Passau stays unreached."],
+        ["r1", "Linz boards REX 3912 at 09:30 → Salzburg 10:55 (2 h 55). Not shown: the 0-transfer path takes 2 h 30."]
+      ] },
+    { rides: ["EC 158", "EC 151"], misses: [], reached: {
+        zurich: [510, "IC 540 → RJ 162 → EC 158"], ljubljana: [410, "RJ 533 → IC 515 → EC 151"] },
+      log: [
+        ["r2", "Innsbruck boards EC 158 → Zürich in 8 h 30."],
+        ["r2", "Villach boards EC 151 → Ljubljana in 6 h 50, across the border."],
+        ["", "Rounds stop at the transfer limit. Each round's stations were already streamed when it ended."]
+      ] }
+  ];
+  const svg = document.getElementById("net");
+  const edgeEls = {}, nodeEls = {};
+  function buildNet() {
+    for (const t of TRIPS) {
+      for (let i = 0; i + 1 < t.stops.length; i++) {
+        const a = proj(ST[t.stops[i][0]]), b = proj(ST[t.stops[i + 1][0]]);
+        const off = t.id === "REX 3912" ? 10 : 0;
+        const line = sv("path", { d: `M${a.x},${a.y} Q${(a.x + b.x) / 2 + off},${(a.y + b.y) / 2 + off * 2} ${b.x},${b.y}`,
+          fill: "none", stroke: "var(--line)", "stroke-width": 3, "stroke-linecap": "round", class: "net-edge" });
+        svg.appendChild(line);
+        (edgeEls[t.id] = edgeEls[t.id] || []).push(line);
+      }
+    }
+    for (const key in ST) {
+      const p = proj(ST[key]);
+      const g = sv("g", { class: "net-node" });
+      const c = sv("circle", { cx: p.x, cy: p.y, r: key === "wien" ? 9 : 6.5, fill: "var(--surface)", stroke: "var(--muted)", "stroke-width": 2.5 });
+      const below = ["villach", "graz", "szeged", "ljubljana", "budapest", "salzburg"].includes(key);
+      const tx = sv("text", { x: p.x, y: below ? p.y + 22 : p.y - 14, "text-anchor": "middle", "font-size": 14, "font-weight": key === "wien" ? 700 : 500, fill: "var(--ink)" }, ST[key].name);
+      g.append(c, tx);
+      svg.appendChild(g);
+      nodeEls[key] = { c, tx };
+    }
+  }
+  const roundColor = ["var(--r0)", "var(--r1)", "var(--r2)"];
+  function showRound(r) {
+    document.querySelectorAll("[data-round]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.round) === r)));
+    for (const id in edgeEls) edgeEls[id].forEach((e) => { e.setAttribute("stroke", "var(--line)"); e.removeAttribute("stroke-dasharray"); e.setAttribute("opacity", 1); });
+    const reachedRound = {};
+    for (let k = 0; k <= r; k++) {
+      for (const id of ROUNDS[k].rides) edgeEls[id].forEach((e) => { e.setAttribute("stroke", roundColor[k]); e.setAttribute("opacity", k === r ? 1 : 0.45); });
+      for (const s in ROUNDS[k].reached) reachedRound[s] = k;
+    }
+    for (const id of ROUNDS[r].misses) edgeEls[id].forEach((e) => { e.setAttribute("stroke", "var(--miss)"); e.setAttribute("stroke-dasharray", "6 6"); });
+    for (const key in nodeEls) {
+      const { c } = nodeEls[key];
+      if (key === "wien") { c.setAttribute("fill", "var(--ink)"); c.setAttribute("stroke", "var(--ink)"); continue; }
+      const k = reachedRound[key];
+      c.setAttribute("fill", k === undefined ? "var(--surface)" : roundColor[k]);
+      c.setAttribute("stroke", k === undefined ? "var(--muted)" : roundColor[k]);
+    }
+    const log = document.getElementById("log");
+    log.replaceChildren();
+    log.appendChild(el("h3", {}, ["Round 0: no transfer", "Round 1: one transfer", "Round 2: two transfers"][r]));
+    const ul = el("ul");
+    for (const [cls, text] of ROUNDS[r].log) {
+      const li = el("li");
+      if (cls) li.appendChild(el("span", { class: "tag " + cls }, cls === "miss" ? "missed" : "round " + cls.slice(1)));
+      if (cls) li.appendChild(document.createTextNode(" "));
+      li.appendChild(document.createTextNode(text));
+      ul.appendChild(li);
+    }
+    log.appendChild(ul);
+    const tbl = document.getElementById("result-table");
+    tbl.replaceChildren();
+    const hr = el("tr");
+    ["Station", "Transfers", "Duration", "Trains"].forEach((h) => hr.appendChild(el("th", {}, h)));
+    tbl.appendChild(el("thead")).appendChild(hr);
+    const tb = el("tbody");
+    for (let k = 0; k <= r; k++) {
+      for (const s in ROUNDS[k].reached) {
+        const [mins, via] = ROUNDS[k].reached[s];
+        const tr = el("tr");
+        tr.appendChild(el("td", {}, ST[s].name));
+        const td = el("td"); td.appendChild(el("span", { class: "tag r" + k }, String(k))); tr.appendChild(td);
+        tr.appendChild(el("td", { class: "mono" }, fmtMin(mins)));
+        tr.appendChild(el("td", { class: "muted" }, via));
+        tb.appendChild(tr);
+      }
+    }
+    tbl.appendChild(tb);
+  }
+  buildNet();
+  document.querySelectorAll("[data-round]").forEach((b) => b.addEventListener("click", () => showRound(Number(b.dataset.round))));
+  showRound(0);
+
+  /* ---------- transfer window ---------- */
+  (function drawWindow() {
+    const w = document.getElementById("window-svg");
+    const t0 = sec("10:20"), t1 = sec("11:20"), X0 = 30, X1 = 610;
+    const x = (hm) => X0 + (sec(hm) - t0) / (t1 - t0) * (X1 - X0);
+    w.appendChild(sv("line", { x1: X0, x2: X1, y1: 100, y2: 100, stroke: "var(--muted)", "stroke-width": 1.5 }));
+    for (const hm of ["10:20", "10:30", "10:40", "10:50", "11:00", "11:10", "11:20"]) {
+      w.appendChild(sv("line", { x1: x(hm), x2: x(hm), y1: 96, y2: 104, stroke: "var(--muted)" }));
+      w.appendChild(sv("text", { x: x(hm), y: 120, "text-anchor": "middle", "font-size": 11, fill: "var(--muted)" }, hm));
+    }
+    // arrivals above the axis
+    const arr = [["10:30", "A · left Wien 08:00", "var(--r0)", 30], ["10:52", "B · left Wien 08:40", "var(--r1)", 60]];
+    for (const [hm, label, col, y] of arr) {
+      w.appendChild(sv("rect", { x: x(hm) + (x("10:25") - x("10:20")), y: y - 7, width: x("11:20") - x("10:25"), height: 14, rx: 3, fill: col, opacity: 0.18 }));
+      w.appendChild(sv("line", { x1: x(hm), x2: x(hm), y1: y, y2: 100, stroke: col, "stroke-width": 2 }));
+      w.appendChild(sv("circle", { cx: x(hm), cy: y, r: 5, fill: col }));
+      w.appendChild(sv("text", { x: x(hm) + 10, y: y - 10, "font-size": 12, fill: "var(--ink)" }, "arr " + hm + "  " + label));
+    }
+    // departures below
+    const dep = [["10:45", "RJ 162 · boards from A (2 h 45 so far)", 150], ["11:10", "RJ 164 · boards from B (2 h 30, not A's 3 h 10)", 180]];
+    for (const [hm, label, y] of dep) {
+      w.appendChild(sv("line", { x1: x(hm), x2: x(hm), y1: 100, y2: y - 6, stroke: "var(--r2)", "stroke-width": 2 }));
+      w.appendChild(sv("rect", { x: x(hm) - 5, y: y - 5, width: 10, height: 10, fill: "var(--r2)" }));
+      w.appendChild(sv("text", { x: x(hm) + (hm === "11:10" ? -10 : 10), y: y + 4, "font-size": 12, fill: "var(--ink)", "text-anchor": hm === "11:10" ? "end" : "start" }, "dep " + hm + "  " + label));
+    }
+    w.appendChild(sv("text", { x: X1, y: 14, "text-anchor": "end", "font-size": 11, fill: "var(--muted)" }, "shaded: each arrival's wait window, from arrival + min wait"));
+  })();
+
+  /* ---------- day grids ---------- */
+  const WD = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const journey = (d, p) => d < 5;                       // so far: Mon–Fri, all year
+  const nextA = (d, p) => p <= 2;                        // daily, first 3 periods
+  const nextB = (d, p) => d >= 5 && p >= 4 && p <= 6;   // weekends, periods 5–7
+  function grid(title, fn, cls) {
+    const box = el("div");
+    box.appendChild(el("div", { class: "eyebrow" }, title));
+    const g = el("div", { class: "days", role: "img", "aria-label": title });
+    g.appendChild(el("span"));
+    for (let p = 0; p < 9; p++) g.appendChild(el("span", { class: "ph" }, String(p + 1)));
+    for (let d = 0; d < 7; d++) {
+      g.appendChild(el("span", { class: "lab" }, WD[d]));
+      for (let p = 0; p < 9; p++) g.appendChild(el("span", { class: "c" + (fn(d, p) ? " " + cls : "") }));
+    }
+    box.appendChild(g);
+    return box;
+  }
+  function showDays(which) {
+    const next = which === "a" ? nextA : nextB;
+    document.querySelectorAll("[data-days]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.days === which)));
+    const both = (d, p) => journey(d, p) && next(d, p);
+    const host = document.getElementById("day-grids");
+    host.replaceChildren(grid("Journey so far: Mon–Fri", journey, "on"), grid("Next train", next, "on2"), grid("AND: common days", both, "both"));
+    let any = false;
+    for (let d = 0; d < 7; d++) for (let p = 0; p < 9; p++) any = any || both(d, p);
+    const v = document.getElementById("day-verdict");
+    v.className = "verdict " + (any ? "ok" : "no");
+    v.textContent = any ? "Common days exist: the transfer is allowed, and the journey's days narrow to the AND." : "No common day: the transfer is not allowed, however good the times look.";
+  }
+  document.querySelectorAll("[data-days]").forEach((b) => b.addEventListener("click", () => showDays(b.dataset.days)));
+  showDays("a");
+
+  /* ---------- sequence ---------- */
+  const SEQ = [
+    ["up", "GET /api/browser-data", "Manifest: data version and path, engine version, the server's today."],
+    ["down", "BrowserDataInfo · JSON", "If anything is missing, the page searches on the server."],
+    ["up", "GET /engine/search.wasm", "The search compiled with TeaVM (Wasm GC). 0.86 MB, 0.30 MB gzipped."],
+    ["up", "GET /api/browser-data/<version>.bin", "Immutable, cached for a year. The browser's fetch unzips it."],
+    ["down", "timetable · 7.8 MB gzip", "Read into a TimetableStore inside a Web Worker. Departures are derived again."],
+    ["up", "POST /api/browser-searches", "After each finished browser search: 204, counts searches per day. No rate limit."],
+    ["up", "POST /api/reachability/ride-journey", "On a station click: the rides as store positions (trip, board event, alight event)."],
+    ["down", "ReachableStation · JSON", "Path, legs, running days. Built from the store without searching."],
+    ["up", "GET /api/reachability/stream (SSE)", "Fallback only. Goes through admission, rate limit and gate."],
+    ["down", "event: stations × n, then done", "30 summaries per event as each round ends; done: {total, calculationTimeMs}; or error."],
+    ["up", "GET /api/reachability/journey", "Fallback station click: the journey from the stored result (searched again if it was evicted)."]
+  ];
+  const seq = document.getElementById("seq");
+  for (const [dir, label, note] of SEQ) {
+    const m = el("div", { class: "msg " + dir });
+    const a = el("div", { class: "arrow" });
+    a.appendChild(el("span", {}, (dir === "up" ? "→ " : "← ") + label));
+    m.appendChild(a);
+    m.appendChild(el("p", {}, note));
+    seq.appendChild(m);
+  }
+
+  /* ---------- delta table ---------- */
+  (function delta() {
+    const t = TRIPS[0];
+    const tbl = document.getElementById("delta-table");
+    const head = el("tr");
+    ["Stop", "Arrival", "as seconds", "stored diff", "Departure", "as seconds", "stored diff"].forEach((h) => head.appendChild(el("th", {}, h)));
+    tbl.appendChild(el("thead")).appendChild(head);
+    const tb = el("tbody");
+    let prev = 0;
+    for (const [s, a, d] of t.stops) {
+      const tr = el("tr");
+      tr.appendChild(el("td", {}, ST[s].name));
+      for (const v of [a, d]) {
+        if (v === null) {
+          tr.appendChild(el("td", { class: "muted" }, "—"));
+          tr.appendChild(el("td", { class: "mono muted" }, "-1"));
+          tr.appendChild(el("td", { class: "mono d" }, "NO_TIME"));
+        } else {
+          tr.appendChild(el("td", { class: "mono" }, v));
+          tr.appendChild(el("td", { class: "mono" }, sec(v).toLocaleString("en")));
+          tr.appendChild(el("td", { class: "mono d" }, "+" + (sec(v) - prev).toLocaleString("en")));
+          prev = sec(v);
+        }
+      }
+      tb.appendChild(tr);
+    }
+    tbl.appendChild(tb);
+  })();
+
+  /* ---------- size bars ---------- */
+  (function bars() {
+    const rows = [
+      ["Server binary cache (gtfs-store.bin)", 50.8],
+      ["Trimmed: no trip IDs, names, infos", 39.8],
+      ["+ departures derived on reading", 18.1],
+      ["+ times as differences (the format)", 7.8]
+    ];
+    const max = rows[0][1];
+    const host = document.getElementById("bars");
+    rows.forEach(([label, mb], i) => {
+      const r = el("div", { class: "bar-row" });
+      r.appendChild(el("span", {}, label));
+      const track = el("div", { class: "bar-track" });
+      const bar = el("div", { class: "bar" + (i === rows.length - 1 ? " final" : "") });
+      bar.style.width = (mb / max * 82) + "%";
+      const val = el("span", { class: "bar-val" }, mb + " MB");
+      val.style.left = (mb / max * 82) + "%";
+      track.append(bar, val);
+      r.appendChild(track);
+      host.appendChild(r);
+    });
+  })();
+
+  /* ---------- store ---------- */
+  (function store() {
+    // Station indexes follow first appearance walking trips in order, as the store numbers them
+    const stIndex = {}, stList = [];
+    for (const t of TRIPS) for (const [s] of t.stops) if (!(s in stIndex)) { stIndex[s] = stList.length; stList.push(s); }
+    const tripFirstEvent = [0], evTrip = [], evStation = [], evArr = [], evDep = [];
+    TRIPS.forEach((t, ti) => {
+      for (const [s, a, d] of t.stops) { evTrip.push(ti); evStation.push(stIndex[s]); evArr.push(a); evDep.push(d); }
+      tripFirstEvent.push(evTrip.length);
+    });
+    const deps = [];
+    for (let e = 0; e < evTrip.length; e++) if (evDep[e] !== null) deps.push(e);
+    deps.sort((a, b) => evStation[a] - evStation[b] || sec(evDep[a]) - sec(evDep[b]) || a - b);
+    const depStart = new Array(stList.length + 1).fill(0);
+    for (const e of deps) depStart[evStation[e] + 1]++;
+    for (let s = 0; s < stList.length; s++) depStart[s + 1] += depStart[s];
+
+    const host = document.getElementById("store");
+    const cellsOf = {};
+    function addArray(key, name, note, values, fmt, wide) {
+      const a = el("div", { class: "arr" });
+      const n = el("div", { class: "arr-name" });
+      n.appendChild(document.createTextNode(name));
+      n.appendChild(el("span", {}, note));
+      a.appendChild(n);
+      const row = el("div", { class: "cells" });
+      cellsOf[key] = values.map((v, i) => {
+        const c = el("div", { class: "cell" + (wide ? " wide" : ""), tabindex: "0", "data-key": key, "data-i": String(i) });
+        c.appendChild(el("span", { class: "ix" }, String(i)));
+        c.appendChild(document.createTextNode(fmt ? fmt(v, i) : String(v)));
+        row.appendChild(c);
+        return c;
+      });
+      a.appendChild(row);
+      host.appendChild(a);
+    }
+    addArray("stations", "StationTable", "station index → ID (PackedStrings)", stList, (k) => ST[k].name, true);
+    addArray("tripFirstEvent", "tripFirstEvent[]", "trip t's events are tripFirstEvent[t] … tripFirstEvent[t+1]−1", tripFirstEvent);
+    addArray("tripDayPattern", "tripDayPattern[]", "trip → day pattern (0 daily, 1 Mon–Fri, 2 Sat, Sun)", TRIPS.map((t) => t.days));
+    addArray("evTrip", "evTrip[]", "event → trip", evTrip);
+    addArray("evStation", "evStation[]", "event → station index", evStation);
+    addArray("evArrSec", "evArrSec[]", "seconds since midnight, shown as hh:mm; −1 = NO_LEG", evArr, (v) => v === null ? "−1" : v);
+    addArray("evDepSec", "evDepSec[]", "same for departures", evDep, (v) => v === null ? "−1" : v);
+    addArray("depStart", "depStart[]", "station s's departures are depStart[s] … depStart[s+1]−1", depStart);
+    addArray("depSec", "depSec[]", "departure times, by station then time", deps.map((e) => evDep[e]));
+    addArray("depEvent", "depEvent[]", "departure → its event", deps);
+
+    const explain = document.getElementById("store-explain");
+    function clear() {
+      host.querySelectorAll(".cell").forEach((c) => c.classList.remove("hl", "sel"));
+      document.querySelectorAll("#pick-trips button, #pick-stations button").forEach((b) => b.setAttribute("aria-pressed", "false"));
+    }
+    const mark = (key, i, cls) => cellsOf[key][i] && cellsOf[key][i].classList.add(cls || "hl");
+    function pickTrip(t) {
+      clear();
+      document.getElementById("pt-" + t).setAttribute("aria-pressed", "true");
+      mark("tripFirstEvent", t, "sel"); mark("tripFirstEvent", t + 1); mark("tripDayPattern", t, "sel");
+      const a = tripFirstEvent[t], b = tripFirstEvent[t + 1];
+      for (let e = a; e < b; e++) {
+        ["evTrip", "evStation", "evArrSec", "evDepSec"].forEach((k) => mark(k, e));
+        mark("stations", evStation[e]);
+      }
+      explain.textContent = `${TRIPS[t].id} is trip ${t}: tripFirstEvent[${t}] = ${a} and tripFirstEvent[${t + 1}] = ${b}, so its stops are events ${a}–${b - 1}. `
+        + `They call at ${TRIPS[t].stops.map(([s]) => ST[s].name + " (" + stIndex[s] + ")").join(", ")}. Runs ${PATTERNS[TRIPS[t].days]}.`;
+    }
+    function pickStation(s) {
+      clear();
+      document.getElementById("ps-" + s).setAttribute("aria-pressed", "true");
+      mark("stations", s, "sel"); mark("depStart", s, "sel"); mark("depStart", s + 1);
+      const a = depStart[s], b = depStart[s + 1];
+      const names = [];
+      for (let d = a; d < b; d++) {
+        mark("depSec", d); mark("depEvent", d);
+        const e = deps[d];
+        ["evTrip", "evStation", "evDepSec"].forEach((k) => mark(k, e));
+        names.push(`${evDep[e]} ${TRIPS[evTrip[e]].id}`);
+      }
+      explain.textContent = a === b
+        ? `${ST[stList[s]].name} is station ${s}. depStart[${s}] = depStart[${s + 1}] = ${a}: no departures, the trains end here.`
+        : `${ST[stList[s]].name} is station ${s}: departures ${a}–${b - 1}, already sorted by time: ${names.join(", ")}. depEvent leads to each event, evTrip to its trip.`;
+    }
+    const pt = document.getElementById("pick-trips");
+    pt.appendChild(el("span", { class: "eyebrow", style: "align-self:center;margin-right:4px" }, "Trips"));
+    TRIPS.forEach((t, i) => {
+      const b = el("button", { type: "button", id: "pt-" + i, "aria-pressed": "false" }, t.id);
+      b.addEventListener("click", () => pickTrip(i));
+      pt.appendChild(b);
+    });
+    const ps = document.getElementById("pick-stations");
+    ps.appendChild(el("span", { class: "eyebrow", style: "align-self:center;margin-right:4px" }, "Stations"));
+    stList.forEach((k, i) => {
+      const b = el("button", { type: "button", id: "ps-" + i, "aria-pressed": "false" }, ST[k].name);
+      b.addEventListener("click", () => pickStation(i));
+      ps.appendChild(b);
+    });
+    host.addEventListener("click", (ev) => {
+      const c = ev.target.closest(".cell");
+      if (!c) return;
+      const key = c.dataset.key, i = Number(c.dataset.i);
+      if (key === "stations" || key === "depStart") return pickStation(Math.min(i, stList.length - 1));
+      if (key === "tripFirstEvent" || key === "tripDayPattern") return pickTrip(Math.min(i, TRIPS.length - 1));
+      if (key === "depSec" || key === "depEvent") return pickTrip(evTrip[deps[i]]);
+      pickTrip(evTrip[i]);
+    });
+    host.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && ev.target.classList.contains("cell")) ev.target.click(); });
+    pickTrip(0);
+  })();
+
+  /* ---------- byte layouts ---------- */
+  (function bytes() {
+    const L = [
+      ["LabelArena · 26 B per label", "an arrival that becomes a candidate or is boarded from, or a ride before one",
+        [["int", "trip", 4], ["int", "previous", 4], ["char", "min", 2], ["short", "board", 2], ["short", "alight", 2], ["long", "WeekPeriodDays", 8], ["int", "days memo", 4]]],
+      ["TripProgressFlat · 18 B per slot", "per stop of each trip the search reaches: the pruning state",
+        [["char", "min", 2], ["long", "days of that ride", 8], ["long", "days recorded here", 8]]],
+      ["RoundRides · 22 B per ride", "one row per boarded trip, kept until the next round boards from it",
+        [["int", "board event", 4], ["int", "from label", 4], ["char", "min", 2], ["long", "WeekPeriodDays", 8], ["int", "records end", 4]]]
+    ];
+    const host = document.getElementById("bytes");
+    for (const [title, note, fields] of L) {
+      const r = el("div", { class: "byte-row" });
+      const h = el("div");
+      h.appendChild(el("b", {}, title));
+      h.appendChild(el("span", { class: "muted", style: "font-size:13.5px" }, " · " + note));
+      r.appendChild(h);
+      const bar = el("div", { class: "byte-bar", role: "img", "aria-label": title });
+      for (const [type, name, n] of fields) {
+        const f = el("div", { class: "f-" + type, title: `${name}: ${type}, ${n} bytes` }, name);
+        f.style.flex = String(n);
+        bar.appendChild(f);
+      }
+      r.appendChild(bar);
+      host.appendChild(r);
+    }
+  })();
+})();
+</script>
+</body>
+</html>
