@@ -19,3 +19,12 @@ _Avoid_: graph (alone), network (the merged network a load is still building is 
 
 **Admin access**: how the app tells the admin from everyone else. The admin proves itself with the token in the `X-Admin-Token` header, or with the cookie of an admin session started by dev login. Only the header opens the admin API, because a cookie would also be sent by a forged cross-site request; either one exempts a search from the rate limit. A wrong token counts against the client wherever it is sent, and a client with too many is turned away from the admin API and loses its header's exemption. In code: `AdminAccess`.
 _Avoid_: admin token (the token is only one of the two proofs), admin identity.
+
+**Path**: one way a search found to a station: how many transfers it takes, how long it takes, the rides it is made of and its running days. A station gets one path per number of transfers, and only if it is faster than every path there with fewer transfers. A path the journey-hours limit hides is still part of the result, because another limit would show it.
+_Avoid_: route (a GTFS route is a line), connection, journey (the legs shown for one path).
+
+**Running days**: the dates, from today on, on which a whole path can be travelled.
+_Avoid_: service days (those belong to one trip, not to a path), calendar.
+
+**Same result**: two searches with equal search options give the same result when they find the same paths at every station: the same transfers, duration and running days. The rides may differ, as long as each one leaves and arrives at the same stations and times: a different but equally good train is the same result.
+_Avoid_: identical output, equivalent result.
