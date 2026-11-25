@@ -1,5 +1,6 @@
 package com.railradius.service;
 
+import com.railradius.model.Station;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -10,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -19,6 +21,9 @@ class CompactReachabilitySearchTest {
     private static final String START_ID = "alpha:A1";
     private static final int A_DAY_MINUTES = 24 * 60;
     private static final int LONGEST_MIN_WAIT_MINUTES = 1300;
+    // One more than a 16-bit station index holds, and one past that for the trip's last stop
+    private static final int WIDE_STATION_COUNT = Character.MAX_VALUE + 3;
+    private static final int NO_LEG = TimetableStore.NO_LEG;
 
     @Test
     void pathsHandedOutAfterEachRoundAddUpToTheResult(@TempDir Path tempDir) throws IOException {
@@ -84,5 +89,27 @@ class CompactReachabilitySearchTest {
         assertThat(rounds).noneMatch(round -> round.containsKey("omega:O1"));
         assertThat(result.paths("omega:O1")).containsExactly(new CompactResult.PathSummary(0, 0));
         assertThat(result.journey("omega:O1", 0).path().getConnections()).isEmpty();
+    }
+
+    // Stations 65536 and 65537 don't fit 16 bits: cut to them, they would be stations 0 and 1 (#37)
+    @Test
+    void aTripToStationsBeyondSixteenBitsReachesThemThere() {
+        List<String> ids = IntStream.range(0, WIDE_STATION_COUNT).mapToObj(index -> "x:S" + index).toList();
+        DayPatterns.Builder dayPatterns = new DayPatterns.Builder();
+        int everyDay = dayPatterns.intern(ServiceDays.EVERY_DAY);
+        TimetableStore store = TimetableStore.of(TimetableStoreBuilder.withoutTripNames(StationTable.of(ids),
+                new int[] {0, 3}, new int[] {65535, 65536, 65537}, new int[] {3600, 4260, NO_LEG},
+                new int[] {NO_LEG, 4200, 4800}, dayPatterns.build(), new int[] {everyDay}));
+        TransitGraph graph = TransitGraph.withToday(GtfsTestFixtures.TODAY);
+        graph.serve(new BrowserDataFile.BrowserData(
+                ids.stream().map(id -> Station.builder().id(id).build()).toList(), store, ""));
+
+        CompactResult result = GtfsTestFixtures.search(graph).search("x:S65535", 0, 0, 180,
+                CompactReachabilitySearch.NO_DEADLINE, round -> { });
+
+        assertThat(result.paths("x:S65536")).containsExactly(new CompactResult.PathSummary(0, 10));
+        assertThat(result.paths("x:S65537")).containsExactly(new CompactResult.PathSummary(0, 20));
+        assertThat(result.paths("x:S0")).isEmpty();
+        assertThat(result.paths("x:S1")).isEmpty();
     }
 }

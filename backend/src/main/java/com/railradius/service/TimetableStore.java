@@ -32,7 +32,7 @@ final class TimetableStore {
     private final int[] tripFirstEvent;
     // Derived from tripFirstEvent: the search looks up the trip of every departure it scans
     private final int[] evTrip;
-    private final int[] evStation;
+    private final EventStations evStation;
     private final int[] evDepSec;
     private final int[] evArrSec;
     private final DayPatterns dayPatterns;
@@ -53,7 +53,7 @@ final class TimetableStore {
         this.stations = parts.stations();
         this.tripFirstEvent = parts.tripFirstEvent();
         this.evTrip = evTrip;
-        this.evStation = parts.evStation();
+        this.evStation = EventStations.of(parts.evStation(), stations.size());
         this.evDepSec = parts.evDepSec();
         this.evArrSec = parts.evArrSec();
         this.dayPatterns = parts.dayPatterns();
@@ -65,16 +65,17 @@ final class TimetableStore {
         this.depSec = parts.depSec();
         this.depEvent = parts.depEvent();
         this.regularDeparture = regularDeparture;
-        this.nextStationCount = nextStationCounts(stations.size(), depStart, depEvent, evStation);
-        this.stoppingTripCount = stoppingTripCounts(stations.size(), tripFirstEvent, evStation);
+        this.nextStationCount = nextStationCounts(stations.size(), depStart, depEvent, parts.evStation());
+        this.stoppingTripCount = stoppingTripCounts(stations.size(), tripFirstEvent, parts.evStation());
     }
 
     static TimetableStore build(RailNetwork network) {
         long startMs = System.currentTimeMillis();
         TimetableStore store = of(TimetableStoreBuilder.parts(MergedTrips.of(network)));
-        log.info("Timetable store built in {} ms: {} trips, {} stop events, {} stations, {} day patterns, {}",
+        log.info("Timetable store built in {} ms: {} trips, {} stop events, {} stations ({}-bit), {} day patterns, {}",
                 System.currentTimeMillis() - startMs, store.tripCount(), store.eventCount(), store.stations.size(),
-                store.dayPatterns.size(), String.format("%.1f MB", store.sizeBytes() / 1e6));
+                store.evStation.isNarrow() ? Character.SIZE : Integer.SIZE, store.dayPatterns.size(),
+                String.format("%.1f MB", store.sizeBytes() / 1e6));
         return store;
     }
 
@@ -101,7 +102,7 @@ final class TimetableStore {
     void writeTo(BinaryBlocks.Writer out) throws IOException {
         stations.writeTo(out);
         out.ints(tripFirstEvent);
-        out.ints(evStation);
+        out.ints(evStation.toInts());
         out.ints(evDepSec);
         out.ints(evArrSec);
         dayPatterns.writeTo(out);
@@ -128,7 +129,7 @@ final class TimetableStore {
     }
 
     int eventCount() {
-        return evStation.length;
+        return evStation.size();
     }
 
     int firstEvent(int trip) {
@@ -145,7 +146,7 @@ final class TimetableStore {
     }
 
     int station(int event) {
-        return evStation[event];
+        return evStation.get(event);
     }
 
     int departureSeconds(int event) {
@@ -205,8 +206,8 @@ final class TimetableStore {
                 .tripId(tripId(trip))
                 .storeTrip(trip)
                 .routeName(routeName(trip).orElse(null))
-                .fromStopId(stations.id(evStation[event]))
-                .toStopId(stations.id(evStation[event + 1]))
+                .fromStopId(stations.id(evStation.get(event)))
+                .toStopId(stations.id(evStation.get(event + 1)))
                 .departureTimeSeconds(evDepSec[event])
                 .arrivalTimeSeconds(evArrSec[event + 1])
                 .build();
@@ -264,13 +265,13 @@ final class TimetableStore {
      * stop ID apart), so they count as one for the journey's days.
      */
     ServiceDays rideDays(int boardEvent, int alightEvent) {
-        int boardStation = evStation[boardEvent];
+        int boardStation = evStation.get(boardEvent);
         int departure = evDepSec[boardEvent];
         ServiceDays days = dayPatterns.days(tripDayPattern[tripOf(boardEvent)]);
         for (int position = firstDepartureAt(boardStation, departure);
              position < depStart[boardStation + 1] && depSec[position] == departure; position++) {
             int twin = depEvent[position];
-            if (arrivesLike(twin, evStation[alightEvent], evArrSec[alightEvent])) {
+            if (arrivesLike(twin, evStation.get(alightEvent), evArrSec[alightEvent])) {
                 days = days.union(dayPatterns.days(tripDayPattern[tripOf(twin)]));
             }
         }
@@ -279,10 +280,11 @@ final class TimetableStore {
 
     /** Estimated bytes of the store's arrays and strings. */
     long sizeBytes() {
-        long intArrays = (long) tripFirstEvent.length + evTrip.length + evStation.length + evDepSec.length
-                + evArrSec.length + tripDayPattern.length + tripRouteName.length + depStart.length + depSec.length + depEvent.length + nextStationCount.length
-                + stoppingTripCount.length;
-        return intArrays * Integer.BYTES + (long) regularDeparture.length * Long.BYTES + stations.sizeBytes()
+        long intArrays = (long) tripFirstEvent.length + evTrip.length + evDepSec.length + evArrSec.length
+                + tripDayPattern.length + tripRouteName.length + depStart.length + depSec.length + depEvent.length
+                + nextStationCount.length + stoppingTripCount.length;
+        return intArrays * Integer.BYTES + evStation.sizeBytes() + (long) regularDeparture.length * Long.BYTES
+                + stations.sizeBytes()
                 + dayPatterns.sizeBytes() + routeNames.sizeBytes() + tripIds.sizeBytes();
     }
 
@@ -329,7 +331,7 @@ final class TimetableStore {
     private boolean arrivesLike(int departureEvent, int station, int arrivalSeconds) {
         int end = endEvent(tripOf(departureEvent));
         for (int event = departureEvent + 1; event < end && hasLeg(event - 1); event++) {
-            if (evStation[event] == station) return evArrSec[event] == arrivalSeconds;
+            if (evStation.get(event) == station) return evArrSec[event] == arrivalSeconds;
         }
         return false;
     }
