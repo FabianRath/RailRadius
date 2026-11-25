@@ -16,17 +16,20 @@ import java.util.Objects;
  * ({@link PackedStrings}, a missing name or country as ""); latitudes and longitudes as float bits (NaN if missing);
  * each trip's stop count; each event's station; each event's arrival and departure as the seconds since the trip's
  * previous time ({@link #NO_TIME} where the store has {@link TimetableStore#NO_LEG}); the day patterns; each trip's
- * day pattern.
+ * day pattern; the regular departures ({@link TimetableStore#regularDepartureWords}).
+ * <p>
+ * The regular departures are shipped, not derived again, because they count days the file may leave out (#47): the
+ * server works them out from every day of the feeds. They are almost all ones, so they gzip to very little.
  * <p>
  * Left out, and why: trip IDs, route names, train numbers and translated names belong to journeys, which the server
- * builds (#11); the station name index stays on the server; the departures index and the regular departures are
- * derived again on reading, as the store does. Times as differences within a trip are small, repeating numbers, which
+ * builds (#11); the station name index stays on the server; the departures index is derived again on reading, as the
+ * store does. Times as differences within a trip are small, repeating numbers, which
  * cuts the gzipped file of all of Europe to a fifth (docs/HOSTING.md).
  */
 final class BrowserDataFile {
 
     /** Bump on every change of the layout: a browser with another version searches on the server. */
-    static final int FORMAT_VERSION = 1;
+    static final int FORMAT_VERSION = 2;
 
     /** An arrival or departure the store has none of; no real difference is this low. */
     static final int NO_TIME = Integer.MIN_VALUE;
@@ -50,6 +53,7 @@ final class BrowserDataFile {
             writeTrips(store, out);
             store.dayPatterns().writeTo(out);
             out.ints(tripDayPatterns(store));
+            out.longs(store.regularDepartureWords());
         }
     }
 
@@ -71,10 +75,11 @@ final class BrowserDataFile {
         undoDifferences(tripFirstEvent, evArrSec, evDepSec);
         DayPatterns dayPatterns = DayPatterns.readFrom(in);
         int[] tripDayPattern = in.ints();
+        long[] regularDeparture = in.longs();
         in.checkAllRead();
         StationTable stationTable = StationTable.of(stations.stream().map(Station::getId).toList());
         TimetableStore store = TimetableStore.of(TimetableStoreBuilder.withoutTripNames(stationTable,
-                tripFirstEvent, evStation, evDepSec, evArrSec, dayPatterns, tripDayPattern));
+                tripFirstEvent, evStation, evDepSec, evArrSec, dayPatterns, tripDayPattern), regularDeparture);
         return new BrowserData(stations, store, notice);
     }
 
