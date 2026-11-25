@@ -3,8 +3,8 @@ package com.railradius.service;
 /**
  * Sliding window over one station's {@link Arrivals} for departures fed in time order: among the arrivals whose wait
  * for the departure lies in the min/max wait and that add a day the departure needs, the one with the latest journey
- * start. Boarding from it gives the shortest journey. The window keeps its queue in a buffer as large as the
- * arrivals. Arrival times count shiftSeconds later, so waits past midnight can use their own window over the same
+ * start. Boarding from it gives the shortest journey. The window keeps its queue in a buffer at least as large as
+ * the arrivals. Arrival times count shiftSeconds later, so waits past midnight can use their own window over the same
  * arrivals; start times are only compared with each other, so they need no shift.
  * <p>
  * When the window's best arrival adds no day, a fallback scan looks through the wait range. It takes most of a large
@@ -17,19 +17,21 @@ final class TransferWindowInts {
     private static final int BLOCK_SIZE = 1 << BLOCK_SHIFT;
 
     /**
-     * A station's arrivals sorted by arrival time: arrival seconds, journey start seconds and {@link WeekPeriodDays}.
-     * Per whole block of {@link #BLOCK_SIZE} arrivals: the latest start and all days of its arrivals.
+     * A station's count arrivals sorted by arrival time: arrival seconds, journey start seconds and
+     * {@link WeekPeriodDays}. Per whole block of {@link #BLOCK_SIZE} arrivals: the latest start and all days of its
+     * arrivals. The arrays may be longer than count ({@link BoardingWorkspace}); entries past it mean nothing.
      */
-    record Arrivals(int[] arrivalSeconds, int[] startSeconds, long[] days, int[] blockLatestStart, long[] blockDays) {
+    record Arrivals(int count, int[] arrivalSeconds, int[] startSeconds, long[] days, int[] blockLatestStart,
+                    long[] blockDays) {
 
-        static Arrivals ofCapacity(int count) {
-            int blocks = count >>> BLOCK_SHIFT;
-            return new Arrivals(new int[count], new int[count], new long[count], new int[blocks], new long[blocks]);
+        /** Whole blocks among count arrivals. */
+        static int blockCount(int count) {
+            return count >>> BLOCK_SHIFT;
         }
 
         /** Sums up the blocks, once the arrivals are filled in. */
         void summarizeBlocks() {
-            for (int block = 0; block < blockDays.length; block++) {
+            for (int block = 0; block < blockCount(count); block++) {
                 int latestStart = Integer.MIN_VALUE;
                 long blockDaysUnion = 0;
                 for (int position = block << BLOCK_SHIFT; position < (block + 1) << BLOCK_SHIFT; position++) {
@@ -45,6 +47,7 @@ final class TransferWindowInts {
     private final Arrivals arrivals;
     private final int[] arrivalSeconds;
     private final int[] startSeconds;
+    private final int count;
     private final int[] queue;
     private final int shiftSeconds;
     private final int minWaitSeconds;
@@ -59,6 +62,7 @@ final class TransferWindowInts {
         this.arrivals = arrivals;
         this.arrivalSeconds = arrivals.arrivalSeconds();
         this.startSeconds = arrivals.startSeconds();
+        this.count = arrivals.count();
         this.queue = queue;
         this.shiftSeconds = shiftSeconds;
         this.minWaitSeconds = minWaitSeconds;
@@ -71,7 +75,7 @@ final class TransferWindowInts {
      */
     int bestFor(int departureSeconds, long nextTripDays, int extraDays, long served) {
         int latestArrival = departureSeconds - minWaitSeconds - shiftSeconds;
-        while (nextArrival < arrivalSeconds.length && arrivalSeconds[nextArrival] <= latestArrival) {
+        while (nextArrival < count && arrivalSeconds[nextArrival] <= latestArrival) {
             while (tail > head && startSeconds[queue[tail - 1]] <= startSeconds[nextArrival]) tail--;
             queue[tail++] = nextArrival++;
         }

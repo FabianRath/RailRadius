@@ -9,8 +9,8 @@ import java.util.List;
  * The transfer part of a round of {@link CompactReachabilitySearch}: the arrivals of the previous round's
  * {@link RoundRides}, minus those a faster ride of their round overtook, grouped by station index, and what each
  * station's departures board from them. Stations choose in parallel. A station's sorted arrivals and transfer windows
- * live only while it chooses, so the round keeps about 8 bytes per arrival. Only the arrivals boarded from get a
- * label ({@link #labelBoardedFrom}).
+ * live only while it chooses, in its thread's {@link BoardingWorkspace}, so the round keeps about 8 bytes per arrival.
+ * Only the arrivals boarded from get a label ({@link #labelBoardedFrom}).
  */
 final class CompactTransferRound {
 
@@ -261,17 +261,18 @@ final class CompactTransferRound {
     }
 
     private StationBoardings boardingsAt(int station, Parameters parameters) {
-        StationArrivals arrivals = sortedArrivals(stationStart[station], stationStart[station + 1]);
-        int count = arrivals.positions().length;
-        TransferWindowInts sameDay = new TransferWindowInts(arrivals.arrivals(), new int[count], 0,
+        int count = stationStart[station + 1] - stationStart[station];
+        BoardingWorkspace workspace = BoardingWorkspace.ofThisThread(count);
+        StationArrivals arrivals = sortedArrivals(workspace, stationStart[station], count);
+        TransferWindowInts sameDay = new TransferWindowInts(arrivals.arrivals(), workspace.sameDayQueue(), 0,
                 parameters.minWaitSeconds(), parameters.maxWaitSeconds());
-        TransferWindowInts overnight = new TransferWindowInts(arrivals.arrivals(), new int[count],
+        TransferWindowInts overnight = new TransferWindowInts(arrivals.arrivals(), workspace.overnightQueue(),
                 -GtfsTime.SECONDS_PER_DAY, parameters.minWaitSeconds(),
                 overnightMaxWaitSeconds(parameters.maxWaitSeconds()));
         StationBoardings boardings = new StationBoardings();
         // Per sorted arrival: its index into the boardings' fromPositions, -1 while nothing boards from it
-        int[] fromIndex = new int[count];
-        Arrays.fill(fromIndex, -1);
+        int[] fromIndex = workspace.fromIndex();
+        Arrays.fill(fromIndex, 0, count, -1);
         int departuresEnd = store.departuresEnd(station);
         for (int position = store.departuresStart(station); position < departuresEnd; position++) {
             board(store.departureEventAt(position), store.departureSecondsAt(position), arrivals, sameDay, overnight,
@@ -288,15 +289,15 @@ final class CompactTransferRound {
      * Stable (Search semantics contract): equal times keep the order the arrivals came in, which is their grouped
      * order, so sorting by arrival seconds and then grouped position does it.
      */
-    private StationArrivals sortedArrivals(int from, int to) {
-        TransferWindowInts.Arrivals arrivals = TransferWindowInts.Arrivals.ofCapacity(to - from);
+    private StationArrivals sortedArrivals(BoardingWorkspace workspace, int from, int count) {
+        TransferWindowInts.Arrivals arrivals = workspace.arrivals(count);
         long[] days = arrivals.days();
-        for (int i = 0; i < days.length; i++) {
+        for (int i = 0; i < count; i++) {
             days[i] = (long) arrivalSeconds(grouped[from + i]) << SECONDS_SHIFT | (from + i);
         }
-        Arrays.sort(days);
-        int[] positions = new int[days.length];
-        for (int i = 0; i < days.length; i++) {
+        Arrays.sort(days, 0, count);
+        int[] positions = workspace.positions();
+        for (int i = 0; i < count; i++) {
             int position = (int) (days[i] & POSITION_MASK);
             int seconds = (int) (days[i] >>> SECONDS_SHIFT);
             long arrival = grouped[position];
