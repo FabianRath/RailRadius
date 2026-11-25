@@ -8,7 +8,6 @@ austria;https://static.web.oebb.at/open-data/soll-fahrplan-gtfs/GTFS_Fahrplan_20
 belgien;https://api-management-discovery-production.azure-api.net/api/gtfs/feed/nmbssncb/static
 belgien;https://gtfs.irail.be/nmbs/gtfs/latest.zip
 belgien;https://data.gtfs.be/sncb/gtfs/be-sncb-gtfs.zip
-bosnia;https://owncloud.cesnet.cz/index.php/s/yWJhi9wjUIc3IC2/download
 bulgaria;https://jbb.ghsq.de/gtfs/bg-bdz.gtfs.zip
 bulgaria;https://gtfs.livetransport.eu/gtfs/bdz.zip
 croatia;https://www.hzpp.hr/GTFS_files.zip
