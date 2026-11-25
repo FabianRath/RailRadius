@@ -66,6 +66,20 @@ class CompactReachabilitySearchTest {
         assertThat(result.paths("delta:D2")).isEmpty();
     }
 
+    // G4 is a dead end reached in round 0: the transfer rounds after it skip it, nothing boards there (#46)
+    @Test
+    void aDeadEndReachedInRoundZeroKeepsItsPath(@TempDir Path tempDir) throws IOException {
+        CompactReachabilitySearch search =
+                GtfsTestFixtures.search(GtfsTestFixtures.load(tempDir, "gamma", "delta"));
+
+        CompactResult result = search.search("gamma:G3", 2, 0, 180, CompactReachabilitySearch.NO_DEADLINE,
+                round -> { });
+
+        assertThat(result.paths("gamma:G4")).containsExactly(new CompactResult.PathSummary(0, 60));
+        assertThat(result.journey("gamma:G4", 0).path().getStationIds())
+                .containsExactly("gamma:G3", "delta:D1", "gamma:G4");
+    }
+
     @Test
     void searchPastItsDeadlineStopsBeforeItsNextRound(@TempDir Path tempDir) throws IOException {
         CompactReachabilitySearch search =

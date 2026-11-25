@@ -139,7 +139,7 @@ final class CompactTransferRound {
 
     /** What each station boards from the arrivals of the rides, by ascending station index. */
     List<StationBoardings> boardings(int startStation, Parameters parameters) {
-        groupByStation(startStation);
+        groupByStation(startStation, parameters.patternDays());
         return Parallel.range(stations.size())
                 .mapToObj(i -> boardingsAt(stations.get(i), parameters))
                 .toList();
@@ -193,9 +193,10 @@ final class CompactTransferRound {
 
     /**
      * Arrivals at the start station are left out: a round never offers them. Overtaking is checked before this round
-     * lowers any best durations, so only same-round overtaking drops an arrival.
+     * lowers any best durations, so only same-round overtaking drops an arrival. Only stations where something can
+     * board choose (#46); arrivals elsewhere are already in the result, as candidates of the round that rode them.
      */
-    private void groupByStation(int startStation) {
+    private void groupByStation(int startStation, long[] patternDays) {
         int words = (rides.recordCount() + Long.SIZE - 1) >>> WORD_SHIFT;
         if (dropped.length < words) {
             dropped = new long[words];
@@ -230,8 +231,25 @@ final class CompactTransferRound {
         }
         stations.clear();
         for (int station = 0; station + 1 < stationStart.length; station++) {
-            if (stationStart[station + 1] > stationStart[station]) stations.add(station);
+            if (stationStart[station + 1] > stationStart[station] && canBoard(station, patternDays)) {
+                stations.add(station);
+            }
         }
+    }
+
+    /**
+     * Whether a departure at the station can be boarded: it is regular and its trip runs from today on. Dead ends and
+     * stations served only by expired trains have none.
+     */
+    private boolean canBoard(int station, long[] patternDays) {
+        int departuresEnd = store.departuresEnd(station);
+        for (int position = store.departuresStart(station); position < departuresEnd; position++) {
+            int event = store.departureEventAt(position);
+            if (store.isRegularDeparture(event) && patternDays[store.dayPattern(store.tripOf(event))] != 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Sets the bits of the ride's dropped records, a word at a time. Rides do it in parallel. */
