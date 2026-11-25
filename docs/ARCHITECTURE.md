@@ -55,6 +55,7 @@ RailRadius/
 │                                     #   board bar across the top (search, query fields, result count, button), the map
 │                                     #   below it (notices, loading overlay, debug banner and dev login over it) and the
 │                                     #   journey column on the right, shown while a station's journey is open
+├── frontend/maintenance.html         # standalone page the reverse proxy serves while the app restarts (#3, HOSTING.md)
 ├── frontend/css/tokens.css           # design tokens (colours incl. map palette, fonts, radius, sizes) and the
 │                                     #   @font-face rules for the self-hosted fonts; loaded before app.css
 ├── frontend/css/app.css              # all other styles, using only the tokens (no colour literals, CODING_GUIDELINES §8).
