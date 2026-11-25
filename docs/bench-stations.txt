@@ -20,7 +20,7 @@ full switzerland:8500010 Basel SBB (border)
 full austria:Pat:45:50002 Salzburg Hauptbahnhof (border)
 full austria:Pit:22021:1389 Brennero (border)
 full belgien:gs:nmbssncb:S8814001 Bruxelles-Midi
-full great-britain:2-910GSTPADOM London St Pancras International
+full great-britain:910GSTPX London St Pancras International
 full denmark:000008600626 København H
 full sweden:740000001 Stockholm Centralstation (night trains)
 full finland:HKI Helsinki

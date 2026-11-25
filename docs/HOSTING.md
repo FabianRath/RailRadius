@@ -93,6 +93,20 @@ In order, before the site goes public. Paths are examples (`/opt/railradius`, De
 
 **Proxy (Caddy)**
 - [ ] The site block from [Admin surface](#admin-surface-s35), with HSTS added inside it: `header Strict-Transport-Security "max-age=31536000"`. The app sets the other security headers itself (B47) but not HSTS, since it doesn't know it is behind TLS. Caddy gets the certificate and redirects HTTP to HTTPS on its own. Add `includeSubDomains` only if every subdomain of the domain serves HTTPS.
+- [ ] Maintenance page while the app restarts (#3). The app serves the page itself, so during a restart (~3 s, ~8 s after a crash with `RestartSec=5`) a new visitor would get only Caddy's empty 502. Inside the site block:
+  ```
+  handle_errors 502 {
+      @page not path /api/*
+      handle @page {
+          root * /opt/railradius/frontend
+          rewrite * /maintenance.html
+          file_server {
+              status 503
+          }
+      }
+  }
+  ```
+  `frontend/maintenance.html` stands alone (no file of the app is reachable then) and reloads itself every 5 s, so the visitor lands on the map once the app is back. `/api/*` keeps the bare 502: an open page reads it as "updating timetables" (F28), and HTML there would only confuse its callers. Status 503, not 200, so crawlers and the uptime check don't take it for the site. A reload from the zips needs nothing here, since the app keeps serving the page during it. *Verify* (`handle_errors` with status codes needs Caddy 2.8 or later): with the app stopped, `curl -i https://<host>/` must answer 503 with the page and `curl -i https://<host>/api/health` 502.
 - [ ] SSE not buffered: Caddy's `reverse_proxy` flushes `text/event-stream` responses immediately, so no `flush_interval` is needed. *Verify*: `curl -N "https://<host>/api/reachability/stream?…"` must print each round's event as it comes, not all at the end.
 - [ ] No proxy timeout below 6 min on a stream. Longest legitimate stream: ~2 min (90 s queued behind a full queue + a 30 s search, S36); the app ends any stream after 5 min (`STREAM_TIMEOUT`). The proxy must not end one first, so if a timeout is set anywhere (`timeouts { write }` in the global `servers` options, `read_timeout`/`write_timeout` in `transport http`, `stream_timeout`), use `6m` or more. Caddy sets none of these by default (*verify* against the installed version's docs). The longest gap between two events is under ~30 s (the `:queued` comment every second while queued, then a round's stations at least every deadline), so an idle-read timeout like nginx's `proxy_read_timeout` would need only > 30 s, but a total time limit needs > 5 min. With nginx instead: `proxy_buffering off; proxy_read_timeout 360s;`.
 - [ ] Connection caps. What already limits load: the search rate limit per IP (F26), the search gate (2 running, 6 queued, then 503), the 30 s deadline and the 5-min stream timeout. Caddy has no per-IP connection or request limit of its own; a request rate limit needs a custom build with the `caddy-ratelimit` plugin (`xcaddy`), which the app's own limit makes unnecessary for now. A cap on open connections per IP belongs in the firewall, e.g. in `/etc/ufw/before.rules` before `COMMIT` (*verify*; the value is a guess and must leave room for many users behind one NAT):
