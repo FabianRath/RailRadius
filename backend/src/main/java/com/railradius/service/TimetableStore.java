@@ -213,6 +213,7 @@ final class TimetableStore {
         int trip = tripOf(event);
         return Connection.builder()
                 .tripId(tripId(trip))
+                .storeTrip(trip)
                 .routeName(routeName(trip).orElse(null))
                 .fromStopId(stations.id(evStation[event]))
                 .toStopId(stations.id(evStation[event + 1]))

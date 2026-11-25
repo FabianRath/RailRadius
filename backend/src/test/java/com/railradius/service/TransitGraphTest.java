@@ -19,7 +19,7 @@ class TransitGraphTest {
         graph.serve(GtfsTestFixtures.network(dir.resolve("omega"), "omega").servedData());
 
         assertThat(before.station("alpha:A1")).isNotNull();
-        assertThat(before.tripInfo("alpha:T1")).isPresent();
+        assertThat(GtfsTestFixtures.tripInfo(before, "alpha:T1")).isPresent();
         assertThat(before.store().stations().indexOf("alpha:A1")).isPresent();
         assertThat(before.searchIndex().ranked()).extracting("id").contains("alpha:A1");
         assertThat(graph.getStation("alpha:A1")).isNull();

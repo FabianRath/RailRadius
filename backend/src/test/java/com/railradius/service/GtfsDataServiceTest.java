@@ -135,7 +135,7 @@ class GtfsDataServiceTest {
         service.loadFromFiles();
 
         assertThat(graph.getStation("zeta:Z1").getName()).isEqualTo("Zeta Start");
-        assertThat(graph.getTripInfo("zeta:ZT1")).isPresent();
+        assertThat(GtfsTestFixtures.tripInfo(graph.served(), "zeta:ZT1")).isPresent();
     }
 
     // B6
@@ -442,7 +442,7 @@ class GtfsDataServiceTest {
     }
 
     private static String trainNumber(TransitGraph graph, String tripId) {
-        return graph.getTripInfo(tripId).orElseThrow().trainNumber();
+        return GtfsTestFixtures.tripInfo(graph.served(), tripId).orElseThrow().trainNumber();
     }
 
     private static Optional<Connection> connection(RailNetwork network, String fromId, String toId, String tripId) {

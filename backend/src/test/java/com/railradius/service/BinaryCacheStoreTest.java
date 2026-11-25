@@ -48,7 +48,8 @@ class BinaryCacheStoreTest {
         TimetableStore parsedStore = parsed.timetableStore();
         for (int trip = 0; trip < parsedStore.tripCount(); trip++) {
             String tripId = parsedStore.tripId(trip);
-            assertThat(restored.getTripInfo(tripId)).as(tripId).isEqualTo(parsed.getTripInfo(tripId));
+            assertThat(GtfsTestFixtures.tripInfo(restored.served(), tripId)).as(tripId)
+                    .isEqualTo(GtfsTestFixtures.tripInfo(parsed.served(), tripId));
         }
     }
 
