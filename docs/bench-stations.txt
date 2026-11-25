@@ -1,5 +1,6 @@
 # Search starts for the oracle (SearchSnapshot) and benchmarks: <set> <stationId> <name>
 # dev = the dev dataset (gtfs-dev-store.bin), full = every feed (gtfs-store.bin). gtfs-mini uses every station.
+# mini = the offline mini profile (scripts/mini-data.sh): made-up stations, for smoke tests of the bench commands only.
 # IDs change when a feed's stop IDs change: SearchSnapshot fails on a start that is not in the store file.
 
 dev austria:Pat:49:1349 Wien Hauptbahnhof
@@ -28,3 +29,7 @@ full spain:60000 Madrid-Puerta de Atocha
 full italy:IT::StopPlace:otherTRENITALIA:830008409 Roma Termini
 full czechia:czptt:stop:CZ:57076 Praha hlavní nádraží
 full romania:10017 Bucureşti Nord (night trains)
+
+mini alpha:A1 Alpha Central
+mini epsilon:E1 Epsilon Start
+mini iota:I1 Iota Start

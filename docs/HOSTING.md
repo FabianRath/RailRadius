@@ -115,6 +115,22 @@ In order, before the site goes public. Paths are examples (`/opt/railradius`, De
 - More permits don't help: 4 permits need ~1.5 GB heap and a burst of 8 large searches finished no sooner.
 - Candidate (2026-10-13): netcup VPS Lite 2 G12.5s (4 vCores, 8 GB, 160 GB SSD, €9.50/month incl. VAT, 3-month term). Budget option: VPS Lite 1 G12.5s (2 vCores, 4 GB, 80 GB, €5.86/month, 6-month term), with ~1.5× slower searches. Before S25 the candidate was VPS Lite 3 (8 vCores, 16 GB, €16.66/month) for the legacy engine's `-Xmx9g`.
 
+## Benchmark commands
+
+`scripts/bench.sh` (run from the repo root, in Git Bash on Windows; `scripts/bench.sh help` lists its commands) measures a running backend: `memory`, `times <set>`, `alloc`, `held`, `entry`. The sets are in `docs/bench-stations.txt`: `dev` (5 starts), `full` (20), and `mini` (3 starts of the offline mini profile, a smoke test only).
+
+`scripts/bench.sh browser <set> <file> <today>` times the browser engine instead (#33): Node loads the compiled engine from `frontend/engine/` the way the browser engine check does, loads the browser data file for that today, and searches from each start of the set at transfers 0–5 (wait 0–180 min, no journey limit, one thread, as in a browser's worker). It prints one line per search, `start transfers stations searchMs` like `times`, then p50 and p95 per transfer count. It needs no running app, only:
+- the engine: `mvn -q -f backend/pom.xml test` then `mvn -q -f browser-engine/pom.xml verify` (writes `frontend/engine/`);
+- Node 22 or later (Wasm GC) on the PATH;
+- a browser data file, gzipped or not: the one the app wrote after its last load, `backend/data/browser-data/browser-data-<version>.bin.gz` (dev and full data; `browser-data-mini/` for the mini profile). Use the `today` that `/api/browser-data` answered for it (`scripts/api.sh` or the browser), since it decides which days are past.
+
+Windows (Git Bash), dev data:
+```
+ls backend/data/browser-data/
+scripts/bench.sh browser dev backend/data/browser-data/browser-data-<version>.bin.gz 2026-11-25
+```
+For full data use the set `full`. The file holds one dataset only, so its set must match: a start that reaches no station (as one missing from the file does) stops the run with an error.
+
 ## Measurements (2026-10-08)
 
 Full data: 49 feeds, 34,081 stations, cache 649 MB. Windows 10 dev machine, 12 cores, Java 25, G1.
