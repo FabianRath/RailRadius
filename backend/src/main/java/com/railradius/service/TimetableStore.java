@@ -89,6 +89,11 @@ final class TimetableStore {
         return new TimetableStore(parts, evTrip, regularDepartures(parts, evTrip));
     }
 
+    /** A store of the parts with the regular departures as {@link #regularDepartureWords} gave them. */
+    static TimetableStore of(TimetableStoreBuilder.Parts parts, long[] regularDeparture) {
+        return new TimetableStore(parts, eventTrips(parts.tripFirstEvent()), regularDeparture);
+    }
+
     /** Reads what {@link #writeTo} wrote. Only evTrip is derived again, which is quick. */
     static TimetableStore readFrom(BinaryBlocks.Reader in) throws IOException {
         TimetableStoreBuilder.Parts parts = new TimetableStoreBuilder.Parts(StationTable.readFrom(in), in.ints(),
@@ -174,6 +179,11 @@ final class TimetableStore {
         int dwellMinutes = legEvent > boardEvent
                 ? Math.max(0, GtfsTime.diffMinutes(arrivalSeconds(legEvent), departureSeconds(legEvent))) : 0;
         return dwellMinutes + legMinutes(legEvent);
+    }
+
+    /** {@link #isRegularDeparture} of each event as a bit, event e in bit e % 64 of word e / 64; not a copy. */
+    long[] regularDepartureWords() {
+        return regularDeparture;
     }
 
     /** Whether the trip may be ridden away from this event ({@link #regularDepartures}). */
