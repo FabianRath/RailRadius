@@ -101,11 +101,23 @@ final class GtfsTestFixtures {
         return dataService(tempDir, graph, reachabilityCache(graph), feedFolders);
     }
 
+    /** Like {@link #dataService(Path, TransitGraph, String...)}, reporting its loads to the given progress. */
+    static GtfsDataService dataService(Path tempDir, TransitGraph graph, GtfsLoadProgress loadProgress,
+                                       String... feedFolders) throws IOException {
+        return dataService(tempDir, graph, reachabilityCache(graph), TRIP_BATCH_SIZE, loadProgress, feedFolders);
+    }
+
     private static GtfsDataService dataService(Path tempDir, TransitGraph graph, ReachabilityCache reachabilityCache,
                                                int tripBatchSize, String... feedFolders) throws IOException {
+        return dataService(tempDir, graph, reachabilityCache, tripBatchSize, new GtfsLoadProgress(), feedFolders);
+    }
+
+    private static GtfsDataService dataService(Path tempDir, TransitGraph graph, ReachabilityCache reachabilityCache,
+                                               int tripBatchSize, GtfsLoadProgress loadProgress,
+                                               String... feedFolders) throws IOException {
         Path gtfsDir = zipFeeds(tempDir, feedFolders);
         GtfsDataService service = new GtfsDataService(graph, feedLoader(tripBatchSize), deduplicator(),
-                binaryCacheStore(tempDir), reachabilityCache, new GtfsLoadProgress(), browserDataStore(tempDir, graph));
+                binaryCacheStore(tempDir), reachabilityCache, loadProgress, browserDataStore(tempDir, graph));
         ReflectionTestUtils.setField(service, "gtfsDirectory", gtfsDir.toString());
         return service;
     }

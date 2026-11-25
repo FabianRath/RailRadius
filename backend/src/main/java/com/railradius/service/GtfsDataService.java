@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Serves a graph at startup (from the binary cache file, else from the zips) and on reload. */
 @Service
@@ -34,6 +35,8 @@ public class GtfsDataService {
 
     // The network a load from the zips is building, for its progress; null when none runs
     private volatile RailNetwork loadingNetwork;
+    // Each load builds a whole graph, so two at once would double the peak memory and mix their progress (#20)
+    private final AtomicBoolean loading = new AtomicBoolean();
 
     @PostConstruct
     public void initialize() {
@@ -57,7 +60,17 @@ public class GtfsDataService {
         loadFromFiles();
     }
 
+    /** Loads the zips and serves what they hold; throws {@link GtfsLoadRunning} while another load runs. */
     public void loadFromFiles() {
+        if (!loading.compareAndSet(false, true)) throw new GtfsLoadRunning();
+        try {
+            loadFromFilesAlone();
+        } finally {
+            loading.set(false);
+        }
+    }
+
+    private void loadFromFilesAlone() {
         log.info("=== Loading GTFS from files ===");
         log.info("Scanning directory: {}", gtfsDirectory);
         // The graph from before is served until the new one is built, and stays if the load fails (#17)

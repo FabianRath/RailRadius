@@ -4,17 +4,24 @@ import com.railradius.model.Connection;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class GtfsDataServiceTest {
+
+    private static final long LATCH_TIMEOUT_SECONDS = 5;
 
     @TempDir
     static Path tempDir;
@@ -73,6 +80,36 @@ class GtfsDataServiceTest {
         assertThat(graph.getStation("alpha:A1")).isNotNull();
         assertThat(graph.isDataLoaded()).isTrue();
         assertThat(service.getCacheStats()).containsEntry("dataLoaded", true);
+    }
+
+    // #20: each reload builds a whole graph, so two at once would double the peak memory and mix their progress
+    @Test
+    void aReloadWhileAnotherRunsIsTurnedAwayWithoutBuilding(@TempDir Path dir) throws Exception {
+        CountDownLatch parsing = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        GtfsLoadProgress progress = new GtfsLoadProgress() {
+            @Override
+            void feedsFound(File[] zipFiles) {
+                super.feedsFound(zipFiles);
+                parsing.countDown();
+                awaitQuietly(release);
+            }
+        };
+        TransitGraph graph = new TransitGraph();
+        GtfsDataService service = GtfsTestFixtures.dataService(dir, graph, progress, "alpha");
+        FutureTask<Void> first = new FutureTask<>(service::loadFromFiles, null);
+        Thread.ofVirtual().start(first);
+        assertThat(parsing.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)).isTrue();
+
+        assertThatThrownBy(service::loadFromFiles).isInstanceOfSatisfying(GtfsLoadRunning.class,
+                e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+        assertThat(service.getLoadStatus().getPhase()).as("the running load's progress").isEqualTo("PARSING");
+
+        release.countDown();
+        first.get(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        assertThat(graph.getStation("alpha:A1")).isNotNull();
+        service.loadFromFiles();
+        assertThat(service.getLoadStatus().getPhase()).as("a reload after it").isEqualTo("DONE");
     }
 
     @Test
@@ -394,6 +431,14 @@ class GtfsDataServiceTest {
     @Test
     void tripsOfAFeedWithoutCalendarRunEveryDay() {
         assertThat(network.getServiceDays("alpha:T1")).isSameAs(ServiceDays.EVERY_DAY);
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static String trainNumber(TransitGraph graph, String tripId) {
