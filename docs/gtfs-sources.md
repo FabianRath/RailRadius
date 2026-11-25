@@ -33,7 +33,7 @@ Feeds in backticks are in `gtfs-feeds.txt`. Rail routes, dates and operators wer
 | L | Ireland | `ireland` | CC BY 4.0 | Iarnród Éireann, official (Transport for Ireland). Includes the Dublin–Belfast Enterprise. |
 | L | Italy | `italy` | CC BY 4.0 | Trenitalia including all regional trains, community conversion of the official NeTEx (CC BY 4.0), updated weekly. The regional Trenitalia feeds (Piemonte, Liguria, Toscana, Sardegna) add nothing. Other Italian operators: see Survey. |
 | L | Italy | `italy-cotral` | **unclear** | Cotral's railways Roma–Viterbo and Roma–Lido. Saved as `gtfs_italy-cotral.zip`. Its "Viterbo" is a separate station from Trenitalia's Viterbo Porta Fiorentina. |
-| L | Italy | `italy-eav` | CC BY 4.0 ² | EAV (Circumvesuviana, Cumana, Circumflegrea around Naples; also has buses, which the rail filter drops). Its "Napoli P. Garibaldi" is a separate station from Napoli Centrale. |
+| L | Italy | `italy-eav` | IODL 2.0 | EAV (Circumvesuviana, Cumana, Circumflegrea around Naples; also has buses, which the rail filter drops). Licence: Italian Open Data Licence 2.0 (attribution), stated on https://www.eavsrl.it/open-data/. Its "Napoli P. Garibaldi" is a separate station from Napoli Centrale. |
 | L | Italy | `italy-italo` | CC BY 4.0 | Italo high-speed (also has ItaloBus routes, which the rail filter drops). Saved as `gtfs_italy-italo.zip`. |
 | L | Italy | `italy-trenord` | CC BY 4.0 | Trenord (Lombardy, incl. Malpensa Express and the lines to Chiasso and Tirano), official (Regione Lombardia). Saved as `gtfs_italy-trenord.zip`. |
 | L | Kosovo | `kosovo` | **unclear** | Trainkos, volunteer rehost. |
@@ -48,7 +48,7 @@ Feeds in backticks are in `gtfs-feeds.txt`. Rail routes, dates and operators wer
 | L | Norway | `norway` | NLOD 2.0 | Entur national feed (Vy, SJ, Go-Ahead, Flytoget). |
 | L | Poland | `poland` | CC BY 4.0 | All rail operators incl. PKP Intercity (mkuran.pl). Fallback `gtfs.kasznia.net/static/polish-trains.zip`, same feed. `gtfs.kasznia.net/static/pkp-ic.zip` has PKP Intercity alone. |
 | L | Portugal | `portugal` | NAP terms ¹ | CP. Enhanced variant with platforms and shapes: https://github.com/joaodcp/cp-gtfs-enhanced. |
-| L | Portugal | `portugal-fertagus` | NAP terms ¹ | Fertagus (Lisbon–Setúbal). Java accepts the server's certificate (Python doesn't). |
+| L | Portugal | `portugal-fertagus` | CC BY 4.0 | Fertagus (Lisbon–Setúbal); CC BY 4.0 per its Portuguese NAP record 185. Java accepts the server's certificate (Python doesn't). |
 | L | Romania | `romania` | OGL-ROU 1.0 | CFR Călători and the private operators. |
 | L | Serbia | `serbia` | **unclear** | Srbijavoz. Fallback: the generator's own GitLab package (same file as jbb). |
 | L | Slovakia | `slovakia` | **unclear** | ZSSK, Leo Express, RegioJet. jbb's `sk-zssk.gtfs.zip` is an HTML page, not a feed. |
@@ -79,7 +79,7 @@ Not needed: Liechtenstein and Monaco (served by ÖBB / SNCF, so covered by the A
 - ¹ Not a standard open licence:
   - Great Britain: the timetable comes from National Rail (NRE developer terms: publishing, including commercial use, is allowed with the credit "Powered by National Rail Enquiries"). Aubin's compilation states no licence of its own.
   - Hungary: MÁV gives the feed free to registered developers for building apps, but names no licence (Transitous lists CC0).
-  - Portugal (CP, Fertagus): conditions are on the Portuguese NAP pages, which only render in a browser.
+  - Portugal (CP): its Portuguese NAP record 176 says "No licence – No contract" (free, no terms).
   - Spain (OUIGO): Spanish NAP licence (LDA). Commercial use is allowed, but it requires the credit "Powered by MITRAMS" with a link, and shares raw data alike. OUIGO's own licence is unknown.
   - Turkey: the generator is MIT, but the timetable is taken from TCDD's website, and TCDD has published no licence for it.
 - ² Only from Transitous; no licence page found at the publisher.
