@@ -140,9 +140,7 @@ final class CompactTransferRound {
     /** What each station boards from the arrivals of the rides, by ascending station index. */
     List<StationBoardings> boardings(int startStation, Parameters parameters) {
         groupByStation(startStation, parameters.patternDays());
-        return Parallel.range(stations.size())
-                .mapToObj(i -> boardingsAt(stations.get(i), parameters))
-                .toList();
+        return Parallel.map(stations.size(), i -> boardingsAt(stations.get(i), parameters));
     }
 
     /** Marks, for the arena's next trim, the label each boarded-from arrival's ride boarded from, and its chain. */
@@ -167,7 +165,7 @@ final class CompactTransferRound {
             fromTotal += boarded.get(i).fromCount;
         }
         int first = labels.reserve(fromTotal);
-        Parallel.range(boarded.size()).forEach(i -> label(boarded.get(i), first + firstLabel[i]));
+        Parallel.forEach(boarded.size(), i -> label(boarded.get(i), first + firstLabel[i]));
     }
 
     long sizeBytes() {
@@ -203,7 +201,7 @@ final class CompactTransferRound {
         } else {
             Arrays.fill(dropped, 0, words, 0L);
         }
-        Parallel.range(rides.size()).forEach(ride -> markDropped(ride, startStation));
+        Parallel.forEach(rides.size(), ride -> markDropped(ride, startStation));
         Arrays.fill(stationStart, 0);
         int kept = 0;
         for (int ride = 0; ride < rides.size(); ride++) {
