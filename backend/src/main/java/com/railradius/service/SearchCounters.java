@@ -8,6 +8,8 @@ final class SearchCounters {
     long departuresScanned;
     long fallbackScans;
     long fallbackScannedArrivals;
+    // Summed over the threads that chose boardings, estimated (TransferWindowInts#fallbackScanNanos)
+    long fallbackScanNanos;
     long pathsNanos;
     int reachedStations;
 }
