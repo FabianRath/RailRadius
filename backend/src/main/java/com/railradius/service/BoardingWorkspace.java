@@ -18,6 +18,8 @@ final class BoardingWorkspace {
     private long[] days = new long[0];
     private int[] blockLatestStart = new int[0];
     private long[] blockDays = new long[0];
+    private int[] largeBlockLatestStart = new int[0];
+    private long[] largeBlockDays = new long[0];
     private int[] positions = new int[0];
     private int[] sameDayQueue = new int[0];
     private int[] overnightQueue = new int[0];
@@ -36,7 +38,8 @@ final class BoardingWorkspace {
 
     /** The arrival columns, as a station's count arrivals. */
     TransferWindowInts.Arrivals arrivals(int count) {
-        return new TransferWindowInts.Arrivals(count, arrivalSeconds, startSeconds, days, blockLatestStart, blockDays);
+        return new TransferWindowInts.Arrivals(count, arrivalSeconds, startSeconds, days, blockLatestStart, blockDays,
+                largeBlockLatestStart, largeBlockDays);
     }
 
     int[] positions() {
@@ -68,6 +71,8 @@ final class BoardingWorkspace {
         days = new long[capacity];
         blockLatestStart = new int[TransferWindowInts.Arrivals.blockCount(capacity)];
         blockDays = new long[TransferWindowInts.Arrivals.blockCount(capacity)];
+        largeBlockLatestStart = new int[TransferWindowInts.Arrivals.largeBlockCount(capacity)];
+        largeBlockDays = new long[TransferWindowInts.Arrivals.largeBlockCount(capacity)];
         positions = new int[capacity];
         sameDayQueue = new int[capacity];
         overnightQueue = new int[capacity];

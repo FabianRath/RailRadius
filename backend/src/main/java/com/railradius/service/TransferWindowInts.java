@@ -12,11 +12,14 @@ package com.railradius.service;
  * each arrival left out of it was outranked by a later queued one. So no arrival after the first queued one that adds
  * days starts at least as late as it, and the scan stops there. It also skips whole blocks of arrivals that cannot
  * hold its answer: a block none of whose arrivals adds a day, or whose latest start doesn't reach the best one so far.
+ * Blocks come in two sizes, so long windows at large stations skip a large block of 32 blocks in one step (#42).
  */
 final class TransferWindowInts {
 
     private static final int BLOCK_SHIFT = 5;
     private static final int BLOCK_SIZE = 1 << BLOCK_SHIFT;
+    private static final int LARGE_BLOCK_SHIFT = 2 * BLOCK_SHIFT;
+    private static final int LARGE_BLOCK_SIZE = 1 << LARGE_BLOCK_SHIFT;
     // Timing every fallback scan would cost about as much as a short scan, so one departure event in this many times
     // its scans, for the search's statistics
     private static final int TIMED_EVENT_MASK = 63;
@@ -25,28 +28,42 @@ final class TransferWindowInts {
 
     /**
      * A station's count arrivals sorted by arrival time: arrival seconds, journey start seconds and
-     * {@link WeekPeriodDays}. Per whole block of {@link #BLOCK_SIZE} arrivals: the latest start and all days of its
-     * arrivals. The arrays may be longer than count ({@link BoardingWorkspace}); entries past it mean nothing.
+     * {@link WeekPeriodDays}. Per whole block of {@link #BLOCK_SIZE} arrivals, and per whole large block of
+     * {@link #LARGE_BLOCK_SIZE}: the latest start and all days of its arrivals. The arrays may be longer than count
+     * ({@link BoardingWorkspace}); entries past it mean nothing.
      */
     record Arrivals(int count, int[] arrivalSeconds, int[] startSeconds, long[] days, int[] blockLatestStart,
-                    long[] blockDays) {
+                    long[] blockDays, int[] largeBlockLatestStart, long[] largeBlockDays) {
 
         /** Whole blocks among count arrivals. */
         static int blockCount(int count) {
             return count >>> BLOCK_SHIFT;
         }
 
+        /** Whole large blocks among count arrivals. */
+        static int largeBlockCount(int count) {
+            return count >>> LARGE_BLOCK_SHIFT;
+        }
+
         /** Sums up the blocks, once the arrivals are filled in. */
         void summarizeBlocks() {
-            for (int block = 0; block < blockCount(count); block++) {
+            summarize(startSeconds, days, blockCount(count), BLOCK_SHIFT, blockLatestStart, blockDays);
+            summarize(blockLatestStart, blockDays, largeBlockCount(count), LARGE_BLOCK_SHIFT - BLOCK_SHIFT,
+                    largeBlockLatestStart, largeBlockDays);
+        }
+
+        /** Sums up blockCount blocks of 2^shift entries each of the starts and days. */
+        private static void summarize(int[] starts, long[] entryDays, int blockCount, int shift, int[] latestStarts,
+                                      long[] daysUnions) {
+            for (int block = 0; block < blockCount; block++) {
                 int latestStart = Integer.MIN_VALUE;
-                long blockDaysUnion = 0;
-                for (int position = block << BLOCK_SHIFT; position < (block + 1) << BLOCK_SHIFT; position++) {
-                    latestStart = Math.max(latestStart, startSeconds[position]);
-                    blockDaysUnion |= days[position];
+                long daysUnion = 0;
+                for (int entry = block << shift; entry < (block + 1) << shift; entry++) {
+                    latestStart = Math.max(latestStart, starts[entry]);
+                    daysUnion |= entryDays[entry];
                 }
-                blockLatestStart[block] = latestStart;
-                blockDays[block] = blockDaysUnion;
+                latestStarts[block] = latestStart;
+                daysUnions[block] = daysUnion;
             }
         }
     }
@@ -132,10 +149,17 @@ final class TransferWindowInts {
         int best = NONE;
         int position = first;
         while (position < end) {
-            int blockEnd = Math.min(((position >>> BLOCK_SHIFT) + 1) << BLOCK_SHIFT, end);
             // A whole block before end lies within the arrivals, so it is summed up
+            if ((position & (LARGE_BLOCK_SIZE - 1)) == 0 && end - position >= LARGE_BLOCK_SIZE
+                    && cannotWin(arrivals.largeBlockLatestStart()[position >>> LARGE_BLOCK_SHIFT],
+                            arrivals.largeBlockDays()[position >>> LARGE_BLOCK_SHIFT], leastStart, extraDays, wanted)) {
+                position += LARGE_BLOCK_SIZE;
+                continue;
+            }
+            int blockEnd = Math.min(((position >>> BLOCK_SHIFT) + 1) << BLOCK_SHIFT, end);
             if ((position & (BLOCK_SIZE - 1)) == 0 && blockEnd - position == BLOCK_SIZE
-                    && cannotWin(position >>> BLOCK_SHIFT, leastStart, extraDays, wanted)) {
+                    && cannotWin(arrivals.blockLatestStart()[position >>> BLOCK_SHIFT],
+                            arrivals.blockDays()[position >>> BLOCK_SHIFT], leastStart, extraDays, wanted)) {
                 position = blockEnd;
                 continue;
             }
@@ -157,9 +181,9 @@ final class TransferWindowInts {
         return NONE;
     }
 
-    private boolean cannotWin(int block, int leastStart, int extraDays, long wanted) {
-        if (arrivals.blockLatestStart()[block] < leastStart) return true;
-        return !addsDays(arrivals.blockDays()[block], extraDays, wanted);
+    private static boolean cannotWin(int blockLatestStart, long blockDays, int leastStart, int extraDays,
+                                     long wanted) {
+        return blockLatestStart < leastStart || !addsDays(blockDays, extraDays, wanted);
     }
 
     /** Position of the first arrival at or after the (unshifted) time, among those already added to the window. */
