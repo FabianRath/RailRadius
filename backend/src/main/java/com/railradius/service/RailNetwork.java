@@ -181,8 +181,18 @@ final class RailNetwork {
             mergeTrips(alias, canonical);
             Set<String> aliasTranslatedNames = translatedNames.remove(alias);
             if (aliasTranslatedNames != null) addTranslatedNames(canonical, aliasTranslatedNames);
+            addAliasName(alias, canonical);
             stations.remove(alias);
         }
+    }
+
+    /** The alias's own name becomes a search name of the canonical station: "Belfast" finds "Grand Central" (#78). */
+    private void addAliasName(String alias, String canonical) {
+        Station aliasStation = stations.get(alias);
+        Station canonicalStation = stations.get(canonical);
+        if (aliasStation == null || canonicalStation == null || aliasStation.getName() == null) return;
+        if (aliasStation.getName().equals(canonicalStation.getName())) return;
+        addTranslatedNames(canonical, List.of(aliasStation.getName()));
     }
 
     // Each merge step below remaps one hop only, so every alias must point straight at the end of its chain.

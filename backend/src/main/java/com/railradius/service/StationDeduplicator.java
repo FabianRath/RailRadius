@@ -11,13 +11,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
  * Merges stations that are the same place after all feeds are loaded. The rules run in this order, each on the
  * stations the earlier ones left:
  * <ol>
- *   <li>exact-name duplicates within one feed;</li>
+ *   <li>exact-name duplicates within one feed, also where a feed lists a station's platforms as stops of their own:
+ *       "Adelaide (Platform 1)" and "Adelaide (Platform 2)" become one "Adelaide";</li>
  *   <li>stations of different feeds with the same station code ({@link StationCodes}) up to a few km apart, as one
  *       feed's coordinates can be that far off;</li>
  *   <li>stations of different feeds near each other with similar names ({@link StationNameMatcher}), or very near
@@ -47,6 +49,9 @@ public class StationDeduplicator {
     // The farthest true match on the full data is 3.8 km (Cavaria, Trenord / Swiss feed); a false one, the
     // Austrian numbers that repeat per state, is 160 km and more
     private static final double SAME_CODE_MAX_DISTANCE_METERS = 5000;
+    // A platform listed as a stop of its own, without a parent station (#77)
+    private static final Pattern PLATFORM_SUFFIX =
+            Pattern.compile("\\s*\\(platform\\b[^)]*\\)\\s*$", Pattern.CASE_INSENSITIVE);
 
     private final CountryLocator countryLocator;
     private final StationNameMatcher nameMatcher = new StationNameMatcher();
@@ -77,7 +82,7 @@ public class StationDeduplicator {
         Map<String, List<Station>> byName = new HashMap<>();
         for (Station station : network.stations()) {
             if (station.getName() != null) {
-                byName.computeIfAbsent(station.getName().trim(), k -> new ArrayList<>()).add(station);
+                byName.computeIfAbsent(withoutPlatform(station.getName()), k -> new ArrayList<>()).add(station);
             }
         }
 
@@ -103,8 +108,13 @@ public class StationDeduplicator {
                 if (!areNear(s1, s2, WITHIN_FEED_RADIUS_DEG)) continue;
                 Station canonical = betterConnected(network, s1, s2);
                 aliasToCanonical.put((canonical == s1 ? s2 : s1).getId(), canonical.getId());
+                canonical.setName(withoutPlatform(canonical.getName()));
             }
         }
+    }
+
+    private static String withoutPlatform(String name) {
+        return PLATFORM_SUFFIX.matcher(name).replaceFirst("").trim();
     }
 
     private void mergeSameStationCodes(RailNetwork network, Map<String, String> aliasToCanonical) {

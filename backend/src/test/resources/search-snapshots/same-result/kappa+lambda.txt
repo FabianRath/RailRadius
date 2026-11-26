@@ -200,6 +200,24 @@ lambda:L2	0	30	lambda:L1 lambda:L2	lambda:L1 34200 lambda:L2 36000	every day	-
 ## lambda:L1 maxTransfers 5
 lambda:L1	0	0	lambda:L1		every day	-
 lambda:L2	0	30	lambda:L1 lambda:L2	lambda:L1 34200 lambda:L2 36000	every day	-
+## lambda:L10 maxTransfers 0
+lambda:L10	0	0	lambda:L10		every day	-
+lambda:L9	0	20	lambda:L10 lambda:L9	lambda:L10 59400 lambda:L9 60600	every day	-
+## lambda:L10 maxTransfers 1
+lambda:L10	0	0	lambda:L10		every day	-
+lambda:L9	0	20	lambda:L10 lambda:L9	lambda:L10 59400 lambda:L9 60600	every day	-
+## lambda:L10 maxTransfers 2
+lambda:L10	0	0	lambda:L10		every day	-
+lambda:L9	0	20	lambda:L10 lambda:L9	lambda:L10 59400 lambda:L9 60600	every day	-
+## lambda:L10 maxTransfers 3
+lambda:L10	0	0	lambda:L10		every day	-
+lambda:L9	0	20	lambda:L10 lambda:L9	lambda:L10 59400 lambda:L9 60600	every day	-
+## lambda:L10 maxTransfers 4
+lambda:L10	0	0	lambda:L10		every day	-
+lambda:L9	0	20	lambda:L10 lambda:L9	lambda:L10 59400 lambda:L9 60600	every day	-
+## lambda:L10 maxTransfers 5
+lambda:L10	0	0	lambda:L10		every day	-
+lambda:L9	0	20	lambda:L10 lambda:L9	lambda:L10 59400 lambda:L9 60600	every day	-
 ## lambda:L2 maxTransfers 0
 lambda:L2	0	0	lambda:L2		every day	-
 ## lambda:L2 maxTransfers 1
@@ -254,3 +272,21 @@ lambda:L6	0	0	lambda:L6		every day	-
 lambda:L6	0	0	lambda:L6		every day	-
 ## lambda:L6 maxTransfers 5
 lambda:L6	0	0	lambda:L6		every day	-
+## lambda:L9 maxTransfers 0
+lambda:L10	0	20	lambda:L9 lambda:L10	lambda:L9 57600 lambda:L10 58800	every day	-
+lambda:L9	0	0	lambda:L9		every day	-
+## lambda:L9 maxTransfers 1
+lambda:L10	0	20	lambda:L9 lambda:L10	lambda:L9 57600 lambda:L10 58800	every day	-
+lambda:L9	0	0	lambda:L9		every day	-
+## lambda:L9 maxTransfers 2
+lambda:L10	0	20	lambda:L9 lambda:L10	lambda:L9 57600 lambda:L10 58800	every day	-
+lambda:L9	0	0	lambda:L9		every day	-
+## lambda:L9 maxTransfers 3
+lambda:L10	0	20	lambda:L9 lambda:L10	lambda:L9 57600 lambda:L10 58800	every day	-
+lambda:L9	0	0	lambda:L9		every day	-
+## lambda:L9 maxTransfers 4
+lambda:L10	0	20	lambda:L9 lambda:L10	lambda:L9 57600 lambda:L10 58800	every day	-
+lambda:L9	0	0	lambda:L9		every day	-
+## lambda:L9 maxTransfers 5
+lambda:L10	0	20	lambda:L9 lambda:L10	lambda:L9 57600 lambda:L10 58800	every day	-
+lambda:L9	0	0	lambda:L9		every day	-

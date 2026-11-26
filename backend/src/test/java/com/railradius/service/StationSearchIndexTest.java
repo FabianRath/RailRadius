@@ -98,6 +98,15 @@ class StationSearchIndexTest {
         assertThat(omegaIndex.search("riverside", 10)).as("translates another field").isEmpty();
     }
 
+    // #78
+    @Test
+    void searchFindsAMergedStationByTheNameOfItsAlias(@TempDir Path dir) throws Exception {
+        // kappa's K3 "Lambda Gate" is merged into lambda's L1 "Lambdastadt Ost"
+        StationSearchIndex mergedIndex = new StationSearchIndex(GtfsTestFixtures.load(dir, "kappa", "lambda"));
+
+        assertThat(ids(mergedIndex.search("lambda gate", 10))).containsExactly("lambda:L1");
+    }
+
     @Test
     void searchFindsAMergedStationByTheTranslatedNameOfItsAlias() {
         assertThat(ids(index.search("grenzstadt", 10))).containsExactly("beta:B1");
