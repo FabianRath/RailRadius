@@ -4,7 +4,8 @@ data/
 *.hprof
 dump.*
 
-# Local settings with secrets, e.g. feed credentials (Spring Boot reads config/ in the working directory)
+# Local settings with secrets, e.g. feed credentials, and the feed download URLs (gtfs-feeds.txt); Spring Boot reads
+# config/ in the working directory
 /backend/config/
 
 # Build output; frontend/engine/ is the browser engine, built by browser-engine/

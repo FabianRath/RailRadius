@@ -1,8 +1,12 @@
 package com.railradius.service;
 
 import com.railradius.util.ResourceLines;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -12,11 +16,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Where each feed is downloaded from, as listed in {@code gtfs-feeds.txt}. */
+/**
+ * Where each feed is downloaded from, as listed in the local {@code gtfs-feeds.txt}. The file is kept out of git so
+ * the download URLs aren't published; without it no feed has a download URL.
+ */
+@Slf4j
 @Component
 public class FeedRegistry {
 
-    private static final String RESOURCE = "/gtfs-feeds.txt";
     private static final int MIN_FIELDS = 2;
     private static final int MAX_FIELDS = 3;
     private static final String HEADER_SEPARATOR = "\\|";
@@ -30,7 +37,18 @@ public class FeedRegistry {
 
     private record FeedLine(String source, FeedUrl url) {}
 
-    private final Map<String, FeedSource> feeds = parseAll(ResourceLines.read(RESOURCE));
+    private final Map<String, FeedSource> feeds;
+
+    public FeedRegistry(@Value("${railradius.feeds.registry-file:config/gtfs-feeds.txt}") String registryFile) {
+        Path file = Path.of(registryFile);
+        if (Files.isRegularFile(file)) {
+            feeds = parseAll(ResourceLines.read(file));
+            log.info("Download URLs of {} feeds from {}", feeds.size(), file.toAbsolutePath());
+        } else {
+            feeds = Map.of();
+            log.info("No feed list at {}: the update center has no download URLs", file.toAbsolutePath());
+        }
+    }
 
     Optional<FeedSource> of(String source) {
         return Optional.ofNullable(feeds.get(source));
