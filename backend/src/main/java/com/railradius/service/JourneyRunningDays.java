@@ -37,14 +37,9 @@ final class JourneyRunningDays {
      * days are {@link TimetableStore#rideDays}: those of its trip and its twins.
      */
     static SoFar withRide(SoFar before, TimetableStore store, int boardEvent, int alightEvent, TransitGraph graph) {
-        return withRide(before, store, boardEvent, alightEvent, store.rideDays(boardEvent, alightEvent), graph);
-    }
-
-    /** {@link #withRide}, with the ride's {@link TimetableStore#rideDays} already worked out. */
-    static SoFar withRide(SoFar before, TimetableStore store, int boardEvent, int alightEvent, ServiceDays rideDays,
-                          TransitGraph graph) {
         int dayShift = store.departureSeconds(boardEvent) < before.arrivalSeconds()
                 ? before.dayShift() + 1 : before.dayShift();
+        ServiceDays rideDays = store.rideDays(boardEvent, alightEvent);
         // The first train's days from today on set the journey's dates (B31)
         ServiceDays days = before == SoFar.START ? graph.upcomingDays(rideDays) : rideDays;
         return new SoFar(before.days().intersect(days, dayShift), dayShift, store.arrivalSeconds(alightEvent));
