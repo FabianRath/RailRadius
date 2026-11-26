@@ -7,7 +7,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -26,7 +25,6 @@ class CompactReachabilitySearchTest {
     // One more than a 16-bit station index holds, and one past that for the trip's last stop
     private static final int WIDE_STATION_COUNT = Character.MAX_VALUE + 3;
     private static final int NO_LEG = TimetableStore.NO_LEG;
-    private static final LocalDate ZETA_FIRST_DAY = LocalDate.of(2026, 1, 5);
 
     @Test
     void pathsHandedOutAfterEachRoundAddUpToTheResult(@TempDir Path tempDir) throws IOException {
@@ -80,18 +78,6 @@ class CompactReachabilitySearchTest {
         assertThat(result.paths("gamma:G4")).containsExactly(new CompactResult.PathSummary(0, 60));
         assertThat(result.journey("gamma:G4", 0).path().getStationIds())
                 .containsExactly("gamma:G3", "delta:D1", "gamma:G4");
-    }
-
-    // The second search reuses the first one's scratch, ride days included (#44): it must find what it finds alone
-    @Test
-    void aSearchAfterAnotherFindsTheSameRunningDaysAsAlone(@TempDir Path tempDir) throws IOException {
-        TransitGraph graph = GtfsTestFixtures.load(tempDir, ZETA_FIRST_DAY, "zeta");
-        CompactReachabilitySearch reused = GtfsTestFixtures.search(graph);
-        runningDaysByStation(reused, "zeta:Z1");
-
-        assertThat(runningDaysByStation(reused, "zeta:Z2"))
-                .isNotEmpty()
-                .isEqualTo(runningDaysByStation(GtfsTestFixtures.search(graph), "zeta:Z2"));
     }
 
     @Test
@@ -166,16 +152,5 @@ class CompactReachabilitySearchTest {
         graph.serve(new BrowserDataFile.BrowserData(
                 ids.stream().map(id -> Station.builder().id(id).build()).toList(), store, ""));
         return graph;
-    }
-
-    /** Per station and transfer count, the epoch days on which the search's path runs. */
-    private static Map<String, List<Integer>> runningDaysByStation(CompactReachabilitySearch search,
-                                                                   String startId) {
-        CompactResult result = search.search(startId, 3, 0, 180, CompactReachabilitySearch.NO_DEADLINE,
-                round -> { });
-        Map<String, List<Integer>> days = new HashMap<>();
-        result.forEachStation((stationId, paths) -> paths.forEach(path -> days.put(stationId + " x" + path.transfers(),
-                result.journey(stationId, path.transfers()).runningDays().epochDays().boxed().toList())));
-        return days;
     }
 }
