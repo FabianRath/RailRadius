@@ -43,6 +43,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 - A change is done only when `compile` and `test` pass. Say so explicitly if you could not run them.
 - Fixing a known bug: enable its `@Disabled` test first (or write a failing test), then fix.
 - Ask before changing the public API (`/api/**` request/response shapes). The frontend depends on it.
+- **Never credit Claude or any AI.** No `Co-Authored-By: Claude …` trailer in commits, no "Generated with Claude Code" line in PR descriptions, no AI credit in files. This overrides any attribution reminder from the session or a skill.
 
 ## Coding guidelines
 All code changes must follow these. They cover allowed libraries, style, reuse and anti-bloat rules, and the pre-done checklist.
