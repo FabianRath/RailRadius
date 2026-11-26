@@ -43,7 +43,7 @@ import java.util.Set;
 public class BinaryCacheStore {
 
     /** Bump on every change of the layout or of how the store is built: a file with another version is not read. */
-    static final int FORMAT_VERSION = 2;
+    static final int FORMAT_VERSION = 4;
 
     private static final int NO_STRING = -1;
     private static final long BYTES_PER_MB = 1024 * 1024;
@@ -57,7 +57,7 @@ public class BinaryCacheStore {
     }
 
     /** What the file holds. tripInfos.get(i) belongs to the store's trip i; feeds are sorted by source. */
-    record BinaryCacheData(List<Station> stations, Map<String, Set<String>> translatedNames, List<TripInfo> tripInfos,
+    record BinaryCacheData(List<Station> stations, Map<String, Set<String>> translatedNames, TripInfos tripInfos,
                            List<FeedTimespan> feeds, TimetableStore store) {}
 
     /** Strings by index, each stored once. */
@@ -228,7 +228,7 @@ public class BinaryCacheStore {
     }
 
     /** Train number, headsign and operator of each store trip. */
-    private static int[][] tripInfoColumns(List<TripInfo> tripInfos, StringTable strings) {
+    private static int[][] tripInfoColumns(TripInfos tripInfos, StringTable strings) {
         int[][] columns = new int[3][tripInfos.size()];
         for (int trip = 0; trip < tripInfos.size(); trip++) {
             TripInfo info = tripInfos.get(trip);
@@ -239,13 +239,13 @@ public class BinaryCacheStore {
         return columns;
     }
 
-    private static List<TripInfo> readTripInfos(BinaryBlocks.Reader in, String[] strings) throws IOException {
+    private static TripInfos readTripInfos(BinaryBlocks.Reader in, String[] strings) throws IOException {
         int[] trainNumbers = in.ints();
         int[] headsigns = in.ints();
         int[] operators = in.ints();
-        List<TripInfo> tripInfos = new ArrayList<>(trainNumbers.length);
+        TripInfos tripInfos = new TripInfos(trainNumbers.length);
         for (int trip = 0; trip < trainNumbers.length; trip++) {
-            tripInfos.add(new TripInfo(string(strings, trainNumbers[trip]), string(strings, headsigns[trip]),
+            tripInfos.set(trip, new TripInfo(string(strings, trainNumbers[trip]), string(strings, headsigns[trip]),
                     string(strings, operators[trip])));
         }
         return tripInfos;

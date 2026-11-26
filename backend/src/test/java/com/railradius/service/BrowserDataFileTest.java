@@ -13,6 +13,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.offset;
@@ -85,6 +86,46 @@ class BrowserDataFileTest {
             assertThat(read.getLongitude()).isCloseTo(original.getLongitude(), offset(COORDINATE_TOLERANCE_DEG));
         }
         assertThat(stations).extracting(Station::getCountry).contains("KA", "LA");
+    }
+
+    // The trip runs every day, so its days alone would make its departure regular: the file must keep the server's
+    // flag instead, which counts days the file may leave out (#47)
+    @Test
+    void regularDeparturesAreTheServersNotWorkedOutFromTheFilesDays() throws IOException {
+        List<String> ids = List.of("x:A", "x:B");
+        DayPatterns.Builder dayPatterns = new DayPatterns.Builder();
+        int everyDay = dayPatterns.intern(ServiceDays.EVERY_DAY);
+        TimetableStoreBuilder.Parts parts = TimetableStoreBuilder.withoutTripNames(StationTable.of(ids),
+                new int[] {0, 2}, new int[] {0, 1}, new int[] {3600, TimetableStore.NO_LEG},
+                new int[] {TimetableStore.NO_LEG, 4200}, dayPatterns.build(), new int[] {everyDay});
+        assertThat(TimetableStore.of(parts).isRegularDeparture(0)).isTrue();
+        TimetableStore noneRegular = TimetableStore.of(parts, new long[1]);
+        ServedGraph served = new ServedGraph(Map.of("x:A", Station.builder().id("x:A").build(),
+                "x:B", Station.builder().id("x:B").build()), Map.of(), TripInfos.EMPTY, noneRegular, List.of(),
+                StationSearchIndex.Index.EMPTY);
+
+        assertThat(writeAndRead(served).store().isRegularDeparture(0)).isFalse();
+    }
+
+    // Trip 0 runs past midnight (seconds over 24 h) and leaves B 10 s before it arrives there: a negative difference.
+    // Trip 1 runs the same profile an hour later, and trip 2 has no time at all; every second must come back (#49)
+    @Test
+    void timesPastMidnightAndNegativeDifferencesReadBackExactly() throws IOException {
+        int noLeg = TimetableStore.NO_LEG;
+        List<String> ids = List.of("x:A", "x:B", "x:C");
+        DayPatterns.Builder dayPatterns = new DayPatterns.Builder();
+        int everyDay = dayPatterns.intern(ServiceDays.EVERY_DAY);
+        TimetableStoreBuilder.Parts parts = TimetableStoreBuilder.withoutTripNames(StationTable.of(ids),
+                new int[] {0, 3, 6, 8}, new int[] {0, 1, 2, 0, 1, 2, 0, 1},
+                new int[] {86_000, 89_990, noLeg, 89_600, 93_590, noLeg, noLeg, noLeg},
+                new int[] {noLeg, 90_000, 100_000, noLeg, 93_600, 103_600, noLeg, noLeg},
+                dayPatterns.build(), new int[] {everyDay, everyDay, everyDay});
+        TimetableStore store = TimetableStore.of(parts);
+        ServedGraph served = new ServedGraph(Map.of("x:A", Station.builder().id("x:A").build(),
+                "x:B", Station.builder().id("x:B").build(), "x:C", Station.builder().id("x:C").build()), Map.of(),
+                TripInfos.EMPTY, store, List.of(), StationSearchIndex.Index.EMPTY);
+
+        assertThat(searchView(writeAndRead(served).store())).containsExactlyElementsOf(searchView(store));
     }
 
     @Test

@@ -29,10 +29,9 @@ class TimetableStoreTest {
         TimetableStore store = TimetableStore.build(network);
 
         assertThat(store.tripCount()).isEqualTo(2);
-        assertThat(store.memberTripIds(0)).containsExactly("x:T1", "x:T2");
         assertThat(store.tripId(0)).isEqualTo("x:T1");
         assertThat(store.dayPatterns().days(store.dayPattern(0)).epochDays()).containsExactly(100, 101);
-        assertThat(store.memberTripIds(1)).containsExactly("x:T3");
+        assertThat(store.tripId(1)).isEqualTo("x:T3");
         assertThat(IntStream.range(0, store.stations().size()).mapToObj(store.stations()::id))
                 .containsExactly("x:A", "x:B", "x:C");
     }

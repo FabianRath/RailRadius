@@ -14,28 +14,23 @@ import java.util.Set;
  * ({@link TransitGraph#serve}), so a reader that holds one never sees it change. All IDs are canonical stop/trip IDs.
  *
  * @param translatedNames stop ID -> its names in other languages, from the feeds' translations.txt
- * @param tripInfos trip ID of a store trip -> train number, headsign and operator
+ * @param tripInfos train number, headsign and operator of each store trip; none on a browser's graph
  * @param feeds how long each feed runs, sorted by source
  */
 record ServedGraph(Map<String, Station> stations, Map<String, Set<String>> translatedNames,
-                   Map<String, TripInfo> tripInfos, TimetableStore store, List<FeedTimespan> feeds,
+                   TripInfos tripInfos, TimetableStore store, List<FeedTimespan> feeds,
                    StationSearchIndex.Index searchIndex) {
 
-    static final ServedGraph EMPTY = new ServedGraph(Map.of(), Map.of(), Map.of(), TimetableStore.empty(), List.of(),
-            StationSearchIndex.Index.EMPTY);
+    static final ServedGraph EMPTY = new ServedGraph(Map.of(), Map.of(), TripInfos.EMPTY, TimetableStore.empty(),
+            List.of(), StationSearchIndex.Index.EMPTY);
 
     static ServedGraph of(BinaryCacheStore.BinaryCacheData data) {
         Map<String, Station> stations = new HashMap<>();
         data.stations().forEach(station -> stations.put(station.getId(), station));
         TimetableStore store = data.store();
-        Map<String, TripInfo> tripInfos = new HashMap<>();
-        for (int trip = 0; trip < store.tripCount(); trip++) {
-            tripInfos.put(store.tripId(trip), data.tripInfos().get(trip));
-        }
         Map<String, Set<String>> translatedNames = Collections.unmodifiableMap(data.translatedNames());
-        return new ServedGraph(Collections.unmodifiableMap(stations), translatedNames,
-                Collections.unmodifiableMap(tripInfos), store, data.feeds(),
-                StationSearchIndex.build(stations.values(), translatedNames, store));
+        return new ServedGraph(Collections.unmodifiableMap(stations), translatedNames, data.tripInfos(), store,
+                data.feeds(), StationSearchIndex.build(stations.values(), translatedNames, store));
     }
 
     /**
@@ -45,8 +40,8 @@ record ServedGraph(Map<String, Station> stations, Map<String, Set<String>> trans
     static ServedGraph of(BrowserDataFile.BrowserData data) {
         Map<String, Station> stations = new HashMap<>();
         data.stations().forEach(station -> stations.put(station.getId(), station));
-        return new ServedGraph(Collections.unmodifiableMap(stations), Map.of(), Map.of(), data.store(), List.of(),
-                StationSearchIndex.Index.EMPTY);
+        return new ServedGraph(Collections.unmodifiableMap(stations), Map.of(), TripInfos.EMPTY, data.store(),
+                List.of(), StationSearchIndex.Index.EMPTY);
     }
 
     Station station(String stopId) {
@@ -57,7 +52,8 @@ record ServedGraph(Map<String, Station> stations, Map<String, Set<String>> trans
         return translatedNames.getOrDefault(stopId, Set.of());
     }
 
-    Optional<TripInfo> tripInfo(String tripId) {
-        return Optional.ofNullable(tripInfos.get(tripId));
+    /** Empty for a trip the graph has no info of, as on a browser's graph. */
+    Optional<TripInfo> tripInfo(int trip) {
+        return trip < tripInfos.size() ? Optional.of(tripInfos.get(trip)) : Optional.empty();
     }
 }

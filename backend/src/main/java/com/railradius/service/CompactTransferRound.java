@@ -64,6 +64,7 @@ final class CompactTransferRound {
         int departureCount;
         int fallbackScans;
         long fallbackScannedArrivals;
+        long fallbackScanNanos;
 
         int departureEvent(int boarding) {
             return departures[boarding] >>> 1;
@@ -281,6 +282,7 @@ final class CompactTransferRound {
         boardings.departureCount = departuresEnd - store.departuresStart(station);
         boardings.fallbackScans = sameDay.fallbackScanCount() + overnight.fallbackScanCount();
         boardings.fallbackScannedArrivals = sameDay.fallbackScannedArrivals() + overnight.fallbackScannedArrivals();
+        boardings.fallbackScanNanos = sameDay.fallbackScanNanos() + overnight.fallbackScanNanos();
         return boardings;
     }
 
@@ -321,8 +323,8 @@ final class CompactTransferRound {
         long nextDays = patternDays[store.dayPattern(nextTrip)];
         long served = 0;
         while ((nextDays & ~served) != 0) {
-            int sameDayFrom = sameDay.bestFor(departureSeconds, nextDays, SAME_DAY, served);
-            int overnightFrom = overnight.bestFor(departureSeconds, nextDays, NEXT_DAY, served);
+            int sameDayFrom = sameDay.bestFor(event, departureSeconds, nextDays, SAME_DAY, served);
+            int overnightFrom = overnight.bestFor(event, departureSeconds, nextDays, NEXT_DAY, served);
             int from = faster(departureSeconds, arrivals, sameDayFrom, overnightFrom);
             if (from < 0) return;
             int extraDays = from == sameDayFrom ? SAME_DAY : NEXT_DAY;

@@ -63,6 +63,14 @@ public class CompactReachabilitySearch {
      */
     public CompactResult search(String startId, int maxTransfers, int minTransferMins, int maxTransferMins,
                                 Duration deadline, Consumer<Map<String, CompactResult.PathSummary>> roundPaths) {
+        return search(startId, maxTransfers, minTransferMins, maxTransferMins, deadline, roundPaths,
+                new SearchCounters());
+    }
+
+    /** {@link #search}, adding what it did to counters: the browser benchmark reads them (#39). */
+    CompactResult search(String startId, int maxTransfers, int minTransferMins, int maxTransferMins,
+                         Duration deadline, Consumer<Map<String, CompactResult.PathSummary>> roundPaths,
+                         SearchCounters counters) {
         if (maxTransfers > Byte.MAX_VALUE) throw new IllegalArgumentException("Too many transfers: " + maxTransfers);
         ServedGraph served = graph.served();
         TimetableStore store = served.store();
@@ -73,7 +81,7 @@ public class CompactReachabilitySearch {
                     maxTransfers, patternDays,
                     new CompactTransferRound.Parameters(patternDays, minTransferMins * GtfsTime.SECONDS_PER_MINUTE,
                             maxTransferMins * GtfsTime.SECONDS_PER_MINUTE),
-                    new SearchCounters(), System.nanoTime(), deadline.toNanos());
+                    counters, System.nanoTime(), deadline.toNanos());
             CompactResult result = search(run, roundPaths);
             idleScratches.offer(scratch);
             return result;
@@ -104,12 +112,13 @@ public class CompactReachabilitySearch {
         CompactResult result = result(run);
 
         log.info("  Search stats (compact): {} stop arrivals on {} trips, {} stations; {} ms, of which choosing paths "
-                        + "{} ms; {} departures scanned, {} boarded, {} fallback scans over {} arrivals; scratch {} "
-                        + "(labels {}), result {}",
+                        + "{} ms; {} departures scanned, {} boarded, {} fallback scans over {} arrivals in ~{} ms "
+                        + "(over all threads); scratch {} (labels {}), result {}",
                 counters.stopArrivals, scratch.progress().reachedTripCount(),
                 scratch.candidates().reachedCount() + 1, millisSince(startNanos),
                 TimeUnit.NANOSECONDS.toMillis(counters.pathsNanos), counters.departuresScanned, counters.boardings,
                 counters.fallbackScans, counters.fallbackScannedArrivals,
+                TimeUnit.NANOSECONDS.toMillis(counters.fallbackScanNanos),
                 String.format("%.1f MB", scratch.sizeBytes() / 1e6),
                 String.format("%.1f MB", scratch.labels().sizeBytes() / 1e6),
                 String.format("%.2f MB", result.sizeBytes() / 1e6));
@@ -177,6 +186,7 @@ public class CompactReachabilitySearch {
             counters.boardings += station.count;
             counters.fallbackScans += station.fallbackScans;
             counters.fallbackScannedArrivals += station.fallbackScannedArrivals;
+            counters.fallbackScanNanos += station.fallbackScanNanos;
             for (int i = 0; i < station.count; i++) {
                 int event = station.departureEvent(i);
                 int trip = store.tripOf(event);

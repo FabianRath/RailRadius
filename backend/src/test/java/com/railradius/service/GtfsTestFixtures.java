@@ -13,7 +13,9 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.UnaryOperator;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -81,6 +83,18 @@ final class GtfsTestFixtures {
     }
 
     /** Per station of the result, the journey of each of its paths in order. */
+    /** The info of the store trip with this ID; the served graph finds infos by trip index only (#35). */
+    static Optional<TripInfo> tripInfo(ServedGraph served, String tripId) {
+        TimetableStore store = served.store();
+        return IntStream.range(0, store.tripCount())
+                .filter(trip -> store.tripId(trip).equals(tripId))
+                .findFirst()
+                .stream()
+                .mapToObj(served::tripInfo)
+                .flatMap(Optional::stream)
+                .findFirst();
+    }
+
     static Map<String, List<JourneyValue>> journeys(CompactResult result) {
         Map<String, List<JourneyValue>> journeys = new HashMap<>();
         result.forEachStation((stationId, paths) -> journeys.put(stationId, paths.stream()
