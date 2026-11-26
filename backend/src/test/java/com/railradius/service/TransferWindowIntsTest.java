@@ -4,7 +4,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Random;
-import java.util.function.LongSupplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,12 +25,6 @@ class TransferWindowIntsTest {
     // Few distinct starts make equal starts common; three day bits make arrivals that lack the day common
     private static final int RANDOM_START_STEP_SECONDS = 60;
     private static final int RANDOM_DAY_BITS = 3;
-    // Several large blocks of 1,024 arrivals within one wait range, where a wanted day is rare enough that whole
-    // large blocks lack it
-    private static final int LARGE_WINDOWS = 20;
-    private static final int LARGE_ARRIVALS = 12_000;
-    private static final int LARGE_DEPARTURES = 200;
-    private static final int RARE_DAY_ONE_IN = 3_000;
 
     // The departure runs on Monday. Arrival 2 starts latest but runs on Tuesday only; of the Monday arrivals,
     // 0 and 3 start equally late and 1 later than both: the scan must still pick 1
@@ -53,30 +46,6 @@ class TransferWindowIntsTest {
         assertThat(window.bestFor(DEPARTURE_EVENT, DEPARTURE_SECONDS, MONDAY, SAME_DAY, 0)).isEqualTo(0);
     }
 
-    // Over three large blocks: the head 1,500 starts latest but runs on Tuesday; 2,100 is the first queued Monday
-    // arrival. 500, in the first large block, starts as late as 2,100 and comes first, so it wins the tie: that large
-    // block's latest start equals the bound's start and must not be skipped
-    @Test
-    void anEquallyLateArrivalSeveralLargeBlocksBeforeTheBoundIsChosen() {
-        int count = 2_200;
-        int[] arrivalSeconds = new int[count];
-        int[] startSeconds = new int[count];
-        long[] days = new long[count];
-        for (int i = 0; i < count; i++) {
-            arrivalSeconds[i] = i / 10;
-            startSeconds[i] = -1_000;
-            days[i] = TUESDAY;
-        }
-        startSeconds[500] = 0;
-        days[500] = MONDAY;
-        startSeconds[1_500] = 100;
-        startSeconds[2_100] = 0;
-        days[2_100] = MONDAY;
-        TransferWindowInts window = windowOver(arrivalSeconds, startSeconds, days);
-
-        assertThat(window.bestFor(DEPARTURE_EVENT, DEPARTURE_SECONDS, MONDAY, SAME_DAY, 0)).isEqualTo(500);
-    }
-
     @Test
     void noArrivalIsChosenWhenNoneAddsTheDay() {
         TransferWindowInts window = windowOver(new int[] {100, 200}, new int[] {100, 150},
@@ -91,43 +60,27 @@ class TransferWindowIntsTest {
     void randomWindowsChooseWhatAFullScanChooses() {
         Random random = new Random(SEED);
         for (int window = 0; window < RANDOM_WINDOWS; window++) {
-            assertChoosesWhatAFullScanChooses(random, window, RANDOM_ARRIVALS, RANDOM_DEPARTURES,
-                    () -> random.nextInt(1 << RANDOM_DAY_BITS));
-        }
-    }
-
-    // Most arrivals run on Tuesday only, so the scan for a Monday one crosses whole large blocks without it (#42)
-    @Test
-    void windowsSpanningSeveralLargeBlocksChooseWhatAFullScanChooses() {
-        Random random = new Random(SEED);
-        for (int window = 0; window < LARGE_WINDOWS; window++) {
-            assertChoosesWhatAFullScanChooses(random, window, LARGE_ARRIVALS, LARGE_DEPARTURES,
-                    () -> random.nextInt(RARE_DAY_ONE_IN) == 0 ? MONDAY : TUESDAY);
-        }
-    }
-
-    private static void assertChoosesWhatAFullScanChooses(Random random, int window, int arrivalCount,
-                                                          int departureCount, LongSupplier randomDays) {
-        int[] arrivalSeconds = new int[arrivalCount];
-        int[] startSeconds = new int[arrivalCount];
-        long[] days = new long[arrivalCount];
-        for (int i = 0; i < arrivalCount; i++) {
-            arrivalSeconds[i] = random.nextInt(RANDOM_SPAN_SECONDS);
-        }
-        Arrays.sort(arrivalSeconds);
-        for (int i = 0; i < arrivalCount; i++) {
-            int journeySteps = random.nextInt(RANDOM_LONGEST_JOURNEY_SECONDS / RANDOM_START_STEP_SECONDS);
-            startSeconds[i] = arrivalSeconds[i] / RANDOM_START_STEP_SECONDS * RANDOM_START_STEP_SECONDS
-                    - journeySteps * RANDOM_START_STEP_SECONDS;
-            days[i] = randomDays.getAsLong();
-        }
-        TransferWindowInts transferWindow = windowOver(arrivalSeconds, startSeconds, days);
-        int[] departures = random.ints(departureCount, 0, RANDOM_SPAN_SECONDS).sorted().toArray();
-        for (int departureSeconds : departures) {
-            long wanted = 1 + random.nextInt((1 << RANDOM_DAY_BITS) - 1);
-            assertThat(transferWindow.bestFor(DEPARTURE_EVENT, departureSeconds, wanted, SAME_DAY, 0))
-                    .as("window %d, departure %d", window, departureSeconds)
-                    .isEqualTo(fullScan(arrivalSeconds, startSeconds, days, departureSeconds, wanted));
+            int[] arrivalSeconds = new int[RANDOM_ARRIVALS];
+            int[] startSeconds = new int[RANDOM_ARRIVALS];
+            long[] days = new long[RANDOM_ARRIVALS];
+            for (int i = 0; i < RANDOM_ARRIVALS; i++) {
+                arrivalSeconds[i] = random.nextInt(RANDOM_SPAN_SECONDS);
+            }
+            Arrays.sort(arrivalSeconds);
+            for (int i = 0; i < RANDOM_ARRIVALS; i++) {
+                int journeySteps = random.nextInt(RANDOM_LONGEST_JOURNEY_SECONDS / RANDOM_START_STEP_SECONDS);
+                startSeconds[i] = arrivalSeconds[i] / RANDOM_START_STEP_SECONDS * RANDOM_START_STEP_SECONDS
+                        - journeySteps * RANDOM_START_STEP_SECONDS;
+                days[i] = random.nextInt(1 << RANDOM_DAY_BITS);
+            }
+            TransferWindowInts transferWindow = windowOver(arrivalSeconds, startSeconds, days);
+            int[] departures = random.ints(RANDOM_DEPARTURES, 0, RANDOM_SPAN_SECONDS).sorted().toArray();
+            for (int departureSeconds : departures) {
+                long wanted = 1 + random.nextInt((1 << RANDOM_DAY_BITS) - 1);
+                assertThat(transferWindow.bestFor(DEPARTURE_EVENT, departureSeconds, wanted, SAME_DAY, 0))
+                        .as("window %d, departure %d", window, departureSeconds)
+                        .isEqualTo(fullScan(arrivalSeconds, startSeconds, days, departureSeconds, wanted));
+            }
         }
     }
 
@@ -147,10 +100,10 @@ class TransferWindowIntsTest {
 
     private static TransferWindowInts windowOver(int[] arrivalSeconds, int[] startSeconds, long[] days) {
         int count = arrivalSeconds.length;
-        int blocks = TransferWindowInts.Arrivals.blockCount(count);
-        int largeBlocks = TransferWindowInts.Arrivals.largeBlockCount(count);
-        TransferWindowInts.Arrivals arrivals = new TransferWindowInts.Arrivals(count, arrivalSeconds, startSeconds,
-                days, new int[blocks], new long[blocks], new int[largeBlocks], new long[largeBlocks]);
+        TransferWindowInts.Arrivals arrivals = TransferWindowInts.Arrivals.ofCapacity(count);
+        System.arraycopy(arrivalSeconds, 0, arrivals.arrivalSeconds(), 0, count);
+        System.arraycopy(startSeconds, 0, arrivals.startSeconds(), 0, count);
+        System.arraycopy(days, 0, arrivals.days(), 0, count);
         arrivals.summarizeBlocks();
         return new TransferWindowInts(arrivals, new int[count], 0, 0, MAX_WAIT_SECONDS);
     }

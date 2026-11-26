@@ -3,8 +3,8 @@ package com.railradius.service;
 /**
  * Sliding window over one station's {@link Arrivals} for departures fed in time order: among the arrivals whose wait
  * for the departure lies in the min/max wait and that add a day the departure needs, the one with the latest journey
- * start. Boarding from it gives the shortest journey. The window keeps its queue in a buffer at least as large as
- * the arrivals. Arrival times count shiftSeconds later, so waits past midnight can use their own window over the same
+ * start. Boarding from it gives the shortest journey. The window keeps its queue in a buffer as large as the
+ * arrivals. Arrival times count shiftSeconds later, so waits past midnight can use their own window over the same
  * arrivals; start times are only compared with each other, so they need no shift.
  * <p>
  * When the window's best arrival adds no day, a fallback scan looks through the wait range. It took most of a large
@@ -12,14 +12,11 @@ package com.railradius.service;
  * each arrival left out of it was outranked by a later queued one. So no arrival after the first queued one that adds
  * days starts at least as late as it, and the scan stops there. It also skips whole blocks of arrivals that cannot
  * hold its answer: a block none of whose arrivals adds a day, or whose latest start doesn't reach the best one so far.
- * Blocks come in two sizes, so long windows at large stations skip a large block of 32 blocks in one step (#42).
  */
 final class TransferWindowInts {
 
     private static final int BLOCK_SHIFT = 5;
     private static final int BLOCK_SIZE = 1 << BLOCK_SHIFT;
-    private static final int LARGE_BLOCK_SHIFT = 2 * BLOCK_SHIFT;
-    private static final int LARGE_BLOCK_SIZE = 1 << LARGE_BLOCK_SHIFT;
     // Timing every fallback scan would cost about as much as a short scan, so one departure event in this many times
     // its scans, for the search's statistics
     private static final int TIMED_EVENT_MASK = 63;
@@ -27,43 +24,27 @@ final class TransferWindowInts {
     private static final int NONE = -1;
 
     /**
-     * A station's count arrivals sorted by arrival time: arrival seconds, journey start seconds and
-     * {@link WeekPeriodDays}. Per whole block of {@link #BLOCK_SIZE} arrivals, and per whole large block of
-     * {@link #LARGE_BLOCK_SIZE}: the latest start and all days of its arrivals. The arrays may be longer than count
-     * ({@link BoardingWorkspace}); entries past it mean nothing.
+     * A station's arrivals sorted by arrival time: arrival seconds, journey start seconds and {@link WeekPeriodDays}.
+     * Per whole block of {@link #BLOCK_SIZE} arrivals: the latest start and all days of its arrivals.
      */
-    record Arrivals(int count, int[] arrivalSeconds, int[] startSeconds, long[] days, int[] blockLatestStart,
-                    long[] blockDays, int[] largeBlockLatestStart, long[] largeBlockDays) {
+    record Arrivals(int[] arrivalSeconds, int[] startSeconds, long[] days, int[] blockLatestStart, long[] blockDays) {
 
-        /** Whole blocks among count arrivals. */
-        static int blockCount(int count) {
-            return count >>> BLOCK_SHIFT;
-        }
-
-        /** Whole large blocks among count arrivals. */
-        static int largeBlockCount(int count) {
-            return count >>> LARGE_BLOCK_SHIFT;
+        static Arrivals ofCapacity(int count) {
+            int blocks = count >>> BLOCK_SHIFT;
+            return new Arrivals(new int[count], new int[count], new long[count], new int[blocks], new long[blocks]);
         }
 
         /** Sums up the blocks, once the arrivals are filled in. */
         void summarizeBlocks() {
-            summarize(startSeconds, days, blockCount(count), BLOCK_SHIFT, blockLatestStart, blockDays);
-            summarize(blockLatestStart, blockDays, largeBlockCount(count), LARGE_BLOCK_SHIFT - BLOCK_SHIFT,
-                    largeBlockLatestStart, largeBlockDays);
-        }
-
-        /** Sums up blockCount blocks of 2^shift entries each of the starts and days. */
-        private static void summarize(int[] starts, long[] entryDays, int blockCount, int shift, int[] latestStarts,
-                                      long[] daysUnions) {
-            for (int block = 0; block < blockCount; block++) {
+            for (int block = 0; block < blockDays.length; block++) {
                 int latestStart = Integer.MIN_VALUE;
-                long daysUnion = 0;
-                for (int entry = block << shift; entry < (block + 1) << shift; entry++) {
-                    latestStart = Math.max(latestStart, starts[entry]);
-                    daysUnion |= entryDays[entry];
+                long blockDaysUnion = 0;
+                for (int position = block << BLOCK_SHIFT; position < (block + 1) << BLOCK_SHIFT; position++) {
+                    latestStart = Math.max(latestStart, startSeconds[position]);
+                    blockDaysUnion |= days[position];
                 }
-                latestStarts[block] = latestStart;
-                daysUnions[block] = daysUnion;
+                blockLatestStart[block] = latestStart;
+                blockDays[block] = blockDaysUnion;
             }
         }
     }
@@ -71,7 +52,6 @@ final class TransferWindowInts {
     private final Arrivals arrivals;
     private final int[] arrivalSeconds;
     private final int[] startSeconds;
-    private final int count;
     private final int[] queue;
     private final int shiftSeconds;
     private final int minWaitSeconds;
@@ -87,7 +67,6 @@ final class TransferWindowInts {
         this.arrivals = arrivals;
         this.arrivalSeconds = arrivals.arrivalSeconds();
         this.startSeconds = arrivals.startSeconds();
-        this.count = arrivals.count();
         this.queue = queue;
         this.shiftSeconds = shiftSeconds;
         this.minWaitSeconds = minWaitSeconds;
@@ -100,7 +79,7 @@ final class TransferWindowInts {
      */
     int bestFor(int departureEvent, int departureSeconds, long nextTripDays, int extraDays, long served) {
         int latestArrival = departureSeconds - minWaitSeconds - shiftSeconds;
-        while (nextArrival < count && arrivalSeconds[nextArrival] <= latestArrival) {
+        while (nextArrival < arrivalSeconds.length && arrivalSeconds[nextArrival] <= latestArrival) {
             while (tail > head && startSeconds[queue[tail - 1]] <= startSeconds[nextArrival]) tail--;
             queue[tail++] = nextArrival++;
         }
@@ -149,17 +128,10 @@ final class TransferWindowInts {
         int best = NONE;
         int position = first;
         while (position < end) {
-            // A whole block before end lies within the arrivals, so it is summed up
-            if ((position & (LARGE_BLOCK_SIZE - 1)) == 0 && end - position >= LARGE_BLOCK_SIZE
-                    && cannotWin(arrivals.largeBlockLatestStart()[position >>> LARGE_BLOCK_SHIFT],
-                            arrivals.largeBlockDays()[position >>> LARGE_BLOCK_SHIFT], leastStart, extraDays, wanted)) {
-                position += LARGE_BLOCK_SIZE;
-                continue;
-            }
             int blockEnd = Math.min(((position >>> BLOCK_SHIFT) + 1) << BLOCK_SHIFT, end);
+            // A whole block before end lies within the arrivals, so it is summed up
             if ((position & (BLOCK_SIZE - 1)) == 0 && blockEnd - position == BLOCK_SIZE
-                    && cannotWin(arrivals.blockLatestStart()[position >>> BLOCK_SHIFT],
-                            arrivals.blockDays()[position >>> BLOCK_SHIFT], leastStart, extraDays, wanted)) {
+                    && cannotWin(position >>> BLOCK_SHIFT, leastStart, extraDays, wanted)) {
                 position = blockEnd;
                 continue;
             }
@@ -181,9 +153,9 @@ final class TransferWindowInts {
         return NONE;
     }
 
-    private static boolean cannotWin(int blockLatestStart, long blockDays, int leastStart, int extraDays,
-                                     long wanted) {
-        return blockLatestStart < leastStart || !addsDays(blockDays, extraDays, wanted);
+    private boolean cannotWin(int block, int leastStart, int extraDays, long wanted) {
+        if (arrivals.blockLatestStart()[block] < leastStart) return true;
+        return !addsDays(arrivals.blockDays()[block], extraDays, wanted);
     }
 
     /** Position of the first arrival at or after the (unshifted) time, among those already added to the window. */

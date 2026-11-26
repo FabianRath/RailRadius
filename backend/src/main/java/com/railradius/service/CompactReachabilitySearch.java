@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -257,7 +258,9 @@ public class CompactReachabilitySearch {
         requestCandidateDays(scratch);
         scratch.days().resolve(run.store(), graph);
         // Choosing only reads the round's candidates and earlier paths, so stations do it in parallel
-        int[] newPaths = Parallel.mapToInt(stations.size(), i -> newPath(run, stations.get(i)));
+        int[] newPaths = Parallel.range(stations.size())
+                .map(i -> newPath(run, stations.get(i)))
+                .toArray();
         Map<String, CompactResult.PathSummary> added = new HashMap<>();
         for (int i = 0; i < stations.size(); i++) {
             int station = stations.get(i);
@@ -292,13 +295,11 @@ public class CompactReachabilitySearch {
     private static int newPath(Run run, int station) {
         SearchScratch scratch = run.scratch();
         StationCandidatesFlat candidates = scratch.candidates();
-        int count = candidates.count(station);
-        if (count == 0) return LabelArena.NONE;
-        int[] rides = new int[count];
-        int ride = 0;
+        List<Integer> rides = new ArrayList<>();
         for (int slot = candidates.first(station); slot != StationCandidatesFlat.NONE; slot = candidates.next(slot)) {
-            rides[ride++] = candidates.label(slot);
+            rides.add(candidates.label(slot));
         }
+        if (rides.isEmpty()) return LabelArena.NONE;
         LabelArena labels = scratch.labels();
         int chosen = RegularJourneyChooser.choose(rides, scratch.days()::days, labels::durationMinutes);
         return labels.durationMinutes(chosen) < scratch.pathMinutes()[station] ? chosen : LabelArena.NONE;

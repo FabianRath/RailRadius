@@ -9,8 +9,8 @@ import java.util.List;
  * The transfer part of a round of {@link CompactReachabilitySearch}: the arrivals of the previous round's
  * {@link RoundRides}, minus those a faster ride of their round overtook, grouped by station index, and what each
  * station's departures board from them. Stations choose in parallel. A station's sorted arrivals and transfer windows
- * live only while it chooses, in its thread's {@link BoardingWorkspace}, so the round keeps about 8 bytes per arrival.
- * Only the arrivals boarded from get a label ({@link #labelBoardedFrom}).
+ * live only while it chooses, so the round keeps about 8 bytes per arrival. Only the arrivals boarded from get a
+ * label ({@link #labelBoardedFrom}).
  */
 final class CompactTransferRound {
 
@@ -139,8 +139,10 @@ final class CompactTransferRound {
 
     /** What each station boards from the arrivals of the rides, by ascending station index. */
     List<StationBoardings> boardings(int startStation, Parameters parameters) {
-        groupByStation(startStation, parameters.patternDays());
-        return Parallel.map(stations.size(), i -> boardingsAt(stations.get(i), parameters));
+        groupByStation(startStation);
+        return Parallel.range(stations.size())
+                .mapToObj(i -> boardingsAt(stations.get(i), parameters))
+                .toList();
     }
 
     /** Marks, for the arena's next trim, the label each boarded-from arrival's ride boarded from, and its chain. */
@@ -165,7 +167,7 @@ final class CompactTransferRound {
             fromTotal += boarded.get(i).fromCount;
         }
         int first = labels.reserve(fromTotal);
-        Parallel.forEach(boarded.size(), i -> label(boarded.get(i), first + firstLabel[i]));
+        Parallel.range(boarded.size()).forEach(i -> label(boarded.get(i), first + firstLabel[i]));
     }
 
     long sizeBytes() {
@@ -191,17 +193,16 @@ final class CompactTransferRound {
 
     /**
      * Arrivals at the start station are left out: a round never offers them. Overtaking is checked before this round
-     * lowers any best durations, so only same-round overtaking drops an arrival. Only stations where something can
-     * board choose (#46); arrivals elsewhere are already in the result, as candidates of the round that rode them.
+     * lowers any best durations, so only same-round overtaking drops an arrival.
      */
-    private void groupByStation(int startStation, long[] patternDays) {
+    private void groupByStation(int startStation) {
         int words = (rides.recordCount() + Long.SIZE - 1) >>> WORD_SHIFT;
         if (dropped.length < words) {
             dropped = new long[words];
         } else {
             Arrays.fill(dropped, 0, words, 0L);
         }
-        Parallel.forEach(rides.size(), ride -> markDropped(ride, startStation));
+        Parallel.range(rides.size()).forEach(ride -> markDropped(ride, startStation));
         Arrays.fill(stationStart, 0);
         int kept = 0;
         for (int ride = 0; ride < rides.size(); ride++) {
@@ -229,25 +230,8 @@ final class CompactTransferRound {
         }
         stations.clear();
         for (int station = 0; station + 1 < stationStart.length; station++) {
-            if (stationStart[station + 1] > stationStart[station] && canBoard(station, patternDays)) {
-                stations.add(station);
-            }
+            if (stationStart[station + 1] > stationStart[station]) stations.add(station);
         }
-    }
-
-    /**
-     * Whether a departure at the station can be boarded: it is regular and its trip runs from today on. Dead ends and
-     * stations served only by expired trains have none.
-     */
-    private boolean canBoard(int station, long[] patternDays) {
-        int departuresEnd = store.departuresEnd(station);
-        for (int position = store.departuresStart(station); position < departuresEnd; position++) {
-            int event = store.departureEventAt(position);
-            if (store.isRegularDeparture(event) && patternDays[store.dayPattern(store.tripOf(event))] != 0) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /** Sets the bits of the ride's dropped records, a word at a time. Rides do it in parallel. */
@@ -278,18 +262,17 @@ final class CompactTransferRound {
     }
 
     private StationBoardings boardingsAt(int station, Parameters parameters) {
-        int count = stationStart[station + 1] - stationStart[station];
-        BoardingWorkspace workspace = BoardingWorkspace.ofThisThread(count);
-        StationArrivals arrivals = sortedArrivals(workspace, stationStart[station], count);
-        TransferWindowInts sameDay = new TransferWindowInts(arrivals.arrivals(), workspace.sameDayQueue(), 0,
+        StationArrivals arrivals = sortedArrivals(stationStart[station], stationStart[station + 1]);
+        int count = arrivals.positions().length;
+        TransferWindowInts sameDay = new TransferWindowInts(arrivals.arrivals(), new int[count], 0,
                 parameters.minWaitSeconds(), parameters.maxWaitSeconds());
-        TransferWindowInts overnight = new TransferWindowInts(arrivals.arrivals(), workspace.overnightQueue(),
+        TransferWindowInts overnight = new TransferWindowInts(arrivals.arrivals(), new int[count],
                 -GtfsTime.SECONDS_PER_DAY, parameters.minWaitSeconds(),
                 overnightMaxWaitSeconds(parameters.maxWaitSeconds()));
         StationBoardings boardings = new StationBoardings();
         // Per sorted arrival: its index into the boardings' fromPositions, -1 while nothing boards from it
-        int[] fromIndex = workspace.fromIndex();
-        Arrays.fill(fromIndex, 0, count, -1);
+        int[] fromIndex = new int[count];
+        Arrays.fill(fromIndex, -1);
         int departuresEnd = store.departuresEnd(station);
         for (int position = store.departuresStart(station); position < departuresEnd; position++) {
             board(store.departureEventAt(position), store.departureSecondsAt(position), arrivals, sameDay, overnight,
@@ -305,17 +288,17 @@ final class CompactTransferRound {
 
     /**
      * Stable (Search semantics contract): equal times keep the order the arrivals came in, which is their grouped
-     * order, so sorting by arrival seconds and then grouped position does it ({@link ArrivalSort}).
+     * order, so sorting by arrival seconds and then grouped position does it.
      */
-    private StationArrivals sortedArrivals(BoardingWorkspace workspace, int from, int count) {
-        TransferWindowInts.Arrivals arrivals = workspace.arrivals(count);
+    private StationArrivals sortedArrivals(int from, int to) {
+        TransferWindowInts.Arrivals arrivals = TransferWindowInts.Arrivals.ofCapacity(to - from);
         long[] days = arrivals.days();
-        for (int i = 0; i < count; i++) {
+        for (int i = 0; i < days.length; i++) {
             days[i] = (long) arrivalSeconds(grouped[from + i]) << SECONDS_SHIFT | (from + i);
         }
-        workspace.sorter().sort(days, count);
-        int[] positions = workspace.positions();
-        for (int i = 0; i < count; i++) {
+        Arrays.sort(days);
+        int[] positions = new int[days.length];
+        for (int i = 0; i < days.length; i++) {
             int position = (int) (days[i] & POSITION_MASK);
             int seconds = (int) (days[i] >>> SECONDS_SHIFT);
             long arrival = grouped[position];
