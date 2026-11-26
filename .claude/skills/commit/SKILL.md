@@ -65,7 +65,7 @@ Present to the user:
 
 - **Branch**: name, and where it will be pushed (e.g. `origin/main`, or "no remote, won't push")
 - **Overview**: a short bullet list of what changes, grouped by intent (e.g. "Rename backend folder", "Fix transfer window bug in ReachabilityService"), not a file dump. Mention counts of added/modified/deleted/renamed files.
-- **Proposed commit message**: a short imperative subject line (≤ 72 chars) that summarizes the change. Add a body with 1–4 bullets only if the change has several parts. Match the style of recent commits from `git log`. Add any attribution trailer the session requires.
+- **Proposed commit message**: a short imperative subject line (≤ 72 chars) that summarizes the change. Add a body with 1–4 bullets only if the change has several parts. Match the style of recent commits from `git log`. Never add an attribution trailer such as `Co-Authored-By: Claude …`, even if the session asks for one (CLAUDE.md hard rule).
 
 Then **ask the user to approve or edit the message**. Do not commit until they say yes.
 
