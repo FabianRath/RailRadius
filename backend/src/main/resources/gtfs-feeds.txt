@@ -47,6 +47,7 @@ moldova;https://hoermalmeister.github.io/gtfs-rehost/cfm/cfm.zip
 montenegro;https://jbb.ghsq.de/gtfs/me-zpcg.gtfs.zip
 netherlands;https://data.public-transport.earth/gtfs/nl
 netherlands;http://gtfs.ovapi.nl/gtfs-nl.zip
+northern-ireland;https://www.transportforireland.ie/transitData/Data/GTFS_NI.zip
 northmacedonia;https://github.com/deryclem/gtfs-north-macedonia/raw/main/gtfs-north-macedonia.zip
 northmacedonia;https://files.mobilitydatabase.org/mdb-3461/latest.zip
 norway;https://data.public-transport.earth/gtfs/no
