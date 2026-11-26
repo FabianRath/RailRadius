@@ -1,7 +1,8 @@
 package com.railradius.service;
 
-import java.util.function.IntFunction;
-import java.util.function.IntUnaryOperator;
+import java.util.List;
+import java.util.function.Function;
+import java.util.function.ToIntFunction;
 
 /**
  * Picks a station's journey among candidates with the same transfer count: the fastest one that runs on at least
@@ -15,23 +16,23 @@ final class RegularJourneyChooser {
     private RegularJourneyChooser() {}
 
     /**
-     * The chosen one of the candidate labels, which are not empty. A journey without calendar data
-     * ({@link ServiceDays#EVERY_DAY}) has unknown days: it always runs often enough and sets no bar for the others.
-     * Called for every station in every round, so it takes and returns plain ints (#41).
+     * {@code candidates} is not empty. A journey without calendar data ({@link ServiceDays#EVERY_DAY}) has unknown
+     * days: it always runs often enough and sets no bar for the others.
      */
-    static int choose(int[] candidates, IntFunction<ServiceDays> daysOf, IntUnaryOperator durationMinutesOf) {
-        if (candidates.length == 1) return candidates[0];
-        int mostDays = 0;
-        for (int candidate : candidates) {
-            ServiceDays days = daysOf.apply(candidate);
-            if (days != ServiceDays.EVERY_DAY) mostDays = Math.max(mostDays, days.dayCount());
-        }
-        int chosen = LabelArena.NONE;
-        for (int candidate : candidates) {
-            ServiceDays days = daysOf.apply(candidate);
-            boolean runsOftenEnough = days == ServiceDays.EVERY_DAY
-                    || days.dayCount() * MIN_DAY_SHARE_DIVISOR >= mostDays;
-            boolean faster = chosen == LabelArena.NONE
+    static <T> T choose(List<T> candidates, Function<T, ServiceDays> daysOf, ToIntFunction<T> durationMinutesOf) {
+        if (candidates.size() == 1) return candidates.getFirst();
+        List<ServiceDays> days = candidates.stream().map(daysOf).toList();
+        int mostDays = days.stream()
+                .filter(journeyDays -> journeyDays != ServiceDays.EVERY_DAY)
+                .mapToInt(ServiceDays::dayCount)
+                .max()
+                .orElse(0);
+        T chosen = null;
+        for (int i = 0; i < candidates.size(); i++) {
+            T candidate = candidates.get(i);
+            boolean runsOftenEnough = days.get(i) == ServiceDays.EVERY_DAY
+                    || days.get(i).dayCount() * MIN_DAY_SHARE_DIVISOR >= mostDays;
+            boolean faster = chosen == null
                     || durationMinutesOf.applyAsInt(candidate) < durationMinutesOf.applyAsInt(chosen);
             if (runsOftenEnough && faster) chosen = candidate;
         }

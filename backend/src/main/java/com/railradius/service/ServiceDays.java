@@ -75,12 +75,7 @@ public record ServiceDays(int firstWord, long[] words) {
 
     /** The number of days it runs; 0 for {@link #EVERY_DAY}. */
     int dayCount() {
-        // A loop, not a stream: choosing paths asks for it per candidate (#41)
-        int count = 0;
-        for (long word : words) {
-            count += Long.bitCount(word);
-        }
-        return count;
+        return Arrays.stream(words).mapToInt(Long::bitCount).sum();
     }
 
     /** The last day it runs; not defined for an empty service or {@link #EVERY_DAY}. */

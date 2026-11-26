@@ -53,7 +53,8 @@ final class LabelDays {
     void resolve(TimetableStore store, TransitGraph graph) {
         for (IntList queued : queuedByTransfers) {
             JourneyRunningDays.SoFar[] soFar = new JourneyRunningDays.SoFar[queued.size()];
-            Parallel.forEach(queued.size(), i -> soFar[i] = soFar(queued.get(i), store, graph));
+            Parallel.range(queued.size())
+                    .forEach(i -> soFar[i] = soFar(queued.get(i), store, graph));
             for (int i = 0; i < soFar.length; i++) {
                 int daysIndex = interned.intern(soFar[i].days());
                 if (daysIndex > MAX_DAYS_INDEX) throw new IllegalStateException("Too many distinct journey days");
