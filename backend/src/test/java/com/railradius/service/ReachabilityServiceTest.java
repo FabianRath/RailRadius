@@ -430,6 +430,20 @@ class ReachabilityServiceTest {
         assertThat(emitter.streamedStopIds()).contains("epsilon:E6");
     }
 
+    // Rounds are sent off the search thread (#84), still one after the other, and the done event after all of them
+    @Test
+    void streamSendsTheRoundsInOrderAndTheDoneEventLast(@TempDir Path dir) throws Exception {
+        TransitGraph graph = GtfsTestFixtures.load(dir, "epsilon");
+        RecordingEmitter emitter = new RecordingEmitter();
+
+        service(graph).calculateReachabilityStreaming(VISITOR,
+                request("epsilon:E1", 2, 0, SearchOptions.MAX_TRANSFER_WAIT_MINUTES, null), emitter);
+
+        assertThat(emitter.streamedStations()).extracting(ReachableStationSummary::getTransfers)
+                .isSorted().contains(0, 1, 2);
+        assertThat(emitter.texts.getLast()).contains("event:done");
+    }
+
     @Test
     void streamStopsSearchingWhenTheClientIsGone() {
         ReachabilityCache cache = GtfsTestFixtures.reachabilityCache(gtfs);
