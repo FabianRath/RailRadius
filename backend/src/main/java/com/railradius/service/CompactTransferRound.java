@@ -62,8 +62,7 @@ final class CompactTransferRound {
         private int[] fromPositions = NO_INTS;
         private int fromCount;
         int departureCount;
-        int fallbackScans;
-        long fallbackScannedArrivals;
+        int fallbacks;
 
         int departureEvent(int boarding) {
             return departures[boarding] >>> 1;
@@ -263,11 +262,10 @@ final class CompactTransferRound {
     private StationBoardings boardingsAt(int station, Parameters parameters) {
         StationArrivals arrivals = sortedArrivals(stationStart[station], stationStart[station + 1]);
         int count = arrivals.positions().length;
-        TransferWindowInts sameDay = new TransferWindowInts(arrivals.arrivals(), new int[count], 0,
+        TransferWindowInts sameDay = new TransferWindowInts(arrivals.arrivals(), new int[count], SAME_DAY,
                 parameters.minWaitSeconds(), parameters.maxWaitSeconds());
-        TransferWindowInts overnight = new TransferWindowInts(arrivals.arrivals(), new int[count],
-                -GtfsTime.SECONDS_PER_DAY, parameters.minWaitSeconds(),
-                overnightMaxWaitSeconds(parameters.maxWaitSeconds()));
+        TransferWindowInts overnight = new TransferWindowInts(arrivals.arrivals(), new int[count], NEXT_DAY,
+                parameters.minWaitSeconds(), overnightMaxWaitSeconds(parameters.maxWaitSeconds()));
         StationBoardings boardings = new StationBoardings();
         // Per sorted arrival: its index into the boardings' fromPositions, -1 while nothing boards from it
         int[] fromIndex = new int[count];
@@ -279,8 +277,7 @@ final class CompactTransferRound {
         }
         boardings.trimToSize();
         boardings.departureCount = departuresEnd - store.departuresStart(station);
-        boardings.fallbackScans = sameDay.fallbackScanCount() + overnight.fallbackScanCount();
-        boardings.fallbackScannedArrivals = sameDay.fallbackScannedArrivals() + overnight.fallbackScannedArrivals();
+        boardings.fallbacks = sameDay.fallbackCount() + overnight.fallbackCount();
         return boardings;
     }
 
@@ -305,7 +302,6 @@ final class CompactTransferRound {
             arrivals.startSeconds()[i] = seconds - durationMinutes(arrival) * GtfsTime.SECONDS_PER_MINUTE;
             days[i] = rides.days(rideOf(arrival));
         }
-        arrivals.summarizeBlocks();
         return new StationArrivals(positions, arrivals);
     }
 
@@ -321,8 +317,8 @@ final class CompactTransferRound {
         long nextDays = patternDays[store.dayPattern(nextTrip)];
         long served = 0;
         while ((nextDays & ~served) != 0) {
-            int sameDayFrom = sameDay.bestFor(departureSeconds, nextDays, SAME_DAY, served);
-            int overnightFrom = overnight.bestFor(departureSeconds, nextDays, NEXT_DAY, served);
+            int sameDayFrom = sameDay.bestFor(departureSeconds, nextDays, served);
+            int overnightFrom = overnight.bestFor(departureSeconds, nextDays, served);
             int from = faster(departureSeconds, arrivals, sameDayFrom, overnightFrom);
             if (from < 0) return;
             int extraDays = from == sameDayFrom ? SAME_DAY : NEXT_DAY;
