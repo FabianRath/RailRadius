@@ -68,7 +68,11 @@ class FeedUpdateCenterTest {
         gtfsDir = Files.createDirectories(tempDir.resolve("gtfs"));
         loadProgress = new GtfsLoadProgress();
         environment = new MockEnvironment();
-        center = new FeedUpdateCenter(new FeedRegistry(), new FeedDownloader(environment), loadProgress);
+        Path feedList = Files.writeString(tempDir.resolve("gtfs-feeds.txt"), """
+                austria;https://example.org/at.zip
+                germany;https://example.org/de.zip
+                """);
+        center = new FeedUpdateCenter(new FeedRegistry(feedList.toString()), new FeedDownloader(environment), loadProgress);
         ReflectionTestUtils.setField(center, "gtfsDirectory", gtfsDir.toString());
         ReflectionTestUtils.setField(center, "expiringDays", EXPIRING_DAYS);
         expectSources("zeta");

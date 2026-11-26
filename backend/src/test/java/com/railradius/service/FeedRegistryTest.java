@@ -3,7 +3,11 @@ package com.railradius.service;
 import com.railradius.service.FeedRegistry.FeedSource;
 import com.railradius.service.FeedRegistry.FeedUrl;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -44,30 +48,27 @@ class FeedRegistryTest {
     }
 
     @Test
-    void registryFileListsFeedsWithTheirHeaders() {
-        FeedRegistry registry = new FeedRegistry();
+    void feedListFileIsReadWithoutComments(@TempDir Path tempDir) throws IOException {
+        Path file = Files.writeString(tempDir.resolve("gtfs-feeds.txt"), """
+                # Format: source;url[;Header: value|Header: value]
+                latvia;https://example.org/lv.zip;User-Agent: RailRadius
 
-        assertThat(registry.of("finland").orElseThrow().urls().getFirst().headers())
-                .containsEntry("Accept-Encoding", "gzip");
+                latvia;https://mirror.example/lv.zip
+                """);
+
+        FeedRegistry registry = new FeedRegistry(file.toString());
+
+        assertThat(registry.sources()).containsExactly("latvia");
+        assertThat(registry.of("latvia").orElseThrow().urls().getFirst().headers())
+                .containsEntry("User-Agent", "RailRadius");
         assertThat(registry.of("albania")).isEmpty();
     }
 
     @Test
-    void latviaSendsItsOwnUserAgentBecauseVivisServerRejectsJavasDefault() {
-        FeedRegistry registry = new FeedRegistry();
+    void missingFeedListMeansNoFeedHasADownloadUrl(@TempDir Path tempDir) {
+        FeedRegistry registry = new FeedRegistry(tempDir.resolve("gtfs-feeds.txt").toString());
 
-        assertThat(registry.of("latvia").orElseThrow().urls().getFirst().headers())
-                .containsEntry("User-Agent", "RailRadius");
-    }
-
-    @Test
-    void northMacedoniaComesFromTheCommunityFeedWithTheMobilityDatabaseMirrorAsFallback() {
-        FeedRegistry registry = new FeedRegistry();
-
-        assertThat(registry.of("northmacedonia").orElseThrow().urls())
-                .extracting(FeedUrl::url)
-                .containsExactly("https://github.com/deryclem/gtfs-north-macedonia/raw/main/gtfs-north-macedonia.zip",
-                        "https://files.mobilitydatabase.org/mdb-3461/latest.zip");
+        assertThat(registry.sources()).isEmpty();
     }
 
     private static FeedSource parseOne(String line) {

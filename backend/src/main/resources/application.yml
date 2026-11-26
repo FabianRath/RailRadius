@@ -63,6 +63,9 @@ railradius:
     # Comma-separated sources that belong in the GTFS directory; one without a zip is listed as MISSING in the
     # update center, ready to download. Empty = every feed in gtfs-feeds.txt
     sources:
+    # Download URL of each feed for the update center, one "source;url[;Header: value|…]" per line, # for comments.
+    # Kept out of git (backend/config/ is gitignored) so the URLs aren't published; without it nothing can be downloaded
+    registry-file: config/gtfs-feeds.txt
     # Credentials that header placeholders in gtfs-feeds.txt refer to, e.g. auth.hungary (base64 of "user:password").
     # Never set them here: use the gitignored backend/config/application.yml or env vars (RAILRADIUS_FEEDS_AUTH_HUNGARY).
     # A feed whose setting is missing is rejected when downloaded.
