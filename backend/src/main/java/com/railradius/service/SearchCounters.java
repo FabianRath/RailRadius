@@ -6,8 +6,7 @@ final class SearchCounters {
     long stopArrivals;
     long boardings;
     long departuresScanned;
-    long fallbackScans;
-    long fallbackScannedArrivals;
+    long fallbacks;
     long pathsNanos;
     int reachedStations;
 }
