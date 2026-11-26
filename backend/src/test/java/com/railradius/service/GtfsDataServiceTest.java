@@ -360,6 +360,32 @@ class GtfsDataServiceTest {
         assertThat(graph.getStation("kappa:K2")).as("stop at home").isNotNull();
     }
 
+    // #77
+    @Test
+    void platformsOfOneStationListedAsStopsOfTheirOwnBecomeOneStationWithoutThePlatformInItsName(@TempDir Path dir)
+            throws Exception {
+        // lambda's L7 "Lambdaheim Station (Platform 1)", L8 "(Platform 2)" and L10 "Lambdaheim Station", ~20 m apart,
+        // have no parent station
+        RailNetwork merged = GtfsTestFixtures.network(dir, "kappa", "lambda");
+
+        String arrival = merged.getStopsOnTrip("lambda:LT4").getLast();
+        assertThat(merged.getStopsOnTrip("lambda:LT5").getFirst()).isEqualTo(arrival);
+        assertThat(merged.getStopsOnTrip("lambda:LT6").getFirst()).isEqualTo(arrival);
+        assertThat(merged.getStation(arrival).getName()).isEqualTo("Lambdaheim Station");
+    }
+
+    // #78
+    @Test
+    void aStopAbroadAlreadyMergedWithItsLocalStationIsNotSnappedIntoAnother(@TempDir Path dir) throws Exception {
+        // kappa's K8 "Lambda Hafen" lies in lambda's country and merges by name with lambda's L5 "Lambda Hafen Hbf",
+        // ~35 m away; lambda's L6 "Nordkreuz", ~330 m away, is another station
+        RailNetwork merged = GtfsTestFixtures.network(dir, "kappa", "lambda");
+
+        assertThat(merged.getStation("kappa:K8")).isNotNull();
+        assertThat(merged.getStation("lambda:L5")).isNull();
+        assertThat(merged.getStopsOnTrip("lambda:LT3")).containsExactly("kappa:K8", "lambda:L6");
+    }
+
     // B30
     @Test
     void stopsAbroadAreMergedIntoALocalStationOfTheSameNameAFewKilometresAway(@TempDir Path dir) throws Exception {
@@ -410,7 +436,8 @@ class GtfsDataServiceTest {
 
     @Test
     void translatedNamesOfAMergedStationMoveToTheSurvivingStation() {
-        assertThat(gtfs.getTranslatedNames("beta:B1")).containsExactly("Grenzstadt");
+        // alpha's A3 "Border Town", merged into B1, adds its own name (#78)
+        assertThat(gtfs.getTranslatedNames("beta:B1")).containsExactlyInAnyOrder("Grenzstadt", "Border Town");
         assertThat(gtfs.getTranslatedNames("alpha:A3")).isEmpty();
     }
 
