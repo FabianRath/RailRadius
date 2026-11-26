@@ -4,8 +4,8 @@ import com.railradius.dto.ReachableStation;
 import com.railradius.dto.ReachableStationSummary;
 import com.railradius.service.SearchRequestValidator.SearchRequest;
 import com.railradius.service.SearchRequestValidator.ValidSearch;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -16,11 +16,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
 
 /** Answers reachability requests: validates them, has the search admitted ({@link SearchAdmission}), maps results. */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class ReachabilityService {
 
     private static final int STREAM_BATCH_SIZE = 30;
@@ -35,9 +37,25 @@ public class ReachabilityService {
     private final SearchRequestValidator validator;
     private final TransitGraph graph;
     private final SearchCounts searchCounts;
+    private final Executor roundSender;
 
     @Value("${railradius.cache.predictive-enabled:true}")
     private boolean predictiveEnabled;
+
+    // With @EnableScheduling the task scheduler is an Executor too; rounds are sent on the task executor
+    public ReachabilityService(ReachabilityCache cache, SearchAdmission admission, ReachabilityWarmer warmer,
+                               JourneyLegBuilder legBuilder, SearchRequestValidator validator, TransitGraph graph,
+                               SearchCounts searchCounts,
+                               @Qualifier("applicationTaskExecutor") Executor roundSender) {
+        this.cache = cache;
+        this.admission = admission;
+        this.warmer = warmer;
+        this.legBuilder = legBuilder;
+        this.validator = validator;
+        this.graph = graph;
+        this.searchCounts = searchCounts;
+        this.roundSender = roundSender;
+    }
 
     /**
      * The journey to targetId with the path the stream sent for it; empty if the target is not reachable within the
@@ -55,7 +73,8 @@ public class ReachabilityService {
 
     /**
      * Resolves the request and sends the stations to the emitter in batches, then a "done" event. A search sends
-     * each round's stations when the round ends; a stored result is sent at once. Runs on a worker thread; the HTTP
+     * each round's stations when the round ends, on another thread while the next round runs; a stored result is sent
+     * at once. Runs on a worker thread; the HTTP
      * response stays open until it completes. A search that waits for a {@link SearchGate} permit sends SSE comments
      * meanwhile, and the search stops when a send fails because the client is gone, which frees its permit. A refused
      * search ({@link SearchRefusal}) gets an error event with the refusal's message instead.
@@ -69,7 +88,7 @@ public class ReachabilityService {
             StreamedStations streamed = new StreamedStations(search, emitter, startMs);
             // A station is sent once, with its first path within the time limit. Rounds add paths by ascending
             // transfers, so that is the path its journey shows too (B4).
-            streamed.sendNew(admission.admit(client, search.options(), streamed));
+            streamed.sendNew(streamed.search(client));
             log.info("Streamed {} stations in {} ms, the first after {} ms", streamed.shown.count(),
                     System.currentTimeMillis() - startMs, streamed.firstSentMs);
             streamed.sendDone();
@@ -120,12 +139,16 @@ public class ReachabilityService {
     /** Sends the stations a search shows ({@link ShownStations}) as they come. */
     private final class StreamedStations implements SearchAdmission.SearchListener {
 
+        private final SearchOptions options;
         private final ShownStations shown;
         private final SseEmitter emitter;
         private final long startMs;
         private long firstSentMs = -1;
+        // The round being built and sent on roundSender, so the search goes on meanwhile (#84)
+        private CompletableFuture<Void> sending = CompletableFuture.completedFuture(null);
 
         StreamedStations(ValidSearch search, SseEmitter emitter, long startMs) {
+            this.options = search.options();
             this.shown = new ShownStations(search.options().startId(), search.maxJourneyMinutes(), legBuilder);
             this.emitter = emitter;
             this.startMs = startMs;
@@ -136,10 +159,22 @@ public class ReachabilityService {
             send(SseEmitter.event().comment("queued"));
         }
 
+        // A round still being sent when the search fails is let finish first, so the error event comes last
+        CompactResult search(SearchAdmission.Client client) {
+            try {
+                return admission.admit(client, options, this);
+            } finally {
+                sending.exceptionally(sendFailure -> null).join();
+            }
+        }
+
         @Override
         public void roundPaths(Map<String, CompactResult.PathSummary> paths) {
             // No result yet to name the graph: a station missing from the one served now is sent with the result
-            sendBatches(shown.newInRound(graph.served(), paths));
+            ServedGraph served = graph.served();
+            // One round at a time keeps the rounds in order, and a gone client stops the search a round later
+            awaitSending();
+            sending = CompletableFuture.runAsync(() -> sendBatches(shown.newInRound(served, paths)), roundSender);
         }
 
         /**
@@ -147,6 +182,7 @@ public class ReachabilityService {
          * ({@link #journey}).
          */
         void sendNew(CompactResult result) {
+            awaitSending();
             sendBatches(shown.newInResult(result));
         }
 
@@ -161,6 +197,17 @@ public class ReachabilityService {
             for (int i = 0; i < stations.size(); i += STREAM_BATCH_SIZE) {
                 send(SseEmitter.event().name("stations")
                         .data(stations.subList(i, Math.min(i + STREAM_BATCH_SIZE, stations.size()))));
+            }
+        }
+
+        // Throws what failed the last round's send, as if the search thread had sent it
+        private void awaitSending() {
+            try {
+                sending.join();
+            } catch (CompletionException e) {
+                if (e.getCause() instanceof RuntimeException failure) throw failure;
+                if (e.getCause() instanceof Error failure) throw failure;
+                throw e;
             }
         }
 

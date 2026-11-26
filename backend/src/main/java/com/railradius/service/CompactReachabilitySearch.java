@@ -112,13 +112,12 @@ public class CompactReachabilitySearch {
         CompactResult result = result(run);
 
         log.info("  Search stats (compact): {} stop arrivals on {} trips, {} stations; {} ms, of which choosing paths "
-                        + "{} ms; {} departures scanned, {} boarded, {} fallback scans over {} arrivals; "
-                        + "scratch {} (labels {}), result {}",
+                        + "{} ms; {} departures scanned, {} boarded, {} fallbacks; scratch {} (labels {}), "
+                        + "result {}",
                 counters.stopArrivals, scratch.progress().reachedTripCount(),
                 scratch.candidates().reachedCount() + 1, millisSince(startNanos),
                 TimeUnit.NANOSECONDS.toMillis(counters.pathsNanos), counters.departuresScanned, counters.boardings,
-                counters.fallbackScans, counters.fallbackScannedArrivals,
-                String.format("%.1f MB", scratch.sizeBytes() / 1e6),
+                counters.fallbacks, String.format("%.1f MB", scratch.sizeBytes() / 1e6),
                 String.format("%.1f MB", scratch.labels().sizeBytes() / 1e6),
                 String.format("%.2f MB", result.sizeBytes() / 1e6));
         return result;
@@ -183,8 +182,7 @@ public class CompactReachabilitySearch {
             checkDeadline(run, transfers);
             counters.departuresScanned += station.departureCount;
             counters.boardings += station.count;
-            counters.fallbackScans += station.fallbackScans;
-            counters.fallbackScannedArrivals += station.fallbackScannedArrivals;
+            counters.fallbacks += station.fallbacks;
             for (int i = 0; i < station.count; i++) {
                 int event = station.departureEvent(i);
                 int trip = store.tripOf(event);
@@ -307,9 +305,9 @@ public class CompactReachabilitySearch {
     private static void logRound(int transfers, long arrivalCount, Run run, long startNanos) {
         SearchCounters counters = run.counters();
         log.debug("  Round {} (compact): {} stop arrivals, {} stations, {} ms; so far {} departures scanned, "
-                        + "{} fallback scans over {} arrivals", transfers, arrivalCount,
+                        + "{} fallbacks", transfers, arrivalCount,
                 run.scratch().candidates().reachedCount(), millisSince(startNanos), counters.departuresScanned,
-                counters.fallbackScans, counters.fallbackScannedArrivals);
+                counters.fallbacks);
     }
 
     private static long millisSince(long startNanos) {
