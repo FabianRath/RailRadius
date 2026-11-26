@@ -360,6 +360,18 @@ class GtfsDataServiceTest {
         assertThat(graph.getStation("kappa:K2")).as("stop at home").isNotNull();
     }
 
+    // #78
+    @Test
+    void aStopAbroadAlreadyMergedWithItsLocalStationIsNotSnappedIntoAnother(@TempDir Path dir) throws Exception {
+        // kappa's K8 "Lambda Hafen" lies in lambda's country and merges by name with lambda's L5 "Lambda Hafen Hbf",
+        // ~35 m away; lambda's L6 "Nordkreuz", ~330 m away, is another station
+        RailNetwork merged = GtfsTestFixtures.network(dir, "kappa", "lambda");
+
+        assertThat(merged.getStation("kappa:K8")).isNotNull();
+        assertThat(merged.getStation("lambda:L5")).isNull();
+        assertThat(merged.getStopsOnTrip("lambda:LT3")).containsExactly("kappa:K8", "lambda:L6");
+    }
+
     // B30
     @Test
     void stopsAbroadAreMergedIntoALocalStationOfTheSameNameAFewKilometresAway(@TempDir Path dir) throws Exception {

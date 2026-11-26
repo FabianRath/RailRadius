@@ -7,9 +7,12 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -35,6 +38,7 @@ final class ForeignStopSnapper {
                     Map<String, String> aliasToCanonical) {
         Map<String, String> homeBySource = HomeCountries.bySource(stations);
         StationGrid grid = new StationGrid(stations, SNAP_CELL_SIZE_DEG);
+        Map<String, Set<String>> mergedHomes = homesMergedInto(aliasToCanonical, homeBySource);
 
         int snapped = 0;
         for (Station stop : stations) {
@@ -42,6 +46,8 @@ final class ForeignStopSnapper {
             String home = homeBySource.get(StopIds.source(stop.getId()));
             if (country == null || home == null || country.equals(home)) continue;
             if (aliasToCanonical.containsKey(stop.getId())) continue;
+            // Already one with the local station (#78): snapping it would move both onto a neighbour
+            if (mergedHomes.getOrDefault(stop.getId(), Set.of()).contains(country)) continue;
             Optional<Station> local = localStation(stop, country, grid, homeBySource, aliasToCanonical, nameMatcher);
             if (local.isEmpty()) continue;
             aliasToCanonical.put(stop.getId(), local.get().getId());
@@ -50,6 +56,17 @@ final class ForeignStopSnapper {
                     stop.getId(), stop.getName(), local.get().getId(), local.get().getName());
         }
         return snapped;
+    }
+
+    /** Per station, the home countries of the feeds whose stations an earlier rule merged into it. */
+    private static Map<String, Set<String>> homesMergedInto(Map<String, String> aliasToCanonical,
+                                                            Map<String, String> homeBySource) {
+        Map<String, Set<String>> homesByCanonical = new HashMap<>();
+        aliasToCanonical.forEach((alias, canonical) -> {
+            String home = homeBySource.get(StopIds.source(alias));
+            if (home != null) homesByCanonical.computeIfAbsent(canonical, k -> new HashSet<>()).add(home);
+        });
+        return homesByCanonical;
     }
 
     /** The nearest local station within the snap distance, else the nearest one of the same name farther away. */

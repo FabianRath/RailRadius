@@ -1,3 +1,4 @@
 route_id,service_id,trip_id
 LR,WD,LT1
 LR,WD,LT2
+LR,WD,LT3

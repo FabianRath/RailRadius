@@ -28,6 +28,30 @@ kappa:K1	0	0	kappa:K1		every day	-
 kappa:K2	0	30	kappa:K1 kappa:K2	kappa:KT1 kappa:K1 28800 kappa:K2 30600	every day	-
 lambda:L1	0	60	kappa:K1 kappa:K2 lambda:L1	kappa:KT1 kappa:K1 28800 lambda:L1 32400	every day	-
 lambda:L2	1	120	kappa:K1 kappa:K2 lambda:L1 lambda:L2	kappa:KT1 kappa:K1 28800 lambda:L1 32400 | lambda:LT1 lambda:L1 34200 lambda:L2 36000	every day	-
+## kappa:K10 maxTransfers 0
+kappa:K10	0	0	kappa:K10		every day	-
+kappa:K8	0	60	kappa:K10 kappa:K8	kappa:KT5 kappa:K10 61200 kappa:K8 64800	every day	-
+kappa:K9	0	120	kappa:K10 kappa:K8 kappa:K9	kappa:KT5 kappa:K10 61200 kappa:K9 68400	every day	-
+## kappa:K10 maxTransfers 1
+kappa:K10	0	0	kappa:K10		every day	-
+kappa:K8	0	60	kappa:K10 kappa:K8	kappa:KT5 kappa:K10 61200 kappa:K8 64800	every day	-
+kappa:K9	0	120	kappa:K10 kappa:K8 kappa:K9	kappa:KT5 kappa:K10 61200 kappa:K9 68400	every day	-
+## kappa:K10 maxTransfers 2
+kappa:K10	0	0	kappa:K10		every day	-
+kappa:K8	0	60	kappa:K10 kappa:K8	kappa:KT5 kappa:K10 61200 kappa:K8 64800	every day	-
+kappa:K9	0	120	kappa:K10 kappa:K8 kappa:K9	kappa:KT5 kappa:K10 61200 kappa:K9 68400	every day	-
+## kappa:K10 maxTransfers 3
+kappa:K10	0	0	kappa:K10		every day	-
+kappa:K8	0	60	kappa:K10 kappa:K8	kappa:KT5 kappa:K10 61200 kappa:K8 64800	every day	-
+kappa:K9	0	120	kappa:K10 kappa:K8 kappa:K9	kappa:KT5 kappa:K10 61200 kappa:K9 68400	every day	-
+## kappa:K10 maxTransfers 4
+kappa:K10	0	0	kappa:K10		every day	-
+kappa:K8	0	60	kappa:K10 kappa:K8	kappa:KT5 kappa:K10 61200 kappa:K8 64800	every day	-
+kappa:K9	0	120	kappa:K10 kappa:K8 kappa:K9	kappa:KT5 kappa:K10 61200 kappa:K9 68400	every day	-
+## kappa:K10 maxTransfers 5
+kappa:K10	0	0	kappa:K10		every day	-
+kappa:K8	0	60	kappa:K10 kappa:K8	kappa:KT5 kappa:K10 61200 kappa:K8 64800	every day	-
+kappa:K9	0	120	kappa:K10 kappa:K8 kappa:K9	kappa:KT5 kappa:K10 61200 kappa:K9 68400	every day	-
 ## kappa:K2 maxTransfers 0
 kappa:K2	0	0	kappa:K2		every day	-
 lambda:L1	0	30	kappa:K2 lambda:L1	kappa:KT1 kappa:K2 30600 lambda:L1 32400	every day	-
@@ -99,6 +123,65 @@ lambda:L3	0	60	kappa:K7 lambda:L3	kappa:KT3 kappa:K7 43200 lambda:L3 46800	every
 ## kappa:K7 maxTransfers 5
 kappa:K7	0	0	kappa:K7		every day	-
 lambda:L3	0	60	kappa:K7 lambda:L3	kappa:KT3 kappa:K7 43200 lambda:L3 46800	every day	-
+## kappa:K8 maxTransfers 0
+kappa:K10	0	60	kappa:K8 kappa:K10	kappa:KT4 kappa:K8 54000 kappa:K10 57600	every day	-
+kappa:K8	0	0	kappa:K8		every day	-
+kappa:K9	0	60	kappa:K8 kappa:K9	kappa:KT5 kappa:K8 64800 kappa:K9 68400	every day	-
+lambda:L6	0	10	kappa:K8 lambda:L6	lambda:LT3 kappa:K8 55800 lambda:L6 56400	every day	-
+## kappa:K8 maxTransfers 1
+kappa:K10	0	60	kappa:K8 kappa:K10	kappa:KT4 kappa:K8 54000 kappa:K10 57600	every day	-
+kappa:K8	0	0	kappa:K8		every day	-
+kappa:K9	0	60	kappa:K8 kappa:K9	kappa:KT5 kappa:K8 64800 kappa:K9 68400	every day	-
+lambda:L6	0	10	kappa:K8 lambda:L6	lambda:LT3 kappa:K8 55800 lambda:L6 56400	every day	-
+## kappa:K8 maxTransfers 2
+kappa:K10	0	60	kappa:K8 kappa:K10	kappa:KT4 kappa:K8 54000 kappa:K10 57600	every day	-
+kappa:K8	0	0	kappa:K8		every day	-
+kappa:K9	0	60	kappa:K8 kappa:K9	kappa:KT5 kappa:K8 64800 kappa:K9 68400	every day	-
+lambda:L6	0	10	kappa:K8 lambda:L6	lambda:LT3 kappa:K8 55800 lambda:L6 56400	every day	-
+## kappa:K8 maxTransfers 3
+kappa:K10	0	60	kappa:K8 kappa:K10	kappa:KT4 kappa:K8 54000 kappa:K10 57600	every day	-
+kappa:K8	0	0	kappa:K8		every day	-
+kappa:K9	0	60	kappa:K8 kappa:K9	kappa:KT5 kappa:K8 64800 kappa:K9 68400	every day	-
+lambda:L6	0	10	kappa:K8 lambda:L6	lambda:LT3 kappa:K8 55800 lambda:L6 56400	every day	-
+## kappa:K8 maxTransfers 4
+kappa:K10	0	60	kappa:K8 kappa:K10	kappa:KT4 kappa:K8 54000 kappa:K10 57600	every day	-
+kappa:K8	0	0	kappa:K8		every day	-
+kappa:K9	0	60	kappa:K8 kappa:K9	kappa:KT5 kappa:K8 64800 kappa:K9 68400	every day	-
+lambda:L6	0	10	kappa:K8 lambda:L6	lambda:LT3 kappa:K8 55800 lambda:L6 56400	every day	-
+## kappa:K8 maxTransfers 5
+kappa:K10	0	60	kappa:K8 kappa:K10	kappa:KT4 kappa:K8 54000 kappa:K10 57600	every day	-
+kappa:K8	0	0	kappa:K8		every day	-
+kappa:K9	0	60	kappa:K8 kappa:K9	kappa:KT5 kappa:K8 64800 kappa:K9 68400	every day	-
+lambda:L6	0	10	kappa:K8 lambda:L6	lambda:LT3 kappa:K8 55800 lambda:L6 56400	every day	-
+## kappa:K9 maxTransfers 0
+kappa:K10	0	120	kappa:K9 kappa:K8 kappa:K10	kappa:KT4 kappa:K9 50400 kappa:K10 57600	every day	-
+kappa:K8	0	60	kappa:K9 kappa:K8	kappa:KT4 kappa:K9 50400 kappa:K8 54000	every day	-
+kappa:K9	0	0	kappa:K9		every day	-
+## kappa:K9 maxTransfers 1
+kappa:K10	0	120	kappa:K9 kappa:K8 kappa:K10	kappa:KT4 kappa:K9 50400 kappa:K10 57600	every day	-
+kappa:K8	0	60	kappa:K9 kappa:K8	kappa:KT4 kappa:K9 50400 kappa:K8 54000	every day	-
+kappa:K9	0	0	kappa:K9		every day	-
+lambda:L6	1	100	kappa:K9 kappa:K8 lambda:L6	kappa:KT4 kappa:K9 50400 kappa:K8 54000 | lambda:LT3 kappa:K8 55800 lambda:L6 56400	every day	-
+## kappa:K9 maxTransfers 2
+kappa:K10	0	120	kappa:K9 kappa:K8 kappa:K10	kappa:KT4 kappa:K9 50400 kappa:K10 57600	every day	-
+kappa:K8	0	60	kappa:K9 kappa:K8	kappa:KT4 kappa:K9 50400 kappa:K8 54000	every day	-
+kappa:K9	0	0	kappa:K9		every day	-
+lambda:L6	1	100	kappa:K9 kappa:K8 lambda:L6	kappa:KT4 kappa:K9 50400 kappa:K8 54000 | lambda:LT3 kappa:K8 55800 lambda:L6 56400	every day	-
+## kappa:K9 maxTransfers 3
+kappa:K10	0	120	kappa:K9 kappa:K8 kappa:K10	kappa:KT4 kappa:K9 50400 kappa:K10 57600	every day	-
+kappa:K8	0	60	kappa:K9 kappa:K8	kappa:KT4 kappa:K9 50400 kappa:K8 54000	every day	-
+kappa:K9	0	0	kappa:K9		every day	-
+lambda:L6	1	100	kappa:K9 kappa:K8 lambda:L6	kappa:KT4 kappa:K9 50400 kappa:K8 54000 | lambda:LT3 kappa:K8 55800 lambda:L6 56400	every day	-
+## kappa:K9 maxTransfers 4
+kappa:K10	0	120	kappa:K9 kappa:K8 kappa:K10	kappa:KT4 kappa:K9 50400 kappa:K10 57600	every day	-
+kappa:K8	0	60	kappa:K9 kappa:K8	kappa:KT4 kappa:K9 50400 kappa:K8 54000	every day	-
+kappa:K9	0	0	kappa:K9		every day	-
+lambda:L6	1	100	kappa:K9 kappa:K8 lambda:L6	kappa:KT4 kappa:K9 50400 kappa:K8 54000 | lambda:LT3 kappa:K8 55800 lambda:L6 56400	every day	-
+## kappa:K9 maxTransfers 5
+kappa:K10	0	120	kappa:K9 kappa:K8 kappa:K10	kappa:KT4 kappa:K9 50400 kappa:K10 57600	every day	-
+kappa:K8	0	60	kappa:K9 kappa:K8	kappa:KT4 kappa:K9 50400 kappa:K8 54000	every day	-
+kappa:K9	0	0	kappa:K9		every day	-
+lambda:L6	1	100	kappa:K9 kappa:K8 lambda:L6	kappa:KT4 kappa:K9 50400 kappa:K8 54000 | lambda:LT3 kappa:K8 55800 lambda:L6 56400	every day	-
 ## lambda:L1 maxTransfers 0
 lambda:L1	0	0	lambda:L1		every day	-
 lambda:L2	0	30	lambda:L1 lambda:L2	lambda:LT1 lambda:L1 34200 lambda:L2 36000	every day	-
@@ -159,3 +242,15 @@ lambda:L4	0	0	lambda:L4		every day	-
 lambda:L4	0	0	lambda:L4		every day	-
 ## lambda:L4 maxTransfers 5
 lambda:L4	0	0	lambda:L4		every day	-
+## lambda:L6 maxTransfers 0
+lambda:L6	0	0	lambda:L6		every day	-
+## lambda:L6 maxTransfers 1
+lambda:L6	0	0	lambda:L6		every day	-
+## lambda:L6 maxTransfers 2
+lambda:L6	0	0	lambda:L6		every day	-
+## lambda:L6 maxTransfers 3
+lambda:L6	0	0	lambda:L6		every day	-
+## lambda:L6 maxTransfers 4
+lambda:L6	0	0	lambda:L6		every day	-
+## lambda:L6 maxTransfers 5
+lambda:L6	0	0	lambda:L6		every day	-
