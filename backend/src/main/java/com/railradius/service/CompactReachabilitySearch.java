@@ -112,13 +112,12 @@ public class CompactReachabilitySearch {
         CompactResult result = result(run);
 
         log.info("  Search stats (compact): {} stop arrivals on {} trips, {} stations; {} ms, of which choosing paths "
-                        + "{} ms; {} departures scanned, {} boarded, {} fallback scans over {} arrivals in ~{} ms "
-                        + "(over all threads); scratch {} (labels {}), result {}",
+                        + "{} ms; {} departures scanned, {} boarded, {} fallback scans over {} arrivals; "
+                        + "scratch {} (labels {}), result {}",
                 counters.stopArrivals, scratch.progress().reachedTripCount(),
                 scratch.candidates().reachedCount() + 1, millisSince(startNanos),
                 TimeUnit.NANOSECONDS.toMillis(counters.pathsNanos), counters.departuresScanned, counters.boardings,
                 counters.fallbackScans, counters.fallbackScannedArrivals,
-                TimeUnit.NANOSECONDS.toMillis(counters.fallbackScanNanos),
                 String.format("%.1f MB", scratch.sizeBytes() / 1e6),
                 String.format("%.1f MB", scratch.labels().sizeBytes() / 1e6),
                 String.format("%.2f MB", result.sizeBytes() / 1e6));
@@ -186,7 +185,6 @@ public class CompactReachabilitySearch {
             counters.boardings += station.count;
             counters.fallbackScans += station.fallbackScans;
             counters.fallbackScannedArrivals += station.fallbackScannedArrivals;
-            counters.fallbackScanNanos += station.fallbackScanNanos;
             for (int i = 0; i < station.count; i++) {
                 int event = station.departureEvent(i);
                 int trip = store.tripOf(event);
