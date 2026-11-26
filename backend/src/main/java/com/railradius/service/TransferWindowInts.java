@@ -17,10 +17,6 @@ final class TransferWindowInts {
 
     private static final int BLOCK_SHIFT = 5;
     private static final int BLOCK_SIZE = 1 << BLOCK_SHIFT;
-    // Timing every fallback scan would cost about as much as a short scan, so one departure event in this many times
-    // its scans, for the search's statistics
-    private static final int TIMED_EVENT_MASK = 63;
-    private static final int TIMED_EVENT_SHARE = TIMED_EVENT_MASK + 1;
     private static final int NONE = -1;
 
     /**
@@ -61,7 +57,6 @@ final class TransferWindowInts {
     private int nextArrival;
     private int fallbackScanCount;
     private long fallbackScannedArrivals;
-    private long timedFallbackNanos;
 
     TransferWindowInts(Arrivals arrivals, int[] queue, int shiftSeconds, int minWaitSeconds, int maxWaitSeconds) {
         this.arrivals = arrivals;
@@ -77,7 +72,7 @@ final class TransferWindowInts {
      * Position of the best arrival for the departure whose journey, moved extraDays forward, runs on a day of the
      * departing trip's nextTripDays that served lacks; -1 if none. Departure times must not decrease between calls.
      */
-    int bestFor(int departureEvent, int departureSeconds, long nextTripDays, int extraDays, long served) {
+    int bestFor(int departureSeconds, long nextTripDays, int extraDays, long served) {
         int latestArrival = departureSeconds - minWaitSeconds - shiftSeconds;
         while (nextArrival < arrivalSeconds.length && arrivalSeconds[nextArrival] <= latestArrival) {
             while (tail > head && startSeconds[queue[tail - 1]] <= startSeconds[nextArrival]) tail--;
@@ -88,11 +83,7 @@ final class TransferWindowInts {
         if (tail == head) return -1;
         long wanted = nextTripDays & ~served;
         if (addsDays(arrivals.days()[queue[head]], extraDays, wanted)) return queue[head];
-        if ((departureEvent & TIMED_EVENT_MASK) != 0) return bestUsableScan(earliestArrival, extraDays, wanted);
-        long startNanos = System.nanoTime();
-        int best = bestUsableScan(earliestArrival, extraDays, wanted);
-        timedFallbackNanos += System.nanoTime() - startNanos;
-        return best;
+        return bestUsableScan(earliestArrival, extraDays, wanted);
     }
 
     int fallbackScanCount() {
@@ -101,11 +92,6 @@ final class TransferWindowInts {
 
     long fallbackScannedArrivals() {
         return fallbackScannedArrivals;
-    }
-
-    /** Estimated time of the fallback scans, from those of one departure event in {@value #TIMED_EVENT_SHARE}. */
-    long fallbackScanNanos() {
-        return timedFallbackNanos * TIMED_EVENT_SHARE;
     }
 
     private static boolean addsDays(long arrivalDays, int extraDays, long wanted) {

@@ -12,7 +12,6 @@ class TransferWindowIntsTest {
     private static final long MONDAY = 1L;
     private static final long TUESDAY = 2L;
     private static final int SAME_DAY = 0;
-    private static final int DEPARTURE_EVENT = 1;
     private static final int DEPARTURE_SECONDS = 400;
     private static final int MAX_WAIT_SECONDS = 1000;
     private static final long SEED = 39;
@@ -33,7 +32,7 @@ class TransferWindowIntsTest {
         TransferWindowInts window = windowOver(new int[] {100, 200, 300, 350}, new int[] {100, 150, 250, 100},
                 new long[] {MONDAY, MONDAY, TUESDAY, MONDAY});
 
-        assertThat(window.bestFor(DEPARTURE_EVENT, DEPARTURE_SECONDS, MONDAY, SAME_DAY, 0)).isEqualTo(1);
+        assertThat(window.bestFor(DEPARTURE_SECONDS, MONDAY, SAME_DAY, 0)).isEqualTo(1);
     }
 
     // Arrivals 0 and 3 start equally late and run on Monday, 2 starts later on Tuesday only: of equal starts the
@@ -43,7 +42,7 @@ class TransferWindowIntsTest {
         TransferWindowInts window = windowOver(new int[] {100, 200, 300, 350}, new int[] {100, 90, 250, 100},
                 new long[] {MONDAY, MONDAY, TUESDAY, MONDAY});
 
-        assertThat(window.bestFor(DEPARTURE_EVENT, DEPARTURE_SECONDS, MONDAY, SAME_DAY, 0)).isEqualTo(0);
+        assertThat(window.bestFor(DEPARTURE_SECONDS, MONDAY, SAME_DAY, 0)).isEqualTo(0);
     }
 
     @Test
@@ -51,7 +50,7 @@ class TransferWindowIntsTest {
         TransferWindowInts window = windowOver(new int[] {100, 200}, new int[] {100, 150},
                 new long[] {TUESDAY, TUESDAY});
 
-        assertThat(window.bestFor(DEPARTURE_EVENT, DEPARTURE_SECONDS, MONDAY, SAME_DAY, 0)).isEqualTo(-1);
+        assertThat(window.bestFor(DEPARTURE_SECONDS, MONDAY, SAME_DAY, 0)).isEqualTo(-1);
     }
 
     // The answer as the search semantics contract states it: the arrival in the wait range with the latest start,
@@ -77,7 +76,7 @@ class TransferWindowIntsTest {
             int[] departures = random.ints(RANDOM_DEPARTURES, 0, RANDOM_SPAN_SECONDS).sorted().toArray();
             for (int departureSeconds : departures) {
                 long wanted = 1 + random.nextInt((1 << RANDOM_DAY_BITS) - 1);
-                assertThat(transferWindow.bestFor(DEPARTURE_EVENT, departureSeconds, wanted, SAME_DAY, 0))
+                assertThat(transferWindow.bestFor(departureSeconds, wanted, SAME_DAY, 0))
                         .as("window %d, departure %d", window, departureSeconds)
                         .isEqualTo(fullScan(arrivalSeconds, startSeconds, days, departureSeconds, wanted));
             }

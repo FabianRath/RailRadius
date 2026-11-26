@@ -18,13 +18,11 @@ import java.util.List;
 public final class BrowserEngine {
 
     private static final JourneyLegBuilder LEG_BUILDER = new JourneyLegBuilder();
-    private static final double NANOS_PER_MILLI = 1e6;
 
     private static TransitGraph graph;
     private static CompactReachabilitySearch search;
     private static CompactResult lastResult;
     private static int lastMaxJourneyMins;
-    private static SearchCounters lastCounters = new SearchCounters();
 
     /** Takes the JSON array of the stations a round shows. */
     @JSFunctor
@@ -64,21 +62,13 @@ public final class BrowserEngine {
         ShownStations shown = new ShownStations(startId, maxJourneyMins, LEG_BUILDER);
         ServedGraph served = graph.served();
         lastResult = null;
-        SearchCounters counters = new SearchCounters();
         CompactResult result = search.search(options.startId(), options.maxTransfers(), options.minTransferMins(),
                 options.maxTransferMins(), CompactReachabilitySearch.NO_DEADLINE,
-                roundPaths -> send(onRound, shown.newInRound(served, roundPaths)), counters);
-        lastCounters = counters;
+                roundPaths -> send(onRound, shown.newInRound(served, roundPaths)), new SearchCounters());
         send(onRound, shown.newInResult(result));
         lastResult = result;
         lastMaxJourneyMins = maxJourneyMins;
         return shown.count();
-    }
-
-    /** Estimated milliseconds the last search spent in fallback scans (#39), for the benchmark. */
-    @JSExport
-    public static double lastFallbackScanMillis() {
-        return lastCounters.fallbackScanNanos / NANOS_PER_MILLI;
     }
 
     /** The rides of the path the last search showed for the station, as JSON, for its journey from the server. */
