@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * What the browser engine hands to JavaScript, as JSON in the server's shapes: the stream's station summaries and a
- * path's rides as the ride-list journey endpoint takes them. TeaVM has no Jackson, so it is written by hand, into one
+ * path's rides as the ride-list journey endpoint takes them, and the stations the map names (#96). TeaVM has no Jackson, so it is written by hand, into one
  * builder: many small concatenated strings were most of the step's time in WebAssembly (#83).
  */
 final class BrowserJson {
@@ -16,6 +16,11 @@ final class BrowserJson {
     // A bit more than a station summary's length (about 200), so the builder rarely grows
     private static final int SUMMARY_CHARS = 240;
     private static final int RIDE_CHARS = 60;
+    private static final int LABEL_CHARS = 80;
+
+    /** A station the map names, ranked by importance. */
+    record StationLabel(String name, double latitude, double longitude, int importance) {
+    }
 
     private BrowserJson() {
     }
@@ -44,6 +49,18 @@ final class BrowserJson {
             json.append("{\"trip\":").append(ride.trip())
                     .append(",\"boardEvent\":").append(ride.boardEvent())
                     .append(",\"alightEvent\":").append(ride.alightEvent()).append('}');
+        }
+        return json.append(']').toString();
+    }
+
+    static String stationLabels(List<StationLabel> labels) {
+        StringBuilder json = new StringBuilder(labels.size() * LABEL_CHARS).append('[');
+        for (StationLabel label : labels) {
+            if (json.length() > 1) json.append(',');
+            text(json.append("{\"name\":"), label.name());
+            json.append(",\"latitude\":").append(label.latitude())
+                    .append(",\"longitude\":").append(label.longitude())
+                    .append(",\"importance\":").append(label.importance()).append('}');
         }
         return json.append(']').toString();
     }

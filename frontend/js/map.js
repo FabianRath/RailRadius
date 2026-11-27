@@ -32,6 +32,17 @@ const RAIL_LAYERS = ['railway', 'railway_minor', 'railway_transit'];
 const BOUNDARY_LAYERS = ['boundary_state', 'boundary_country_z0-4', 'boundary_country_z5-'];
 const LABEL_LAYERS = ['place_city', 'place_city_large', 'place_country_other', 'place_country_minor',
     'place_country_major'];
+// Station names from our own data (#96), by importance (stations reached without a stop between): the hubs from the
+// Europe view, more as the map zooms in; within a zoom the more important name wins a collision
+const STATION_LABEL_TIERS = [
+    { minImportance: 12, minZoom: 4, sizePx: 13 },
+    { minImportance: 8, minZoom: 6, sizePx: 12 },
+    { minImportance: 4, minZoom: 8, sizePx: 11 },
+    { minImportance: 0, minZoom: 10, sizePx: 11 }
+];
+const STATION_LABEL_FONT = ['Noto Sans Regular'];
+const STATION_LABEL_OFFSET_EM = 0.6;
+const STATION_LABEL_HALO_PX = 1.4;
 const EMPTY_COLLECTION = { type: 'FeatureCollection', features: [] };
 
 let map;
@@ -138,6 +149,11 @@ function addDataLayers() {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-width': JOURNEY_LINE_WIDTH_PX } });
 
+    // Under the dots and beside them, so a name never hides a dot. The hubs' tier last: the layer on top is placed
+    // first, so its names win collisions with the tiers below
+    map.addSource('station-labels', { type: 'geojson', data: EMPTY_COLLECTION });
+    for (let index = STATION_LABEL_TIERS.length - 1; index >= 0; index--) addStationLabelTier(index);
+
     map.addLayer({ id: LAYERS.reachable, type: 'circle', source: 'reachable',
         // Direct connections (level 0) are drawn on top
         layout: { 'circle-sort-key': ['-', MAX_TRANSFER_LEVEL, ['get', 'level']] },
@@ -165,6 +181,32 @@ function applyDataColors() {
         setPaint([areaLayerId(level)], 'heatmap-color',
             ['step', ['heatmap-density'], 'transparent', AREA_DENSITY_THRESHOLD, cssVar(`--transfer-${level}`)]);
     }
+}
+
+/** Each tier's names from its zoom on; a tier holds only the stations no tier above it named. */
+function addStationLabelTier(index) {
+    const { minImportance, minZoom, sizePx } = STATION_LABEL_TIERS[index];
+    const upper = STATION_LABEL_TIERS[index - 1];
+    const importance = ['get', 'importance'];
+    const filter = ['all', ['>=', importance, minImportance]];
+    if (upper) filter.push(['<', importance, upper.minImportance]);
+    map.addLayer({ id: `station-labels-${index}`, type: 'symbol', source: 'station-labels', minzoom: minZoom, filter,
+        layout: {
+            'text-field': ['get', 'name'], 'text-font': STATION_LABEL_FONT, 'text-size': sizePx,
+            'text-anchor': 'left', 'text-offset': [STATION_LABEL_OFFSET_EM, 0],
+            'symbol-sort-key': ['-', importance]
+        },
+        paint: {
+            'text-color': cssVar('--map-label'),
+            'text-halo-color': cssVar('--map-label-halo'), 'text-halo-width': STATION_LABEL_HALO_PX
+        } });
+}
+
+/** Names the stations ({ name, latitude, longitude, importance }) on the map. */
+export function setStationLabels(labels) {
+    const features = labels.map(label => pointFeature(label.longitude, label.latitude,
+        { name: label.name, importance: label.importance }));
+    map.getSource('station-labels').setData({ type: 'FeatureCollection', features });
 }
 
 /**

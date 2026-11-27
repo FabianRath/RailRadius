@@ -1512,3 +1512,40 @@ input[type="number"]::-webkit-inner-spin-button {
         white-space: normal;
     }
 }
+
+/* Phones: a shorter bar leaves the map most of the screen; touch targets grow to 44px */
+@media (width < 480px) {
+    .board-brand,
+    .board-field,
+    .board-count {
+        padding: 6px 12px;
+    }
+
+    .board-label {
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .board-value {
+        font-size: 18px;
+    }
+
+    .board-digits {
+        font-size: 22px;
+    }
+
+    .board-go {
+        height: 40px;
+    }
+
+    .stepper-btn,
+    .board-close,
+    .board-options-toggle {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .journey {
+        max-height: 70%;
+    }
+}

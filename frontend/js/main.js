@@ -1,10 +1,11 @@
 import { isUpdatingTimetables } from './server-status.js';
-import { initMap, jumpToBounds, LAYERS, onEmptyMapClick, onPointClick, setAreasVisible } from './map.js';
+import { initMap, jumpToBounds, LAYERS, onEmptyMapClick, onPointClick, setAreasVisible,
+    setStationLabels } from './map.js';
 import { closeStationDetails, initStationDetails, showStationDetails } from './station-details.js';
 import { initSearch, prefillStation, setStation } from './search.js';
 import { applyQuery, initQueryForm, showQueryForm } from './query-form.js';
 import { calculate, getJourney, initReachability } from './reachability.js';
-import { startBrowserEngine } from './browser-engine.js';
+import { onBrowserStationLabels, startBrowserEngine } from './browser-engine.js';
 import { initDebugOverlay, startDebugPolling, stopDebugPolling } from './debug.js';
 import { initDevAuth } from './dev-auth.js';
 import { hideAdminPanel, initAdminPanel, showAdminEntry } from './admin-panel.js';
@@ -35,6 +36,7 @@ const coverageBounds = fetchCoverage()
 applyInitialTheme();
 await initMap('map');
 // After the map, so the first view keeps the bandwidth; most visitors pick a station after the engine is ready
+onBrowserStationLabels(setStationLabels);
 startBrowserEngine();
 initAbout();
 initThemeToggle();

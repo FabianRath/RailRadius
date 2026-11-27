@@ -81,6 +81,22 @@ public final class BrowserEngine {
     }
 
     /**
+     * The stations the map names (#96), as JSON: every station with coordinates, its importance how many stations its
+     * trips run to without a stop between. Fast trains skip stops, so a long-distance hub reaches many stations
+     * directly and a suburban stop two or three, however many trains stop there.
+     */
+    @JSExport
+    public static String stationLabels() {
+        requireGraph();
+        List<BrowserJson.StationLabel> labels = graph.getAllStations().values().stream()
+                .filter(station -> station.getLatitude() != null && station.getLongitude() != null)
+                .map(station -> new BrowserJson.StationLabel(station.getName(), station.getLatitude(),
+                        station.getLongitude(), graph.nextStationCount(station.getId())))
+                .toList();
+        return BrowserJson.stationLabels(labels);
+    }
+
+    /**
      * The search snapshot from every station, rides as store positions (strict) or as stations and times (same
      * result): what the build check compares (#10, #32).
      */

@@ -26,6 +26,7 @@ async function handle(request) {
         case 'load': return loadTimetable(request);
         case 'search': return search(request);
         case 'rides': return rides(request);
+        case 'stationLabels': return JSON.parse(engine.stationLabels());
         default: throw new Error(`Unknown request ${request.type}`);
     }
 }
