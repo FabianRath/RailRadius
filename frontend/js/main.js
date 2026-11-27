@@ -11,6 +11,7 @@ import { hideAdminPanel, initAdminPanel, showAdminEntry } from './admin-panel.js
 import { showStatus } from './util.js';
 import { renderStaticIcons } from './icons.js';
 import { initAbout } from './about.js';
+import { applyInitialTheme, initThemeToggle } from './theme.js';
 import { initIntroHint } from './intro-hint.js';
 import { fetchCoverage, fetchStation } from './api.js';
 import { boundsOfCountries } from './country-bounds.js';
@@ -31,10 +32,12 @@ const coverageBounds = fetchCoverage()
         console.error('Coverage request failed:', error);
         return null;
     });
+applyInitialTheme();
 await initMap('map');
 // After the map, so the first view keeps the bandwidth; most visitors pick a station after the engine is ready
 startBrowserEngine();
 initAbout();
+initThemeToggle();
 initStationDetails();
 onPointClick(LAYERS.reachable, async ({ stopId }) => {
     try {
