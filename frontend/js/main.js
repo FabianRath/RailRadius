@@ -14,7 +14,7 @@ import { renderStaticIcons } from './icons.js';
 import { initAbout } from './about.js';
 import { applyInitialTheme, initThemeToggle } from './theme.js';
 import { initIntroHint } from './intro-hint.js';
-import { fetchCoverage, fetchStation } from './api.js';
+import { fetchCoverage, fetchRailTiles, fetchStation } from './api.js';
 import { boundsOfCountries } from './country-bounds.js';
 import { readDeepLink } from './deep-link.js';
 
@@ -34,7 +34,7 @@ const coverageBounds = fetchCoverage()
         return null;
     });
 applyInitialTheme();
-await initMap('map');
+await initMap('map', fetchRailTiles());
 // After the map, so the first view keeps the bandwidth; most visitors pick a station after the engine is ready
 onBrowserStationLabels(setStationLabels);
 startBrowserEngine();
