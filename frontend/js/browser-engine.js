@@ -17,6 +17,8 @@ let loadStartedMs = null;
 // After an engine failure this visit searches on the server only
 let failed = false;
 let nextRequestId = 1;
+// Gets the stations the map names, once per loaded data file (#96)
+let onStationLabels = () => {};
 // Requests sent to the worker and not answered yet: id -> { resolve, reject, onStations }
 const pending = new Map();
 
@@ -33,6 +35,11 @@ export function startBrowserEngine() {
         .finally(() => {
             loading = null;
         });
+}
+
+/** Hands each loaded data file's station labels ({ name, latitude, longitude, importance }) to the callback. */
+export function onBrowserStationLabels(callback) {
+    onStationLabels = callback;
 }
 
 /**
@@ -114,6 +121,7 @@ async function loadData() {
     loaded = candidate;
     rememberLoadedVersion(server.version);
     console.log('Searches now run in the browser, data version', server.version);
+    onStationLabels(await callEngine({ type: 'stationLabels' }, undefined, ENGINE_SEARCH_TIMEOUT_MS));
 }
 
 async function checkMatchesServer() {
