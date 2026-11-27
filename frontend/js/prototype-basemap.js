@@ -2,12 +2,14 @@
 //   1  OpenFreeMap tiles without roads and clutter, OSM rail as the hero
 //   2  no OSM rail: our own network from the timetable, with our station names
 //   12 our network when zoomed out, OSM tracks once zoomed in
+//   L  OSM tracks (the tiles have rail only from z8) plus our station names at every zoom
 import { basemap } from './prototype.js';
 import { cssVar } from './util.js';
 
 const DROPPED = /^(road|highway|aeroway|building|railway_.*dashline|water_name|landuse_residential|landcover_wood|landuse_park|place_(other|suburb|village|town|state))/;
 const OSM_RAIL = /^railway/;
-const SWITCH_ZOOM = 9;
+// The OpenFreeMap tiles carry rail only from this zoom
+const SWITCH_ZOOM = 8;
 const LABEL_FONT = ['Noto Sans Regular'];
 const MAX_EDGE_KM = 120;
 const KM_PER_DEG = 111;
@@ -32,7 +34,7 @@ export function transformBasemapStyle(style) {
     });
     for (const layer of layers) {
         if (!OSM_RAIL.test(layer.id)) continue;
-        layer.minzoom = basemap.key === '12' ? SWITCH_ZOOM : 5;
+        layer.minzoom = SWITCH_ZOOM;
     }
     return { ...style, layers };
 }
@@ -43,7 +45,7 @@ export async function applyPrototypeBasemap(map) {
     const rail = cssVar('--map-rail');
     for (const id of ['railway', 'railway_minor', 'railway_transit']) {
         if (!map.getLayer(id)) continue;
-        map.setLayerZoomRange(id, basemap.key === '12' ? SWITCH_ZOOM : 5, 24);
+        map.setLayerZoomRange(id, SWITCH_ZOOM, 24);
         map.setPaintProperty(id, 'line-color', rail);
         map.setPaintProperty(id, 'line-width',
             ['interpolate', ['exponential', 1.4], ['zoom'], 5, 0.6, 8, 1.2, 12, 2.4, 16, 4]);
@@ -56,8 +58,8 @@ export async function applyPrototypeBasemap(map) {
     network.features = network.features.filter(feature => feature.geometry.type === 'Point'
         || lengthKm(feature.geometry.coordinates) <= MAX_EDGE_KM);
     map.addSource('proto-network', { type: 'geojson', data: network });
-    const maxzoom = basemap.key === '12' ? SWITCH_ZOOM + 0.5 : 24;
-    map.addLayer({
+    const maxzoom = basemap.key === '12' ? SWITCH_ZOOM : 24;
+    if (basemap.key !== 'L') map.addLayer({
         id: 'proto-network-lines', type: 'line', source: 'proto-network', maxzoom,
         filter: ['==', ['geometry-type'], 'LineString'],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
@@ -68,7 +70,7 @@ export async function applyPrototypeBasemap(map) {
                 10, ['interpolate', ['linear'], ['get', 'trips'], 1, 1.2, 100, 3, 400, 5]],
         },
     });
-    map.addLayer({
+    if (basemap.key !== 'L') map.addLayer({
         id: 'proto-network-stations', type: 'circle', source: 'proto-network', minzoom: 9,
         filter: ['==', ['geometry-type'], 'Point'],
         paint: {
