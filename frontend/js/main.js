@@ -1,3 +1,4 @@
+import './prototype.js';
 import { isUpdatingTimetables } from './server-status.js';
 import { initMap, jumpToBounds, LAYERS, onEmptyMapClick, onPointClick, setAreasVisible } from './map.js';
 import { closeStationDetails, initStationDetails, showStationDetails } from './station-details.js';

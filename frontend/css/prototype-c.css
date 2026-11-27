@@ -1,0 +1,147 @@
+/* PROTOTYPE variant C "Sentence": the bar reads as one editable sentence. Dark ink, bold type, one lime accent. */
+:root[data-variant="c"] {
+    --board: #131518;
+    --board-2: #1b1e23;
+    --board-3: #252930;
+    --line: #2c3139;
+    --row-stripe: rgba(255, 255, 255, 0.025);
+    --overlay: rgba(19, 21, 24, 0.85);
+
+    --text: #f4f4ef;
+    --muted: #8a9099;
+    --on-amber: #131518;
+    --amber: #d4ff3a;
+    --danger: #ff6b6b;
+    --ok: #3ad6a0;
+
+    --transfer-0: #d4ff3a;
+    --transfer-1: #3ad0ff;
+    --transfer-2: #7c8cff;
+    --transfer-3: #ff7ad1;
+    --transfer-4: #ffa043;
+    --transfer-5: #e6e6e6;
+
+    --map-land: #171a1e;
+    --map-water: #0d0f12;
+    --map-rail: #5b6573;
+    --map-boundary: #2a2f37;
+    --map-label: #8a9099;
+    --map-label-halo: #171a1e;
+    --marker-stroke: #131518;
+    --marker-start-fill: #f4f4ef;
+    --marker-start-ring: #d4ff3a;
+
+    --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-board: var(--font-ui);
+    --radius: 6px;
+    --bar-height: 76px;
+}
+
+[data-variant="c"] .board-bar {
+    border-bottom: 1px solid var(--line);
+    align-items: center;
+    font-size: 22px;
+}
+
+[data-variant="c"] .board-brand {
+    width: auto;
+    border: 0;
+    padding: 0 28px 0 24px;
+}
+
+[data-variant="c"] .board-wordmark {
+    font: 800 18px/1 var(--font-ui);
+    text-transform: none;
+    letter-spacing: -0.01em;
+}
+
+[data-variant="c"] .board-tagline {
+    display: none;
+}
+
+/* Fields become words in a row; their labels are replaced by the sentence's own words */
+[data-variant="c"] .board-field {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 10px;
+    border: 0;
+    padding: 0 10px 0 0;
+    font: 500 22px var(--font-ui);
+    color: var(--muted);
+}
+
+[data-variant="c"] .board-field:focus-within {
+    background: transparent;
+}
+
+[data-variant="c"] .board-field > .board-label,
+[data-variant="c"] .board-options-toggle > .board-label {
+    display: none;
+}
+
+[data-variant="c"] .board-from {
+    flex: 0 1 380px;
+}
+
+[data-variant="c"] .board-from::before { content: 'From'; }
+[data-variant="c"] .board-changes::before { content: 'with'; }
+[data-variant="c"] .board-changes::after { content: 'changes,'; }
+[data-variant="c"] .board-maxtime::before { content: 'up to'; }
+[data-variant="c"] .board-options::before { content: 'waiting'; }
+
+[data-variant="c"] .board-value,
+[data-variant="c"] .stepper-value {
+    font: 700 22px var(--font-ui);
+    color: var(--text);
+}
+
+/* The editable words: underlined in the accent, like links in a sentence */
+[data-variant="c"] #searchInput,
+[data-variant="c"] #maxJourneyTime,
+[data-variant="c"] .stepper-value,
+[data-variant="c"] .board-options-toggle .board-value {
+    border-bottom: 2px solid var(--amber);
+    padding-bottom: 2px;
+}
+
+[data-variant="c"] .stepper {
+    gap: 4px;
+}
+
+[data-variant="c"] .stepper-btn {
+    border: 0;
+    width: 22px;
+    color: var(--muted);
+}
+
+[data-variant="c"] .board-unit {
+    font: 500 22px var(--font-ui);
+}
+
+[data-variant="c"] .board-count {
+    border: 0;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+}
+
+[data-variant="c"] .board-count .board-label {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 14px;
+}
+
+[data-variant="c"] .board-digits {
+    font: 800 30px/1 var(--font-ui);
+    color: var(--amber);
+    min-width: 0;
+}
+
+[data-variant="c"] .board-go {
+    margin: 0 16px 0 8px;
+    height: 48px;
+    border-radius: 999px;
+    font: 800 17px var(--font-ui);
+    text-transform: none;
+    letter-spacing: 0;
+}

@@ -16,7 +16,10 @@ export function readDeepLink() {
 
 /** Puts the search into the URL without a history entry, so the URL always shows the last search that ran. */
 export function writeDeepLink(stationId, query) {
-    history.replaceState(null, '', `${location.pathname}?${formatLink(stationId, query)}${location.hash}`);
+    // PROTOTYPE: keep the variant and basemap switches in the URL
+    const keep = new URLSearchParams(location.search);
+    const proto = ['variant', 'basemap'].filter(key => keep.has(key)).map(key => `&${key}=${keep.get(key)}`).join('');
+    history.replaceState(null, '', `${location.pathname}?${formatLink(stationId, query)}${proto}${location.hash}`);
 }
 
 /** The search in a URL's query string as { stationId, query }, or null without a start station. */

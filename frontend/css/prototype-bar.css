@@ -1,0 +1,49 @@
+/* PROTOTYPE switcher bar: deliberately not part of any design being judged */
+.proto-bar {
+    position: fixed;
+    bottom: 34px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    display: flex;
+    gap: 10px;
+    padding: 6px;
+    background: #111;
+    color: #fff;
+    border-radius: 999px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+    font: 13px/1.2 system-ui, sans-serif;
+}
+
+.proto-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #2a2a2a;
+    border-radius: 999px;
+    padding: 2px;
+}
+
+.proto-group span {
+    min-width: 190px;
+    text-align: center;
+}
+
+.proto-group small {
+    display: block;
+    font-size: 10px;
+    opacity: 0.55;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.proto-group button {
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 999px;
+    background: #fff;
+    color: #111;
+    font-size: 18px;
+    cursor: pointer;
+}

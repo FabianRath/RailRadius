@@ -1,0 +1,128 @@
+/* PROTOTYPE variant B "Quiet app": neutral, system font, boxed rounded inputs. The results do the talking. */
+:root[data-variant="b"] {
+    --board: #ffffff;
+    --board-2: #f4f4f6;
+    --board-3: #e9e9ee;
+    --line: #e1e1e6;
+    --row-stripe: rgba(0, 0, 0, 0.025);
+    --overlay: rgba(255, 255, 255, 0.85);
+
+    --text: #1c1c1e;
+    --muted: #6e6e73;
+    --on-amber: #ffffff;
+    --amber: #0a66ff;
+    --danger: #e5383b;
+    --ok: #12a150;
+
+    --transfer-0: #f26b00;
+    --transfer-1: #00a37a;
+    --transfer-2: #2f6fed;
+    --transfer-3: #8e44ec;
+    --transfer-4: #e0457b;
+    --transfer-5: #8e8e93;
+
+    --map-land: #eceef1;
+    --map-water: #c9dcec;
+    --map-rail: #3a3a3c;
+    --map-boundary: #c4c4cc;
+    --map-label: #6e6e73;
+    --map-label-halo: #eceef1;
+    --marker-stroke: #ffffff;
+    --marker-start-fill: #1c1c1e;
+    --marker-start-ring: #0a66ff;
+
+    --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-board: var(--font-ui);
+    --radius: 10px;
+    --bar-height: 80px;
+}
+
+[data-variant="b"] .board-bar {
+    border-bottom: 1px solid var(--line);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    padding: 0 12px;
+    gap: 8px;
+    align-items: center;
+}
+
+[data-variant="b"] .board-brand {
+    border: 0;
+    width: auto;
+    padding: 0 12px 0 4px;
+}
+
+[data-variant="b"] .board-wordmark {
+    font: 700 20px/1 var(--font-ui);
+    text-transform: none;
+    letter-spacing: -0.01em;
+}
+
+[data-variant="b"] .board-wordmark span {
+    color: var(--amber);
+}
+
+/* Every option is a visible box you can click into */
+[data-variant="b"] .board-field {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--board-2);
+    padding: 8px 14px;
+    height: 56px;
+    gap: 2px;
+}
+
+[data-variant="b"] .board-field:focus-within {
+    background: var(--board);
+    border-color: var(--amber);
+    box-shadow: 0 0 0 3px rgba(10, 102, 255, 0.15);
+}
+
+[data-variant="b"] .board-label {
+    font: 500 12px var(--font-ui);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+[data-variant="b"] .board-value,
+[data-variant="b"] .stepper-value {
+    font: 600 17px var(--font-ui);
+    color: var(--text);
+}
+
+[data-variant="b"] .stepper-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--board);
+}
+
+[data-variant="b"] .board-count {
+    border: 0;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
+}
+
+[data-variant="b"] .board-digits {
+    font: 700 26px/1 var(--font-ui);
+    color: var(--text);
+    min-width: 0;
+}
+
+[data-variant="b"] .board-go {
+    border-radius: 12px;
+    height: 56px;
+    font: 600 16px var(--font-ui);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+[data-variant="b"] .journey {
+    border-left: 1px solid var(--line);
+    background: var(--board);
+}
+
+[data-variant="b"] .journey-eyebrow {
+    text-transform: none;
+    letter-spacing: 0;
+}

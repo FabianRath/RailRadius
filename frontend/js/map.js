@@ -3,6 +3,7 @@ import { Map, Marker, Popup, LngLatBounds, NavigationControl }
 import { MAP_STYLE_URL, MAP_CENTER, MAP_ZOOM } from './config.js';
 import { cssVar } from './util.js';
 import { withLatinLabels } from './map-labels.js';
+import { applyPrototypeBasemap, transformBasemapStyle } from './prototype-basemap.js';
 
 export const MAX_TRANSFER_LEVEL = 5;
 export const LAYERS = { reachable: 'reachable-stations', debug: 'debug-stations' };
@@ -51,10 +52,11 @@ export function initMap(containerId) {
         attributionControl: { compact: false },
     });
     // Rewritten before the first render, which already fetches the fonts its labels need
-    map.setStyle(MAP_STYLE_URL, { transformStyle: (previous, next) => withLatinLabels(next) });
+    map.setStyle(MAP_STYLE_URL, { transformStyle: (previous, next) => transformBasemapStyle(withLatinLabels(next)) });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
-    return new Promise(resolve => map.on('load', () => {
+    return new Promise(resolve => map.on('load', async () => {
         applyBoardColors();
+        await applyPrototypeBasemap(map);
         addDataLayers();
         resolve();
     }));

@@ -1,0 +1,109 @@
+/* PROTOTYPE variant A "Atlas": printed rail atlas. Paper, ink, serif, one red accent. */
+:root[data-variant="a"] {
+    --board: #f3eee2;
+    --board-2: #ebe4d3;
+    --board-3: #e0d7c2;
+    --line: #cdbfa5;
+    --row-stripe: rgba(60, 40, 10, 0.035);
+    --overlay: rgba(243, 238, 226, 0.88);
+
+    --text: #221d17;
+    --muted: #6f6555;
+    --on-amber: #f3eee2;
+    --amber: #a8321f;
+    --danger: #a8321f;
+    --ok: #2f6b4f;
+
+    --transfer-0: #c2410c;
+    --transfer-1: #0f766e;
+    --transfer-2: #1d4ed8;
+    --transfer-3: #7e22ce;
+    --transfer-4: #be185d;
+    --transfer-5: #57534e;
+
+    --map-land: #f3eee2;
+    --map-water: #c6d6da;
+    --map-rail: #2a241d;
+    --map-boundary: #c9b99c;
+    --map-label: #5f5647;
+    --map-label-halo: #f3eee2;
+    --marker-stroke: #fffdf7;
+    --marker-start-fill: #221d17;
+    --marker-start-ring: #a8321f;
+
+    --font-ui: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+    --font-board: var(--font-ui);
+    --radius: 0;
+    --bar-height: 84px;
+}
+
+[data-variant="a"] .board-bar {
+    border-bottom: 4px double var(--text);
+}
+
+[data-variant="a"] .board-wordmark {
+    font: italic 700 26px/1 var(--font-ui);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+[data-variant="a"] .board-wordmark span {
+    color: var(--text);
+    font-weight: 400;
+}
+
+[data-variant="a"] .board-tagline {
+    font-style: italic;
+}
+
+[data-variant="a"] .board-label {
+    font: 400 13px var(--font-ui);
+    font-variant: small-caps;
+    text-transform: lowercase;
+    letter-spacing: 0.08em;
+}
+
+[data-variant="a"] .board-value,
+[data-variant="a"] .stepper-value {
+    font: 600 21px var(--font-ui);
+    color: var(--text);
+}
+
+/* Inputs read as fill-in lines on a printed form */
+[data-variant="a"] #searchInput,
+[data-variant="a"] #maxJourneyTime,
+[data-variant="a"] .stepper-value {
+    border-bottom: 1px dotted var(--muted);
+}
+
+[data-variant="a"] .board-field:focus-within {
+    background: var(--board-2);
+}
+
+[data-variant="a"] .stepper-btn {
+    border-radius: 50%;
+    border-color: var(--muted);
+    color: var(--text);
+}
+
+[data-variant="a"] .board-digits {
+    font: italic 600 34px/1 var(--font-ui);
+    color: var(--text);
+}
+
+[data-variant="a"] .board-go {
+    background: var(--text);
+    color: var(--board);
+    font: italic 600 20px var(--font-ui);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+[data-variant="a"] .journey {
+    border-left: 4px double var(--text);
+}
+
+[data-variant="a"] .journey-eyebrow {
+    font-variant: small-caps;
+    text-transform: lowercase;
+}
