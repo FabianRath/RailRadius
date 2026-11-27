@@ -1,0 +1,63 @@
+# Planetiler custom-map schema for the rail-only basemap tiles (#93), built by scripts/rail-tiles.sh: OpenFreeMap's
+# tiles carry rail only from z8, these show running track at every zoom. One run per OSM extract; the script passes
+# the extract as --osm_path.
+schema_name: RailRadius rail
+schema_description: OSM running track only, generalised by importance
+# MapLibre overzooms z12 for closer views; nothing is drawn below z4
+args:
+  minzoom: 4
+  maxzoom: 12
+attribution: <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>
+sources:
+  osm:
+    type: osm
+    local_path: extract.osm.pbf
+layers:
+  - id: rail
+    # OSM splits a line into many short ways: join them per tile, or each piece below a pixel vanishes at low zoom
+    tile_post_process:
+      merge_line_strings:
+        min_length: 1
+        tolerance: 0.5
+        buffer: 4
+    features:
+      # Main lines carry the overview of a whole country
+      - source: osm
+        geometry: line
+        min_size: 0
+        min_zoom: 4
+        include_when:
+          __all__:
+            - railway: rail
+            - usage: main
+        exclude_when:
+          service: __any__
+        attributes:
+          - key: rank
+            value: main
+      - source: osm
+        geometry: line
+        min_size: 0
+        min_zoom: 6
+        include_when:
+          __all__:
+            - railway: rail
+            - usage: branch
+        exclude_when:
+          service: __any__
+        attributes:
+          - key: rank
+            value: branch
+      # Other running track only once zoomed in; sidings, yards and spurs (service=*) never
+      - source: osm
+        geometry: line
+        min_size: 0
+        min_zoom: 8
+        include_when:
+          railway: [rail, narrow_gauge]
+        exclude_when:
+          - service: __any__
+          - usage: [main, branch]
+        attributes:
+          - key: rank
+            value: other

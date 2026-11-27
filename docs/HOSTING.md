@@ -282,6 +282,12 @@ The timetable browsers search on (`BrowserDataFile`), built from the served grap
 - Reading it back, departures and regular departures derived, takes **0.6 s** on one JVM thread (the store file: 0.15 s). TeaVM runs ~1.5× slower than one JVM thread (#8), so ~1 s in a browser.
 - Dev data: 0.3 MB gzipped (3.0 MB raw), built in 0.7 s.
 
+## Rail tiles (#93, 2026-11-27)
+The rail-only basemap tiles of the dev area (Austria, Hungary, Slovakia), built by `scripts/rail-tiles.sh` on the dev machine:
+- **Tiles** (`data/rail-tiles/`): 4,157 tiles z4–z12, 172 of them merged from two countries; **0.73 MB** of tile bytes (5.2 MB on an NTFS disk, as each small file takes a cluster), **0.61 MB** gzipped as one archive. z4–z7: 23 tiles, 34 KB.
+- **Inputs** (`data/osm-rail/`, kept for the next build): Geofabrik extracts 779 MB (Austria) + 316 MB (Hungary) + 334 MB (Slovakia), Planetiler jar 89 MB.
+- **Build time:** 72 s with the extracts on disk (three Planetiler runs of ~10–25 s each plus JVM starts, the merge a few seconds); downloading the extracts adds their transfer time.
+
 ## Scratch grows by an eighth, drop flags as bits (S23, partly done, 2026-10-10)
 Full data (fresh-parse store, S26), `-Xmx3g`, compact object headers, warmer off, port 8081, both builds run from their classes on a fresh app, alternating, two runs each (HEAD = the rides step below). Results are byte-identical to the goldens (`SearchSnapshot`, dev and full).
 

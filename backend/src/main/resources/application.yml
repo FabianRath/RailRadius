@@ -5,10 +5,11 @@ server:
   # without a proxy that overwrites X-Forwarded-For: clients could then pick any IP
   forward-headers-strategy: ${RAILRADIUS_FORWARD_HEADERS_STRATEGY:none}
   # The browser engine's search.wasm (#12) goes out gzipped: 0.30 instead of 0.86 MB. Only that type, so nothing
-  # else changes; the browser data file is gzipped already
+  # else changes; the browser data file is gzipped already. The rail tiles (#93) are written uncompressed and shrink
+  # to about a third
   compression:
     enabled: true
-    mime-types: application/wasm
+    mime-types: application/wasm,application/vnd.mapbox-vector-tile
 
 spring:
   application:
@@ -53,6 +54,11 @@ railradius:
   browser-data:
     # Where the gzipped timetable for browsers (#9) is written after each load; only the newest file is kept
     directory: data/browser-data
+
+  rail-tiles:
+    # The rail-only basemap tiles that scripts/rail-tiles.sh builds (#93), served at /tiles/rail/. Without them the
+    # map keeps OpenFreeMap's rail layers, which start at z8
+    directory: data/rail-tiles
 
   feeds:
     # Update center: a feed whose last service day, or the last day of one of its main rail operators, is at most

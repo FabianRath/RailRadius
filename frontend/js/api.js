@@ -1,6 +1,7 @@
 import { API_BASE } from './config.js';
 
 const SEARCH_LIMIT = 50;
+const HTTP_NO_CONTENT = 204;
 
 // Page memory only, not localStorage, where any injected script could read it; a reload logs out
 let adminToken = null;
@@ -64,6 +65,17 @@ export function fetchStation(stationId) {
 /** Opens the SSE stream; the caller attaches the 'stations', 'done' and 'error' listeners. */
 export function openReachabilityStream(params) {
     return new EventSource(`${API_BASE}/api/reachability/stream?${new URLSearchParams(params)}`);
+}
+
+/** The rail-only basemap tiles as TileJSON (#93), or null while none are built (HTTP 204) or on any failure. */
+export async function fetchRailTiles() {
+    try {
+        const response = await request('/tiles/rail/tiles.json');
+        return response.status === HTTP_NO_CONTENT ? null : await response.json();
+    } catch (error) {
+        console.warn('Rail tiles unavailable, the map keeps the rail of its base style:', error);
+        return null;
+    }
 }
 
 /** One reachable station with its journey; params are the stream's plus targetId. */

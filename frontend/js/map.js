@@ -3,6 +3,7 @@ import { Map, Marker, Popup, LngLatBounds, NavigationControl }
 import { MAP_STYLE_URL, MAP_CENTER, MAP_ZOOM } from './config.js';
 import { cssVar } from './util.js';
 import { withLatinLabels } from './map-labels.js';
+import { railTileSource } from './rail-tiles.js';
 
 export const MAX_TRANSFER_LEVEL = 5;
 export const LAYERS = { reachable: 'reachable-stations', debug: 'debug-stations' };
@@ -28,7 +29,17 @@ const AREA_DOT_STROKE_WIDTH_PX = 0.5;
 const CLUTTER_LAYERS = new RegExp('^(road|highway|aeroway|building|railway_.*dashline|water_name|landuse_residential'
     + '|landcover_wood|landuse_park|place_(other|suburb|village|town|state))');
 const LAND_FILL_LAYERS = ['landcover_ice_shelf', 'landcover_glacier'];
-const RAIL_LAYERS = ['railway', 'railway_minor', 'railway_transit'];
+const OSM_RAIL_LAYERS = ['railway', 'railway_minor', 'railway_transit'];
+// Our own rail-only tiles (#93), drawn in place of the OpenFreeMap layers, which start only at z8
+const RAIL_TILES_LAYER = 'rail-tiles';
+const RAIL_TILES_SOURCE_LAYER = 'rail';
+const RAIL_LAYERS = [...OSM_RAIL_LAYERS, RAIL_TILES_LAYER];
+// Line width by zoom and rank (main, branch, other running track)
+const RAIL_TILES_WIDTH_PX = ['interpolate', ['exponential', 1.4], ['zoom'],
+    4, ['match', ['get', 'rank'], 'main', 0.7, 0.4],
+    8, ['match', ['get', 'rank'], 'main', 1.6, 'branch', 1.1, 0.7],
+    12, ['match', ['get', 'rank'], 'main', 3, 'branch', 2.2, 1.4],
+    16, 4];
 const BOUNDARY_LAYERS = ['boundary_state', 'boundary_country_z0-4', 'boundary_country_z5-'];
 const LABEL_LAYERS = ['place_city', 'place_city_large', 'place_country_other', 'place_country_minor',
     'place_country_major'];
@@ -58,7 +69,8 @@ export function addMapButton(button) {
     map.addControl({ onAdd: () => group, onRemove: () => group.remove() }, 'top-right');
 }
 
-export function initMap(containerId) {
+/** railTiles: a promise of the rail tiles' TileJSON, or of null to keep OpenFreeMap's rail layers. */
+export function initMap(containerId, railTiles) {
     // The licences require the credit; spelled out, its own (i) toggle can't be mistaken for the about button
     map = new Map({
         container: containerId, center: MAP_CENTER, zoom: MAP_ZOOM,
@@ -67,7 +79,9 @@ export function initMap(containerId) {
     // Rewritten before the first render, which already fetches the fonts its labels need
     map.setStyle(MAP_STYLE_URL, { transformStyle: (previous, next) => withoutClutter(withLatinLabels(next)) });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
-    return new Promise(resolve => map.on('load', () => {
+    return new Promise(resolve => map.on('load', async () => {
+        const tileJson = await railTiles;
+        if (tileJson) addRailTiles(tileJson);
         applyBoardColors();
         addDataLayers();
         resolve();
@@ -85,6 +99,19 @@ export function hasCoordinates(lat, lon) {
 
 function withoutClutter(style) {
     return { ...style, layers: style.layers.filter(layer => !CLUTTER_LAYERS.test(layer.id)) };
+}
+
+/** Under the base style's labels, as solid lines: the tiles join OSM's short ways per tile. */
+function addRailTiles(tileJson) {
+    for (const id of OSM_RAIL_LAYERS) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
+    }
+    map.addSource(RAIL_TILES_LAYER, railTileSource(tileJson, location.origin));
+    const firstLabel = map.getStyle().layers.find(layer => layer.type === 'symbol');
+    map.addLayer({ id: RAIL_TILES_LAYER, type: 'line', source: RAIL_TILES_LAYER,
+        'source-layer': RAIL_TILES_SOURCE_LAYER,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-width': RAIL_TILES_WIDTH_PX } }, firstLabel?.id);
 }
 
 /** Recolours the base style down to land, water and rail, so the coloured dots carry the map. */

@@ -96,6 +96,10 @@ check "$WRONG_TOKEN" /api/admin/debug/status -H "X-Admin-Token: probe-wrong-toke
 check 404 /actuator/env
 check 404 /actuator/heapdump
 check 404 /backend_test.html
+# Rail tiles (#93): only integer tile coordinates, never a file next to or above the tile folders
+check "400|404" /tiles/rail/../../application.yml
+check 400 /tiles/rail/a/b/c.pbf
+check "400|404" "/tiles/rail/4/%2e%2e/metadata.json.pbf"
 
 # Security headers (B47); HSTS comes from the proxy only (S38)
 for path in / /api/health; do
