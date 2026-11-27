@@ -78,3 +78,43 @@
     --bar-height: 84px;
     --journey-width: 380px;
 }
+
+/* Night edition: set by js/theme.js from the system setting or the visitor's choice */
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --board: #1b1814;
+    --board-2: #24201b;
+    --board-3: #2e2922;
+    --line: #463e33;
+    --row-stripe: rgba(255, 240, 210, 0.03);
+    --overlay: rgba(27, 24, 20, 0.88);
+
+    --text: #ece4d2;
+    --muted: #a59a86;
+    --on-accent: #1b1814;
+
+    --accent: #e0745c;
+    --danger: #e0745c;
+    --ok: #6fbf97;
+
+    --transfer-0: #f59e5b;
+    --transfer-1: #2dd4bf;
+    --transfer-2: #7aa7ff;
+    --transfer-3: #c49bf5;
+    --transfer-4: #f472b6;
+    --transfer-5: #b5ada2;
+
+    --map-land: #1b1814;
+    --map-water: #2b3a40;
+    --map-rail: #d8cdb6;
+    --map-boundary: #4f4538;
+    --map-label: #a59a86;
+    --map-label-halo: #1b1814;
+    --marker-stroke: #1b1814;
+    --marker-start-fill: #ece4d2;
+    --marker-start-ring: #e0745c;
+
+    --debug-low: #2dd4bf;
+    --debug-mid: #7aa7ff;
+    --debug-high: #e0745c;
+}

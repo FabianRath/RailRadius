@@ -132,8 +132,6 @@ function radiusByLevelExpression(scale) {
 }
 
 function addDataLayers() {
-    const colorByLevel = colorByLevelExpression();
-
     map.addSource('reachable', { type: 'geojson', data: EMPTY_COLLECTION });
     addAreaLayers();
 
@@ -146,10 +144,10 @@ function addDataLayers() {
     map.addSource('journey', { type: 'geojson', data: EMPTY_COLLECTION });
     map.addLayer({ id: 'journey-casing', type: 'line', source: 'journey',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': cssVar('--marker-stroke'), 'line-width': JOURNEY_CASING_WIDTH_PX } });
+        paint: { 'line-width': JOURNEY_CASING_WIDTH_PX } });
     map.addLayer({ id: 'journey-lines', type: 'line', source: 'journey',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': colorByLevel, 'line-width': JOURNEY_LINE_WIDTH_PX } });
+        paint: { 'line-width': JOURNEY_LINE_WIDTH_PX } });
 
     // Under the dots and beside them, so a name never hides a dot. The hubs' tier last: the layer on top is placed
     // first, so its names win collisions with the tiers below
@@ -160,11 +158,29 @@ function addDataLayers() {
         // Direct connections (level 0) are drawn on top
         layout: { 'circle-sort-key': ['-', MAX_TRANSFER_LEVEL, ['get', 'level']] },
         paint: {
-            'circle-color': colorByLevel,
             'circle-radius': radiusByLevelExpression(1),
-            'circle-stroke-color': cssVar('--marker-stroke'),
             'circle-stroke-width': DOT_STROKE_WIDTH_PX
         } });
+    applyDataColors();
+}
+
+/** Re-reads every map colour from the CSS variables; call after the theme changed. */
+export function applyThemeColors() {
+    applyBoardColors();
+    applyDataColors();
+}
+
+function applyDataColors() {
+    const colorByLevel = colorByLevelExpression();
+    const stroke = cssVar('--marker-stroke');
+    setPaint(['journey-casing'], 'line-color', stroke);
+    setPaint(['journey-lines'], 'line-color', colorByLevel);
+    setPaint([LAYERS.reachable], 'circle-color', colorByLevel);
+    setPaint([LAYERS.reachable], 'circle-stroke-color', stroke);
+    for (let level = 0; level <= MAX_TRANSFER_LEVEL; level++) {
+        setPaint([areaLayerId(level)], 'heatmap-color',
+            ['step', ['heatmap-density'], 'transparent', AREA_DENSITY_THRESHOLD, cssVar(`--transfer-${level}`)]);
+    }
 }
 
 /** Each tier's names from its zoom on; a tier holds only the stations no tier above it named. */
@@ -205,8 +221,6 @@ function addAreaLayers() {
             paint: {
                 'heatmap-radius': AREA_RADIUS_PX,
                 'heatmap-opacity': AREA_OPACITY,
-                'heatmap-color': ['step', ['heatmap-density'],
-                    'transparent', AREA_DENSITY_THRESHOLD, cssVar(`--transfer-${level}`)]
             } });
     }
 }
