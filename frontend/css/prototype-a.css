@@ -107,3 +107,34 @@
     font-variant: small-caps;
     text-transform: lowercase;
 }
+
+/* Tweaks after the first review */
+
+/* 99 % of the 34,749 full-data names fit 340 px in this font (median 127 px); longer ones get an ellipsis */
+[data-variant="a"] .board-from {
+    flex: 0 1 420px;
+}
+
+[data-variant="a"] #stationResults {
+    min-width: 440px;
+}
+
+[data-variant="a"] .board-changes {
+    align-items: center;
+}
+
+[data-variant="a"] #maxJourneyTime {
+    width: 2.4em;
+}
+
+/* "1,083 stations" reads as one phrase; the limit sits below it */
+[data-variant="a"] .board-count-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+[data-variant="a"] .board-count-unit {
+    font: italic 400 18px var(--font-ui);
+    color: var(--text);
+}
