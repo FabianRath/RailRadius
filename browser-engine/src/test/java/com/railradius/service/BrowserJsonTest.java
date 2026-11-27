@@ -35,4 +35,13 @@ class BrowserJsonTest {
                         + "{\"trip\":9,\"boardEvent\":30,\"alightEvent\":31}]");
         assertThat(BrowserJson.summaries(List.of())).isEqualTo("[]");
     }
+
+    @Test
+    void stationLabelsCarryNameCoordinatesAndImportance() {
+        BrowserJson.StationLabel wien = new BrowserJson.StationLabel("Wien \"Hbf\"", 48.185, 16.375, 42);
+        assertThat(BrowserJson.stationLabels(List.of(wien)))
+                .isEqualTo("[{\"name\":\"Wien \\\"Hbf\\\"\",\"latitude\":48.185,\"longitude\":16.375,"
+                        + "\"importance\":42}]");
+        assertThat(BrowserJson.stationLabels(List.of())).isEqualTo("[]");
+    }
 }
