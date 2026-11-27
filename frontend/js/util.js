@@ -20,6 +20,10 @@ const BYTES_PER_MB = 1024 * 1024;
 const MB_PER_GB = 1024;
 
 /** File sizes as "12.3 MB", or "1.23 GB" from a GB on. */
+export function fmtChanges(count) {
+    return count === 1 ? '1 change' : `${count} changes`;
+}
+
 export function fmtBytes(bytes) {
     const mb = bytes / BYTES_PER_MB;
     return mb < MB_PER_GB ? `${mb.toFixed(1)} MB` : `${(mb / MB_PER_GB).toFixed(2)} GB`;

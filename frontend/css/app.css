@@ -9,7 +9,7 @@
 }
 
 :focus-visible {
-    outline: 2px solid var(--amber);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
 
@@ -33,7 +33,7 @@ body {
 .board-bar {
     display: flex;
     align-items: stretch;
-    border-bottom: 3px solid var(--amber);
+    border-bottom: 4px double var(--text);
     background: var(--board);
     position: relative;
     z-index: 10;
@@ -54,7 +54,7 @@ body {
 .journey {
     width: var(--journey-width);
     background: var(--board-2);
-    border-left: 1px solid var(--line);
+    border-left: 4px double var(--text);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -83,19 +83,18 @@ body {
 
 .board-wordmark {
     margin: 0;
-    font: 700 25px/1 var(--font-ui);
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+    font: italic 700 26px/1 var(--font-ui);
     color: var(--text);
 }
 
 .board-wordmark span {
-    color: var(--amber);
+    font-weight: 400;
 }
 
 .board-tagline {
     margin-top: 4px;
     font-size: 13px;
+    font-style: italic;
     color: var(--muted);
 }
 
@@ -110,8 +109,9 @@ body {
     position: relative;
 }
 
+/* 99 % of the 34,749 full-data names fit 340 px in the 21 px serif (median 127 px); longer ones get an ellipsis */
 .board-from {
-    flex: 1 1 320px;
+    flex: 0 1 420px;
 }
 
 .board-field:focus-within {
@@ -120,14 +120,15 @@ body {
 
 .board-label,
 .feed-table th {
-    font: 600 12px var(--font-ui);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
+    font: 400 13px var(--font-ui);
+    font-variant: small-caps;
+    text-transform: lowercase;
+    letter-spacing: 0.08em;
     color: var(--muted);
 }
 
 .board-value {
-    font: 600 22px var(--font-ui);
+    font: 600 21px var(--font-ui);
     color: var(--text);
     white-space: nowrap;
 }
@@ -141,7 +142,7 @@ body {
     font: inherit;
     padding: 0;
     min-width: 0;
-    caret-color: var(--amber);
+    caret-color: var(--accent);
 }
 
 .board-from-row {
@@ -154,6 +155,13 @@ body {
     flex: 1;
     width: 100%;
     text-overflow: ellipsis;
+}
+
+/* Inputs read as fill-in lines on a printed form */
+#searchInput,
+#maxJourneyTime,
+.stepper-value {
+    border-bottom: 1px dotted var(--muted);
 }
 
 #searchInput::placeholder,
@@ -171,7 +179,7 @@ body {
     position: absolute;
     top: calc(100% + 3px);
     left: 0;
-    width: max(100%, 380px);
+    width: max(100%, 440px);
     max-height: 320px;
     overflow-y: auto;
     z-index: 20;
@@ -189,6 +197,10 @@ body {
     flex: none;
 }
 
+.board-changes {
+    align-items: center;
+}
+
 .stepper {
     display: flex;
     align-items: center;
@@ -196,8 +208,8 @@ body {
 }
 
 .stepper-value {
-    font: 900 28px/1 var(--font-board);
-    color: var(--amber);
+    font: 600 21px var(--font-ui);
+    color: var(--text);
     width: 1.4ch;
     text-align: center;
 }
@@ -206,15 +218,15 @@ body {
     width: 28px;
     height: 28px;
     background: transparent;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    color: var(--muted);
+    border: 1px solid var(--muted);
+    border-radius: 50%;
+    color: var(--text);
     font: 600 18px/1 var(--font-ui);
     cursor: pointer;
 }
 
 .stepper-btn:not(:disabled):hover {
-    border-color: var(--amber);
+    border-color: var(--accent);
     color: var(--text);
 }
 
@@ -229,7 +241,7 @@ body {
 }
 
 #maxJourneyTime {
-    width: 3ch;
+    width: 2.4em;
     text-align: right;
 }
 
@@ -315,7 +327,7 @@ body {
 }
 
 .toggle.is-on {
-    background: var(--amber);
+    background: var(--accent);
 }
 
 .toggle.is-on::after {
@@ -373,7 +385,7 @@ body {
 }
 
 .panel-check input {
-    accent-color: var(--amber);
+    accent-color: var(--accent);
     width: 16px;
     height: 16px;
     cursor: pointer;
@@ -391,12 +403,23 @@ body {
     gap: 2px;
 }
 
+/* "1,083 stations" reads as one phrase; the limit sits below it */
+.board-count-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
 /* The fixed width keeps the cell from jumping while the stream counts up */
 .board-digits {
-    font: 900 40px/1 var(--font-board);
-    color: var(--amber);
+    font: italic 600 34px/1 var(--font-ui);
+    color: var(--text);
     min-width: 4ch;
     text-align: right;
+}
+
+.board-count-unit {
+    font: italic 400 18px var(--font-ui);
 }
 
 .board-go {
@@ -405,11 +428,9 @@ body {
     padding: 0 22px;
     border: 0;
     border-radius: 0;
-    background: var(--amber);
-    color: var(--on-amber);
-    font: 700 18px var(--font-ui);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    background: var(--text);
+    color: var(--board);
+    font: italic 600 20px var(--font-ui);
     cursor: pointer;
 }
 
@@ -431,8 +452,8 @@ body {
 
 .btn-loading {
     background: var(--board-2);
-    color: var(--amber);
-    box-shadow: inset 0 0 0 2px var(--amber);
+    color: var(--accent);
+    box-shadow: inset 0 0 0 2px var(--accent);
 }
 
 .btn-loading .btn-label {
@@ -485,7 +506,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .station-item:hover {
     background: var(--board-3);
-    box-shadow: inset 3px 0 0 var(--amber);
+    box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .station-name {
@@ -544,7 +565,7 @@ input[type="number"]::-webkit-inner-spin-button {
 .status-warning,
 #updatingNotice,
 .intro-hint {
-    border-left-color: var(--amber);
+    border-left-color: var(--accent);
 }
 
 .status-error {
@@ -563,9 +584,10 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .journey-eyebrow {
     font: 600 12px var(--font-ui);
-    text-transform: uppercase;
+    font-variant: small-caps;
+    text-transform: lowercase;
     letter-spacing: 0.12em;
-    color: var(--amber);
+    color: var(--accent);
 }
 
 .board-close {
@@ -583,7 +605,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .board-close:hover {
     color: var(--text);
-    border-color: var(--amber);
+    border-color: var(--accent);
 }
 
 #stationDetailsBody {
@@ -620,7 +642,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .journey-note .icon {
     flex: none;
-    color: var(--amber);
+    color: var(--accent);
 }
 
 .journey-thead,
@@ -676,20 +698,21 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .journey-time {
-    font: 900 18px var(--font-board);
-    color: var(--amber);
+    font: 600 18px var(--font-ui);
+    color: var(--accent);
 }
 
 .journey-day {
     font: 600 11px var(--font-ui);
-    color: var(--amber);
+    color: var(--accent);
     margin-left: 2px;
 }
 
 .journey-change {
     padding: 6px 18px 6px 100px;
     font-size: 13px;
-    text-transform: uppercase;
+    font-variant: small-caps;
+    text-transform: lowercase;
     letter-spacing: 0.08em;
     color: var(--muted);
     border-bottom: 1px solid var(--line);
@@ -700,7 +723,7 @@ input[type="number"]::-webkit-inner-spin-button {
     padding: 0 6px;
     border-radius: var(--radius);
     font: 700 14px/20px var(--font-ui);
-    color: var(--on-amber);
+    color: var(--on-accent);
     white-space: nowrap;
 }
 
@@ -832,7 +855,7 @@ input[type="number"]::-webkit-inner-spin-button {
     width: 18px;
     height: 18px;
     border: 2px solid var(--line);
-    border-top-color: var(--amber);
+    border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
     display: inline-block;
@@ -876,7 +899,7 @@ input[type="number"]::-webkit-inner-spin-button {
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    background: var(--amber);
+    background: var(--accent);
 }
 
 .loading-pulse::after {
@@ -884,7 +907,7 @@ input[type="number"]::-webkit-inner-spin-button {
     position: absolute;
     inset: -4px;
     border-radius: 50%;
-    border: 2px solid var(--amber);
+    border: 2px solid var(--accent);
     animation: pulse-ring 1.2s ease-out infinite;
 }
 
@@ -897,9 +920,10 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .loading-text {
     font: 600 12px var(--font-ui);
-    text-transform: uppercase;
+    font-variant: small-caps;
+    text-transform: lowercase;
     letter-spacing: 0.1em;
-    color: var(--amber);
+    color: var(--accent);
 }
 
 .loading-count {
@@ -914,8 +938,8 @@ input[type="number"]::-webkit-inner-spin-button {
     left: 50%;
     transform: translateX(-50%);
     background: var(--board-2);
-    border: 1px dashed var(--amber);
-    color: var(--amber);
+    border: 1px dashed var(--accent);
+    color: var(--accent);
     border-radius: var(--radius);
     padding: 8px 16px;
     font: 13px var(--font-mono);
@@ -969,7 +993,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .dev-toggle:hover,
 .dev-toggle.is-active {
-    color: var(--amber);
+    color: var(--accent);
 }
 
 .dev-login {
@@ -1002,7 +1026,7 @@ input[type="number"]::-webkit-inner-spin-button {
     background: var(--board-2);
     color: var(--text);
     border: 1px solid var(--line);
-    border-top: 3px solid var(--amber);
+    border-top: 3px solid var(--accent);
     border-radius: var(--radius);
     padding: 24px;
     font: 15px var(--font-ui);
@@ -1016,7 +1040,8 @@ input[type="number"]::-webkit-inner-spin-button {
 .about-title,
 .admin-title {
     font: 700 18px var(--font-ui);
-    text-transform: uppercase;
+    font-variant: small-caps;
+    text-transform: lowercase;
     letter-spacing: 0.06em;
     color: var(--text);
 }
@@ -1069,7 +1094,7 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .admin-btn:hover:not(:disabled) {
-    border-color: var(--amber);
+    border-color: var(--accent);
 }
 
 .admin-btn-danger:hover:not(:disabled) {
@@ -1078,8 +1103,8 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .admin-btn[aria-pressed="true"] {
-    border-color: var(--amber);
-    color: var(--amber);
+    border-color: var(--accent);
+    color: var(--accent);
 }
 
 .admin-btn:disabled {
@@ -1115,7 +1140,8 @@ input[type="number"]::-webkit-inner-spin-button {
     border: none;
     border-bottom: 2px solid transparent;
     font: 600 13px var(--font-ui);
-    text-transform: uppercase;
+    font-variant: small-caps;
+    text-transform: lowercase;
     letter-spacing: 0.08em;
     color: var(--muted);
     padding: 8px 12px;
@@ -1127,8 +1153,8 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .dialog-tab.is-active {
-    border-bottom-color: var(--amber);
-    color: var(--amber);
+    border-bottom-color: var(--accent);
+    color: var(--accent);
 }
 
 .feed-summary {
@@ -1193,7 +1219,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .feed-state-expiring,
 .feed-result-busy {
-    color: var(--amber);
+    color: var(--accent);
 }
 
 .feed-state-missing,
@@ -1223,11 +1249,11 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .admin-progress-bar::-webkit-progress-value {
-    background: var(--amber);
+    background: var(--accent);
 }
 
 .admin-progress-bar::-moz-progress-bar {
-    background: var(--amber);
+    background: var(--accent);
 }
 
 .admin-progress-text {
@@ -1318,7 +1344,7 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .about-sources a {
-    color: var(--amber);
+    color: var(--accent);
 }
 
 /* ── Narrower screens: each block also applies to all widths below it ── */
@@ -1455,7 +1481,7 @@ input[type="number"]::-webkit-inner-spin-button {
         width: auto;
         max-height: 60%;
         border-left: 0;
-        border-top: 3px solid var(--amber);
+        border-top: 3px solid var(--accent);
         z-index: 8;
     }
 
