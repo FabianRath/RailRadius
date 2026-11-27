@@ -18,6 +18,7 @@ export function initSearch(onSelect) {
     let debounceTimer;
     searchInput.addEventListener('input', () => {
         searchCountry.textContent = '';
+        searchInput.title = '';
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => runSearch(searchInput.value), SEARCH_DEBOUNCE_MS);
     });
@@ -53,6 +54,8 @@ export async function prefillStation(name, onSelect) {
 /** Shows the station in the search field and selects it, as if it had been picked from the results. */
 export function setStation(station, onSelect) {
     searchInput.value = station.name;
+    // The field fits 99 % of the names; the rest are cut off with an ellipsis
+    searchInput.title = station.name;
     searchCountry.textContent = station.country ?? '';
     onSelect(station);
 }

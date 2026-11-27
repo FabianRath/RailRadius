@@ -14,7 +14,7 @@
         <header class="board-bar">
             <div class="board-brand">
                 <h1 class="board-wordmark">Rail<span>radius</span></h1>
-                <div class="board-tagline">Every station by train</div>
+                <div class="board-tagline">Where can a train take you?</div>
             </div>
 
             <div class="board-field board-from">
@@ -50,7 +50,7 @@
             <div class="board-field board-options">
                 <button type="button" class="board-options-toggle" id="optionsToggle"
                         aria-expanded="false" aria-controls="optionsPanel">
-                    <span class="board-label">Wait</span>
+                    <span class="board-label">Wait at changes</span>
                     <span class="board-value"><span id="transferTimeToggleHint"></span>
                         <span class="board-caret">▾</span></span>
                 </button>
@@ -82,8 +82,11 @@
             </div>
 
             <div class="board-count" id="resultsSection">
-                <b id="reachableCount" class="board-digits">—</b>
-                <span class="board-label">stations · max <span id="maxTransfersUsed">—</span> changes</span>
+                <div class="board-count-row">
+                    <b id="reachableCount" class="board-digits">—</b>
+                    <span class="board-count-unit">stations</span>
+                </div>
+                <span class="board-label" id="maxTransfersUsed"></span>
             </div>
 
             <button class="board-go" id="calculateBtn" disabled>

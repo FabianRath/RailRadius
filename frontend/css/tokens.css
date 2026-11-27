@@ -1,117 +1,44 @@
-@font-face {
-    font-family: 'Barlow Semi Condensed';
-    font-style: normal;
-    font-weight: 400;
-    font-display: swap;
-    src: url('../vendor/fonts/barlow-semi-condensed-400-latin-ext.woff2') format('woff2');
-    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-    font-family: 'Barlow Semi Condensed';
-    font-style: normal;
-    font-weight: 400;
-    font-display: swap;
-    src: url('../vendor/fonts/barlow-semi-condensed-400-latin.woff2') format('woff2');
-    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-    font-family: 'Barlow Semi Condensed';
-    font-style: normal;
-    font-weight: 500;
-    font-display: swap;
-    src: url('../vendor/fonts/barlow-semi-condensed-500-latin-ext.woff2') format('woff2');
-    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-    font-family: 'Barlow Semi Condensed';
-    font-style: normal;
-    font-weight: 500;
-    font-display: swap;
-    src: url('../vendor/fonts/barlow-semi-condensed-500-latin.woff2') format('woff2');
-    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-    font-family: 'Barlow Semi Condensed';
-    font-style: normal;
-    font-weight: 600;
-    font-display: swap;
-    src: url('../vendor/fonts/barlow-semi-condensed-600-latin-ext.woff2') format('woff2');
-    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-    font-family: 'Barlow Semi Condensed';
-    font-style: normal;
-    font-weight: 600;
-    font-display: swap;
-    src: url('../vendor/fonts/barlow-semi-condensed-600-latin.woff2') format('woff2');
-    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-    font-family: 'Barlow Semi Condensed';
-    font-style: normal;
-    font-weight: 700;
-    font-display: swap;
-    src: url('../vendor/fonts/barlow-semi-condensed-700-latin-ext.woff2') format('woff2');
-    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-    font-family: 'Barlow Semi Condensed';
-    font-style: normal;
-    font-weight: 700;
-    font-display: swap;
-    src: url('../vendor/fonts/barlow-semi-condensed-700-latin.woff2') format('woff2');
-    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-    font-family: 'Doto';
-    font-style: normal;
-    font-weight: 900;
-    font-display: swap;
-    src: url('../vendor/fonts/doto-900-latin.woff2') format('woff2');
-    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
 :root {
-    --board: #0e161f;
-    --board-2: #15202c;
-    --board-3: #1c2a38;
-    --line: #253446;
-    --row-stripe: rgba(255, 255, 255, 0.02);
-    --overlay: rgba(14, 22, 31, 0.8);
+    --board: #f3eee2;
+    --board-2: #ebe4d3;
+    --board-3: #e0d7c2;
+    --line: #cdbfa5;
+    --row-stripe: rgba(60, 40, 10, 0.035);
+    --overlay: rgba(243, 238, 226, 0.88);
 
-    --text: #f1f3f5;
-    --muted: #8796a8;
-    --on-amber: #0e161f;
+    --text: #221d17;
+    --muted: #6f6555;
+    --on-accent: #f3eee2;
 
-    --amber: #ffb000;
-    --danger: #ff5c5c;
-    --ok: #46c2a8;
+    --accent: #a8321f;
+    --danger: #a8321f;
+    --ok: #2f6b4f;
 
-    --transfer-0: #ffb000;
-    --transfer-1: #46c2a8;
-    --transfer-2: #4a9be8;
-    --transfer-3: #b07ce8;
-    --transfer-4: #e86fa3;
-    --transfer-5: #f2f2f2;
+    --transfer-0: #c2410c;
+    --transfer-1: #0f766e;
+    --transfer-2: #1d4ed8;
+    --transfer-3: #7e22ce;
+    --transfer-4: #be185d;
+    --transfer-5: #57534e;
 
-    --map-land: #16212c;
-    --map-water: #0b121a;
-    --map-rail: #2a3a4c;
-    --map-boundary: #34465a;
-    --map-label: #8796a8;
-    --map-label-halo: #16212c;
-    --marker-stroke: #0e161f;
-    --marker-start-fill: #f1f3f5;
-    --marker-start-ring: #ffb000;
+    --map-land: #f3eee2;
+    --map-water: #c6d6da;
+    --map-rail: #2a241d;
+    --map-boundary: #c9b99c;
+    --map-label: #5f5647;
+    --map-label-halo: #f3eee2;
+    --marker-stroke: #fffdf7;
+    --marker-start-fill: #221d17;
+    --marker-start-ring: #a8321f;
 
-    --debug-low: #46c2a8;
-    --debug-mid: #4a9be8;
-    --debug-high: #ff5c5c;
+    --debug-low: #0f766e;
+    --debug-mid: #1d4ed8;
+    --debug-high: #a8321f;
 
-    --font-ui: 'Barlow Semi Condensed', 'Segoe UI', system-ui, sans-serif;
-    --font-board: 'Doto', ui-monospace, monospace;
+    /* System serifs until a self-hosted face is chosen (#94) */
+    --font-ui: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
     --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
-    --radius: 2px;
-    --bar-height: 96px;
+    --radius: 0;
+    --bar-height: 84px;
     --journey-width: 380px;
 }

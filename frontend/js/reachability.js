@@ -2,7 +2,7 @@ import { fetchJourney, openReachabilityStream } from './api.js';
 import { addReachableStations, clearReachableStations, fitToPoints, hasCoordinates, setStartStation } from './map.js';
 import { checkQuery, readQuery } from './query-form.js';
 import { requestParamsOf } from './query.js';
-import { clearStatus, showStatus } from './util.js';
+import { clearStatus, fmtChanges, showStatus } from './util.js';
 import { isUpdatingTimetables } from './server-status.js';
 import { dismissIntroHint } from './intro-hint.js';
 import { writeDeepLink } from './deep-link.js';
@@ -99,7 +99,7 @@ export function calculate(station, fromLink = false) {
     clearReachableStations();
     setStartStation(station);
     shownStart = station;
-    maxTransfersUsed.textContent = query.maxTransfers;
+    maxTransfersUsed.textContent = `max ${fmtChanges(query.maxTransfers)}`;
 
     const cached = localResultsCache.get(key);
     if (cached) {

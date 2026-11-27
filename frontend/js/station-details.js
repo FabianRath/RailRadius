@@ -1,5 +1,5 @@
 // The selected station's journey, in its own column beside the map so it never covers the route drawn on it (F22).
-import { countryBadgeHtml, escapeHtml, fmtGtfsClock } from './util.js';
+import { countryBadgeHtml, escapeHtml, fmtChanges, fmtGtfsClock } from './util.js';
 import { icon } from './icons.js';
 import { clearJourney, MAX_TRANSFER_LEVEL, resizeMap, showJourney } from './map.js';
 import { journeyRoute } from './journey.js';
@@ -53,7 +53,7 @@ function summaryHtml(station) {
 function changesText(transfers) {
     if (transfers == null) return '';
     if (transfers === 0) return 'direct';
-    return transfers === 1 ? '1 change' : `${transfers} changes`;
+    return fmtChanges(transfers);
 }
 
 /**

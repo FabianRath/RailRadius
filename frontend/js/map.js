@@ -23,12 +23,15 @@ const DOT_RADIUS_BY_LEVEL_PX = [6, 5, 4.5, 4, 3.5, 3];
 const AREA_DOT_SCALE = 0.5;
 const DOT_STROKE_WIDTH_PX = 1;
 const AREA_DOT_STROKE_WIDTH_PX = 0.5;
-const LAND_FILL_LAYERS = ['landcover_ice_shelf', 'landcover_glacier', 'landuse_residential', 'landcover_wood',
-    'landuse_park', 'building', 'aeroway-area'];
+// Roads, buildings, towns and water names compete with the coloured dots; land, water, borders, country names and
+// cities stay for orientation
+const CLUTTER_LAYERS = new RegExp('^(road|highway|aeroway|building|railway_.*dashline|water_name|landuse_residential'
+    + '|landcover_wood|landuse_park|place_(other|suburb|village|town|state))');
+const LAND_FILL_LAYERS = ['landcover_ice_shelf', 'landcover_glacier'];
 const RAIL_LAYERS = ['railway', 'railway_minor', 'railway_transit'];
 const BOUNDARY_LAYERS = ['boundary_state', 'boundary_country_z0-4', 'boundary_country_z5-'];
-const LABEL_LAYERS = ['water_name', 'place_other', 'place_suburb', 'place_village', 'place_town', 'place_city',
-    'place_city_large', 'place_state', 'place_country_other', 'place_country_minor', 'place_country_major'];
+const LABEL_LAYERS = ['place_city', 'place_city_large', 'place_country_other', 'place_country_minor',
+    'place_country_major'];
 const EMPTY_COLLECTION = { type: 'FeatureCollection', features: [] };
 
 let map;
@@ -51,7 +54,7 @@ export function initMap(containerId) {
         attributionControl: { compact: false },
     });
     // Rewritten before the first render, which already fetches the fonts its labels need
-    map.setStyle(MAP_STYLE_URL, { transformStyle: (previous, next) => withLatinLabels(next) });
+    map.setStyle(MAP_STYLE_URL, { transformStyle: (previous, next) => withoutClutter(withLatinLabels(next)) });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     return new Promise(resolve => map.on('load', () => {
         applyBoardColors();
@@ -67,6 +70,10 @@ export function resizeMap() {
 
 export function hasCoordinates(lat, lon) {
     return lat != null && lon != null;
+}
+
+function withoutClutter(style) {
+    return { ...style, layers: style.layers.filter(layer => !CLUTTER_LAYERS.test(layer.id)) };
 }
 
 /** Recolours the base style down to land, water and rail, so the coloured dots carry the map. */
