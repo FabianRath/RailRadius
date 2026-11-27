@@ -1,0 +1,65 @@
+# PROTOTYPE (branch prototype/redesign): Planetiler custom-map schema for a rail-only tileset, so the basemap can
+# show real tracks when zoomed out, where the OpenFreeMap tiles have none (they carry rail only from z8).
+# Run from backend/data/osm-rail/ (see the spike notes in the prototype commit).
+schema_name: RailRadius rail
+schema_description: OSM running track only, generalised by importance
+attribution: <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>
+sources:
+  at:
+    type: osm
+    local_path: austria.osm.pbf
+  hu:
+    type: osm
+    local_path: hungary.osm.pbf
+  sk:
+    type: osm
+    local_path: slovakia.osm.pbf
+layers:
+  - id: rail
+    # OSM splits a line into many short ways: join them per tile, or each piece below a pixel vanishes at low zoom
+    tile_post_process:
+      merge_line_strings:
+        min_length: 1
+        tolerance: 0.5
+        buffer: 4
+    features:
+      # Main lines carry the overview of a whole country
+      - source: [at, hu, sk]
+        geometry: line
+        min_size: 0
+        min_zoom: 4
+        include_when:
+          __all__:
+            - railway: rail
+            - usage: main
+        exclude_when:
+          service: __any__
+        attributes:
+          - key: rank
+            value: main
+      - source: [at, hu, sk]
+        geometry: line
+        min_size: 0
+        min_zoom: 6
+        include_when:
+          __all__:
+            - railway: rail
+            - usage: branch
+        exclude_when:
+          service: __any__
+        attributes:
+          - key: rank
+            value: branch
+      # Untagged or industrial running track only once zoomed in; sidings, yards and spurs never
+      - source: [at, hu, sk]
+        geometry: line
+        min_size: 0
+        min_zoom: 8
+        include_when:
+          railway: [rail, narrow_gauge]
+        exclude_when:
+          - service: __any__
+          - usage: [main, branch]
+        attributes:
+          - key: rank
+            value: other

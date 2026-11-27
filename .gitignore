@@ -54,3 +54,6 @@ MANUAL_TEST.md
 # llm-council skill output
 council-report-*.html
 council-transcript-*.md
+
+# PROTOTYPE: rail-only tiles built by scripts/prototype-rail-tiles.yml
+/frontend/prototype-tiles/

@@ -1,5 +1,5 @@
 // PROTOTYPE (branch prototype/redesign, never merged): redesign variants and basemaps, switched by
-// ?variant=A|B|C and ?basemap=1|2|12|L. Without either param the page is unchanged and no bar shows.
+// ?variant=A|B|C and ?basemap=1|2|12|L|R. Without either param the page is unchanged and no bar shows.
 
 const VARIANTS = [
     { key: 'off', name: 'Current (Abfahrt)' },
@@ -13,6 +13,7 @@ const BASEMAPS = [
     { key: '2', name: 'Our network' },
     { key: '12', name: 'Network → OSM tracks' },
     { key: 'L', name: 'OSM tracks + our labels' },
+    { key: 'R', name: 'Our rail tiles + labels' },
 ];
 
 const params = new URLSearchParams(location.search);

@@ -2,6 +2,7 @@
 //   1  OpenFreeMap tiles without roads and clutter, OSM rail as the hero
 //   2  no OSM rail: our own network from the timetable, with our station names
 //   12 our network when zoomed out, OSM tracks once zoomed in
+//   R  our own rail-only tiles built from OSM (scripts/prototype-rail-tiles.yml) at every zoom, plus our names
 //   L  OSM tracks (the tiles have rail only from z8) plus our station names at every zoom
 import { basemap } from './prototype.js';
 import { cssVar } from './util.js';
@@ -28,7 +29,7 @@ export function transformBasemapStyle(style) {
     if (!prototypeBasemapActive()) return style;
     const layers = style.layers.filter(layer => {
         if (DROPPED.test(layer.id)) return false;
-        if (basemap.key === '2' && OSM_RAIL.test(layer.id)) return false;
+        if (['2', 'R'].includes(basemap.key) && OSM_RAIL.test(layer.id)) return false;
         if (basemap.key !== '1' && layer.id === 'place_city') return false;
         return true;
     });
@@ -52,6 +53,8 @@ export async function applyPrototypeBasemap(map) {
     }
     if (basemap.key === '1') return;
 
+    if (basemap.key === 'R') addRailTiles(map, rail);
+
     const response = await fetch('/api/prototype/network');
     const network = await response.json();
     // Trains leaving the covered countries have no stops in between: drop those chords
@@ -59,7 +62,7 @@ export async function applyPrototypeBasemap(map) {
         || lengthKm(feature.geometry.coordinates) <= MAX_EDGE_KM);
     map.addSource('proto-network', { type: 'geojson', data: network });
     const maxzoom = basemap.key === '12' ? SWITCH_ZOOM : 24;
-    if (basemap.key !== 'L') map.addLayer({
+    if (!['L', 'R'].includes(basemap.key)) map.addLayer({
         id: 'proto-network-lines', type: 'line', source: 'proto-network', maxzoom,
         filter: ['==', ['geometry-type'], 'LineString'],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
@@ -70,7 +73,7 @@ export async function applyPrototypeBasemap(map) {
                 10, ['interpolate', ['linear'], ['get', 'trips'], 1, 1.2, 100, 3, 400, 5]],
         },
     });
-    if (basemap.key !== 'L') map.addLayer({
+    if (!['L', 'R'].includes(basemap.key)) map.addLayer({
         id: 'proto-network-stations', type: 'circle', source: 'proto-network', minzoom: 9,
         filter: ['==', ['geometry-type'], 'Point'],
         paint: {
@@ -95,6 +98,25 @@ function addLabelTier(map, name, minTrips, minzoom, sizePx) {
         paint: {
             'text-color': cssVar('--map-label'),
             'text-halo-color': cssVar('--map-label-halo'), 'text-halo-width': 1.4,
+        },
+    });
+}
+
+function addRailTiles(map, color) {
+    map.addSource('proto-rail', {
+        type: 'vector', tiles: [`${location.origin}/prototype-tiles/{z}/{x}/{y}.pbf`], minzoom: 4, maxzoom: 12,
+    });
+    // Planetiler reads one OSM file per run: each country is its own layer in the merged tiles
+    for (const country of ['at', 'hu', 'sk']) map.addLayer({
+        id: `proto-rail-${country}`, type: 'line', source: 'proto-rail', 'source-layer': `rail_${country}`,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+            'line-color': color,
+            'line-width': ['interpolate', ['exponential', 1.4], ['zoom'],
+                4, ['match', ['get', 'rank'], 'main', 0.7, 0.4],
+                8, ['match', ['get', 'rank'], 'main', 1.6, 'branch', 1.1, 0.7],
+                12, ['match', ['get', 'rank'], 'main', 3, 'branch', 2.2, 1.4],
+                16, 4],
         },
     });
 }
