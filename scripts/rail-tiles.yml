@@ -3,9 +3,10 @@
 # the extract as --osm_path.
 schema_name: RailRadius rail
 schema_description: OSM running track only, generalised by importance
-# MapLibre overzooms z12 for closer views; nothing is drawn below z4
+# MapLibre overzooms z12 for closer views. Main lines start at z3: the first view of all of Europe can fit just
+# below z4, and a source shows nothing below its minzoom
 args:
-  minzoom: 4
+  minzoom: 3
   maxzoom: 12
 attribution: <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>
 sources:
@@ -25,7 +26,7 @@ layers:
       - source: osm
         geometry: line
         min_size: 0
-        min_zoom: 4
+        min_zoom: 3
         include_when:
           __all__:
             - railway: rail
