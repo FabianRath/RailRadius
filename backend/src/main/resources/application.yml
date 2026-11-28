@@ -4,12 +4,13 @@ server:
   # proxy set "native" (RAILRADIUS_FORWARD_HEADERS_STRATEGY), or every visitor shares the proxy's budget. Never set it
   # without a proxy that overwrites X-Forwarded-For: clients could then pick any IP
   forward-headers-strategy: ${RAILRADIUS_FORWARD_HEADERS_STRATEGY:none}
-  # The browser engine's search.wasm (#12) goes out gzipped: 0.30 instead of 0.86 MB. Only that type, so nothing
-  # else changes; the browser data file is gzipped already. The rail tiles (#93) are written uncompressed and shrink
-  # to about a third
+  # The browser engine's search.wasm (#12) goes out gzipped: 0.30 instead of 0.86 MB; the browser data file is gzipped
+  # already. The rail tiles (#93) are written uncompressed and shrink to about a third, and JSON such as the station
+  # labels (#108) to about a quarter (dev data: 72 instead of 277 KB). The SSE stream (text/event-stream) stays
+  # uncompressed, so each round reaches the browser at once
   compression:
     enabled: true
-    mime-types: application/wasm,application/vnd.mapbox-vector-tile
+    mime-types: application/wasm,application/vnd.mapbox-vector-tile,application/json
 
 spring:
   application:
