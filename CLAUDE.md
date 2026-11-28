@@ -14,7 +14,7 @@ Details: `docs/ARCHITECTURE.md`. Read it only when the task needs more than this
 - `frontend/`: `index.html` (markup), `css/app.css`, `js/*.js` (one ES module per concern, entry `main.js`), `test/` (tests of the DOM-free modules). See guidelines §8.
 - Backlog and known bugs: GitHub Issues, read and written with `gh` (guidelines §9)
 - `docs/decisions.md` (why things are the way they are), `docs/HOSTING.md` (server size, memory measurements)
-- `scripts/api.sh`: curl shortcuts (`scripts/api.sh help`); `scripts/bench.sh`: memory and speed baselines, of the server and of the browser engine in Node, and the full-data check of `perf` (`docs/HOSTING.md`); `scripts/probe.sh`: abuse probe (hostile requests, expected statuses); `scripts/rail-tiles.sh`: builds the rail-only basemap tiles of the dev area into `backend/data/rail-tiles/` (Planetiler, schema `scripts/rail-tiles.yml`, ~1 min once the extracts are downloaded)
+- `scripts/api.sh`: curl shortcuts (`scripts/api.sh help`); `scripts/bench.sh`: memory and speed baselines, of the server and of the browser engine in Node, and the full-data check of `perf` (`docs/HOSTING.md`); `scripts/probe.sh`: abuse probe (hostile requests, expected statuses); `scripts/rail-tiles.sh`: builds the rail-only basemap tiles of the dev area into `backend/data/rail-tiles/` (Planetiler, schema `scripts/rail-tiles.yml`, ~1 min once the extracts are downloaded); `scripts/rail-tracks.sh`: builds the track network journeys are routed on from the same extracts into `backend/data/rail-tracks.bin` (~40 s, read at the backend's start)
 
 ## Environment: Windows first, also Linux cloud sessions
 - Dev machine is Windows 10. Claude's Bash tool is Git Bash; the user's own terminal is PowerShell 5.1.

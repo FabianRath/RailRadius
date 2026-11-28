@@ -61,6 +61,13 @@ railradius:
     # map keeps OpenFreeMap's rail layers, which start at z8
     directory: data/rail-tiles
 
+  tracks:
+    # The track network that scripts/rail-tracks.sh builds (#110), read at start. Journeys' TRAIN legs follow its
+    # tracks (JourneyLeg.track); without the file they keep straight lines between the stops
+    file: data/rail-tracks.bin
+    # Stop pairs whose line along the tracks is kept, so a journey clicked again isn't routed again
+    cache-size: 20000
+
   feeds:
     # Update center: a feed whose last service day, or the last day of one of its main rail operators, is at most
     # this many days away counts as expiring

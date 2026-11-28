@@ -1,8 +1,9 @@
 // The selected station's journey, in its own column beside the map so it never covers the route drawn on it (F22).
 import { countryBadgeHtml, escapeHtml, fmtChanges, fmtGtfsClock } from './util.js';
 import { icon } from './icons.js';
-import { clearJourney, MAX_TRANSFER_LEVEL, resizeMap, showJourney } from './map.js';
+import { clearJourney, hasCoordinates, MAX_TRANSFER_LEVEL, resizeMap, showJourney } from './map.js';
 import { journeyRoute } from './journey.js';
+import { getStation } from './reachability.js';
 
 const panel = document.getElementById('stationDetails');
 const body = document.getElementById('stationDetailsBody');
@@ -21,8 +22,15 @@ export function showStationDetails(station) {
     body.scrollTop = 0;
     panel.hidden = false;
     closeButton.focus();
-    showJourney(journeyRoute(station));
+    showJourney(journeyRoute(station, stopCoordinates));
     resizeMap();
+}
+
+/** Every stop on the way is a reachable station itself, so its coordinates come from the results. */
+function stopCoordinates(stopId) {
+    const station = getStation(stopId);
+    return station && hasCoordinates(station.latitude, station.longitude)
+        ? [station.longitude, station.latitude] : null;
 }
 
 export function closeStationDetails() {

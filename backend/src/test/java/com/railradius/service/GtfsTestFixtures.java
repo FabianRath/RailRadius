@@ -42,6 +42,8 @@ final class GtfsTestFixtures {
     static final LocalDate TODAY = LocalDate.of(2026, 1, 1);
     // Tests that are not about the rate limit search as this client, with a budget no test can use up
     static final SearchAdmission.Client VISITOR = new SearchAdmission.Client("192.0.2.1", false);
+    // Journeys with legs as they are: no track network (#110)
+    static final TrackLines NO_TRACK_LINES = new TrackLines((TrackNetwork) null, 1);
     private static final int UNLIMITED_SEARCH_BUDGET = 1_000_000;
     // Short, so tests that wait for a queued or joining search to check its client do not wait long
     private static final Duration WAIT_CHECK = Duration.ofMillis(50);
@@ -205,7 +207,8 @@ final class GtfsTestFixtures {
     static ReachabilityService reachabilityService(TransitGraph graph, ReachabilityCache cache,
                                                    SearchAdmission admission) {
         return new ReachabilityService(cache, admission, new ReachabilityWarmer(cache, admission),
-                new JourneyLegBuilder(), new SearchRequestValidator(graph), graph, new SearchCounts(graph),
+                new JourneyLegBuilder(), NO_TRACK_LINES, new SearchRequestValidator(graph), graph,
+                new SearchCounts(graph),
                 Thread::startVirtualThread);
     }
 

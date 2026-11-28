@@ -43,7 +43,8 @@ class RideListJourneysTest {
         BrowserDataStore browserData = GtfsTestFixtures.browserDataStore(tempDir, graph);
         browserData.buildServed();
         return new Fixture(graph, browserData,
-                new RideListJourneys(browserData, rateLimiter, new JourneyLegBuilder(), graph));
+                new RideListJourneys(browserData, rateLimiter, new JourneyLegBuilder(),
+                        GtfsTestFixtures.NO_TRACK_LINES, graph));
     }
 
     private Fixture fixture(String... feeds) throws IOException {

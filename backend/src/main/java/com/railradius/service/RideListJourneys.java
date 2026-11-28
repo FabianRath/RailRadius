@@ -22,6 +22,7 @@ public class RideListJourneys {
     private final BrowserDataStore browserDataStore;
     private final SearchRateLimiter rateLimiter;
     private final JourneyLegBuilder legBuilder;
+    private final TrackLines trackLines;
     // Only for its clock: which days are past
     private final TransitGraph graph;
 
@@ -49,7 +50,8 @@ public class RideListJourneys {
         CompactResult.RideList rideList = CompactResult.rideList(store, rides, graph);
         String targetId = store.stations().id(store.station(rides.getLast().alightEvent()));
         return legBuilder.toReachableStation(served, targetId,
-                CompactResult.journey(store, startId, rideList, durationMinutes));
+                CompactResult.journey(store, startId, rideList, durationMinutes))
+                .map(station -> trackLines.addTo(station, served::station));
     }
 
     /** The ride, if its trip runs from its board event to its later alight event. */
