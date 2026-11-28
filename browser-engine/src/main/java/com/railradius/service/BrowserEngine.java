@@ -88,12 +88,7 @@ public final class BrowserEngine {
     @JSExport
     public static String stationLabels() {
         requireGraph();
-        List<BrowserJson.StationLabel> labels = graph.getAllStations().values().stream()
-                .filter(station -> station.getLatitude() != null && station.getLongitude() != null)
-                .map(station -> new BrowserJson.StationLabel(station.getName(), station.getLatitude(),
-                        station.getLongitude(), graph.nextStationCount(station.getId())))
-                .toList();
-        return BrowserJson.stationLabels(labels);
+        return BrowserJson.stationLabels(StationLabels.of(graph));
     }
 
     /**
