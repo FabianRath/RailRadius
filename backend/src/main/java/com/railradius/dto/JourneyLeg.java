@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -27,4 +29,7 @@ public class JourneyLeg {
     private String arrivalTime;
     private String duration;
     private Integer durationMinutes;
+    // TRAIN legs, when the server has a track network (#110): per pair of consecutive stops its line along the
+    // tracks as [lon, lat] points, null for a pair the tracks don't join. Null without a network
+    private List<float[][]> track;
 }

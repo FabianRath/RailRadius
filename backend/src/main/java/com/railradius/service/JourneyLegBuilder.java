@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 @Component
 public class JourneyLegBuilder {
 
-    private static final String LEG_TRAIN = "TRAIN";
+    static final String LEG_TRAIN = "TRAIN";
     private static final String LEG_TRANSFER = "TRANSFER";
     // Rounding in the feeds can put a few seconds between arriving and departing on the same train
     private static final int SAME_RIDE_MAX_GAP_MINUTES = 1;

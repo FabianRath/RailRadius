@@ -34,6 +34,7 @@ public class ReachabilityService {
     private final SearchAdmission admission;
     private final ReachabilityWarmer warmer;
     private final JourneyLegBuilder legBuilder;
+    private final TrackLines trackLines;
     private final SearchRequestValidator validator;
     private final TransitGraph graph;
     private final SearchCounts searchCounts;
@@ -44,13 +45,14 @@ public class ReachabilityService {
 
     // With @EnableScheduling the task scheduler is an Executor too; rounds are sent on the task executor
     public ReachabilityService(ReachabilityCache cache, SearchAdmission admission, ReachabilityWarmer warmer,
-                               JourneyLegBuilder legBuilder, SearchRequestValidator validator, TransitGraph graph,
-                               SearchCounts searchCounts,
+                               JourneyLegBuilder legBuilder, TrackLines trackLines, SearchRequestValidator validator,
+                               TransitGraph graph, SearchCounts searchCounts,
                                @Qualifier("applicationTaskExecutor") Executor roundSender) {
         this.cache = cache;
         this.admission = admission;
         this.warmer = warmer;
         this.legBuilder = legBuilder;
+        this.trackLines = trackLines;
         this.validator = validator;
         this.graph = graph;
         this.searchCounts = searchCounts;
@@ -68,7 +70,8 @@ public class ReachabilityService {
         if (targetId.equals(search.options().startId())) return Optional.empty();
         CompactResult result = admission.admit(client, search.options(), SearchAdmission.SearchListener.NONE);
         return ShownStations.fewestTransfersWithin(result.paths(targetId), search.maxJourneyMinutes())
-                .flatMap(path -> legBuilder.toReachableStation(result, targetId, path.transfers()));
+                .flatMap(path -> legBuilder.toReachableStation(result, targetId, path.transfers()))
+                .map(station -> trackLines.addTo(station, result.served()::station));
     }
 
     /**

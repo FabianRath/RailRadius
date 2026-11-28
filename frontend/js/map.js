@@ -14,6 +14,9 @@ const RAILWAY_MIN_ZOOM = 8;
 const POPUP_MAX_WIDTH = '360px';
 const JOURNEY_LINE_WIDTH_PX = 5;
 const JOURNEY_CASING_WIDTH_PX = 9;
+const JOURNEY_UNMATCHED_WIDTH_PX = 3;
+// Dash and gap, in line widths
+const JOURNEY_UNMATCHED_DASH = [2, 2];
 // Every station's kernel this wide; above the density threshold the kernels of nearby stations join into one area
 const AREA_RADIUS_PX = 30;
 const AREA_DENSITY_THRESHOLD = 0.05;
@@ -169,12 +172,17 @@ function addDataLayers() {
 
     // Below the stations, so the stops of the journey stay clickable on top of its lines
     map.addSource('journey', { type: 'geojson', data: EMPTY_COLLECTION });
-    map.addLayer({ id: 'journey-casing', type: 'line', source: 'journey',
+    // A stop pair the tracks don't join (#110) is dashed and has no casing, so it doesn't pass for track
+    const onTrack = ['!', ['get', 'unmatched']];
+    map.addLayer({ id: 'journey-casing', type: 'line', source: 'journey', filter: onTrack,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-width': JOURNEY_CASING_WIDTH_PX } });
-    map.addLayer({ id: 'journey-lines', type: 'line', source: 'journey',
+    map.addLayer({ id: 'journey-lines', type: 'line', source: 'journey', filter: onTrack,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-width': JOURNEY_LINE_WIDTH_PX } });
+    map.addLayer({ id: 'journey-unmatched', type: 'line', source: 'journey', filter: ['get', 'unmatched'],
+        layout: { 'line-join': 'round' },
+        paint: { 'line-width': JOURNEY_UNMATCHED_WIDTH_PX, 'line-dasharray': JOURNEY_UNMATCHED_DASH } });
 
     // Under the dots and beside them, so a name never hides a dot. The hubs' tier last: the layer on top is placed
     // first, so its names win collisions with the tiers below
@@ -201,7 +209,7 @@ function applyDataColors() {
     const colorByLevel = colorByLevelExpression();
     const stroke = cssVar('--marker-stroke');
     setPaint(['journey-casing'], 'line-color', stroke);
-    setPaint(['journey-lines'], 'line-color', colorByLevel);
+    setPaint(['journey-lines', 'journey-unmatched'], 'line-color', colorByLevel);
     setPaint([LAYERS.reachable], 'circle-color', colorByLevel);
     setPaint([LAYERS.reachable], 'circle-stroke-color', stroke);
     for (let level = 0; level <= MAX_TRANSFER_LEVEL; level++) {
@@ -310,10 +318,14 @@ function scheduleReachableRender() {
     });
 }
 
-/** Draws the lines ([lon, lat] coordinates and a level for the colour) and hides every station not in stopIds. */
+/**
+ * Draws the lines ([lon, lat] coordinates, a level for the colour, unmatched for a stop pair off the tracks) and hides
+ * every station not in stopIds.
+ */
 export function showJourney({ stopIds, lines }) {
     const features = lines.map(line => ({ type: 'Feature',
-        geometry: { type: 'LineString', coordinates: line.coordinates }, properties: { level: line.level } }));
+        geometry: { type: 'LineString', coordinates: line.coordinates },
+        properties: { level: line.level, unmatched: line.unmatched } }));
     map.getSource('journey').setData({ type: 'FeatureCollection', features });
     map.setFilter(LAYERS.reachable, ['in', ['get', 'stopId'], ['literal', stopIds]]);
 }
