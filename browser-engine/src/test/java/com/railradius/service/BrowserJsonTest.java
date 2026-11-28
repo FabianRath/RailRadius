@@ -1,6 +1,7 @@
 package com.railradius.service;
 
 import com.railradius.dto.ReachableStationSummary;
+import com.railradius.dto.StationLabel;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -38,7 +39,7 @@ class BrowserJsonTest {
 
     @Test
     void stationLabelsCarryNameCoordinatesAndImportance() {
-        BrowserJson.StationLabel wien = new BrowserJson.StationLabel("Wien \"Hbf\"", 48.185, 16.375, 42);
+        StationLabel wien = new StationLabel("Wien \"Hbf\"", 48.185, 16.375, 42);
         assertThat(BrowserJson.stationLabels(List.of(wien)))
                 .isEqualTo("[{\"name\":\"Wien \\\"Hbf\\\"\",\"latitude\":48.185,\"longitude\":16.375,"
                         + "\"importance\":42}]");

@@ -1,6 +1,7 @@
 package com.railradius.service;
 
 import com.railradius.dto.ReachableStationSummary;
+import com.railradius.dto.StationLabel;
 
 import java.util.List;
 
@@ -17,10 +18,6 @@ final class BrowserJson {
     private static final int SUMMARY_CHARS = 240;
     private static final int RIDE_CHARS = 60;
     private static final int LABEL_CHARS = 80;
-
-    /** A station the map names, ranked by importance. */
-    record StationLabel(String name, double latitude, double longitude, int importance) {
-    }
 
     private BrowserJson() {
     }
@@ -57,10 +54,10 @@ final class BrowserJson {
         StringBuilder json = new StringBuilder(labels.size() * LABEL_CHARS).append('[');
         for (StationLabel label : labels) {
             if (json.length() > 1) json.append(',');
-            text(json.append("{\"name\":"), label.name());
-            json.append(",\"latitude\":").append(label.latitude())
-                    .append(",\"longitude\":").append(label.longitude())
-                    .append(",\"importance\":").append(label.importance()).append('}');
+            text(json.append("{\"name\":"), label.getName());
+            json.append(",\"latitude\":").append(label.getLatitude())
+                    .append(",\"longitude\":").append(label.getLongitude())
+                    .append(",\"importance\":").append(label.getImportance()).append('}');
         }
         return json.append(']').toString();
     }

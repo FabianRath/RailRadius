@@ -78,6 +78,11 @@ export async function fetchRailTiles() {
     }
 }
 
+/** The stations the map names ({ name, latitude, longitude, importance }), for a browser without the engine (#108). */
+export function fetchStationLabels() {
+    return requestJson('/api/station-labels');
+}
+
 /** One reachable station with its journey; params are the stream's plus targetId. */
 export function fetchJourney(params) {
     return requestJson(`/api/reachability/journey?${new URLSearchParams(params)}`);

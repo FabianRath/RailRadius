@@ -1,6 +1,6 @@
 // Searching in the browser (#12): owns the engine's worker (js/engine-worker.js) and the data version it has loaded.
 // Every failure leaves the search to the server: the caller catches it and streams instead.
-import { countBrowserSearch, fetchBrowserData, fetchRideJourney } from './api.js';
+import { countBrowserSearch, fetchBrowserData, fetchRideJourney, fetchStationLabels } from './api.js';
 import {
     ENGINE_SEARCH_TIMEOUT_MS, engineWaitMs, matchesServer, mayRunEngine, maxJourneyMinutesOf, timeLimited
 } from './engine-rules.js';
@@ -17,8 +17,9 @@ let loadStartedMs = null;
 // After an engine failure this visit searches on the server only
 let failed = false;
 let nextRequestId = 1;
-// Gets the stations the map names, once per loaded data file (#96)
+// Gets the stations the map names, once per loaded data file (#96), or from the server without an engine (#108)
 let onStationLabels = () => {};
+let labelsShown = false;
 // Requests sent to the worker and not answered yet: id -> { resolve, reject, onStations }
 const pending = new Map();
 
@@ -28,10 +29,17 @@ const pending = new Map();
  * each search the server answered, which retries a load that failed (e.g. while the server built its file).
  */
 export function startBrowserEngine() {
-    if (failed || loading || loaded || !mayRunEngine(thisBrowser())) return;
+    if (!mayRunEngine(thisBrowser())) {
+        showServerStationLabels();
+        return;
+    }
+    if (failed || loading || loaded) return;
     loadStartedMs = Date.now();
     loading = loadData()
-        .catch(error => console.warn('The browser engine did not load, searching on the server:', error))
+        .catch(error => {
+            console.warn('The browser engine did not load, searching on the server:', error);
+            showServerStationLabels();
+        })
         .finally(() => {
             loading = null;
         });
@@ -122,6 +130,7 @@ async function loadData() {
     rememberLoadedVersion(server.version);
     console.log('Searches now run in the browser, data version', server.version);
     onStationLabels(await callEngine({ type: 'stationLabels' }, undefined, ENGINE_SEARCH_TIMEOUT_MS));
+    labelsShown = true;
 }
 
 async function checkMatchesServer() {
@@ -205,6 +214,17 @@ function giveUp(error) {
     failed = true;
     loaded = null;
     stopWorker();
+    showServerStationLabels();
+}
+
+/** The names the engine would give, from the server, when it doesn't run or failed before giving them (#108). */
+function showServerStationLabels() {
+    if (labelsShown) return;
+    labelsShown = true;
+    fetchStationLabels().then(onStationLabels).catch(error => {
+        labelsShown = false;
+        console.warn('The map shows no station names:', error);
+    });
 }
 
 function stopWorker() {

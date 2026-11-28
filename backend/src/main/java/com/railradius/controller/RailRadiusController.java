@@ -5,6 +5,7 @@ import com.railradius.dto.BrowserDataInfo;
 import com.railradius.dto.Coverage;
 import com.railradius.dto.ReachableStation;
 import com.railradius.dto.RideListJourneyRequest;
+import com.railradius.dto.StationLabel;
 import com.railradius.model.Station;
 import com.railradius.service.BrowserDataManifest;
 import com.railradius.service.CoverageService;
@@ -13,6 +14,7 @@ import com.railradius.service.RideListJourneys;
 import com.railradius.service.SearchAdmission;
 import com.railradius.service.SearchCounts;
 import com.railradius.service.SearchRequestValidator.SearchRequest;
+import com.railradius.service.StationLabels;
 import com.railradius.service.StationSearchIndex;
 import com.railradius.service.TransitGraph;
 import jakarta.servlet.http.HttpServletRequest;
@@ -192,6 +194,12 @@ public class RailRadiusController {
         return ResponseEntity.ok(transitGraph.getStats());
     }
     
+    /** The stations the map names, for browsers whose engine doesn't run or failed (#108). */
+    @GetMapping("/station-labels")
+    public List<StationLabel> stationLabels() {
+        return StationLabels.of(transitGraph);
+    }
+
     @GetMapping("/coverage")
     public Coverage coverage() {
         return coverageService.coverage();
